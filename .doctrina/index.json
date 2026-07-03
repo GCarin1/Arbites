@@ -59,9 +59,9 @@
         "id": "indexing",
         "path": ".doctrina/specs/indexing/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-03",
-        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "implementation": "partial — M0 entrega parsers/reindex/warnings; scan Gherkin de targets fica para o M3 (spec local-automation)",
         "realizes": [
           "SC1",
           "SC8"
@@ -93,9 +93,9 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-03",
-        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC1"
         ]
@@ -104,9 +104,9 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-03",
-        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
         ]
@@ -115,9 +115,9 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-03",
-        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
           "SC1"
         ]
@@ -206,8 +206,42 @@
         "date": "2026-07-03"
       }
     ],
-    "changes": [],
-    "changes_archive": [],
+    "changes": [
+      {
+        "id": "0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "title": "M1 - execucao manual: executions, kanban de resultados, steps marcaveis, evidencias com hash, historico, defeitos minimos, fechamento",
+        "path": ".doctrina/changes/0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "status": "proposed",
+        "opened": "2026-07-03"
+      }
+    ],
+    "changes_archive": [
+      {
+        "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
+        "title": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
+        "path": ".doctrina/changes/archive/2026-07-03-0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
+        "status": "applied",
+        "applied": "2026-07-03",
+        "specs_affected": [
+          {
+            "capability": "indexing",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      }
+    ],
     "skills": [],
     "contracts": [
       {

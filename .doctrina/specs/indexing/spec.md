@@ -2,10 +2,10 @@
 
 **Capability:** indexing
 **Status:** active
-**Implementation:** planned — bootstrap pré-código; entra no walking skeleton (M0)
+**Implementation:** partial — M0 entrega parsers/reindex/warnings; scan Gherkin de targets fica para o M3 (spec local-automation)
 **Realizes:** SC1, SC8
 **Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -70,14 +70,15 @@ e o mapa de cenários automatizados `@CT-XXXX → (feature, cenário, linha)`.
 
 ## Acceptance criteria
 
-1. [unverified] Editar um CT em editor externo reflete na API/UI em
-   segundos sem ação manual — verified by `tests/test_indexing.py`.
-2. [unverified] Reindex de workspace com 2.000 CTs conclui em < 5 s —
-   verified by `tests/test_indexing_perf.py`.
-3. [unverified] ID duplicado gera conflito listado em `/warnings` —
-   verified by `tests/test_indexing.py`.
+1. [verified] Editar um CT em editor externo reflete na API/UI em
+   segundos sem ação manual — verified by `backend/tests/test_indexing.py`.
+2. [verified] Reindex de workspace com 2.000 CTs conclui em < 5 s —
+   verified by `backend/tests/test_indexing_perf.py`.
+3. [verified] ID duplicado gera conflito listado em `/warnings` —
+   verified by `backend/tests/test_indexing.py`.
 4. [unverified] Feature em `# language: pt` é parseada e mapeada por tag
-   `@CT-XXXX` — verified by `tests/test_gherkin.py`.
+   `@CT-XXXX` — deferido ao M3; verified by `backend/tests/test_gherkin.py`
+   (a criar).
 
 ## Maturity
 

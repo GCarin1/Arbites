@@ -1,0 +1,306 @@
+"""Indexer — SQLite descartável reconstruído do filesystem (ADR 0001).
+
+`reindex_full` varre o workspace inteiro; `reindex_file` reparseia um único
+arquivo (usado pelo watcher). Apagar o banco nunca perde dados.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import sqlite3
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from pathlib import Path
+
+from .parser import ParsedDoc, check_testcase_headings, parse_markdown, parse_text
+from .workspace import Workspace
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS requirements(
+  id TEXT PRIMARY KEY, kind TEXT, title TEXT, epic_id TEXT, status TEXT,
+  external_key TEXT, confluence_url TEXT, tags TEXT, path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS testcases(
+  id TEXT PRIMARY KEY, title TEXT, type TEXT, priority TEXT, status TEXT,
+  story_id TEXT, path TEXT, mtime REAL,
+  automation_target TEXT, scenario_tag TEXT);
+CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
+CREATE TABLE IF NOT EXISTS scenarios(
+  target TEXT, tag TEXT PRIMARY KEY, feature_path TEXT,
+  scenario_name TEXT, line INTEGER, language TEXT);
+CREATE TABLE IF NOT EXISTS executions(
+  id TEXT PRIMARY KEY, name TEXT, owner TEXT, sprint TEXT, environment TEXT,
+  origin TEXT, status TEXT, created_at TEXT, closed_at TEXT, path TEXT);
+CREATE TABLE IF NOT EXISTS results(
+  execution_id TEXT, testcase_id TEXT, status TEXT, executed_at TEXT,
+  duration_seconds REAL, PRIMARY KEY(execution_id, testcase_id));
+CREATE TABLE IF NOT EXISTS evidences(
+  execution_id TEXT, testcase_id TEXT, path TEXT, sha256 TEXT,
+  mime TEXT, captured_at TEXT);
+CREATE TABLE IF NOT EXISTS defects(
+  id TEXT PRIMARY KEY, title TEXT, status TEXT, severity TEXT,
+  testcase_id TEXT, execution_id TEXT, external_key TEXT, path TEXT);
+CREATE TABLE IF NOT EXISTS warnings(
+  source_path TEXT, code TEXT, message TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS index_meta(key TEXT PRIMARY KEY, value TEXT);
+"""
+
+_ID_RE = re.compile(r"^([A-Z]+)-(\d+)$")
+
+
+def connect(ws: Workspace) -> sqlite3.Connection:
+    ws.arbites_dir.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(ws.index_db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA)
+    return conn
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _add_warning(conn: sqlite3.Connection, path: str, code: str, message: str) -> None:
+    conn.execute(
+        "INSERT INTO warnings(source_path, code, message, created_at) VALUES (?,?,?,?)",
+        (path, code, message, _now()),
+    )
+
+
+def _tags(doc: ParsedDoc) -> list[str]:
+    raw = doc.meta.get("tags") or []
+    if isinstance(raw, str):
+        raw = [raw]
+    return [str(t) for t in raw]
+
+
+def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
+    """Varre o workspace inteiro e reconstrói o índice. Meta: < 5 s p/ 2.000 CTs."""
+    started = time.perf_counter()
+    conn.execute("DELETE FROM requirements")
+    conn.execute("DELETE FROM testcases")
+    conn.execute("DELETE FROM tc_tags")
+    conn.execute("DELETE FROM defects")
+    conn.execute("DELETE FROM warnings")
+
+    seen_ids: dict[str, str] = {}  # id -> relpath (detecção de duplicidade)
+    max_by_prefix: dict[str, int] = {}
+
+    def track_id(doc: ParsedDoc, rel: str) -> bool:
+        """Registra o ID; retorna False (conflito) se duplicado."""
+        if doc.id is None:
+            return False
+        m = _ID_RE.match(doc.id)
+        if m:
+            prefix, num = m.group(1), int(m.group(2))
+            max_by_prefix[prefix] = max(max_by_prefix.get(prefix, 0), num)
+        if doc.id in seen_ids:
+            for p in (seen_ids[doc.id], rel):
+                _add_warning(
+                    conn, p, "duplicate_id",
+                    f"ID {doc.id} duplicado em {seen_ids[doc.id]} e {rel} — conflito",
+                )
+            return False
+        seen_ids[doc.id] = rel
+        return True
+
+    # leitura em paralelo: no Windows o open() por arquivo custa ms (AV);
+    # I/O solta o GIL, então threads cortam o tempo total por ~n workers
+    def read_all(directory: Path) -> list[tuple[Path, str | None, str | None]]:
+        paths = sorted(directory.rglob("*.md"))
+
+        def read_one(p: Path) -> tuple[Path, str | None, str | None]:
+            try:
+                return p, p.read_text(encoding="utf-8-sig"), None
+            except OSError as exc:
+                return p, None, str(exc)
+
+        if not paths:
+            return []
+        with ThreadPoolExecutor(max_workers=min(32, 4 * (os.cpu_count() or 4))) as pool:
+            return list(pool.map(read_one, paths))
+
+    def parse_one(path: Path, text: str | None, error: str | None) -> ParsedDoc:
+        if text is None:
+            doc = ParsedDoc(path=path)
+            doc.warnings.append(("unreadable", f"{path.name}: {error}"))
+            return doc
+        return parse_text(path, text)
+
+    for path, text, error in read_all(ws.root / "requirements"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_requirement(conn, doc, rel)
+
+    for path, text, error in read_all(ws.root / "testcases"):
+        doc = parse_one(path, text, error)
+        check_testcase_headings(doc)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_testcase(conn, doc, rel)
+
+    for path, text, error in read_all(ws.root / "defects"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_defect(conn, doc, rel)
+
+    _relational_checks(conn)
+
+    for prefix, seen_max in max_by_prefix.items():
+        ws.bump_counter_to(prefix, seen_max)
+
+    duration = time.perf_counter() - started
+    conn.execute(
+        "INSERT OR REPLACE INTO index_meta(key, value) VALUES ('last_reindex', ?)",
+        (_now(),),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO index_meta(key, value) VALUES ('last_reindex_seconds', ?)",
+        (f"{duration:.3f}",),
+    )
+    conn.commit()
+    return {
+        "duration_seconds": round(duration, 3),
+        "requirements": conn.execute("SELECT COUNT(*) c FROM requirements").fetchone()["c"],
+        "testcases": conn.execute("SELECT COUNT(*) c FROM testcases").fetchone()["c"],
+        "defects": conn.execute("SELECT COUNT(*) c FROM defects").fetchone()["c"],
+        "warnings": conn.execute("SELECT COUNT(*) c FROM warnings").fetchone()["c"],
+    }
+
+
+def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
+    """Incremental: reparseia um único arquivo (edição externa → UI em segundos)."""
+    rel = ws.relpath(path)
+    conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
+    for table in ("requirements", "testcases", "defects"):
+        for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
+            if table == "testcases":
+                conn.execute("DELETE FROM tc_tags WHERE testcase_id = ?", (row["id"],))
+        conn.execute(f"DELETE FROM {table} WHERE path = ?", (rel,))
+
+    if path.exists():
+        doc = parse_markdown(path)
+        top = rel.split("/", 1)[0]
+        if top == "testcases":
+            check_testcase_headings(doc)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id:
+            existing = _find_id(conn, doc.id)
+            if existing and existing != rel:
+                for p in (existing, rel):
+                    _add_warning(
+                        conn, p, "duplicate_id",
+                        f"ID {doc.id} duplicado em {existing} e {rel} — conflito",
+                    )
+            elif top == "requirements":
+                _insert_requirement(conn, doc, rel)
+            elif top == "testcases":
+                _insert_testcase(conn, doc, rel)
+            elif top == "defects":
+                _insert_defect(conn, doc, rel)
+            m = _ID_RE.match(doc.id)
+            if m:
+                ws.bump_counter_to(m.group(1), int(m.group(2)))
+    conn.commit()
+
+
+def _find_id(conn: sqlite3.Connection, entity_id: str) -> str | None:
+    for table in ("requirements", "testcases", "defects"):
+        row = conn.execute(f"SELECT path FROM {table} WHERE id = ?", (entity_id,)).fetchone()
+        if row:
+            return row["path"]
+    return None
+
+
+def _flush_doc_warnings(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    for code, message in doc.warnings:
+        _add_warning(conn, rel, code, message)
+
+
+def _insert_requirement(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO requirements"
+        "(id, kind, title, epic_id, status, external_key, confluence_url, tags, path, mtime)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("kind", "")),
+            str(doc.meta.get("title", "")),
+            doc.meta.get("epic"),
+            str(doc.meta.get("status", "active")),
+            doc.meta.get("external_key"),
+            doc.meta.get("confluence_url"),
+            ",".join(_tags(doc)),
+            rel,
+            doc.path.stat().st_mtime,
+        ),
+    )
+
+
+def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    automation = doc.meta.get("automation") or {}
+    conn.execute(
+        "INSERT OR REPLACE INTO testcases"
+        "(id, title, type, priority, status, story_id, path, mtime,"
+        " automation_target, scenario_tag) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("title", "")),
+            str(doc.meta.get("type", "manual")),
+            str(doc.meta.get("priority", "medium")),
+            str(doc.meta.get("status", "draft")),
+            doc.meta.get("story"),
+            rel,
+            doc.path.stat().st_mtime,
+            automation.get("target") if isinstance(automation, dict) else None,
+            automation.get("scenario_tag") if isinstance(automation, dict) else None,
+        ),
+    )
+    for tag in _tags(doc):
+        conn.execute("INSERT INTO tc_tags(testcase_id, tag) VALUES (?,?)", (doc.id, tag))
+
+
+def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO defects"
+        "(id, title, status, severity, testcase_id, execution_id, external_key, path)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("title", "")),
+            str(doc.meta.get("status", "open")),
+            doc.meta.get("severity"),
+            doc.meta.get("testcase"),
+            doc.meta.get("execution"),
+            doc.meta.get("external_key"),
+            rel,
+        ),
+    )
+
+
+def _relational_checks(conn: sqlite3.Connection) -> None:
+    """Integridade entre entidades — sempre warning, nunca bloqueio."""
+    for row in conn.execute(
+        "SELECT r.id, r.epic_id, r.path FROM requirements r"
+        " WHERE r.kind = 'story' AND r.epic_id IS NOT NULL"
+        " AND r.epic_id NOT IN (SELECT id FROM requirements WHERE kind = 'epic')"
+    ).fetchall():
+        _add_warning(
+            conn, row["path"], "missing_epic",
+            f"{row['id']}: epic '{row['epic_id']}' não existe",
+        )
+    for row in conn.execute(
+        "SELECT t.id, t.story_id, t.path FROM testcases t"
+        " WHERE t.story_id IS NOT NULL"
+        " AND t.story_id NOT IN (SELECT id FROM requirements WHERE kind = 'story')"
+    ).fetchall():
+        _add_warning(
+            conn, row["path"], "missing_story",
+            f"{row['id']}: story '{row['story_id']}' não existe",
+        )

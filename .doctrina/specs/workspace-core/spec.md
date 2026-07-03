@@ -2,10 +2,10 @@
 
 **Capability:** workspace-core
 **Status:** active
-**Implementation:** planned — bootstrap pré-código; entra no walking skeleton (M0)
+**Implementation:** verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)
 **Realizes:** SC1
 **Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -66,14 +66,14 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
 
 ## Acceptance criteria
 
-1. [unverified] `GET /workspace` retorna a config do `arbites.yaml` e o
-   status do índice — verified by `tests/test_workspace.py`.
-2. [unverified] Apagar `index.db` e reindexar reconstrói o índice sem
-   perda de dados — verified by `tests/test_workspace.py`.
-3. [unverified] Criar um CT via API consome o contador e grava `.md` com
-   ID no frontmatter — verified by `tests/test_workspace.py`.
-4. [unverified] DELETE move o arquivo para `.arbites/trash/` e ele é
-   removido do índice — verified by `tests/test_workspace.py`.
+1. [verified] `GET /workspace` retorna a config do `arbites.yaml` e o
+   status do índice — verified by `backend/tests/test_workspace.py`.
+2. [verified] Apagar `index.db` e reindexar reconstrói o índice sem
+   perda de dados — verified by `backend/tests/test_workspace.py`.
+3. [verified] Criar um CT via API consome o contador e grava `.md` com
+   ID no frontmatter — verified by `backend/tests/test_workspace.py`.
+4. [verified] DELETE move o arquivo para `.arbites/trash/` e ele é
+   removido do índice — verified by `backend/tests/test_workspace.py`.
 
 ## Maturity
 

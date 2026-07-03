@@ -2,10 +2,10 @@
 
 **Capability:** testcases
 **Status:** active
-**Implementation:** planned — bootstrap pré-código; entra no walking skeleton (M0)
+**Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -67,14 +67,14 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 
 ## Acceptance criteria
 
-1. [unverified] Criar CT pela UI grava `.md` no folder escolhido com
-   frontmatter completo — verified by `tests/test_testcases.py`.
-2. [unverified] Editar o `.md` externamente atualiza a UI sem ação manual
-   — verified by `tests/test_testcases.py`.
-3. [unverified] CT manual sem `## Passos` gera warning, não erro —
-   verified by `tests/test_testcases.py`.
-4. [unverified] `GET /tree` espelha a árvore real de `testcases/` —
-   verified by `tests/test_testcases.py`.
+1. [verified] Criar CT pela UI grava `.md` no folder escolhido com
+   frontmatter completo — verified by `backend/tests/test_testcases.py`.
+2. [verified] Editar o `.md` externamente atualiza a UI sem ação manual
+   — verified by `backend/tests/test_indexing.py`.
+3. [verified] CT manual sem `## Passos` gera warning, não erro —
+   verified by `backend/tests/test_testcases.py`.
+4. [verified] `GET /tree` espelha a árvore real de `testcases/` —
+   verified by `backend/tests/test_testcases.py`.
 
 ## Maturity
 
