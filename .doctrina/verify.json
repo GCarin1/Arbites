@@ -1,0 +1,13 @@
+{
+  "$comment": "Gate executável do Arbites. Backend: pytest no diretório backend/. Frontend: build do Vite em frontend/. Os checks assumem a estrutura do M0; ajuste os caminhos se a estrutura mudar.",
+  "checks": [
+    {
+      "name": "backend-tests",
+      "run": "python -m pytest backend/tests -q"
+    },
+    {
+      "name": "frontend-build",
+      "run": "npm --prefix frontend run build"
+    }
+  ]
+}

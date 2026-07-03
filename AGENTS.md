@@ -56,20 +56,17 @@ Capture lessons: `doctrina skill suggest` surfaces skills worth writing.
 
 ## Stack and tooling
 
-<!-- Replace with the project's actual stack. Keep this section short. -->
-- Runtime:
-- Package manager:
-- Test runner:
-- Linter / formatter:
+- Runtime: Python 3.12+ (FastAPI + Pydantic v2, uvicorn) · Node (React 18 + Vite + TypeScript)
+- Package manager: pip/venv (backend) · npm (frontend)
+- Test runner: pytest (backend)
+- Índice: SQLite (stdlib) · Watcher: watchdog · Parsers: python-frontmatter, markdown-it-py, gherkin
 
 ## Commands
 
-<!-- Use exact, copy-pasteable commands. Avoid prose. -->
 ```
-# install
-# build
-# test
-# lint
+python -m pytest backend/tests -q     # test (backend)
+npm --prefix frontend run build       # build (frontend)
+doctrina verify                       # gate executável (roda os dois)
 ```
 
 ## Repository structure

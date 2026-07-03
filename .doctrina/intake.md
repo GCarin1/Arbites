@@ -1,6 +1,6 @@
 # Intake — Arbites
 
-- **Status:** pending
+- **Status:** converted
 - **Date:** 2026-07-03
 - **Source:** descricao.md
 

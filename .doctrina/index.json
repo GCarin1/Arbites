@@ -4,19 +4,221 @@
   "framework_version": "0.11.0",
   "last_updated": "2026-07-03",
   "artifacts": {
-    "entrypoint": {
-      "path": "AGENTS.md"
-    },
     "product": {
       "path": ".doctrina/product.md",
       "status": "active",
       "version": "0.1.0",
       "last_updated": "2026-07-03"
     },
-    "specs": [],
-    "decisions": [],
+    "specs": [
+      {
+        "id": "ai-assist",
+        "path": ".doctrina/specs/ai-assist/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M5 (IA é opcional por princípio)",
+        "realizes": [
+          "SC7"
+        ]
+      },
+      {
+        "id": "ci-automation",
+        "path": ".doctrina/specs/ci-automation/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M4 (após M3)",
+        "realizes": [
+          "SC6"
+        ]
+      },
+      {
+        "id": "defects",
+        "path": ".doctrina/specs/defects/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M1 (após o walking skeleton M0)",
+        "realizes": [
+          "SC2"
+        ]
+      },
+      {
+        "id": "executions",
+        "path": ".doctrina/specs/executions/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M1 (após o walking skeleton M0)",
+        "realizes": [
+          "SC2"
+        ]
+      },
+      {
+        "id": "indexing",
+        "path": ".doctrina/specs/indexing/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "realizes": [
+          "SC1",
+          "SC8"
+        ]
+      },
+      {
+        "id": "local-automation",
+        "path": ".doctrina/specs/local-automation/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M3 (após M2)",
+        "realizes": [
+          "SC5"
+        ]
+      },
+      {
+        "id": "reporting",
+        "path": ".doctrina/specs/reporting/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M1.5 (após M1)",
+        "realizes": [
+          "SC3"
+        ]
+      },
+      {
+        "id": "requirements",
+        "path": ".doctrina/specs/requirements/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "realizes": [
+          "SC1"
+        ]
+      },
+      {
+        "id": "testcases",
+        "path": ".doctrina/specs/testcases/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "realizes": [
+          "SC1"
+        ]
+      },
+      {
+        "id": "workspace-core",
+        "path": ".doctrina/specs/workspace-core/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — bootstrap pré-código; entra no walking skeleton (M0)",
+        "realizes": [
+          "SC1"
+        ]
+      },
+      {
+        "id": "xray-migration",
+        "path": ".doctrina/specs/xray-migration/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-03",
+        "implementation": "planned — deferido ao M2 (janela de migração antes do descomissionamento do Xray)",
+        "realizes": [
+          "SC4"
+        ]
+      }
+    ],
+    "decisions": [
+      {
+        "id": "0001",
+        "path": ".doctrina/decisions/0001-filesystem-como-fonte-de-verdade-sqlite-como-indice-descartavel.md",
+        "title": "Filesystem como fonte de verdade, SQLite como indice descartavel",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0002",
+        "path": ".doctrina/decisions/0002-id-no-frontmatter-nome-de-arquivo-livre.md",
+        "title": "ID no frontmatter, nome de arquivo livre",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0003",
+        "path": ".doctrina/decisions/0003-vinculo-ct-cenario-por-tag-ct-xxxx.md",
+        "title": "Vinculo CT-cenario por tag @CT-XXXX",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0004",
+        "path": ".doctrina/decisions/0004-execucao-local-via-subprocess-direto-na-v1.md",
+        "title": "Execucao local via subprocess direto na v1",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0005",
+        "path": ".doctrina/decisions/0005-status-de-documento-separado-de-status-de-resultado.md",
+        "title": "Status de documento separado de status de resultado",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0006",
+        "path": ".doctrina/decisions/0006-coleta-ci-por-artifact-cucumber-json.md",
+        "title": "Coleta CI por artifact Cucumber JSON",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0007",
+        "path": ".doctrina/decisions/0007-jira-fora-de-escopo-xray-como-migracao-pontual.md",
+        "title": "Jira fora de escopo, Xray como migracao pontual",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0008",
+        "path": ".doctrina/decisions/0008-pat-github-no-keyring-do-os.md",
+        "title": "PAT GitHub no keyring do OS",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0009",
+        "path": ".doctrina/decisions/0009-frontend-react-spa.md",
+        "title": "Frontend React SPA",
+        "status": "accepted",
+        "date": "2026-07-03"
+      },
+      {
+        "id": "0010",
+        "path": ".doctrina/decisions/0010-sprint-e-ambiente-como-texto-livre-na-v1.md",
+        "title": "Sprint e ambiente como texto livre na v1",
+        "status": "accepted",
+        "date": "2026-07-03"
+      }
+    ],
     "changes": [],
     "changes_archive": [],
-    "skills": []
+    "skills": [],
+    "contracts": [
+      {
+        "id": "http-api",
+        "path": ".doctrina/contracts/http-api.md",
+        "status": "active",
+        "last_updated": "2026-07-03"
+      }
+    ],
+    "entrypoint": {
+      "path": "AGENTS.md"
+    }
   }
 }
