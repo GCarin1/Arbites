@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-03
-**Version:** 0.2.0
+**Last updated:** 2026-07-04
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -39,6 +39,9 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   para edição direta do arquivo.
 - The system shall exigir `story` no frontmatter para o CT entrar na
   matriz de cobertura.
+- The system shall aceitar `external_key` opcional no frontmatter do CT
+  (chave no sistema externo de origem) e indexá-la para detecção de
+  duplicidade na migração (spec `xray-migration`).
 
 ### Event-driven
 

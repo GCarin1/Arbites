@@ -1,4 +1,18 @@
-import type { Requirement, TestCase, TreeNode, Warning, WorkspaceInfo } from "./types";
+import type {
+  Defect,
+  EvidenceEntry,
+  Execution,
+  ExecutionSummary,
+  FlakyReport,
+  MetricsSummary,
+  Requirement,
+  TestCase,
+  TraceabilityMatrix,
+  TreeNode,
+  TrendPoint,
+  Warning,
+  WorkspaceInfo,
+} from "./types";
 
 const BASE = "/api/v1";
 
@@ -55,4 +69,67 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ content }),
     }),
+
+  executions: () => request<ExecutionSummary[]>("/executions"),
+  execution: (id: string) => request<Execution>(`/executions/${id}`),
+  createExecution: (body: object) =>
+    request<Execution>("/executions", { method: "POST", body: JSON.stringify(body) }),
+  resultStatus: (execId: string, ctId: string, body: object) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/status`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  stepStatus: (execId: string, ctId: string, step: number, status: string) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/steps/${step}`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
+  uploadEvidence: async (
+    execId: string,
+    ctId: string,
+    file: File,
+    note: string,
+  ): Promise<EvidenceEntry> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (note) form.append("note", note);
+    const resp = await fetch(`${BASE}/executions/${execId}/results/${ctId}/evidences`, {
+      method: "POST",
+      body: form, // sem Content-Type manual: o browser define o boundary
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => null);
+      throw new Error(data?.error?.message ?? `${resp.status} ${resp.statusText}`);
+    }
+    return resp.json();
+  },
+  deleteEvidence: (execId: string, ctId: string, index: number) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/evidences/${index}`, {
+      method: "DELETE",
+    }),
+  closeExecution: (id: string) =>
+    request<Execution>(`/executions/${id}/close`, { method: "POST" }),
+
+  defects: () => request<Defect[]>("/defects"),
+  createDefect: (body: object) =>
+    request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
+
+  metricsSummary: (sprint: string, days: number) =>
+    request<MetricsSummary>(
+      `/metrics/summary?sprint=${encodeURIComponent(sprint)}&days=${days}`,
+    ),
+  metricsTrend: (days: number, sprint: string) =>
+    request<TrendPoint[]>(
+      `/metrics/trend?days=${days}&sprint=${encodeURIComponent(sprint)}`,
+    ),
+  metricsFlaky: (window: number) =>
+    request<FlakyReport>(`/metrics/flaky?window=${window}`),
+  traceability: (epic: string, sprint: string) =>
+    request<TraceabilityMatrix>(
+      `/metrics/traceability?epic=${encodeURIComponent(epic)}&sprint=${encodeURIComponent(sprint)}`,
+    ),
+  exportUrl: (format: "md" | "pdf", sprint: string) =>
+    `${BASE}/metrics/traceability/export?format=${format}&sprint=${encodeURIComponent(sprint)}`,
+  evidenceFileUrl: (execId: string, ctId: string, index: number) =>
+    `${BASE}/executions/${execId}/results/${ctId}/evidences/${index}/file`,
 };

@@ -15,7 +15,11 @@ from watchdog.observers import Observer
 from .indexer import reindex_file
 from .workspace import Workspace
 
-WATCHED_DIRS = ("requirements", "testcases", "defects")
+WATCHED_DIRS = ("requirements", "testcases", "defects", "executions")
+
+
+def _is_watched_file(raw: str) -> bool:
+    return raw.endswith(".md") or raw.endswith("execution.json")
 
 
 class _Handler(FileSystemEventHandler):
@@ -27,7 +31,7 @@ class _Handler(FileSystemEventHandler):
         if event.is_directory:
             return
         for raw in {str(event.src_path), str(getattr(event, "dest_path", "") or "")}:
-            if not raw or not raw.endswith(".md"):
+            if not raw or not _is_watched_file(raw):
                 continue
             path = Path(raw)
             try:

@@ -2,10 +2,10 @@
 
 **Capability:** xray-migration
 **Status:** active
-**Implementation:** planned — deferido ao M2 (janela de migração antes do descomissionamento do Xray)
+**Implementation:** verified — M2 (backend/arbites/xray_import.py, frontend/src/components/XrayImport.tsx); formato suportado: Jira RSS com custom fields do Xray, adapter isolado com fixture de contrato
 **Realizes:** SC4
-**Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Last updated:** 2026-07-04
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -57,12 +57,12 @@ acima da automação na ordem de entrega.
 
 ## Acceptance criteria
 
-1. [unverified] Import de XML de amostra gera CTs `.md` corretos no folder
-   escolhido — verified by `tests/test_xray_import.py`.
-2. [unverified] Reimportar o mesmo XML não duplica CTs — verified by
-   `tests/test_xray_import.py`.
-3. [unverified] Preview lista conflitos de ID sem tocar o disco —
-   verified by `tests/test_xray_import.py`.
+1. [verified] Import de XML de amostra gera CTs `.md` corretos no folder
+   escolhido — verified by `backend/tests/test_xray_import.py`.
+2. [verified] Reimportar o mesmo XML não duplica CTs — verified by
+   `backend/tests/test_xray_import.py`.
+3. [verified] Preview lista conflitos/skips sem tocar o disco —
+   verified by `backend/tests/test_xray_import.py`.
 
 ## Maturity
 

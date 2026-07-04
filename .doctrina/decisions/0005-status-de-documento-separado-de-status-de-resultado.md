@@ -6,7 +6,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Evidence:** n/a — decisão de modelo de dados do intake; nenhuma implementação ainda (landará com o M1)
-- **Landed:** —
+- **Landed:** 2026-07-03 — `backend/arbites/executions.py`
 
 ## Context
 

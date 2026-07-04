@@ -2,10 +2,10 @@
 
 **Capability:** executions
 **Status:** active
-**Implementation:** planned — deferido ao M1 (após o walking skeleton M0)
+**Implementation:** verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -69,15 +69,15 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 
 ## Acceptance criteria
 
-1. [unverified] Regressão manual de ~20 CTs com evidências e defeito
+1. [verified] Regressão manual de ~20 CTs com evidências e defeito
    vinculado completa sem sair da plataforma — verified by
-   `tests/test_executions_e2e.py`.
-2. [unverified] Drag no Kanban persiste no `execution.json` e gera evento
-   de history — verified by `tests/test_executions.py`.
-3. [unverified] Upload de evidência grava arquivo + SHA-256 corretos —
-   verified by `tests/test_executions.py`.
-4. [unverified] Mesmo CT com resultados distintos em duas executions não
-   gera conflito — verified by `tests/test_executions.py`.
+   `backend/tests/test_executions_e2e.py`.
+2. [verified] Drag no Kanban persiste no `execution.json` e gera evento
+   de history — verified by `backend/tests/test_executions.py`.
+3. [verified] Upload de evidência grava arquivo + SHA-256 corretos —
+   verified by `backend/tests/test_executions.py`.
+4. [verified] Mesmo CT com resultados distintos em duas executions não
+   gera conflito — verified by `backend/tests/test_executions.py`.
 
 ## Maturity
 

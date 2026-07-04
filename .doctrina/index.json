@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-03",
+  "last_updated": "2026-07-04",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -37,9 +37,9 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M1 (após o walking skeleton M0)",
+        "version": "0.3.0",
+        "last_updated": "2026-07-04",
+        "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz; backend/arbites/metrics.py)",
         "realizes": [
           "SC2"
         ]
@@ -48,9 +48,9 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M1 (após o walking skeleton M0)",
+        "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
         ]
@@ -82,9 +82,9 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M1.5 (após M1)",
+        "version": "0.2.0",
+        "last_updated": "2026-07-04",
+        "implementation": "verified — M1.5 (backend/arbites/metrics.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx); filtro target do pass rate entra no M3",
         "realizes": [
           "SC3"
         ]
@@ -104,8 +104,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.3.0",
+        "last_updated": "2026-07-04",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -126,9 +126,9 @@
         "id": "xray-migration",
         "path": ".doctrina/specs/xray-migration/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M2 (janela de migração antes do descomissionamento do Xray)",
+        "version": "0.2.0",
+        "last_updated": "2026-07-04",
+        "implementation": "verified — M2 (backend/arbites/xray_import.py, frontend/src/components/XrayImport.tsx); formato suportado: Jira RSS com custom fields do Xray, adapter isolado com fixture de contrato",
         "realizes": [
           "SC4"
         ]
@@ -140,14 +140,16 @@
         "path": ".doctrina/decisions/0001-filesystem-como-fonte-de-verdade-sqlite-como-indice-descartavel.md",
         "title": "Filesystem como fonte de verdade, SQLite como indice descartavel",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-03 — `backend/arbites/indexer.py`, `backend/arbites/workspace.py`"
       },
       {
         "id": "0002",
         "path": ".doctrina/decisions/0002-id-no-frontmatter-nome-de-arquivo-livre.md",
         "title": "ID no frontmatter, nome de arquivo livre",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-03 — `backend/arbites/parser.py`"
       },
       {
         "id": "0003",
@@ -168,7 +170,8 @@
         "path": ".doctrina/decisions/0005-status-de-documento-separado-de-status-de-resultado.md",
         "title": "Status de documento separado de status de resultado",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-03 — `backend/arbites/executions.py`"
       },
       {
         "id": "0006",
@@ -182,7 +185,8 @@
         "path": ".doctrina/decisions/0007-jira-fora-de-escopo-xray-como-migracao-pontual.md",
         "title": "Jira fora de escopo, Xray como migracao pontual",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-04 — `backend/arbites/xray_import.py`"
       },
       {
         "id": "0008",
@@ -196,25 +200,19 @@
         "path": ".doctrina/decisions/0009-frontend-react-spa.md",
         "title": "Frontend React SPA",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-03 — `frontend/src/App.tsx`"
       },
       {
         "id": "0010",
         "path": ".doctrina/decisions/0010-sprint-e-ambiente-como-texto-livre-na-v1.md",
         "title": "Sprint e ambiente como texto livre na v1",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [
-      {
-        "id": "0002-m1-execucao-manual-executions-kanban-de-resultad",
-        "title": "M1 - execucao manual: executions, kanban de resultados, steps marcaveis, evidencias com hash, historico, defeitos minimos, fechamento",
-        "path": ".doctrina/changes/0002-m1-execucao-manual-executions-kanban-de-resultad",
-        "status": "proposed",
-        "opened": "2026-07-03"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -237,6 +235,57 @@
           },
           {
             "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "title": "0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "path": ".doctrina/changes/archive/2026-07-03-0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "status": "applied",
+        "applied": "2026-07-03",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
+        "title": "0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
+        "path": ".doctrina/changes/archive/2026-07-04-0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
+        "status": "applied",
+        "applied": "2026-07-04",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0004-m2-migracao-xray-import-xml-com-preview-e-confir",
+        "title": "0004-m2-migracao-xray-import-xml-com-preview-e-confir",
+        "path": ".doctrina/changes/archive/2026-07-04-0004-m2-migracao-xray-import-xml-com-preview-e-confir",
+        "status": "applied",
+        "applied": "2026-07-04",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "xray-migration",
             "operation": "MODIFIED"
           }
         ]

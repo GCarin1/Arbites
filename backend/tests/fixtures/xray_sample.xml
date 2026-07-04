@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="0.92">
+  <channel>
+    <title>Xray Test Repository export</title>
+    <item>
+      <title>[QAB-101] Login com credenciais validas</title>
+      <summary>Login com credenciais validas</summary>
+      <key>QAB-101</key>
+      <priority>High</priority>
+      <labels>
+        <label>login</label>
+        <label>smoke</label>
+      </labels>
+      <issuelinks>
+        <issuelinktype>
+          <name>Tests</name>
+          <outwardlinks description="tests">
+            <issuelink>
+              <issuekey>PROJ-123</issuekey>
+            </issuelink>
+          </outwardlinks>
+        </issuelinktype>
+      </issuelinks>
+      <customfields>
+        <customfield id="customfield_10200">
+          <customfieldname>Manual Test Steps</customfieldname>
+          <customfieldvalues>
+            <customfieldvalue>[{"index": 1, "fields": {"Action": "Abrir a tela de login", "Data": "", "Expected Result": "Tela exibida"}}, {"index": 2, "fields": {"Action": "Informar e-mail e senha validos", "Data": "qa.user@empresa.com", "Expected Result": "Campos preenchidos"}}, {"index": 3, "fields": {"Action": "Clicar em Entrar", "Data": "", "Expected Result": "Dashboard exibido com nome do usuario"}}]</customfieldvalue>
+          </customfieldvalues>
+        </customfield>
+        <customfield id="customfield_10300">
+          <customfieldname>Pre-Condition</customfieldname>
+          <customfieldvalues>
+            <customfieldvalue>Usuario ativo cadastrado na base de teste</customfieldvalue>
+          </customfieldvalues>
+        </customfield>
+        <customfield id="customfield_10400">
+          <customfieldname>Test Repository Path</customfieldname>
+          <customfieldvalues>
+            <customfieldvalue>/frontend/login</customfieldvalue>
+          </customfieldvalues>
+        </customfield>
+      </customfields>
+    </item>
+    <item>
+      <title>[QAB-102] Login com senha invalida</title>
+      <summary>Login com senha invalida</summary>
+      <key>QAB-102</key>
+      <priority>Medium</priority>
+      <labels>
+        <label>login</label>
+      </labels>
+      <issuelinks>
+        <issuelinktype>
+          <name>Tests</name>
+          <outwardlinks description="tests">
+            <issuelink>
+              <issuekey>PROJ-123</issuekey>
+            </issuelink>
+          </outwardlinks>
+        </issuelinktype>
+      </issuelinks>
+      <customfields>
+        <customfield id="customfield_10200">
+          <customfieldname>Manual Test Steps</customfieldname>
+          <customfieldvalues>
+            <customfieldvalue>[{"index": 1, "fields": {"Action": "Abrir a tela de login", "Data": "", "Expected Result": ""}}, {"index": 2, "fields": {"Action": "Informar senha errada", "Data": "", "Expected Result": "Mensagem de erro sem revelar o campo"}}]</customfieldvalue>
+          </customfieldvalues>
+        </customfield>
+      </customfields>
+    </item>
+    <item>
+      <title>[QAB-103] Teste sem steps</title>
+      <summary>Teste sem steps</summary>
+      <key>QAB-103</key>
+      <priority>Lowest</priority>
+    </item>
+  </channel>
+</rss>

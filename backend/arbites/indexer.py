@@ -6,6 +6,7 @@ arquivo (usado pelo watcher). Apagar o banco nunca perde dados.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS requirements(
 CREATE TABLE IF NOT EXISTS testcases(
   id TEXT PRIMARY KEY, title TEXT, type TEXT, priority TEXT, status TEXT,
   story_id TEXT, path TEXT, mtime REAL,
-  automation_target TEXT, scenario_tag TEXT);
+  automation_target TEXT, scenario_tag TEXT, external_key TEXT);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
 CREATE TABLE IF NOT EXISTS scenarios(
   target TEXT, tag TEXT PRIMARY KEY, feature_path TEXT,
@@ -35,6 +36,8 @@ CREATE TABLE IF NOT EXISTS executions(
 CREATE TABLE IF NOT EXISTS results(
   execution_id TEXT, testcase_id TEXT, status TEXT, executed_at TEXT,
   duration_seconds REAL, PRIMARY KEY(execution_id, testcase_id));
+CREATE TABLE IF NOT EXISTS result_events(
+  execution_id TEXT, testcase_id TEXT, status TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS evidences(
   execution_id TEXT, testcase_id TEXT, path TEXT, sha256 TEXT,
   mime TEXT, captured_at TEXT);
@@ -54,6 +57,11 @@ def connect(ws: Workspace) -> sqlite3.Connection:
     conn = sqlite3.connect(ws.index_db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    # migração tolerante para índices criados antes da coluna (descartável)
+    try:
+        conn.execute("ALTER TABLE testcases ADD COLUMN external_key TEXT")
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 
@@ -82,6 +90,10 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM testcases")
     conn.execute("DELETE FROM tc_tags")
     conn.execute("DELETE FROM defects")
+    conn.execute("DELETE FROM executions")
+    conn.execute("DELETE FROM results")
+    conn.execute("DELETE FROM result_events")
+    conn.execute("DELETE FROM evidences")
     conn.execute("DELETE FROM warnings")
 
     seen_ids: dict[str, str] = {}  # id -> relpath (detecção de duplicidade)
@@ -150,6 +162,12 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
         if doc.id and track_id(doc, rel):
             _insert_defect(conn, doc, rel)
 
+    exec_base = ws.root / "executions"
+    if exec_base.exists():
+        for path in sorted(exec_base.glob("*/*/execution.json")):
+            rel = ws.relpath(path)
+            _index_execution(conn, ws, path, rel, max_by_prefix)
+
     _relational_checks(conn)
 
     for prefix, seen_max in max_by_prefix.items():
@@ -177,6 +195,13 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
 def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
     """Incremental: reparseia um único arquivo (edição externa → UI em segundos)."""
     rel = ws.relpath(path)
+    if rel.split("/", 1)[0] == "executions" and path.name == "execution.json":
+        _drop_execution_rows(conn, rel)
+        conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
+        if path.exists():
+            _index_execution(conn, ws, path, rel, {})
+        conn.commit()
+        return
     conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
     for table in ("requirements", "testcases", "defects"):
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
@@ -248,7 +273,8 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
     conn.execute(
         "INSERT OR REPLACE INTO testcases"
         "(id, title, type, priority, status, story_id, path, mtime,"
-        " automation_target, scenario_tag) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        " automation_target, scenario_tag, external_key)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -260,6 +286,7 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
             doc.path.stat().st_mtime,
             automation.get("target") if isinstance(automation, dict) else None,
             automation.get("scenario_tag") if isinstance(automation, dict) else None,
+            doc.meta.get("external_key"),
         ),
     )
     for tag in _tags(doc):
@@ -282,6 +309,89 @@ def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             rel,
         ),
     )
+
+
+def _drop_execution_rows(conn: sqlite3.Connection, rel: str) -> None:
+    row = conn.execute("SELECT id FROM executions WHERE path = ?", (rel,)).fetchone()
+    if row:
+        conn.execute("DELETE FROM results WHERE execution_id = ?", (row["id"],))
+        conn.execute("DELETE FROM result_events WHERE execution_id = ?", (row["id"],))
+        conn.execute("DELETE FROM evidences WHERE execution_id = ?", (row["id"],))
+    conn.execute("DELETE FROM executions WHERE path = ?", (rel,))
+
+
+def _index_execution(
+    conn: sqlite3.Connection,
+    ws: Workspace,
+    path: Path,
+    rel: str,
+    max_by_prefix: dict[str, int],
+) -> None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        _add_warning(conn, rel, "invalid_execution", f"{path.name}: {exc}")
+        return
+    exec_id = data.get("id")
+    if not exec_id:
+        _add_warning(conn, rel, "invalid_execution", f"{path.name}: sem campo 'id'")
+        return
+    m = _ID_RE.match(str(exec_id))
+    if m:
+        prefix, num = m.group(1), int(m.group(2))
+        max_by_prefix[prefix] = max(max_by_prefix.get(prefix, 0), num)
+        ws.bump_counter_to(prefix, num)
+    conn.execute(
+        "INSERT OR REPLACE INTO executions"
+        "(id, name, owner, sprint, environment, origin, status, created_at, closed_at, path)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (
+            exec_id,
+            data.get("name"),
+            data.get("owner"),
+            data.get("sprint"),
+            data.get("environment"),
+            data.get("origin", "manual"),
+            data.get("status", "draft"),
+            data.get("created_at"),
+            data.get("closed_at"),
+            rel,
+        ),
+    )
+    for result in data.get("results") or []:
+        conn.execute(
+            "INSERT OR REPLACE INTO results"
+            "(execution_id, testcase_id, status, executed_at, duration_seconds)"
+            " VALUES (?,?,?,?,?)",
+            (
+                exec_id,
+                result.get("testcase_id"),
+                result.get("status", "pending"),
+                result.get("executed_at"),
+                result.get("duration_seconds"),
+            ),
+        )
+        for evidence in result.get("evidences") or []:
+            conn.execute(
+                "INSERT INTO evidences"
+                "(execution_id, testcase_id, path, sha256, mime, captured_at)"
+                " VALUES (?,?,?,?,?,?)",
+                (
+                    exec_id,
+                    result.get("testcase_id"),
+                    evidence.get("path"),
+                    evidence.get("sha256"),
+                    evidence.get("mime"),
+                    evidence.get("captured_at"),
+                ),
+            )
+    for event in data.get("history") or []:
+        if event.get("event") == "result" and event.get("testcase_id"):
+            conn.execute(
+                "INSERT INTO result_events(execution_id, testcase_id, status, at)"
+                " VALUES (?,?,?,?)",
+                (exec_id, event["testcase_id"], event.get("to"), event.get("at")),
+            )
 
 
 def _relational_checks(conn: sqlite3.Connection) -> None:

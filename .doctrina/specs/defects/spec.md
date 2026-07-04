@@ -2,10 +2,10 @@
 
 **Capability:** defects
 **Status:** active
-**Implementation:** planned — deferido ao M1 (após o walking skeleton M0)
+**Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz; backend/arbites/metrics.py)
 **Realizes:** SC2
-**Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Last updated:** 2026-07-04
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -48,10 +48,10 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 
 ## Acceptance criteria
 
-1. [unverified] Criar defeito a partir de um resultado failed vincula
-   `testcase` e `execution` — verified by `tests/test_defects.py`.
-2. [unverified] Defeito aparece na matriz de rastreabilidade da story —
-   verified by `tests/test_defects.py`.
+1. [verified] Criar defeito a partir de um resultado failed vincula
+   `testcase` e `execution` — verified by `backend/tests/test_defects.py`.
+2. [verified] Defeito aparece na matriz de rastreabilidade da story —
+   verified by `backend/tests/test_reporting_e2e.py`.
 
 ## Maturity
 

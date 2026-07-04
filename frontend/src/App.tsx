@@ -5,8 +5,21 @@ import { Tree } from "./components/Tree";
 import { TestCaseEditor } from "./components/TestCaseEditor";
 import { RequirementsList, RequirementEditor } from "./components/Requirements";
 import { WarningsView } from "./components/Warnings";
+import {
+  ExecutionBoard,
+  ExecutionCreate,
+  ExecutionsList,
+} from "./components/Executions";
+import { Dashboard } from "./components/Dashboard";
+import { XrayImport } from "./components/XrayImport";
 
-type Tab = "testcases" | "requirements" | "problems";
+type Tab =
+  | "testcases"
+  | "requirements"
+  | "executions"
+  | "dashboard"
+  | "migration"
+  | "problems";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("testcases");
@@ -15,6 +28,8 @@ export default function App() {
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
+  const [selectedExec, setSelectedExec] = useState<string | null>(null);
+  const [execCreating, setExecCreating] = useState(false);
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reindexing, setReindexing] = useState(false);
@@ -100,6 +115,24 @@ export default function App() {
               Requisitos
             </button>
             <button
+              className={tab === "executions" ? "active" : ""}
+              onClick={() => setTab("executions")}
+            >
+              Execuções
+            </button>
+            <button
+              className={tab === "dashboard" ? "active" : ""}
+              onClick={() => setTab("dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              className={tab === "migration" ? "active" : ""}
+              onClick={() => setTab("migration")}
+            >
+              Migração
+            </button>
+            <button
               className={tab === "problems" ? "active" : ""}
               onClick={() => setTab("problems")}
             >
@@ -122,6 +155,33 @@ export default function App() {
                 onError={setError}
               />
             )}
+            {tab === "executions" && (
+              <ExecutionsList
+                version={reqVersion}
+                selected={selectedExec}
+                onSelect={(id) => {
+                  setExecCreating(false);
+                  setSelectedExec(id);
+                }}
+                onNew={() => {
+                  setSelectedExec(null);
+                  setExecCreating(true);
+                }}
+                onError={setError}
+              />
+            )}
+            {tab === "dashboard" && (
+              <p className="muted" style={{ padding: 8 }}>
+                Métricas, tendência e matriz de rastreabilidade no painel
+                principal. Cada linha da matriz expande até a evidência.
+              </p>
+            )}
+            {tab === "migration" && (
+              <p className="muted" style={{ padding: 8 }}>
+                Import do XML do Xray (preview → confirm, idempotente) no
+                painel principal. Export Markdown fica no próprio wizard.
+              </p>
+            )}
             {tab === "problems" && (
               <p className="muted" style={{ padding: 8 }}>
                 {problemCount === 0
@@ -142,6 +202,25 @@ export default function App() {
           {error && <div className="error-banner">{error}</div>}
           {tab === "problems" ? (
             <WarningsView warnings={warnings} />
+          ) : tab === "dashboard" ? (
+            <Dashboard onError={setError} />
+          ) : tab === "migration" ? (
+            <XrayImport onImported={() => void refresh()} onError={setError} />
+          ) : tab === "executions" ? (
+            execCreating ? (
+              <ExecutionCreate
+                onCreated={(id) => {
+                  setExecCreating(false);
+                  setSelectedExec(id);
+                  void refresh();
+                }}
+                onError={setError}
+              />
+            ) : selectedExec ? (
+              <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
+            ) : (
+              <p className="empty">Selecione uma execução ou crie uma nova.</p>
+            )
           ) : tab === "requirements" ? (
             selectedReq ? (
               <RequirementEditor

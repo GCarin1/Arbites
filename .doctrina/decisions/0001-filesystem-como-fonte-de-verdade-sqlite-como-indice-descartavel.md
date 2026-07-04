@@ -6,7 +6,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Evidence:** n/a — decisão de design do intake; nenhuma implementação ainda (landará com o M0)
-- **Landed:** —
+- **Landed:** 2026-07-03 — `backend/arbites/indexer.py`, `backend/arbites/workspace.py`
 
 ## Context
 

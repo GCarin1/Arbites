@@ -289,3 +289,187 @@ table.dense th {
   padding: 8px 12px;
   margin-bottom: 12px;
 }
+
+/* Kanban de resultados (M1) — colunas fixas, cards densos */
+.kanban {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+.kanban-col {
+  flex: 1;
+  min-width: 132px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 160px;
+}
+.kanban-col-title {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.kanban-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  cursor: grab;
+}
+.kanban-card:hover,
+.kanban-card.selected {
+  border-color: var(--primary);
+}
+.dot-col-pending { --dot: var(--text-muted); }
+.dot-col-in_progress { --dot: var(--primary); }
+.dot-col-blocked { --dot: var(--warning); }
+.dot-col-failed { --dot: var(--danger); }
+.dot-col-retest { --dot: var(--retest); }
+.dot-col-passed { --dot: var(--success); }
+.dot-step-pending { --dot: var(--text-muted); }
+.dot-step-passed { --dot: var(--success); }
+.dot-step-failed { --dot: var(--danger); }
+.dot-step-blocked { --dot: var(--warning); }
+
+.result-panel {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 12px 16px;
+  max-width: 880px;
+}
+.result-panel h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.result-panel h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 12px 0 6px;
+}
+.step-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 12px;
+}
+.step-actions {
+  display: flex;
+  gap: 4px;
+}
+.step-actions button {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.ct-picker {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+}
+.ct-option {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12px;
+}
+.ct-option:hover {
+  background: var(--bg);
+}
+.ct-option input {
+  width: auto;
+}
+
+/* Dashboard (M1.5) — cards de métrica com fórmula visível */
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.metric-value {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 2px 0;
+}
+.metric-formula {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 16px 0 8px;
+}
+.matrix-epic {
+  margin-bottom: 16px;
+}
+.matrix-epic-title {
+  font-weight: 600;
+  padding: 4px 0;
+}
+.matrix-row {
+  cursor: pointer;
+}
+.matrix-row:hover td {
+  background: var(--surface);
+}
+.matrix-ct-row td {
+  background: var(--surface);
+  font-size: 12px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.button-link {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  text-decoration: none;
+}
+.button-link:hover {
+  border-color: var(--text-muted);
+}

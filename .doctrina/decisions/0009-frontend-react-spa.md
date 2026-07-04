@@ -6,7 +6,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Evidence:** n/a — decisão de stack do intake; nenhuma implementação ainda (landará com o M0)
-- **Landed:** —
+- **Landed:** 2026-07-03 — `frontend/src/App.tsx`
 
 ## Context
 

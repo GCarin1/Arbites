@@ -5,3 +5,5 @@ python-frontmatter>=1.1
 markdown-it-py>=3.0
 watchdog>=4.0
 PyYAML>=6.0
+python-multipart>=0.0.9
+fpdf2>=2.7

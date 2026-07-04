@@ -2,10 +2,10 @@
 
 **Capability:** reporting
 **Status:** active
-**Implementation:** planned — deferido ao M1.5 (após M1)
+**Implementation:** verified — M1.5 (backend/arbites/metrics.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx); filtro target do pass rate entra no M3
 **Realizes:** SC3
-**Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Last updated:** 2026-07-04
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -58,14 +58,14 @@ export PDF e Markdown (para colar no Confluence).
 
 ## Acceptance criteria
 
-1. [unverified] Reporte de sprint gerado em < 1 minuto com drill-down até
-   evidência — verified by `tests/test_reporting_e2e.py`.
-2. [unverified] Cada métrica bate com a fórmula sobre um dataset fixture
-   conhecido — verified by `tests/test_metrics.py`.
-3. [unverified] Export Markdown da matriz é colável no Confluence sem
-   perda de estrutura — verified by `tests/test_export.py`.
-4. [unverified] Export PDF gerado com a matriz navegada — verified by
-   `tests/test_export.py`.
+1. [verified] Reporte de sprint gerado em < 1 minuto com drill-down até
+   evidência — verified by `backend/tests/test_reporting_e2e.py`.
+2. [verified] Cada métrica bate com a fórmula sobre um dataset fixture
+   conhecido — verified by `backend/tests/test_metrics.py`.
+3. [verified] Export Markdown da matriz é colável no Confluence sem
+   perda de estrutura — verified by `backend/tests/test_export.py`.
+4. [verified] Export PDF gerado com a matriz navegada — verified by
+   `backend/tests/test_export.py`.
 
 ## Maturity
 

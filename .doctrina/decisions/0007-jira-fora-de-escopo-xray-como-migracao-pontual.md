@@ -6,7 +6,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Evidence:** n/a — decisão de escopo do intake; a migração landará com o M2
-- **Landed:** —
+- **Landed:** 2026-07-04 — `backend/arbites/xray_import.py`
 
 ## Context
 

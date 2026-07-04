@@ -14,13 +14,19 @@ from pathlib import Path
 from typing import Any
 
 import frontmatter
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import __version__
+from . import executions as exec_ops
+from . import metrics as metrics_ops
+from . import xray_import as xray_ops
+from .executions import ExecutionError
+from .xray_import import XrayImportError
 from .indexer import connect, reindex_file, reindex_full
+from .parser import parse_markdown
 from .watcher import start_watcher
 from .workspace import Workspace, slugify
 
@@ -84,6 +90,53 @@ class RawIn(BaseModel):
     content: str
 
 
+class ExecutionCreate(BaseModel):
+    name: str
+    sprint: str | None = None
+    environment: str | None = None
+    testcase_ids: list[str]
+    owner: str = "local"
+
+
+class ExecutionPatch(BaseModel):
+    name: str | None = None
+    sprint: str | None = None
+    environment: str | None = None
+    status: str | None = Field(default=None, pattern="^(draft|in_progress)$")
+
+
+class ResultStatusIn(BaseModel):
+    status: str
+    comment: str | None = None
+    column: str | None = None
+    who: str = "local"
+
+
+class StepStatusIn(BaseModel):
+    status: str
+    who: str = "local"
+
+
+class DefectIn(BaseModel):
+    title: str
+    severity: str = "medium"
+    status: str = Field(default="open", pattern="^(open|fixed|closed)$")
+    testcase: str | None = None
+    execution: str | None = None
+    external_key: str | None = None
+    body: str = ""
+
+
+class DefectUpdate(BaseModel):
+    title: str | None = None
+    severity: str | None = None
+    status: str | None = None
+    testcase: str | None = None
+    execution: str | None = None
+    external_key: str | None = None
+    body: str | None = None
+
+
 DEFAULT_TC_BODY = """## Objetivo
 
 ## Pré-condições
@@ -134,6 +187,20 @@ def create_app(
         if not isinstance(detail, dict):
             detail = {"code": "error", "message": str(detail)}
         return JSONResponse(status_code=exc.status_code, content={"error": detail})
+
+    @app.exception_handler(ExecutionError)
+    async def _exec_error(request: Request, exc: ExecutionError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(XrayImportError)
+    async def _xray_error(request: Request, exc: XrayImportError):
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
 
     _register_routes(app)
     _mount_frontend(app)
@@ -439,6 +506,316 @@ def _register_routes(app: FastAPI) -> None:
         (ws.root / rel).write_text(payload.content, encoding="utf-8")
         reindex_file(ws, conn, ws.root / rel)
         return _tc_out(conn, ws, entity_id)
+
+    # -- executions (M1) ---------------------------------------------------
+
+    def _save_and_index(ws: Workspace, conn, execution: dict) -> None:
+        path = exec_ops.save(ws, execution)
+        reindex_file(ws, conn, path)
+
+    @app.get(API_PREFIX + "/executions")
+    async def list_executions(
+        request: Request, sprint: str = "", status: str = "", origin: str = ""
+    ):
+        conn = conn_of(request)
+        sql, params = "SELECT * FROM executions WHERE 1=1", []
+        for field, value in (("sprint", sprint), ("status", status), ("origin", origin)):
+            if value:
+                sql += f" AND {field} = ?"
+                params.append(value)
+        rows = conn.execute(sql + " ORDER BY id DESC", params).fetchall()
+        out = []
+        for row in rows:
+            counts = {
+                r["status"]: r["c"]
+                for r in conn.execute(
+                    "SELECT status, COUNT(*) c FROM results WHERE execution_id = ?"
+                    " GROUP BY status",
+                    (row["id"],),
+                )
+            }
+            out.append({**dict(row), "result_counts": counts})
+        return out
+
+    @app.post(API_PREFIX + "/executions", status_code=201)
+    async def create_execution(request: Request, payload: ExecutionCreate):
+        ws, conn = ws_of(request), conn_of(request)
+        if not payload.testcase_ids:
+            raise _error(422, "empty_execution", "informe ao menos um testcase_id")
+        testcases = []
+        for ct_id in payload.testcase_ids:
+            row = conn.execute(
+                "SELECT id, path FROM testcases WHERE id = ?", (ct_id,)
+            ).fetchone()
+            if not row:
+                raise _error(404, "not_found", f"{ct_id} não encontrado no índice")
+            doc = parse_markdown(ws.root / row["path"])
+            testcases.append({"id": ct_id, "steps": doc.steps})
+        execution = exec_ops.create(
+            ws, payload.name, payload.owner, payload.sprint, payload.environment, testcases
+        )
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.get(API_PREFIX + "/executions/{exec_id}")
+    async def get_execution(request: Request, exec_id: str):
+        return exec_ops.load(ws_of(request), exec_id)
+
+    @app.patch(API_PREFIX + "/executions/{exec_id}")
+    async def patch_execution(request: Request, exec_id: str, payload: ExecutionPatch):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        if execution["status"] == "closed":
+            raise _error(409, "execution_closed", f"{exec_id} está fechada")
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            execution[key] = value
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/status")
+    async def post_result_status(
+        request: Request, exec_id: str, ct_id: str, payload: ResultStatusIn
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.set_result_status(
+            execution, ct_id, payload.status, payload.who, payload.comment, payload.column
+        )
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/steps/{step_index}")
+    async def post_step_status(
+        request: Request, exec_id: str, ct_id: str, step_index: int, payload: StepStatusIn
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.set_step_status(execution, ct_id, step_index, payload.status, payload.who)
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(
+        API_PREFIX + "/executions/{exec_id}/results/{ct_id}/evidences", status_code=201
+    )
+    async def post_evidence(
+        request: Request,
+        exec_id: str,
+        ct_id: str,
+        file: UploadFile = File(...),
+        note: str | None = Form(default=None),
+        who: str = Form(default="local"),
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        content = await file.read()
+        evidence = exec_ops.add_evidence(
+            ws,
+            execution,
+            ct_id,
+            file.filename or "evidencia.bin",
+            content,
+            file.content_type,
+            note,
+            who,
+        )
+        _save_and_index(ws, conn, execution)
+        return evidence
+
+    @app.delete(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/evidences/{index}")
+    async def delete_evidence(request: Request, exec_id: str, ct_id: str, index: int):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.remove_evidence(ws, execution, ct_id, index, "local")
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/close")
+    async def close_execution(request: Request, exec_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.close(execution, "local")
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    # -- metrics / matriz (M1.5) --------------------------------------------
+
+    @app.get(API_PREFIX + "/metrics/summary")
+    async def metrics_summary(
+        request: Request, sprint: str = "", days: int = 0, epic: str = ""
+    ):
+        conn = conn_of(request)
+        s, d = sprint or None, days or None
+        return {
+            "requirement_coverage": metrics_ops.requirement_coverage(conn, epic or None),
+            "execution_coverage": metrics_ops.execution_coverage(conn, s, d),
+            "pass_rate": metrics_ops.pass_rate(conn, s, d),
+            "blocked_rate": metrics_ops.blocked_rate(conn, s, d),
+            "rework_rate": metrics_ops.rework_rate(conn, s, d),
+        }
+
+    @app.get(API_PREFIX + "/metrics/trend")
+    async def metrics_trend(request: Request, days: int = 7, sprint: str = ""):
+        if days not in (7, 15, 30):
+            raise _error(422, "invalid_days", "days deve ser 7, 15 ou 30")
+        return metrics_ops.trend(conn_of(request), days, sprint or None)
+
+    @app.get(API_PREFIX + "/metrics/coverage")
+    async def metrics_coverage(request: Request, epic: str = ""):
+        return metrics_ops.requirement_coverage(conn_of(request), epic or None)
+
+    @app.get(API_PREFIX + "/metrics/flaky")
+    async def metrics_flaky(request: Request, window: int = 5):
+        return metrics_ops.flaky(conn_of(request), window)
+
+    @app.get(API_PREFIX + "/metrics/traceability")
+    async def metrics_traceability(request: Request, epic: str = "", sprint: str = ""):
+        return metrics_ops.traceability(conn_of(request), epic or None, sprint or None)
+
+    @app.get(API_PREFIX + "/metrics/traceability/export")
+    async def metrics_traceability_export(
+        request: Request, format: str = "md", epic: str = "", sprint: str = ""
+    ):
+        matrix = metrics_ops.traceability(conn_of(request), epic or None, sprint or None)
+        if format == "md":
+            return PlainTextResponse(
+                metrics_ops.matrix_markdown(matrix),
+                media_type="text/markdown; charset=utf-8",
+                headers={"Content-Disposition": 'attachment; filename="matriz.md"'},
+            )
+        if format == "pdf":
+            from .export_pdf import matrix_pdf
+
+            return Response(
+                content=matrix_pdf(matrix),
+                media_type="application/pdf",
+                headers={"Content-Disposition": 'attachment; filename="matriz.pdf"'},
+            )
+        raise _error(422, "invalid_format", "format deve ser md ou pdf")
+
+    @app.get(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/evidences/{index}/file")
+    async def download_evidence(request: Request, exec_id: str, ct_id: str, index: int):
+        ws = ws_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        result = next(
+            (r for r in execution["results"] if r["testcase_id"] == ct_id), None
+        )
+        if not result or not 0 <= index < len(result["evidences"]):
+            raise _error(404, "not_found", "evidência não encontrada")
+        evidence = result["evidences"][index]
+        file_path = (
+            exec_ops.exec_dir(ws, exec_id, execution["created_at"]) / evidence["path"]
+        )
+        if not file_path.exists():
+            raise _error(404, "not_found", f"arquivo ausente no disco: {evidence['path']}")
+        return FileResponse(
+            file_path, media_type=evidence["mime"], filename=file_path.name
+        )
+
+    # -- migração Xray (M2) -------------------------------------------------
+
+    @app.post(API_PREFIX + "/import/xray")
+    async def import_xray_preview(request: Request, file: UploadFile = File(...)):
+        tests = xray_ops.parse_xray_xml(await file.read())
+        return xray_ops.preview(conn_of(request), tests)
+
+    @app.post(API_PREFIX + "/import/xray/confirm")
+    async def import_xray_confirm(
+        request: Request,
+        file: UploadFile = File(...),
+        folder: str = Form(default="xray"),
+        create_stories: str = Form(default=""),
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        tests = xray_ops.parse_xray_xml(await file.read())
+        stories = [s.strip() for s in create_stories.split(",") if s.strip()]
+        return xray_ops.confirm(
+            ws,
+            conn,
+            tests,
+            folder,
+            stories,
+            write_doc=_write_doc,
+            reindex=lambda path: reindex_file(ws, conn, path),
+        )
+
+    @app.post(API_PREFIX + "/export/markdown")
+    async def export_markdown(request: Request, folder: str = ""):
+        import io
+        import zipfile
+
+        ws = ws_of(request)
+        base = ws.root / "testcases"
+        root = base / folder.strip("/") if folder.strip("/") else base
+        if not root.exists():
+            raise _error(404, "not_found", f"pasta não existe: {folder}")
+        buffer = io.BytesIO()
+        count = 0
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path in sorted(root.rglob("*.md")):
+                zf.write(path, path.relative_to(base).as_posix())
+                count += 1
+        if count == 0:
+            raise _error(404, "empty", "nenhum .md na pasta")
+        buffer.seek(0)
+        return Response(
+            content=buffer.read(),
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="testcases.zip"'},
+        )
+
+    # -- defects (M1, mínimo) ---------------------------------------------
+
+    def _defect_out(conn, ws: Workspace, defect_id: str) -> dict:
+        row = conn.execute("SELECT * FROM defects WHERE id = ?", (defect_id,)).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{defect_id} não encontrado")
+        out = dict(row)
+        _, out["body"] = _load_doc(ws, row["path"])
+        return out
+
+    @app.get(API_PREFIX + "/defects")
+    async def list_defects(request: Request, status: str = ""):
+        sql, params = "SELECT * FROM defects WHERE 1=1", []
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
+        return [
+            dict(r) for r in conn_of(request).execute(sql + " ORDER BY id", params)
+        ]
+
+    @app.post(API_PREFIX + "/defects", status_code=201)
+    async def create_defect(request: Request, payload: DefectIn):
+        ws, conn = ws_of(request), conn_of(request)
+        defect_id = ws.next_id("defect")
+        meta = {
+            "id": defect_id,
+            "title": payload.title,
+            "status": payload.status,
+            "severity": payload.severity,
+            "testcase": payload.testcase,
+            "execution": payload.execution,
+            "external_key": payload.external_key,
+        }
+        path = ws.root / "defects" / f"{defect_id}-{slugify(payload.title)}.md"
+        _write_doc(path, meta, payload.body)
+        reindex_file(ws, conn, path)
+        if payload.execution and payload.testcase:
+            execution = exec_ops.load(ws, payload.execution)
+            exec_ops.link_defect(execution, payload.testcase, defect_id, "local")
+            _save_and_index(ws, conn, execution)
+        return _defect_out(conn, ws, defect_id)
+
+    @app.put(API_PREFIX + "/defects/{defect_id}")
+    async def update_defect(request: Request, defect_id: str, payload: DefectUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "defects", defect_id)
+        meta, body = _load_doc(ws, rel)
+        changes = payload.model_dump(exclude_unset=True)
+        body = changes.pop("body", body)
+        meta.update(changes)
+        _write_doc(ws.root / rel, meta, body)
+        reindex_file(ws, conn, ws.root / rel)
+        return _defect_out(conn, ws, defect_id)
 
 
 def _mount_frontend(app: FastAPI) -> None:
