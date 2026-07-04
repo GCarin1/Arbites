@@ -6,6 +6,7 @@ Toda resposta de escrita retorna a entidade atualizada (contrato http-api).
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sqlite3
 from contextlib import asynccontextmanager
@@ -15,7 +16,13 @@ from typing import Any
 
 import frontmatter
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -23,7 +30,10 @@ from . import __version__
 from . import executions as exec_ops
 from . import metrics as metrics_ops
 from . import xray_import as xray_ops
+from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .executions import ExecutionError
+from .gherkin_scan import scan_target
+from .runner import RunManager
 from .xray_import import XrayImportError
 from .indexer import connect, reindex_file, reindex_full
 from .parser import parse_markdown
@@ -117,6 +127,23 @@ class StepStatusIn(BaseModel):
     who: str = "local"
 
 
+class LocalRunIn(BaseModel):
+    target: str
+    tags: list[str] = []
+    testcase_ids: list[str] = []
+
+
+class CIRunIn(BaseModel):
+    target: str
+    ref: str | None = None
+    tags: list[str] = []
+    testcase_ids: list[str] = []
+
+
+class TokenIn(BaseModel):
+    token: str
+
+
 class DefectIn(BaseModel):
     title: str
     severity: str = "medium"
@@ -159,8 +186,12 @@ DEFAULT_TC_BODY = """## Objetivo
 def create_app(
     workspace_root: str | os.PathLike[str] | None = None,
     watch: bool = True,
+    github_client=None,
+    token_store: TokenStore | None = None,
 ) -> FastAPI:
     ws = Workspace(workspace_root or os.environ.get("ARBITES_WORKSPACE", "workspace"))
+    tokens = token_store or TokenStore()
+    github = github_client or HttpxGitHub(tokens)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -169,12 +200,16 @@ def create_app(
         app.state.conn = connect(ws)
         app.state.conn.execute("PRAGMA busy_timeout=5000")
         reindex_full(ws, app.state.conn)
+        app.state.runner = RunManager(ws, app.state.conn)
+        app.state.tokens = tokens
+        app.state.ci = CIManager(ws, app.state.conn, github, tokens)
         observer = None
         if watch:
             watch_conn = connect(ws)
             watch_conn.execute("PRAGMA busy_timeout=5000")
             observer = start_watcher(ws, watch_conn)
         yield
+        await app.state.runner.shutdown()
         if observer is not None:
             observer.stop()
         app.state.conn.close()
@@ -199,6 +234,13 @@ def create_app(
     async def _xray_error(request: Request, exc: XrayImportError):
         return JSONResponse(
             status_code=422,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(CIError)
+    async def _ci_error(request: Request, exc: CIError):
+        return JSONResponse(
+            status_code=exc.status,
             content={"error": {"code": exc.code, "message": exc.message}},
         )
 
@@ -710,6 +752,186 @@ def _register_routes(app: FastAPI) -> None:
         return FileResponse(
             file_path, media_type=evidence["mime"], filename=file_path.name
         )
+
+    # -- automação local (M3) -----------------------------------------------
+
+    def _find_target(ws: Workspace, name: str) -> dict:
+        for target in ws.config().get("automation_targets") or []:
+            if target.get("name") == name:
+                return target
+        raise _error(404, "not_found", f"target '{name}' não configurado")
+
+    @app.get(API_PREFIX + "/targets")
+    async def list_targets(request: Request):
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        out = []
+        for target in ws.config().get("automation_targets") or []:
+            name = target.get("name")
+            scenarios = conn.execute(
+                "SELECT COUNT(*) c FROM scenarios WHERE target = ?", (name,)
+            ).fetchone()["c"]
+            out.append(
+                {
+                    "name": name,
+                    "kind": target.get("kind", "behave"),
+                    "local_path": target.get("local_path"),
+                    "features_glob": target.get("features_glob"),
+                    "scenarios": scenarios,
+                    "queue_length": runner.queue_length(str(name)),
+                }
+            )
+        return out
+
+    @app.post(API_PREFIX + "/targets/{name}/scan")
+    async def scan_target_route(request: Request, name: str):
+        ws, conn = ws_of(request), conn_of(request)
+        return scan_target(ws, conn, _find_target(ws, name))
+
+    @app.post(API_PREFIX + "/runs/local", status_code=201)
+    async def create_local_run(request: Request, payload: LocalRunIn):
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        target = _find_target(ws, payload.target)
+
+        # resolve seleção → CTs da execution + tags do behave
+        ct_ids: list[str] = list(payload.testcase_ids)
+        tags: list[str] = [t if t.startswith("@") else f"@{t}" for t in payload.tags]
+        if tags and not ct_ids:
+            rows = conn.execute(
+                "SELECT DISTINCT t.id FROM testcases t JOIN tc_tags g"
+                " ON g.testcase_id = t.id WHERE g.tag IN (%s)"
+                % ",".join("?" for _ in payload.tags),
+                payload.tags,
+            ).fetchall()
+            by_scenario = conn.execute(
+                "SELECT tag FROM scenarios WHERE target = ? AND tag IN (%s)"
+                % ",".join("?" for _ in tags),
+                [payload.target, *tags],
+            ).fetchall()
+            ct_ids = [r["id"] for r in rows] + [
+                r["tag"].lstrip("@") for r in by_scenario
+            ]
+            ct_ids = sorted(set(ct_ids))
+        if not ct_ids:
+            raise _error(422, "empty_selection",
+                         "informe testcase_ids ou tags que resolvam para CTs")
+        if not tags:
+            rows = conn.execute(
+                "SELECT id, scenario_tag FROM testcases WHERE id IN (%s)"
+                % ",".join("?" for _ in ct_ids),
+                ct_ids,
+            ).fetchall()
+            tags = [r["scenario_tag"] or f"@{r['id']}" for r in rows]
+
+        testcases = []
+        for ct_id in ct_ids:
+            row = conn.execute(
+                "SELECT id, path FROM testcases WHERE id = ?", (ct_id,)
+            ).fetchone()
+            if not row:
+                raise _error(404, "not_found", f"{ct_id} não encontrado")
+            doc = parse_markdown(ws.root / row["path"])
+            testcases.append({"id": ct_id, "steps": doc.steps})
+
+        execution = runner.submit(target, testcases, tags)
+        return {
+            "execution": execution,
+            "run": runner.runs[execution["id"]].snapshot(),
+        }
+
+    @app.get(API_PREFIX + "/runs/{exec_id}")
+    async def run_status(request: Request, exec_id: str):
+        runner: RunManager = request.app.state.runner
+        run = runner.runs.get(exec_id)
+        if not run:
+            raise _error(404, "not_found", f"run {exec_id} não existe")
+        return run.snapshot()
+
+    @app.get(API_PREFIX + "/runs/{exec_id}/stream")
+    async def stream_run(request: Request, exec_id: str):
+        runner: RunManager = request.app.state.runner
+        run = runner.runs.get(exec_id)
+        if not run:
+            raise _error(404, "not_found", f"run {exec_id} não existe")
+
+        async def event_stream():
+            queue: asyncio.Queue = asyncio.Queue()
+            finished = run.status in ("done", "failed", "timeout", "cancelled")
+            if not finished:
+                run.subscribers.append(queue)
+            try:
+                for line in list(run.log):  # replay do buffer p/ quem chega tarde
+                    yield f"data: {line}\n\n"
+                if not finished:
+                    while True:
+                        line = await queue.get()
+                        if line is None:
+                            break
+                        yield f"data: {line}\n\n"
+                yield f"event: done\ndata: {run.status}\n\n"
+            finally:
+                if queue in run.subscribers:
+                    run.subscribers.remove(queue)
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+    @app.post(API_PREFIX + "/runs/{exec_id}/cancel")
+    async def cancel_run(request: Request, exec_id: str):
+        runner: RunManager = request.app.state.runner
+        return runner.cancel(exec_id).snapshot()
+
+    # -- GitHub Actions (M4) --------------------------------------------------
+
+    @app.post(API_PREFIX + "/runs/ci", status_code=201)
+    async def create_ci_run(request: Request, payload: CIRunIn):
+        ws, conn = ws_of(request), conn_of(request)
+        ci: CIManager = request.app.state.ci
+        ct_ids = list(payload.testcase_ids)
+        if payload.tags and not ct_ids:
+            rows = conn.execute(
+                "SELECT id FROM testcases WHERE scenario_tag IN (%s)"
+                % ",".join("?" for _ in payload.tags),
+                [t if t.startswith("@") else f"@{t}" for t in payload.tags],
+            ).fetchall()
+            ct_ids = [r["id"] for r in rows]
+        testcases = []
+        for ct_id in ct_ids:
+            row = conn.execute(
+                "SELECT id, path FROM testcases WHERE id = ?", (ct_id,)
+            ).fetchone()
+            if not row:
+                raise _error(404, "not_found", f"{ct_id} não encontrado")
+            doc = parse_markdown(ws.root / row["path"])
+            testcases.append({"id": ct_id, "steps": doc.steps})
+        if not testcases:
+            raise _error(422, "empty_selection",
+                         "informe testcase_ids ou tags que resolvam para CTs")
+        inputs = {"tags": ",".join(
+            t if t.startswith("@") else f"@{t}" for t in payload.tags
+        )} if payload.tags else {"tags": ",".join(f"@{c}" for c in ct_ids)}
+        return await asyncio.to_thread(
+            ci.dispatch, payload.target, payload.ref, inputs, testcases
+        )
+
+    @app.get(API_PREFIX + "/runs/ci/{exec_id}/status")
+    async def ci_run_status(request: Request, exec_id: str):
+        ci: CIManager = request.app.state.ci
+        return await asyncio.to_thread(ci.status, exec_id)
+
+    @app.post(API_PREFIX + "/runs/ci/{exec_id}/collect")
+    async def ci_run_collect(request: Request, exec_id: str):
+        ci: CIManager = request.app.state.ci
+        return await asyncio.to_thread(ci.collect, exec_id)
+
+    @app.get(API_PREFIX + "/settings/github/token")
+    async def github_token_status(request: Request):
+        return request.app.state.tokens.status()  # status apenas, nunca o valor
+
+    @app.put(API_PREFIX + "/settings/github/token")
+    async def github_token_set(request: Request, payload: TokenIn):
+        request.app.state.tokens.set(payload.token)
+        return request.app.state.tokens.status()
 
     # -- migração Xray (M2) -------------------------------------------------
 

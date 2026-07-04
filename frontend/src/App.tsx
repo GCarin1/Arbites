@@ -12,12 +12,14 @@ import {
 } from "./components/Executions";
 import { Dashboard } from "./components/Dashboard";
 import { XrayImport } from "./components/XrayImport";
+import { Automation } from "./components/Automation";
 
 type Tab =
   | "testcases"
   | "requirements"
   | "executions"
   | "dashboard"
+  | "automation"
   | "migration"
   | "problems";
 
@@ -127,6 +129,12 @@ export default function App() {
               Dashboard
             </button>
             <button
+              className={tab === "automation" ? "active" : ""}
+              onClick={() => setTab("automation")}
+            >
+              Automação
+            </button>
+            <button
               className={tab === "migration" ? "active" : ""}
               onClick={() => setTab("migration")}
             >
@@ -176,6 +184,13 @@ export default function App() {
                 principal. Cada linha da matriz expande até a evidência.
               </p>
             )}
+            {tab === "automation" && (
+              <p className="muted" style={{ padding: 8 }}>
+                Targets do arbites.yaml, re-scan de features e runs Behave
+                com log ao vivo no painel principal. Uma execução por
+                target; excedentes entram em fila FIFO.
+              </p>
+            )}
             {tab === "migration" && (
               <p className="muted" style={{ padding: 8 }}>
                 Import do XML do Xray (preview → confirm, idempotente) no
@@ -204,6 +219,8 @@ export default function App() {
             <WarningsView warnings={warnings} />
           ) : tab === "dashboard" ? (
             <Dashboard onError={setError} />
+          ) : tab === "automation" ? (
+            <Automation onChanged={() => void refresh()} onError={setError} />
           ) : tab === "migration" ? (
             <XrayImport onImported={() => void refresh()} onError={setError} />
           ) : tab === "executions" ? (

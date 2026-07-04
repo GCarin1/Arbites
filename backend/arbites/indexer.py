@@ -170,6 +170,11 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
 
     _relational_checks(conn)
 
+    # scan dos feature files dos automation targets (spec indexing / ADR 0003)
+    from .gherkin_scan import scan_all_targets
+
+    scan_all_targets(ws, conn)
+
     for prefix, seen_max in max_by_prefix.items():
         ws.bump_counter_to(prefix, seen_max)
 

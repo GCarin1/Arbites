@@ -2,10 +2,10 @@
 
 **Capability:** local-automation
 **Status:** active
-**Implementation:** planned — deferido ao M3 (após M2)
+**Implementation:** verified — M3 (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
-**Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Last updated:** 2026-07-04
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -69,15 +69,15 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 
 ## Acceptance criteria
 
-1. [unverified] Disparar automação real pela UI mostra log ao vivo e
+1. [verified] Disparar automação real pela UI mostra log ao vivo e
    popula a execution com steps Gherkin — verified by
-   `tests/test_local_runs.py`.
-2. [unverified] Dois runs no mesmo target entram em fila FIFO — verified
-   by `tests/test_local_runs.py`.
-3. [unverified] Timeout marca pendentes como `blocked` com
-   `error: "timeout"` — verified by `tests/test_local_runs.py`.
-4. [unverified] Screenshot de falha do hook aparece hasheado em
-   `evidences/` — verified by `tests/test_local_runs.py`.
+   `backend/tests/test_local_runs.py`.
+2. [verified] Dois runs no mesmo target entram em fila FIFO — verified
+   by `backend/tests/test_local_runs.py`.
+3. [verified] Timeout marca pendentes como `blocked` com
+   `error: "timeout"` — verified by `backend/tests/test_local_runs.py`.
+4. [verified] Screenshot de falha do hook aparece hasheado em
+   `evidences/` — verified by `backend/tests/test_local_runs.py`.
 
 ## Maturity
 

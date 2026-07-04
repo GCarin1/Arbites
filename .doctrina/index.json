@@ -26,9 +26,9 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M4 (após M3)",
+        "version": "0.2.0",
+        "last_updated": "2026-07-04",
+        "implementation": "verified — M4 (backend/arbites/ci.py, frontend/src/components/Automation.tsx, docs/examples/tests.yml); orquestração provada com fake client — validação contra a API real pendente do primeiro uso com o repo da B3",
         "realizes": [
           "SC6"
         ]
@@ -59,9 +59,9 @@
         "id": "indexing",
         "path": ".doctrina/specs/indexing/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
-        "implementation": "partial — M0 entrega parsers/reindex/warnings; scan Gherkin de targets fica para o M3 (spec local-automation)",
+        "version": "0.3.0",
+        "last_updated": "2026-07-04",
+        "implementation": "verified — M0 (parsers/reindex) + M3 (scan Gherkin: backend/arbites/gherkin_scan.py)",
         "realizes": [
           "SC1",
           "SC8"
@@ -71,9 +71,9 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M3 (após M2)",
+        "version": "0.2.0",
+        "last_updated": "2026-07-04",
+        "implementation": "verified — M3 (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
           "SC5"
         ]
@@ -156,14 +156,16 @@
         "path": ".doctrina/decisions/0003-vinculo-ct-cenario-por-tag-ct-xxxx.md",
         "title": "Vinculo CT-cenario por tag @CT-XXXX",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-04 — `backend/arbites/gherkin_scan.py`"
       },
       {
         "id": "0004",
         "path": ".doctrina/decisions/0004-execucao-local-via-subprocess-direto-na-v1.md",
         "title": "Execucao local via subprocess direto na v1",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-04 — `backend/arbites/runner.py`"
       },
       {
         "id": "0005",
@@ -178,7 +180,8 @@
         "path": ".doctrina/decisions/0006-coleta-ci-por-artifact-cucumber-json.md",
         "title": "Coleta CI por artifact Cucumber JSON",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-04 — `backend/arbites/ci.py`, `docs/examples/tests.yml`"
       },
       {
         "id": "0007",
@@ -193,7 +196,8 @@
         "path": ".doctrina/decisions/0008-pat-github-no-keyring-do-os.md",
         "title": "PAT GitHub no keyring do OS",
         "status": "accepted",
-        "date": "2026-07-03"
+        "date": "2026-07-03",
+        "landed": "2026-07-04 — `backend/arbites/ci.py`"
       },
       {
         "id": "0009",
@@ -286,6 +290,36 @@
           },
           {
             "capability": "xray-migration",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0005-m3-automacao-local-targets-scan-de-features-gher",
+        "title": "0005-m3-automacao-local-targets-scan-de-features-gher",
+        "path": ".doctrina/changes/archive/2026-07-04-0005-m3-automacao-local-targets-scan-de-features-gher",
+        "status": "applied",
+        "applied": "2026-07-04",
+        "specs_affected": [
+          {
+            "capability": "indexing",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0006-m4-github-actions-workflow-dispatch-com-correlac",
+        "title": "0006-m4-github-actions-workflow-dispatch-com-correlac",
+        "path": ".doctrina/changes/archive/2026-07-04-0006-m4-github-actions-workflow-dispatch-com-correlac",
+        "status": "applied",
+        "applied": "2026-07-04",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
             "operation": "MODIFIED"
           }
         ]

@@ -2,10 +2,10 @@
 
 **Capability:** ci-automation
 **Status:** active
-**Implementation:** planned — deferido ao M4 (após M3)
+**Implementation:** verified — M4 (backend/arbites/ci.py, frontend/src/components/Automation.tsx, docs/examples/tests.yml); orquestração provada com fake client — validação contra a API real pendente do primeiro uso com o repo da B3
 **Realizes:** SC6
-**Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Last updated:** 2026-07-04
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -67,12 +67,13 @@ workflow/jobs/steps do workflow.
 
 ## Acceptance criteria
 
-1. [unverified] Disparo real pela UI cria execution `github_actions` e
-   correlaciona o run id — verified by `tests/test_ci_runs.py`.
-2. [unverified] Ao completar, collect produz execution idêntica em
-   estrutura à de um run local — verified by `tests/test_ci_runs.py`.
-3. [unverified] Token gravado via API está no keyring e nunca aparece em
-   respostas ou logs — verified by `tests/test_ci_token.py`.
+1. [verified] Disparo pela UI cria execution `github_actions` e
+   correlaciona o run id — verified by `backend/tests/test_ci_runs.py`.
+2. [verified] Ao completar, collect produz execution idêntica em
+   estrutura à de um run local — verified by `backend/tests/test_ci_runs.py`.
+3. [verified] Token gravado via API está no keyring e nunca aparece em
+   respostas, logs ou arquivos do workspace — verified by
+   `backend/tests/test_ci_token.py`.
 
 ## Maturity
 

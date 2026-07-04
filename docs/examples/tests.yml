@@ -1,0 +1,51 @@
+# tests.yml — workflow de exemplo para integração com o Arbites (M4)
+#
+# Requisitos (ADR 0006):
+#   (a) aceitar workflow_dispatch com input de tags
+#   (b) publicar o Cucumber JSON + screenshots como artifact
+#
+# O Arbites dispara via POST /runs/ci, acompanha os steps do workflow por
+# polling e, ao completar, baixa o artifact "cucumber-report" e popula a
+# execution com o mesmo parser do run local.
+
+name: tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Tags Behave (ex.: @CT-0001,@smoke)"
+        required: false
+        default: ""
+
+jobs:
+  behave:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Execute tests
+        env:
+          ARBITES_EVIDENCE_DIR: ${{ github.workspace }}/evidences
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.tags }}" ]; then ARGS="--tags=${{ inputs.tags }}"; fi
+          behave -f json -o result.json -f plain --no-capture $ARGS
+        continue-on-error: true   # o resultado vem do JSON, não do exit code
+
+      - name: Publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-report
+          path: |
+            result.json
+            evidences/

@@ -2,10 +2,10 @@
 
 **Capability:** indexing
 **Status:** active
-**Implementation:** partial — M0 entrega parsers/reindex/warnings; scan Gherkin de targets fica para o M3 (spec local-automation)
+**Implementation:** verified — M0 (parsers/reindex) + M3 (scan Gherkin: backend/arbites/gherkin_scan.py)
 **Realizes:** SC1, SC8
-**Last updated:** 2026-07-03
-**Version:** 0.2.0
+**Last updated:** 2026-07-04
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -76,9 +76,8 @@ e o mapa de cenários automatizados `@CT-XXXX → (feature, cenário, linha)`.
    verified by `backend/tests/test_indexing_perf.py`.
 3. [verified] ID duplicado gera conflito listado em `/warnings` —
    verified by `backend/tests/test_indexing.py`.
-4. [unverified] Feature em `# language: pt` é parseada e mapeada por tag
-   `@CT-XXXX` — deferido ao M3; verified by `backend/tests/test_gherkin.py`
-   (a criar).
+4. [verified] Feature em `# language: pt` é parseada e mapeada por tag
+   `@CT-XXXX` — verified by `backend/tests/test_gherkin.py`.
 
 ## Maturity
 

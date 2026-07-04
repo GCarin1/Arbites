@@ -6,7 +6,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Evidence:** n/a — decisão de design do intake; nenhuma implementação ainda (landará com o M3)
-- **Landed:** —
+- **Landed:** 2026-07-04 — `backend/arbites/runner.py`
 
 ## Context
 

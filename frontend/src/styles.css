@@ -473,3 +473,16 @@ table.dense th {
 .button-link:hover {
   border-color: var(--text-muted);
 }
+
+.run-log {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  max-width: 880px;
+}
