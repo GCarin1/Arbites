@@ -2,10 +2,10 @@
 
 **Capability:** reporting
 **Status:** active
-**Implementation:** verified — M1.5 (backend/arbites/metrics.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx); filtro target do pass rate entra no M3
+**Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-06
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -37,6 +37,10 @@ export PDF e Markdown (para colar no Confluence).
   (drill-down completo).
 - The system shall marcar stories sem CT como "sem cobertura" na matriz.
 - The system shall exportar a matriz em PDF e em Markdown.
+- The system shall anotar cada métrica do summary com um `status`
+  (ok/warn/bad/none) contra metas opcionais configuradas em `arbites.yaml`
+  (`metric_thresholds`), respeitando a direção da métrica (maior-melhor ou
+  menor-melhor).
 
 ### Event-driven
 
@@ -47,6 +51,9 @@ export PDF e Markdown (para colar no Confluence).
 
 - While não há dados de execução no período, the system shall exibir
   métricas zeradas com denominadores explícitos (nunca esconder a fórmula).
+- While nenhuma meta está configurada para uma métrica, the system shall
+  reportar `status: none` e não colorir o card (número e fórmula seguem
+  visíveis).
 
 ### Unwanted-behavior (must-not)
 
@@ -76,16 +83,20 @@ export PDF e Markdown (para colar no Confluence).
 5. [verified] Um único CT arrastado por vários status no mesmo dia conta
    como 1 no status final do dia na tendência, não como vários — verified
    by `backend/tests/test_metrics.py`.
+6. [verified] Cada métrica recebe status ok/warn/bad conforme a meta e a
+   direção configuradas, e `none` quando não há meta — verified by
+   `backend/tests/test_metrics.py`.
 
 ## Maturity
 
 **MVP (committed):**
 
-- 7 métricas, tendência, matriz navegável, export PDF/MD.
+- 7 métricas, tendência, matriz navegável, export PDF/MD, metas/thresholds
+  por métrica (semáforo).
 
 **Future (aspirational, not committed):**
 
-- Comparação entre sprints; metas/thresholds configuráveis por métrica.
+- Comparação entre sprints.
 
 ## Out of scope for this spec
 

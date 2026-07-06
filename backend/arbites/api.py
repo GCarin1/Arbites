@@ -755,13 +755,15 @@ def _register_routes(app: FastAPI) -> None:
     ):
         conn = conn_of(request)
         s, d, sq = sprint or None, days or None, squad or None
-        return {
+        summary = {
             "requirement_coverage": metrics_ops.requirement_coverage(conn, epic or None, sq),
             "execution_coverage": metrics_ops.execution_coverage(conn, s, d, sq),
             "pass_rate": metrics_ops.pass_rate(conn, s, d, sq),
             "blocked_rate": metrics_ops.blocked_rate(conn, s, d, sq),
             "rework_rate": metrics_ops.rework_rate(conn, s, d, sq),
         }
+        thresholds = ws_of(request).config().get("metric_thresholds")
+        return metrics_ops.annotate_thresholds(summary, thresholds)
 
     @app.get(API_PREFIX + "/metrics/trend")
     async def metrics_trend(request: Request, days: int = 7, sprint: str = "", squad: str = ""):

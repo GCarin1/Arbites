@@ -1,8 +1,41 @@
 """Critérios de aceite da spec reporting — fórmulas sobre dataset conhecido."""
 
+import yaml
+
 import pytest
 
 TC_BODY = "## Passos\n\n1. x\n\n## Resultado esperado\n\nok\n"
+
+
+def _set_thresholds(client, thresholds: dict) -> None:
+    cfg = client.ws.config()
+    cfg["metric_thresholds"] = thresholds
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+
+def test_metric_thresholds_traffic_light(client, dataset):
+    """M8: cada métrica recebe status ok/warn/bad conforme a meta e direção."""
+    _set_thresholds(
+        client,
+        {
+            "pass_rate": {"warn": 0.8, "bad": 0.6},  # up; valor 0.25 → bad
+            "requirement_coverage": {"warn": 0.5, "bad": 0.3},  # up; 1/3≈0.33 → warn
+            "blocked_rate": {"warn": 0.1, "bad": 0.2},  # down (default); 0.0 → ok
+        },
+    )
+    m = client.get("/api/v1/metrics/summary").json()
+    assert m["pass_rate"]["status"] == "bad"
+    assert m["requirement_coverage"]["status"] == "warn"
+    assert m["blocked_rate"]["status"] == "ok"
+    assert m["blocked_rate"]["threshold"]["direction"] == "down"
+    # métrica sem meta configurada → sem semáforo
+    assert m["execution_coverage"]["status"] == "none"
+
+
+def test_thresholds_absent_by_default(client, dataset):
+    """Sem metas configuradas, nenhum semáforo (retrocompat)."""
+    m = client.get("/api/v1/metrics/summary").json()
+    assert all(m[k]["status"] == "none" for k in m)
 
 
 @pytest.fixture()

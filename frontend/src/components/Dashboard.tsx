@@ -175,12 +175,23 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
 
 function MetricCard({ label, metric }: { label: string; metric: MetricValue }) {
   const pct = metric.value === null ? "—" : `${Math.round(metric.value * 100)}%`;
+  const status = metric.status ?? "none";
+  const goal =
+    status !== "none" && metric.threshold?.warn !== undefined
+      ? `meta ${metric.threshold.direction === "down" ? "≤" : "≥"} ${Math.round(
+          (metric.threshold.warn ?? 0) * 100,
+        )}%`
+      : null;
   return (
-    <div className="metric-card">
-      <div className="metric-label">{label}</div>
+    <div className={`metric-card metric-${status}`}>
+      <div className="metric-label">
+        {label}
+        {status !== "none" && <span className={`metric-flag flag-${status}`} title={goal ?? ""} />}
+      </div>
       <div className="metric-value">{pct}</div>
       <div className="metric-formula mono" title={metric.formula}>
-        {metric.numerator}/{metric.denominator} · {metric.formula}
+        {goal ? `${goal} · ` : ""}
+        {metric.numerator}/{metric.denominator}
       </div>
     </div>
   );

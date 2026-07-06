@@ -23,6 +23,17 @@
         ]
       },
       {
+        "id": "businessmap",
+        "path": ".doctrina/specs/businessmap/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-06",
+        "implementation": "planned — M6, gated na migração corporativa. Especificado (intenção fixada); a implementação começa quando o Businessmap substituir o Jira/Xray na B3 e houver acesso à API real (ADR 0007)",
+        "realizes": [
+          "SC10"
+        ]
+      },
+      {
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "active",
@@ -82,9 +93,9 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-06",
-        "implementation": "verified — M1.5 (backend/arbites/metrics.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx); filtro target do pass rate entra no M3",
+        "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
         ]
@@ -402,6 +413,19 @@
         "specs_affected": [
           {
             "capability": "segmentation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0014-m8-metas-thresholds-no-dashboard-metas-configura",
+        "title": "M8 metas/thresholds no dashboard: metas configuraveis por metrica no arbites.yaml (metric_thresholds); o summary anota cada metrica com status ok/warn/bad conforme a meta e direcao (maior-melhor p/ pass_rate e coberturas, menor-melhor p/ blocked/rework); frontend colore os KPI cards como semaforo",
+        "path": ".doctrina/changes/archive/2026-07-06-0014-m8-metas-thresholds-no-dashboard-metas-configura",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]

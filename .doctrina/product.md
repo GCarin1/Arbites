@@ -92,6 +92,9 @@ Out of scope (deferred or rejected):
 - [SC9] Marcar squad em epic/story, CT e execução (CT herda da story), e
   filtrar dashboard e board por squad, com as 7 métricas recalculadas sobre
   o subconjunto do squad. (M7)
+- [SC10] Vincular requisitos/defeitos a cards do Businessmap por chave
+  externa e importar cards como requisitos-espelho (import pontual análogo
+  ao Xray), quando a migração corporativa concretizar. (M6 — gated)
 
 ## Delivery order (walking skeleton)
 

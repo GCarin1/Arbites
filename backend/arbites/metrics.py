@@ -27,6 +27,42 @@ def _ratio(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 4) if denominator else None
 
 
+# métricas em que "menor é melhor" (default de direção quando não configurado)
+_LOWER_IS_BETTER = {"blocked_rate", "rework_rate"}
+
+
+def threshold_status(value: float | None, cfg: dict[str, Any]) -> str:
+    """Semáforo de uma métrica vs sua meta: ok | warn | bad | none.
+
+    `cfg` = {warn, bad, direction?}. `direction` "up" (maior melhor, default)
+    ou "down" (menor melhor). Sem valor ou sem warn/bad → "none".
+    """
+    if value is None or "warn" not in cfg or "bad" not in cfg:
+        return "none"
+    warn, bad = float(cfg["warn"]), float(cfg["bad"])
+    if cfg.get("direction", "up") == "down":
+        if value <= warn:
+            return "ok"
+        return "warn" if value <= bad else "bad"
+    if value >= warn:
+        return "ok"
+    return "warn" if value >= bad else "bad"
+
+
+def annotate_thresholds(summary: dict, thresholds: dict[str, Any] | None) -> dict:
+    """Anota cada métrica do summary com `status` e a `threshold` usada."""
+    thresholds = thresholds or {}
+    for key, metric in summary.items():
+        if not isinstance(metric, dict) or "value" not in metric:
+            continue
+        cfg = dict(thresholds.get(key) or {})
+        if cfg and "direction" not in cfg:
+            cfg["direction"] = "down" if key in _LOWER_IS_BETTER else "up"
+        metric["threshold"] = cfg or None
+        metric["status"] = threshold_status(metric.get("value"), cfg)
+    return summary
+
+
 _SQUAD_CT = " AND {col} IN (SELECT id FROM testcases WHERE squad_effective = ?)"
 
 # predicado do squad efetivo de uma story (própria squad → herda do epic)

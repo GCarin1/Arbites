@@ -136,6 +136,8 @@ export interface MetricValue {
   numerator: number;
   denominator: number;
   value: number | null;
+  status?: "ok" | "warn" | "bad" | "none";
+  threshold?: { warn?: number; bad?: number; direction?: string } | null;
 }
 
 export interface MetricsSummary {
