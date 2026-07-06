@@ -392,6 +392,63 @@ def traceability(
             "epics": out_epics}
 
 
+_SEVERITY_ORDER = ["critical", "high", "medium", "low"]
+
+
+def defects_report(conn: sqlite3.Connection, squad: str | None = None) -> dict:
+    """Painel de defeitos abertos: aging (dias em aberto), severidade e squad.
+
+    Squad do defeito = squad efetivo do CT vinculado (LEFT JOIN). Aging usa
+    `opened_at`; defeitos antigos sem data ficam com `age_days: null`.
+    """
+    where, params = "WHERE d.status = 'open'", []
+    if squad:
+        where += " AND t.squad_effective = ?"
+        params.append(squad)
+    rows = conn.execute(
+        "SELECT d.id, d.title, d.severity, d.testcase_id, d.execution_id,"
+        " d.external_key, d.opened_at, t.squad_effective squad"
+        " FROM defects d LEFT JOIN testcases t ON t.id = d.testcase_id "
+        + where + " ORDER BY d.opened_at ASC, d.id ASC",
+        params,
+    ).fetchall()
+
+    today = datetime.now(timezone.utc).date()
+    by_severity: dict[str, int] = {}
+    by_squad: dict[str, int] = {}
+    buckets = {"0-7": 0, "8-30": 0, "30+": 0}
+    items = []
+    for r in rows:
+        age = None
+        if r["opened_at"]:
+            try:
+                age = (today - datetime.fromisoformat(r["opened_at"][:10]).date()).days
+            except ValueError:
+                age = None
+        severity = r["severity"] or "unspecified"
+        squad_label = r["squad"] or "sem squad"
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+        by_squad[squad_label] = by_squad.get(squad_label, 0) + 1
+        if age is not None:
+            key = "0-7" if age <= 7 else "8-30" if age <= 30 else "30+"
+            buckets[key] += 1
+        items.append({**dict(r), "squad": squad_label, "age_days": age})
+
+    ordered_sev = {
+        s: by_severity[s]
+        for s in (*_SEVERITY_ORDER, "unspecified")
+        if s in by_severity
+    }
+    return {
+        "squad_filter": squad,
+        "open_count": len(items),
+        "by_severity": ordered_sev,
+        "by_squad": dict(sorted(by_squad.items())),
+        "aging_buckets": buckets,
+        "items": items,
+    }
+
+
 def matrix_markdown(matrix: dict) -> str:
     """Renderiza a matriz em Markdown colável no Confluence."""
     lines = ["# Matriz de rastreabilidade", ""]

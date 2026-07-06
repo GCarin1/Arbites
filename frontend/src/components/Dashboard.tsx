@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { api } from "../api";
 import type {
+  DefectsReport,
   Execution,
   FlakyReport,
   MatrixStory,
@@ -29,6 +30,7 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [flaky, setFlaky] = useState<FlakyReport | null>(null);
   const [matrix, setMatrix] = useState<TraceabilityMatrix | null>(null);
+  const [defects, setDefects] = useState<DefectsReport | null>(null);
 
   useEffect(() => {
     api
@@ -39,16 +41,18 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
 
   const load = useCallback(async () => {
     try {
-      const [s, t, f, m] = await Promise.all([
+      const [s, t, f, m, d] = await Promise.all([
         api.metricsSummary(sprint, days, squad),
         api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, squad),
         api.metricsFlaky(5),
         api.traceability("", sprint, squad),
+        api.metricsDefects(squad),
       ]);
       setSummary(s);
       setTrend(t);
       setFlaky(f);
       setMatrix(m);
+      setDefects(d);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
@@ -133,6 +137,9 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
         </ResponsiveContainer>
       </div>
 
+      <h3 className="section-title">Defeitos abertos</h3>
+      <DefectsPanel report={defects} />
+
       <h3 className="section-title">Matriz de rastreabilidade</h3>
       {matrix && matrix.epics.length === 0 && (
         <div className="empty-state">
@@ -192,6 +199,86 @@ function MetricCard({ label, metric }: { label: string; metric: MetricValue }) {
       <div className="metric-formula mono" title={metric.formula}>
         {goal ? `${goal} · ` : ""}
         {metric.numerator}/{metric.denominator}
+      </div>
+    </div>
+  );
+}
+
+const SEV_DOT: Record<string, string> = {
+  critical: "dot-col-failed",
+  high: "dot-col-failed",
+  medium: "dot-col-blocked",
+  low: "dot-col-pending",
+};
+
+function DefectsPanel({ report }: { report: DefectsReport | null }) {
+  if (!report) return null;
+  if (report.open_count === 0) {
+    return (
+      <div className="empty-state">
+        <div className="empty-title">Nenhum defeito aberto</div>
+        <div className="empty-body">
+          Defeitos criados a partir de resultados failed aparecem aqui, com
+          aging por severidade e squad.
+        </div>
+      </div>
+    );
+  }
+  const aging = report.aging_buckets;
+  return (
+    <div className="chart-card">
+      <div className="defects-summary">
+        <div className="defect-stat">
+          <div className="metric-value">{report.open_count}</div>
+          <div className="metric-label">abertos</div>
+        </div>
+        <div className="defect-breakdown">
+          <div className="defect-row">
+            {Object.entries(report.by_severity).map(([sev, n]) => (
+              <span key={sev} className={`status-dot ${SEV_DOT[sev] ?? "dot-col-pending"}`}>
+                {sev}: {n}
+              </span>
+            ))}
+          </div>
+          <div className="defect-row caption">
+            <span>Aging:</span>
+            <span className="status-dot dot-col-passed">0–7d: {aging["0-7"]}</span>
+            <span className="status-dot dot-col-blocked">8–30d: {aging["8-30"]}</span>
+            <span className="status-dot dot-col-failed">30+d: {aging["30+"]}</span>
+          </div>
+        </div>
+      </div>
+      <div className="table-wrap" style={{ marginTop: 16 }}>
+        <table className="dense">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Título</th>
+              <th>Severidade</th>
+              <th>Squad</th>
+              <th>Idade</th>
+              <th>CT</th>
+              <th>Externo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.items.map((d) => (
+              <tr key={d.id}>
+                <td className="mono">{d.id}</td>
+                <td>{d.title}</td>
+                <td>
+                  <span className={`status-dot ${SEV_DOT[d.severity ?? ""] ?? "dot-col-pending"}`}>
+                    {d.severity ?? "—"}
+                  </span>
+                </td>
+                <td>{d.squad}</td>
+                <td className="mono">{d.age_days === null ? "—" : `${d.age_days}d`}</td>
+                <td className="mono muted">{d.testcase_id ?? "—"}</td>
+                <td className="mono muted">{d.external_key ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

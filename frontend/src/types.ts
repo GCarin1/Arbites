@@ -42,6 +42,68 @@ export interface TestCase {
   body?: string;
 }
 
+export interface TodoLink {
+  id: string;
+  kind: string | null;
+  title: string | null;
+}
+
+export interface Todo {
+  id: string;
+  title: string;
+  status: "open" | "doing" | "blocked" | "done";
+  due: string | null;
+  squad: string | null;
+  links: TodoLink[];
+  created: string | null;
+  path: string;
+  body?: string;
+}
+
+export interface DailyMetricDiff {
+  metric: string;
+  label: string;
+  today: number | null;
+  previous: number | null;
+  delta: number | null;
+}
+
+export interface DailyContext {
+  date: string;
+  todos: {
+    blocked: { id: string; title: string }[];
+    in_progress: { id: string; title: string; due: string | null }[];
+    done_count: number;
+  };
+  activity: {
+    executions: { execution_id: string; name: string; passed: number; failed: number; blocked: number }[];
+    defects_opened: { id: string; title: string; severity: string | null }[];
+  };
+  metrics_diff: {
+    previous_date: string;
+    has_today: boolean;
+    has_previous: boolean;
+    metrics: DailyMetricDiff[];
+  };
+  markdown: string;
+}
+
+export interface DailyDigestResult {
+  preview: boolean;
+  date: string;
+  summary: string;
+  impediments: string[];
+  progress: string;
+  action_items: string[];
+  context_markdown: string;
+}
+
+export interface SavedDaily {
+  date: string;
+  action_items: string[];
+  body: string;
+}
+
 export interface TreeNode {
   name: string;
   path: string;
@@ -159,6 +221,27 @@ export interface FlakyReport {
   formula: string;
   window: number;
   testcases: { testcase_id: string; sequence: string[] }[];
+}
+
+export interface DefectItem {
+  id: string;
+  title: string;
+  severity: string | null;
+  testcase_id: string | null;
+  execution_id: string | null;
+  external_key: string | null;
+  opened_at: string | null;
+  squad: string;
+  age_days: number | null;
+}
+
+export interface DefectsReport {
+  squad_filter: string | null;
+  open_count: number;
+  by_severity: Record<string, number>;
+  by_squad: Record<string, number>;
+  aging_buckets: Record<string, number>;
+  items: DefectItem[];
 }
 
 export interface MatrixLastResult {

@@ -1079,6 +1079,30 @@ table.dense tbody tr:hover td {
   margin-bottom: var(--s3);
 }
 
+.defects-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.defect-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.defect-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+}
+.defect-row {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .matrix-epic {
   margin-bottom: var(--s3);
 }
@@ -1146,6 +1170,59 @@ a {
   overflow: auto;
   white-space: pre-wrap;
   color: #c9d1d9;
+}
+
+/* -------------------------------------------------------------- Daily */
+
+.daily-history {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--s2);
+}
+.daily-history .link-chip {
+  cursor: pointer;
+  color: var(--text);
+}
+.daily-history .chip-active {
+  border-color: var(--primary);
+  background: var(--selected);
+}
+.daily-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s3);
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .daily-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------- Afazeres */
+
+.link-chip {
+  display: inline-block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin: 0 4px 2px 0;
+  font-size: var(--fs-caption);
+}
+.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+.status-select {
+  height: 28px;
+  padding: 0 24px 0 8px;
+  font-size: var(--fs-caption);
+  width: auto;
+  min-width: 100px;
+  background-position: calc(100% - 10px) 11px, calc(100% - 6px) 11px;
 }
 
 /* --------------------------------------------------------------- Modal */

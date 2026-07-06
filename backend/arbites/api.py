@@ -30,6 +30,7 @@ from . import __version__
 from . import executions as exec_ops
 from . import metrics as metrics_ops
 from . import ai as ai_ops
+from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
@@ -191,6 +192,33 @@ class DefectUpdate(BaseModel):
     execution: str | None = None
     external_key: str | None = None
     body: str | None = None
+
+
+class TodoIn(BaseModel):
+    title: str
+    status: str = Field(default="open", pattern="^(open|doing|blocked|done)$")
+    due: str | None = None
+    squad: str | None = None
+    links: list[str] = []
+    body: str = ""
+
+
+class TodoUpdate(BaseModel):
+    title: str | None = None
+    status: str | None = Field(default=None, pattern="^(open|doing|blocked|done)$")
+    due: str | None = None
+    squad: str | None = None
+    links: list[str] | None = None
+    body: str | None = None
+
+
+class DailyIn(BaseModel):
+    body: str = ""
+    action_items: list[str] = []
+
+
+class DailyGenerateIn(BaseModel):
+    provider: str | None = None
 
 
 DEFAULT_TC_BODY = """## Objetivo
@@ -779,6 +807,10 @@ def _register_routes(app: FastAPI) -> None:
     async def metrics_flaky(request: Request, window: int = 5, squad: str = ""):
         return metrics_ops.flaky(conn_of(request), window, squad or None)
 
+    @app.get(API_PREFIX + "/metrics/defects")
+    async def metrics_defects(request: Request, squad: str = ""):
+        return metrics_ops.defects_report(conn_of(request), squad or None)
+
     @app.get(API_PREFIX + "/metrics/traceability")
     async def metrics_traceability(
         request: Request, epic: str = "", sprint: str = "", squad: str = ""
@@ -1226,6 +1258,7 @@ def _register_routes(app: FastAPI) -> None:
             "testcase": payload.testcase,
             "execution": payload.execution,
             "external_key": payload.external_key,
+            "opened": date.today().isoformat(),
         }
         path = ws.root / "defects" / f"{defect_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body)
@@ -1247,6 +1280,173 @@ def _register_routes(app: FastAPI) -> None:
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
         return _defect_out(conn, ws, defect_id)
+
+    # -- todos (M10) -------------------------------------------------------
+
+    def _resolve_link(conn, link_id: str) -> dict:
+        """Resolve o título de um artefato linkado (CT/execução/requisito)."""
+        for table, kind, col in (
+            ("testcases", "testcase", "title"),
+            ("requirements", "requirement", "title"),
+            ("executions", "execution", "name"),
+            ("defects", "defect", "title"),
+        ):
+            row = conn.execute(
+                f"SELECT {col} v FROM {table} WHERE id = ?", (link_id,)
+            ).fetchone()
+            if row:
+                return {"id": link_id, "kind": kind, "title": row["v"]}
+        return {"id": link_id, "kind": None, "title": None}  # link pendente
+
+    def _todo_out(conn, ws: Workspace, todo_id: str) -> dict:
+        row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{todo_id} não encontrado")
+        out = dict(row)
+        link_ids = [x for x in (row["links"] or "").split(",") if x]
+        out["links"] = [_resolve_link(conn, x) for x in link_ids]
+        _, out["body"] = _load_doc(ws, row["path"])
+        return out
+
+    @app.get(API_PREFIX + "/todos")
+    async def list_todos(
+        request: Request,
+        status: str = "",
+        squad: str = "",
+        due_from: str = "",
+        due_to: str = "",
+        link: str = "",
+    ):
+        conn = conn_of(request)
+        sql, params = "SELECT * FROM todos WHERE 1=1", []
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
+        if squad:
+            sql += " AND squad = ?"
+            params.append(squad)
+        if due_from:
+            sql += " AND due >= ?"
+            params.append(due_from)
+        if due_to:
+            sql += " AND due <= ?"
+            params.append(due_to)
+        if link:
+            sql += " AND (',' || links || ',') LIKE ?"
+            params.append(f"%,{link},%")
+        # abertos por prazo primeiro; concluídos ao final
+        sql += " ORDER BY CASE status WHEN 'done' THEN 1 ELSE 0 END, due IS NULL, due, id"
+        out = []
+        for row in conn.execute(sql, params):
+            item = dict(row)
+            link_ids = [x for x in (row["links"] or "").split(",") if x]
+            item["links"] = [_resolve_link(conn, x) for x in link_ids]
+            out.append(item)
+        return out
+
+    @app.post(API_PREFIX + "/todos", status_code=201)
+    async def create_todo(request: Request, payload: TodoIn):
+        ws, conn = ws_of(request), conn_of(request)
+        todo_id = ws.next_id("todo")
+        meta = {
+            "id": todo_id,
+            "title": payload.title,
+            "status": payload.status,
+            "due": payload.due,
+            "squad": payload.squad,
+            "links": payload.links or None,
+            "created": date.today().isoformat(),
+        }
+        path = ws.root / "todos" / f"{todo_id}-{slugify(payload.title)}.md"
+        _write_doc(path, meta, payload.body)
+        reindex_file(ws, conn, path)
+        return _todo_out(conn, ws, todo_id)
+
+    @app.get(API_PREFIX + "/todos/{todo_id}")
+    async def get_todo(request: Request, todo_id: str):
+        return _todo_out(conn_of(request), ws_of(request), todo_id)
+
+    @app.put(API_PREFIX + "/todos/{todo_id}")
+    async def update_todo(request: Request, todo_id: str, payload: TodoUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "todos", todo_id)
+        meta, body = _load_doc(ws, rel)
+        changes = payload.model_dump(exclude_unset=True)
+        body = changes.pop("body", body)
+        for field in ("due", "squad", "links"):
+            if field in changes and not changes[field]:
+                meta.pop(field, None)
+                changes.pop(field)
+        meta.update(changes)
+        _write_doc(ws.root / rel, meta, body)
+        reindex_file(ws, conn, ws.root / rel)
+        return _todo_out(conn, ws, todo_id)
+
+    @app.delete(API_PREFIX + "/todos/{todo_id}", status_code=204)
+    async def delete_todo(request: Request, todo_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "todos", todo_id)
+        path = ws.root / rel
+        ws.trash(path)
+        reindex_file(ws, conn, path)
+
+    # -- daily (M11) -------------------------------------------------------
+
+    _DATE_RE = __import__("re").compile(r"^\d{4}-\d{2}-\d{2}$")
+
+    def _check_date(day: str) -> str:
+        if not _DATE_RE.match(day):
+            raise _error(422, "invalid_date", "data deve ser AAAA-MM-DD")
+        return day
+
+    def _daily_path(ws: Workspace, day: str) -> Path:
+        return ws.root / "dailies" / f"{day}.md"
+
+    @app.post(API_PREFIX + "/metrics/snapshot")
+    async def metrics_snapshot(request: Request):
+        ws, conn = ws_of(request), conn_of(request)
+        return daily_ops.save_snapshot(ws, conn)
+
+    @app.get(API_PREFIX + "/daily/{day}/context")
+    async def daily_context(request: Request, day: str):
+        ws, conn = ws_of(request), conn_of(request)
+        ctx = daily_ops.build_context(ws, conn, _check_date(day))
+        return {**ctx, "markdown": daily_ops.context_markdown(ctx)}
+
+    @app.post(API_PREFIX + "/daily/{day}/generate")
+    async def daily_generate(request: Request, day: str, payload: DailyGenerateIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        ctx = daily_ops.build_context(ws, conn, _check_date(day))
+        markdown = daily_ops.context_markdown(ctx)
+        digest = await asyncio.to_thread(ai_ops.generate_daily, provider, markdown)
+        return {"preview": True, "date": day, **digest.model_dump(), "context_markdown": markdown}
+
+    @app.get(API_PREFIX + "/dailies")
+    async def list_dailies(request: Request):
+        ws = ws_of(request)
+        base = ws.root / "dailies"
+        days = sorted(
+            (p.stem for p in base.glob("*.md") if _DATE_RE.match(p.stem)), reverse=True
+        ) if base.exists() else []
+        return {"dailies": days}
+
+    @app.get(API_PREFIX + "/daily/{day}")
+    async def get_daily(request: Request, day: str):
+        ws = ws_of(request)
+        path = _daily_path(ws, _check_date(day))
+        if not path.exists():
+            raise _error(404, "not_found", f"daily {day} não existe")
+        meta, body = _load_doc(ws, ws.relpath(path))
+        return {"date": day, "action_items": meta.get("action_items") or [], "body": body}
+
+    @app.put(API_PREFIX + "/daily/{day}")
+    async def put_daily(request: Request, day: str, payload: DailyIn):
+        ws = ws_of(request)
+        _check_date(day)
+        meta = {"date": day, "action_items": payload.action_items or None}
+        _write_doc(_daily_path(ws, day), meta, payload.body)
+        return {"date": day, "action_items": payload.action_items, "body": payload.body}
 
 
 def _mount_frontend(app: FastAPI) -> None:

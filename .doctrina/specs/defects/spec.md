@@ -2,10 +2,10 @@
 
 **Capability:** defects
 **Status:** active
-**Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz; backend/arbites/metrics.py)
+**Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)
 **Realizes:** SC2
-**Last updated:** 2026-07-04
-**Version:** 0.3.0
+**Last updated:** 2026-07-06
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -20,7 +20,7 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 
 - The system shall representar defeito como `.md` em `defects/` com
   frontmatter `id`, `title`, `status (open|fixed|closed)`, `severity`,
-  `testcase`, `execution`, `external_key`.
+  `testcase`, `execution`, `external_key`, `opened` (data de abertura).
 - The system shall expor `GET /defects`, `POST /defects`,
   `PUT /defects/{id}`.
 - The system shall permitir vincular defeitos a um resultado de execution
@@ -52,6 +52,9 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
    `testcase` e `execution` — verified by `backend/tests/test_defects.py`.
 2. [verified] Defeito aparece na matriz de rastreabilidade da story —
    verified by `backend/tests/test_reporting_e2e.py`.
+3. [verified] Defeito é carimbado com `opened` na criação e o report expõe
+   sua idade (dias em aberto), severidade e squad do CT vinculado —
+   verified by `backend/tests/test_defects.py`.
 
 ## Maturity
 

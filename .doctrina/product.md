@@ -95,6 +95,13 @@ Out of scope (deferred or rejected):
 - [SC10] Vincular requisitos/defeitos a cards do Businessmap por chave
   externa e importar cards como requisitos-espelho (import pontual análogo
   ao Xray), quando a migração corporativa concretizar. (M6 — gated)
+- [SC11] Manter uma lista de afazeres (todos) com datas, status (incl.
+  impedimento) e links para CT/execução/story, persistida em arquivo e
+  consultável por período/histórico. (M10)
+- [SC12] Gerar a daily de um dia a partir dos todos + atividade do QA +
+  diff de métricas (snapshot diário) + defeitos, com resumo executivo,
+  impedimentos e action items em destaque; salvar por data e navegar por
+  calendário; action items viram todos. IA opcional. (M11)
 
 ## Delivery order (walking skeleton)
 
@@ -117,5 +124,12 @@ Depth before breadth — o esqueleto é o M0 de ponta a ponta:
     semáforo vs meta configurável).
 11. M9 — dashboard: painel de defeitos (aging/severidade/por squad; delta de
     `reporting`/`defects`).
+12. M10 — aba To-Do: afazeres com datas, status (incl. impedimento) e links
+    para CT/execução/story, persistidos em arquivo (capability `todos`, SC11).
+13. M11 — Daily digest: snapshot diário de métricas + página Daily com
+    calendário; IA junta todos + atividade + diff + defeitos e gera o texto
+    da daily; action items viram todos (com confirmação).
+14. M12 — Reuniões: tema + descrição/transcrição; resumo executivo da IA que
+    entra na digestão da daily.
 
 Nada do milestone N+1 começa antes do N fechar (lição do Probatio).

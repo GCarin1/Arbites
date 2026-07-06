@@ -25,13 +25,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "testcase": "CT",
             "execution": "EXEC",
             "defect": "DF",
+            "todo": "TD",
         },
     },
     "automation_targets": [],
     "ai": {"default_provider": None, "providers": []},
 }
 
-SUBDIRS = ["requirements", "testcases", "executions", "defects", ".arbites"]
+SUBDIRS = [
+    "requirements", "testcases", "executions", "defects", "todos",
+    "dailies", "metrics", ".arbites",
+]
 
 
 def slugify(text: str) -> str:

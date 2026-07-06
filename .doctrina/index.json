@@ -45,12 +45,23 @@
         ]
       },
       {
+        "id": "daily",
+        "path": ".doctrina/specs/daily/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-07-06",
+        "implementation": "verified — M11 (backend/arbites/daily.py, backend/arbites/api.py, backend/arbites/ai.py; frontend Daily.tsx). IA opcional (reusa provider do M5); snapshots em `metrics/`, dailies em `dailies/`",
+        "realizes": [
+          "SC12"
+        ]
+      },
+      {
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.3.0",
-        "last_updated": "2026-07-04",
-        "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz; backend/arbites/metrics.py)",
+        "version": "0.4.0",
+        "last_updated": "2026-07-06",
+        "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
         ]
@@ -93,9 +104,9 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "last_updated": "2026-07-06",
-        "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
+        "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
         ]
@@ -131,6 +142,17 @@
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
+        ]
+      },
+      {
+        "id": "todos",
+        "path": ".doctrina/specs/todos/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-07-06",
+        "implementation": "verified — M10 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/workspace.py; frontend Todos.tsx). ID `TD-`, arquivos em `todos/`",
+        "realizes": [
+          "SC11"
         ]
       },
       {
@@ -426,6 +448,49 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0015-m9-painel-de-defeitos-no-dashboard-aging-dias-em",
+        "title": "M9 painel de defeitos no dashboard: aging (dias em aberto), por severidade e por squad; defeito ganha campo opened (data), report GET /metrics/defects, e painel no dashboard respeitando o filtro de squad",
+        "path": ".doctrina/changes/archive/2026-07-06-0015-m9-painel-de-defeitos-no-dashboard-aging-dias-em",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0016-m10-aba-to-do-capability-todos-crud-de-afazeres",
+        "title": "M10 aba To-Do: capability todos — CRUD de afazeres em todos/*.md com status (open/doing/blocked/done), due, squad e links para CT/execucao/story; indice e filtros; frontend lista com filtros e historico",
+        "path": ".doctrina/changes/archive/2026-07-06-0016-m10-aba-to-do-capability-todos-crud-de-afazeres",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "todos",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0017-m11-daily-digest-snapshot-diario-de-metricas-con",
+        "title": "M11 daily digest: snapshot diario de metricas, contexto do dia (todos+atividade+diff+defeitos), geracao por IA (preview) com resumo/impedimentos/andamento/action items, salvar dailies/AAAA-MM-DD.md, listar por data, action items viram todos",
+        "path": ".doctrina/changes/archive/2026-07-06-0017-m11-daily-digest-snapshot-diario-de-metricas-con",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "daily",
             "operation": "MODIFIED"
           }
         ]

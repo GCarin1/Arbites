@@ -46,7 +46,11 @@ CREATE TABLE IF NOT EXISTS evidences(
   mime TEXT, captured_at TEXT);
 CREATE TABLE IF NOT EXISTS defects(
   id TEXT PRIMARY KEY, title TEXT, status TEXT, severity TEXT,
-  testcase_id TEXT, execution_id TEXT, external_key TEXT, path TEXT);
+  testcase_id TEXT, execution_id TEXT, external_key TEXT, path TEXT,
+  opened_at TEXT);
+CREATE TABLE IF NOT EXISTS todos(
+  id TEXT PRIMARY KEY, title TEXT, status TEXT, due TEXT, squad TEXT,
+  links TEXT, created TEXT, path TEXT, mtime REAL);
 CREATE TABLE IF NOT EXISTS warnings(
   source_path TEXT, code TEXT, message TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS index_meta(key TEXT PRIMARY KEY, value TEXT);
@@ -67,6 +71,7 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE testcases ADD COLUMN squad_effective TEXT",
         "ALTER TABLE requirements ADD COLUMN squad TEXT",
         "ALTER TABLE executions ADD COLUMN squad TEXT",
+        "ALTER TABLE defects ADD COLUMN opened_at TEXT",
     ):
         try:
             conn.execute(ddl)
@@ -104,6 +109,7 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM results")
     conn.execute("DELETE FROM result_events")
     conn.execute("DELETE FROM evidences")
+    conn.execute("DELETE FROM todos")
     conn.execute("DELETE FROM warnings")
 
     seen_ids: dict[str, str] = {}  # id -> relpath (detecção de duplicidade)
@@ -172,6 +178,13 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
         if doc.id and track_id(doc, rel):
             _insert_defect(conn, doc, rel)
 
+    for path, text, error in read_all(ws.root / "todos"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_todo(conn, doc, rel)
+
     exec_base = ws.root / "executions"
     if exec_base.exists():
         for path in sorted(exec_base.glob("*/*/execution.json")):
@@ -219,7 +232,7 @@ def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
         conn.commit()
         return
     conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
-    for table in ("requirements", "testcases", "defects"):
+    for table in ("requirements", "testcases", "defects", "todos"):
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
             if table == "testcases":
                 conn.execute("DELETE FROM tc_tags WHERE testcase_id = ?", (row["id"],))
@@ -245,6 +258,8 @@ def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
                 _insert_testcase(conn, doc, rel)
             elif top == "defects":
                 _insert_defect(conn, doc, rel)
+            elif top == "todos":
+                _insert_todo(conn, doc, rel)
             m = _ID_RE.match(doc.id)
             if m:
                 ws.bump_counter_to(m.group(1), int(m.group(2)))
@@ -254,7 +269,7 @@ def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
 
 
 def _find_id(conn: sqlite3.Connection, entity_id: str) -> str | None:
-    for table in ("requirements", "testcases", "defects"):
+    for table in ("requirements", "testcases", "defects", "todos"):
         row = conn.execute(f"SELECT path FROM {table} WHERE id = ?", (entity_id,)).fetchone()
         if row:
             return row["path"]
@@ -344,8 +359,9 @@ def _recompute_effective_squads(conn: sqlite3.Connection) -> None:
 def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO defects"
-        "(id, title, status, severity, testcase_id, execution_id, external_key, path)"
-        " VALUES (?,?,?,?,?,?,?,?)",
+        "(id, title, status, severity, testcase_id, execution_id, external_key, path,"
+        " opened_at)"
+        " VALUES (?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -355,6 +371,30 @@ def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             doc.meta.get("execution"),
             doc.meta.get("external_key"),
             rel,
+            str(doc.meta.get("opened")) if doc.meta.get("opened") else None,
+        ),
+    )
+
+
+def _insert_todo(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    raw_links = doc.meta.get("links") or []
+    if isinstance(raw_links, str):
+        raw_links = [raw_links]
+    links = ",".join(str(link) for link in raw_links)
+    conn.execute(
+        "INSERT OR REPLACE INTO todos"
+        "(id, title, status, due, squad, links, created, path, mtime)"
+        " VALUES (?,?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("title", "")),
+            str(doc.meta.get("status", "open")),
+            str(doc.meta.get("due")) if doc.meta.get("due") else None,
+            (str(doc.meta.get("squad")).strip() or None) if doc.meta.get("squad") else None,
+            links,
+            str(doc.meta.get("created")) if doc.meta.get("created") else None,
+            rel,
+            doc.path.stat().st_mtime,
         ),
     )
 

@@ -79,6 +79,13 @@ class ReviewResult(BaseModel):
     summary: str = ""
 
 
+class DailyDigest(BaseModel):
+    summary: str  # resumo executivo do dia
+    impediments: list[str] = []  # impedimentos
+    progress: str = ""  # andamento
+    action_items: list[str] = []  # viram todos com confirmação
+
+
 def testcase_body(item: GeneratedTestcase) -> str:
     """Converte o item gerado no corpo .md canônico (âncoras do parser)."""
     lines = ["## Objetivo", "", item.objetivo or "-", "", "## Pré-condições", ""]
@@ -309,6 +316,21 @@ _NEGATIVE_SYSTEM = (
 def negative_cases(provider: _BaseProvider, ct_md: str) -> GeneratedTestcases:
     result = provider.complete(_NEGATIVE_SYSTEM, ct_md, GeneratedTestcases)
     assert isinstance(result, GeneratedTestcases)
+    return result
+
+
+_DAILY_SYSTEM = (
+    "Você é um QA sênior preparando sua daily standup. A partir do contexto "
+    "do dia (afazeres, atividade de testes, variação das métricas e defeitos), "
+    "escreva o que deve ser dito na daily: um resumo executivo objetivo do que "
+    "andou, os impedimentos (se houver), o andamento, e os action items "
+    "concretos para hoje. Seja direto e factual, em português do Brasil."
+)
+
+
+def generate_daily(provider: _BaseProvider, context_md: str) -> DailyDigest:
+    result = provider.complete(_DAILY_SYSTEM, context_md, DailyDigest)
+    assert isinstance(result, DailyDigest)
     return result
 
 

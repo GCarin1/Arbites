@@ -37,11 +37,19 @@ const Automation = lazy(() =>
 const AiAssist = lazy(() =>
   import("./components/AiAssist").then((m) => ({ default: m.AiAssist }))
 );
+const Todos = lazy(() =>
+  import("./components/Todos").then((m) => ({ default: m.Todos }))
+);
+const Daily = lazy(() =>
+  import("./components/Daily").then((m) => ({ default: m.Daily }))
+);
 
 type Tab =
   | "testcases"
   | "requirements"
   | "executions"
+  | "todos"
+  | "daily"
   | "dashboard"
   | "automation"
   | "ia"
@@ -52,6 +60,8 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "testcases", label: "Test cases" },
   { key: "requirements", label: "Requisitos" },
   { key: "executions", label: "Execuções" },
+  { key: "todos", label: "Afazeres" },
+  { key: "daily", label: "Daily" },
   { key: "dashboard", label: "Dashboard" },
   { key: "automation", label: "Automação" },
   { key: "ia", label: "IA" },
@@ -210,6 +220,20 @@ export default function App() {
                 saída é preview — nada é gravado sem você aceitar.
               </p>
             )}
+            {tab === "todos" && (
+              <p className="panel-hint">
+                Lista de afazeres com prazo, status e links para CT/execução/
+                story. Impedimentos (blocked) e concluídos ficam no histórico —
+                e alimentam a daily.
+              </p>
+            )}
+            {tab === "daily" && (
+              <p className="panel-hint">
+                Escolha o dia no calendário. A IA (opcional) digere afazeres +
+                atividade + diff de métricas + defeitos e gera o texto da daily
+                com action items — que viram afazeres.
+              </p>
+            )}
             {tab === "migration" && (
               <p className="panel-hint">
                 Import do XML do Xray (preview → confirm, idempotente) no
@@ -250,6 +274,14 @@ export default function App() {
           ) : tab === "ia" ? (
             <Suspense fallback={<p className="empty">Carregando IA…</p>}>
               <AiAssist onChanged={() => void refresh()} onError={setError} />
+            </Suspense>
+          ) : tab === "todos" ? (
+            <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
+              <Todos onError={setError} />
+            </Suspense>
+          ) : tab === "daily" ? (
+            <Suspense fallback={<p className="empty">Carregando daily…</p>}>
+              <Daily onError={setError} />
             </Suspense>
           ) : tab === "migration" ? (
             <Suspense fallback={<p className="empty">Carregando migração…</p>}>

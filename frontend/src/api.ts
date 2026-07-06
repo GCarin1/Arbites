@@ -1,7 +1,11 @@
 import type {
   AiProvidersInfo,
+  DailyContext,
+  DailyDigestResult,
   Defect,
+  DefectsReport,
   EvidenceEntry,
+  SavedDaily,
   Execution,
   ExecutionSummary,
   FlakyReport,
@@ -10,6 +14,7 @@ import type {
   Requirement,
   ReviewResponse,
   TestCase,
+  Todo,
   TraceabilityMatrix,
   TreeNode,
   TrendPoint,
@@ -117,6 +122,25 @@ export const api = {
   createDefect: (body: object) =>
     request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
 
+  todos: (query = "") => request<Todo[]>(`/todos${query}`),
+  createTodo: (body: object) =>
+    request<Todo>("/todos", { method: "POST", body: JSON.stringify(body) }),
+  updateTodo: (id: string, body: object) =>
+    request<Todo>(`/todos/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteTodo: (id: string) => request<void>(`/todos/${id}`, { method: "DELETE" }),
+
+  metricsSnapshot: () => request<unknown>("/metrics/snapshot", { method: "POST" }),
+  dailyContext: (day: string) => request<DailyContext>(`/daily/${day}/context`),
+  generateDaily: (day: string, provider?: string | null) =>
+    request<DailyDigestResult>(`/daily/${day}/generate`, {
+      method: "POST",
+      body: JSON.stringify({ provider: provider ?? null }),
+    }),
+  dailies: () => request<{ dailies: string[] }>("/dailies"),
+  getDaily: (day: string) => request<SavedDaily>(`/daily/${day}`),
+  putDaily: (day: string, body: object) =>
+    request<SavedDaily>(`/daily/${day}`, { method: "PUT", body: JSON.stringify(body) }),
+
   squads: () => request<{ squads: string[] }>("/squads"),
   metricsSummary: (sprint: string, days: number, squad = "") =>
     request<MetricsSummary>(
@@ -130,6 +154,8 @@ export const api = {
     ),
   metricsFlaky: (window: number) =>
     request<FlakyReport>(`/metrics/flaky?window=${window}`),
+  metricsDefects: (squad = "") =>
+    request<DefectsReport>(`/metrics/defects?squad=${encodeURIComponent(squad)}`),
   traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +

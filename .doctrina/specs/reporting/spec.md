@@ -2,10 +2,10 @@
 
 **Capability:** reporting
 **Status:** active
-**Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
+**Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-06
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -41,6 +41,9 @@ export PDF e Markdown (para colar no Confluence).
   (ok/warn/bad/none) contra metas opcionais configuradas em `arbites.yaml`
   (`metric_thresholds`), respeitando a direção da métrica (maior-melhor ou
   menor-melhor).
+- The system shall expor `GET /metrics/defects` com um resumo dos defeitos
+  abertos: contagem total, por severidade, por squad e por faixa de aging
+  (dias em aberto), além da lista, filtrável por squad.
 
 ### Event-driven
 
@@ -86,13 +89,16 @@ export PDF e Markdown (para colar no Confluence).
 6. [verified] Cada métrica recebe status ok/warn/bad conforme a meta e a
    direção configuradas, e `none` quando não há meta — verified by
    `backend/tests/test_metrics.py`.
+7. [verified] O report de defeitos agrega os defeitos abertos por
+   severidade, squad e faixa de aging, e filtra por squad — verified by
+   `backend/tests/test_defects.py`.
 
 ## Maturity
 
 **MVP (committed):**
 
 - 7 métricas, tendência, matriz navegável, export PDF/MD, metas/thresholds
-  por métrica (semáforo).
+  por métrica (semáforo), painel de defeitos abertos (aging/severidade/squad).
 
 **Future (aspirational, not committed):**
 
