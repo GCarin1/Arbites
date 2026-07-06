@@ -661,6 +661,51 @@ textarea.raw {
   }
 }
 
+/* Detail card — agrupa os metadados no modo leitura, título + ações no head */
+.detail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  margin-bottom: var(--s3);
+  overflow: hidden;
+}
+.detail-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.detail-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  min-width: 0;
+}
+.detail-title > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-card-head .spacer {
+  flex: 1;
+}
+.detail-actions {
+  display: flex;
+  gap: var(--s1);
+}
+.detail-card-body {
+  padding: var(--s2);
+}
+.detail-card-body .read-grid {
+  margin-bottom: 0;
+}
+
 .doc-body {
   background: var(--surface);
   border: 1px solid var(--border);

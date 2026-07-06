@@ -1,5 +1,39 @@
 import type { ReactNode } from "react";
 
+/**
+ * Card de detalhes do modo leitura — agrupa os metadados com um cabeçalho que
+ * carrega id/título, status e as ações (Editar/Excluir). Elimina a sensação de
+ * campos flutuantes sobre o fundo (padrão Jira/GitHub Issues).
+ */
+export function DetailCard({
+  id,
+  title,
+  status,
+  actions,
+  children,
+}: {
+  id: string;
+  title: string;
+  status?: ReactNode;
+  actions: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="detail-card">
+      <div className="detail-card-head">
+        <span className="detail-title">
+          <span className="mono muted">{id}</span>
+          <span>{title}</span>
+        </span>
+        {status}
+        <span className="spacer" />
+        <div className="detail-actions">{actions}</div>
+      </div>
+      <div className="detail-card-body">{children}</div>
+    </div>
+  );
+}
+
 /** Campo rótulo/valor no modo leitura. */
 export function ReadField({
   label,

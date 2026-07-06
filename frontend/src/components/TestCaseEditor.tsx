@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal } from "./Modal";
-import { DocBody, ReadField } from "./ReadView";
+import { DetailCard, DocBody, ReadField } from "./ReadView";
 import type { TestCase } from "../types";
 
 export function TestCaseEditor({
@@ -98,41 +98,6 @@ export function TestCaseEditor({
 
   return (
     <div className="editor">
-      <h2>
-        <span className="mono muted">{tc.id}</span>
-        <span>{tc.title}</span>
-        <span className={`status-dot dot-${tc.status} muted`}>{tc.status}</span>
-      </h2>
-      <div className="toolbar">
-        {editing ? (
-          <>
-            <button className={mode === "form" ? "primary" : ""} onClick={() => setMode("form")}>
-              Formulário
-            </button>
-            <button className={mode === "raw" ? "primary" : ""} onClick={() => setMode("raw")}>
-              Markdown cru
-            </button>
-            <span className="spacer" />
-            <button className="primary" onClick={() => void save()} disabled={saving}>
-              {saving ? "Salvando…" : "Salvar"}
-            </button>
-            <button onClick={cancelEdit} disabled={saving}>
-              Cancelar
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="primary" onClick={() => setEditing(true)}>
-              Editar
-            </button>
-            <span className="spacer" />
-          </>
-        )}
-        <button className="danger" onClick={() => setConfirmDelete(true)}>
-          Excluir
-        </button>
-      </div>
-
       {confirmDelete && (
         <ConfirmModal
           title="Excluir test case"
@@ -151,6 +116,21 @@ export function TestCaseEditor({
 
       {!editing ? (
         <>
+          <DetailCard
+            id={tc.id}
+            title={tc.title}
+            status={<span className={`status-dot dot-${tc.status}`}>{tc.status}</span>}
+            actions={
+              <>
+                <button className="primary" onClick={() => setEditing(true)}>
+                  Editar
+                </button>
+                <button className="danger" onClick={() => setConfirmDelete(true)}>
+                  Excluir
+                </button>
+              </>
+            }
+          >
           <div className="read-grid">
             <ReadField label="Tipo" value={tc.type} />
             <ReadField label="Prioridade" value={tc.priority} />
@@ -165,21 +145,49 @@ export function TestCaseEditor({
             />
             <ReadField label="Arquivo" value={tc.path} mono />
           </div>
-          <div className="field wide">
-            <label>Corpo</label>
+          </DetailCard>
+          <div className="card">
+            <div className="card-head">
+              <h3>Corpo</h3>
+            </div>
             <DocBody text={tc.body} />
           </div>
         </>
-      ) : mode === "raw" ? (
-        <textarea
-          className="raw"
-          value={raw}
-          onChange={(e) => setRaw(e.target.value)}
-          spellCheck={false}
-        />
       ) : (
         <>
-          <div className="field-grid">
+          <h2>
+            <span className="mono muted">{tc.id}</span>
+            <span>{tc.title}</span>
+            <span className={`status-dot dot-${tc.status} muted`}>{tc.status}</span>
+          </h2>
+          <div className="toolbar">
+            <button className={mode === "form" ? "primary" : ""} onClick={() => setMode("form")}>
+              Formulário
+            </button>
+            <button className={mode === "raw" ? "primary" : ""} onClick={() => setMode("raw")}>
+              Markdown cru
+            </button>
+            <span className="spacer" />
+            <button className="primary" onClick={() => void save()} disabled={saving}>
+              {saving ? "Salvando…" : "Salvar"}
+            </button>
+            <button onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </button>
+            <button className="danger" onClick={() => setConfirmDelete(true)}>
+              Excluir
+            </button>
+          </div>
+          {mode === "raw" ? (
+            <textarea
+              className="raw"
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              spellCheck={false}
+            />
+          ) : (
+            <>
+              <div className="field-grid">
             <div className="field wide">
               <label>Título</label>
               <input value={tc.title} onChange={(e) => set("title", e.target.value)} />
@@ -243,15 +251,17 @@ export function TestCaseEditor({
               </span>
             </div>
           </div>
-          <div className="field wide">
-            <label>Corpo (markdown — Objetivo / Pré-condições / Passos / Resultado esperado)</label>
-            <textarea
-              className="raw"
-              value={tc.body ?? ""}
-              onChange={(e) => set("body", e.target.value)}
-              spellCheck={false}
-            />
-          </div>
+              <div className="field wide">
+                <label>Corpo (markdown — Objetivo / Pré-condições / Passos / Resultado esperado)</label>
+                <textarea
+                  className="raw"
+                  value={tc.body ?? ""}
+                  onChange={(e) => set("body", e.target.value)}
+                  spellCheck={false}
+                />
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

@@ -373,9 +373,23 @@
         "status": "applied",
         "applied": "2026-07-06",
         "specs_affected": []
+      },
+      {
+        "id": "0012-redesenhar-o-modo-leitura-de-test-case-e-requisi",
+        "title": "redesenhar o modo leitura de test case e requisito: agrupar os metadados (Tipo, Prioridade, Status, Story, Tags, Arquivo) num card de detalhes com cabecalho contendo titulo/status e as acoes Editar/Excluir, com contraste de fundo e grid responsivo, eliminando a sensacao de campos flutuantes",
+        "path": ".doctrina/changes/archive/2026-07-06-0012-redesenhar-o-modo-leitura-de-test-case-e-requisi",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": []
       }
     ],
     "skills": [
+      {
+        "id": "leitura-agrupada-em-card",
+        "path": ".doctrina/skills/leitura-agrupada-em-card.md",
+        "description": "Como estruturar telas de leitura no frontend Arbites — agrupar metadados num card com cabeçalho (título/status/ações), evitando campos flutuantes sobre o fundo.",
+        "last_updated": "2026-07-06"
+      },
       {
         "id": "metricas-resultado-liquido",
         "path": ".doctrina/skills/metricas-resultado-liquido.md",

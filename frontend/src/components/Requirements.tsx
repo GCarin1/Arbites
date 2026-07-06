@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
-import { DocBody, ReadField } from "./ReadView";
+import { DetailCard, DocBody, ReadField } from "./ReadView";
 import type { Requirement } from "../types";
 
 export function RequirementsList({
@@ -242,31 +242,6 @@ export function RequirementEditor({
 
   return (
     <div className="editor">
-      <h2>
-        <span className="mono muted">{req.id}</span>
-        <span>{req.title}</span>
-        <span className={`status-dot dot-${req.status} muted`}>{req.status}</span>
-      </h2>
-      <div className="toolbar">
-        {editing ? (
-          <>
-            <button className="primary" onClick={() => void save()} disabled={saving}>
-              {saving ? "Salvando…" : "Salvar"}
-            </button>
-            <button onClick={cancelEdit} disabled={saving}>
-              Cancelar
-            </button>
-          </>
-        ) : (
-          <button className="primary" onClick={() => setEditing(true)}>
-            Editar
-          </button>
-        )}
-        <span className="spacer" />
-        <button className="danger" onClick={() => setConfirmDelete(true)}>
-          Excluir
-        </button>
-      </div>
       {confirmDelete && (
         <ConfirmModal
           title="Excluir requisito"
@@ -284,6 +259,21 @@ export function RequirementEditor({
       )}
       {!editing ? (
         <>
+          <DetailCard
+            id={req.id}
+            title={req.title}
+            status={<span className={`status-dot dot-${req.status}`}>{req.status}</span>}
+            actions={
+              <>
+                <button className="primary" onClick={() => setEditing(true)}>
+                  Editar
+                </button>
+                <button className="danger" onClick={() => setConfirmDelete(true)}>
+                  Excluir
+                </button>
+              </>
+            }
+          >
           <div className="read-grid">
             <ReadField label="Tipo" value={req.kind} />
             <ReadField
@@ -311,13 +301,33 @@ export function RequirementEditor({
             />
             <ReadField label="Arquivo" value={req.path} mono />
           </div>
-          <div className="field wide">
-            <label>Corpo</label>
+          </DetailCard>
+          <div className="card">
+            <div className="card-head">
+              <h3>Corpo</h3>
+            </div>
             <DocBody text={req.body} />
           </div>
         </>
       ) : (
         <>
+      <h2>
+        <span className="mono muted">{req.id}</span>
+        <span>{req.title}</span>
+        <span className={`status-dot dot-${req.status} muted`}>{req.status}</span>
+      </h2>
+      <div className="toolbar">
+        <button className="primary" onClick={() => void save()} disabled={saving}>
+          {saving ? "Salvando…" : "Salvar"}
+        </button>
+        <button onClick={cancelEdit} disabled={saving}>
+          Cancelar
+        </button>
+        <span className="spacer" />
+        <button className="danger" onClick={() => setConfirmDelete(true)}>
+          Excluir
+        </button>
+      </div>
       <div className="field-grid">
         <div className="field wide">
           <label>Título</label>
