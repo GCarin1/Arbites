@@ -23,18 +23,27 @@ import type {
 export function Dashboard({ onError }: { onError: (message: string) => void }) {
   const [sprint, setSprint] = useState("");
   const [days, setDays] = useState(30);
+  const [squad, setSquad] = useState("");
+  const [squads, setSquads] = useState<string[]>([]);
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [flaky, setFlaky] = useState<FlakyReport | null>(null);
   const [matrix, setMatrix] = useState<TraceabilityMatrix | null>(null);
 
+  useEffect(() => {
+    api
+      .squads()
+      .then((r) => setSquads(r.squads))
+      .catch(() => {});
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const [s, t, f, m] = await Promise.all([
-        api.metricsSummary(sprint, days),
-        api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint),
+        api.metricsSummary(sprint, days, squad),
+        api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, squad),
         api.metricsFlaky(5),
-        api.traceability("", sprint),
+        api.traceability("", sprint, squad),
       ]);
       setSummary(s);
       setTrend(t);
@@ -43,7 +52,7 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
-  }, [sprint, days, onError]);
+  }, [sprint, days, squad, onError]);
 
   useEffect(() => {
     void load();
@@ -60,15 +69,29 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
             value={sprint}
             onChange={(e) => setSprint(e.target.value)}
           />
+          {squads.length > 0 && (
+            <select
+              value={squad}
+              onChange={(e) => setSquad(e.target.value)}
+              aria-label="Filtrar por squad"
+            >
+              <option value="">Todas as squads</option>
+              {squads.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
           <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
             <option value={7}>7 dias</option>
             <option value={15}>15 dias</option>
             <option value={30}>30 dias</option>
           </select>
-          <a className="button-link" href={api.exportUrl("md", sprint)} download>
+          <a className="button-link" href={api.exportUrl("md", sprint, squad)} download>
             Export MD
           </a>
-          <a className="button-link" href={api.exportUrl("pdf", sprint)} download>
+          <a className="button-link" href={api.exportUrl("pdf", sprint, squad)} download>
             Export PDF
           </a>
         </div>

@@ -89,6 +89,9 @@ Out of scope (deferred or rejected):
 - [SC7] Gerar CTs a partir de uma story real com LM Studio local e com um
   provider cloud, aceitando/rejeitando item a item. (M5)
 - [SC8] Reindex completo em menos de 5 segundos para 2.000 CTs.
+- [SC9] Marcar squad em epic/story, CT e execução (CT herda da story), e
+  filtrar dashboard e board por squad, com as 7 métricas recalculadas sobre
+  o subconjunto do squad. (M7)
 
 ## Delivery order (walking skeleton)
 
@@ -105,5 +108,11 @@ Depth before breadth — o esqueleto é o M0 de ponta a ponta:
 6. M4 — GitHub Actions.
 7. M5 — IA opcional.
 8. M6 — Businessmap (especificar quando se concretizar).
+9. M7 — segmentação por squad (campo na cadeia + filtro no board e no
+   dashboard; capability `segmentation`, SC9).
+10. M8 — dashboard: metas/thresholds por métrica (delta de `reporting`,
+    semáforo vs meta configurável).
+11. M9 — dashboard: painel de defeitos (aging/severidade/por squad; delta de
+    `reporting`/`defects`).
 
 Nada do milestone N+1 começa antes do N fechar (lição do Probatio).

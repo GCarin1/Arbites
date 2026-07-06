@@ -57,6 +57,7 @@ class RequirementIn(BaseModel):
     external_key: str | None = None
     confluence_url: str | None = None
     tags: list[str] = []
+    squad: str | None = None
     body: str = ""
 
 
@@ -67,6 +68,7 @@ class RequirementUpdate(BaseModel):
     external_key: str | None = None
     confluence_url: str | None = None
     tags: list[str] | None = None
+    squad: str | None = None
     body: str | None = None
 
 
@@ -82,6 +84,7 @@ class TestcaseIn(BaseModel):
     status: str = Field(default="draft", pattern="^(draft|ready|deprecated)$")
     tags: list[str] = []
     story: str | None = None
+    squad: str | None = None
     folder: str = ""
     automation: AutomationRef | None = None
     body: str | None = None
@@ -94,6 +97,7 @@ class TestcaseUpdate(BaseModel):
     status: str | None = None
     tags: list[str] | None = None
     story: str | None = None
+    squad: str | None = None
     automation: AutomationRef | None = None
     body: str | None = None
 
@@ -106,6 +110,7 @@ class ExecutionCreate(BaseModel):
     name: str
     sprint: str | None = None
     environment: str | None = None
+    squad: str | None = None
     testcase_ids: list[str]
     owner: str = "local"
 
@@ -425,7 +430,9 @@ def _register_routes(app: FastAPI) -> None:
     # -- requirements ----------------------------------------------------
 
     @app.get(API_PREFIX + "/requirements")
-    async def list_requirements(request: Request, kind: str = "", status: str = ""):
+    async def list_requirements(
+        request: Request, kind: str = "", status: str = "", squad: str = ""
+    ):
         sql, params = "SELECT * FROM requirements WHERE 1=1", []
         if kind:
             sql += " AND kind = ?"
@@ -433,6 +440,9 @@ def _register_routes(app: FastAPI) -> None:
         if status:
             sql += " AND status = ?"
             params.append(status)
+        if squad:
+            sql += " AND squad = ?"
+            params.append(squad)
         rows = conn_of(request).execute(sql + " ORDER BY id", params).fetchall()
         return [
             {**dict(r), "tags": [t for t in (r["tags"] or "").split(",") if t]}
@@ -451,6 +461,8 @@ def _register_routes(app: FastAPI) -> None:
             "external_key": payload.external_key,
             "tags": payload.tags,
         }
+        if payload.squad:
+            meta["squad"] = payload.squad
         if payload.kind == "story":
             meta["epic"] = payload.epic
             meta["confluence_url"] = payload.confluence_url
@@ -470,6 +482,9 @@ def _register_routes(app: FastAPI) -> None:
         meta, body = _load_doc(ws, rel)
         changes = payload.model_dump(exclude_unset=True)
         body = changes.pop("body", body)
+        if "squad" in changes and not changes["squad"]:
+            meta.pop("squad", None)
+            changes.pop("squad")
         meta.update(changes)
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
@@ -493,6 +508,7 @@ def _register_routes(app: FastAPI) -> None:
         tag: str = "",
         type: str = "",
         folder: str = "",
+        squad: str = "",
         q: str = "",
     ):
         sql, params = "SELECT DISTINCT t.* FROM testcases t", []
@@ -500,7 +516,12 @@ def _register_routes(app: FastAPI) -> None:
             sql += " JOIN tc_tags g ON g.testcase_id = t.id AND g.tag = ?"
             params.append(tag)
         sql += " WHERE 1=1"
-        for field, value in (("story_id", story), ("status", status), ("type", type)):
+        for field, value in (
+            ("story_id", story),
+            ("status", status),
+            ("type", type),
+            ("squad_effective", squad),
+        ):
             if value:
                 sql += f" AND t.{field} = ?"
                 params.append(value)
@@ -532,6 +553,8 @@ def _register_routes(app: FastAPI) -> None:
             "created": today,
             "updated": today,
         }
+        if payload.squad:
+            meta["squad"] = payload.squad
         if payload.automation is not None:
             meta["automation"] = payload.automation.model_dump()
         folder = payload.folder.strip("/").replace("\\", "/")
@@ -557,6 +580,9 @@ def _register_routes(app: FastAPI) -> None:
         if "automation" in changes and changes["automation"] is None:
             meta.pop("automation", None)
             changes.pop("automation")
+        if "squad" in changes and not changes["squad"]:
+            meta.pop("squad", None)
+            changes.pop("squad")
         meta.update(changes)
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
@@ -593,11 +619,16 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/executions")
     async def list_executions(
-        request: Request, sprint: str = "", status: str = "", origin: str = ""
+        request: Request, sprint: str = "", status: str = "", origin: str = "", squad: str = ""
     ):
         conn = conn_of(request)
         sql, params = "SELECT * FROM executions WHERE 1=1", []
-        for field, value in (("sprint", sprint), ("status", status), ("origin", origin)):
+        for field, value in (
+            ("sprint", sprint),
+            ("status", status),
+            ("origin", origin),
+            ("squad", squad),
+        ):
             if value:
                 sql += f" AND {field} = ?"
                 params.append(value)
@@ -630,7 +661,8 @@ def _register_routes(app: FastAPI) -> None:
             doc = parse_markdown(ws.root / row["path"])
             testcases.append({"id": ct_id, "steps": doc.steps})
         execution = exec_ops.create(
-            ws, payload.name, payload.owner, payload.sprint, payload.environment, testcases
+            ws, payload.name, payload.owner, payload.sprint, payload.environment,
+            testcases, squad=payload.squad,
         )
         _save_and_index(ws, conn, execution)
         return execution
@@ -719,41 +751,64 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/metrics/summary")
     async def metrics_summary(
-        request: Request, sprint: str = "", days: int = 0, epic: str = ""
+        request: Request, sprint: str = "", days: int = 0, epic: str = "", squad: str = ""
     ):
         conn = conn_of(request)
-        s, d = sprint or None, days or None
+        s, d, sq = sprint or None, days or None, squad or None
         return {
-            "requirement_coverage": metrics_ops.requirement_coverage(conn, epic or None),
-            "execution_coverage": metrics_ops.execution_coverage(conn, s, d),
-            "pass_rate": metrics_ops.pass_rate(conn, s, d),
-            "blocked_rate": metrics_ops.blocked_rate(conn, s, d),
-            "rework_rate": metrics_ops.rework_rate(conn, s, d),
+            "requirement_coverage": metrics_ops.requirement_coverage(conn, epic or None, sq),
+            "execution_coverage": metrics_ops.execution_coverage(conn, s, d, sq),
+            "pass_rate": metrics_ops.pass_rate(conn, s, d, sq),
+            "blocked_rate": metrics_ops.blocked_rate(conn, s, d, sq),
+            "rework_rate": metrics_ops.rework_rate(conn, s, d, sq),
         }
 
     @app.get(API_PREFIX + "/metrics/trend")
-    async def metrics_trend(request: Request, days: int = 7, sprint: str = ""):
+    async def metrics_trend(request: Request, days: int = 7, sprint: str = "", squad: str = ""):
         if days not in (7, 15, 30):
             raise _error(422, "invalid_days", "days deve ser 7, 15 ou 30")
-        return metrics_ops.trend(conn_of(request), days, sprint or None)
+        return metrics_ops.trend(conn_of(request), days, sprint or None, squad or None)
 
     @app.get(API_PREFIX + "/metrics/coverage")
-    async def metrics_coverage(request: Request, epic: str = ""):
-        return metrics_ops.requirement_coverage(conn_of(request), epic or None)
+    async def metrics_coverage(request: Request, epic: str = "", squad: str = ""):
+        return metrics_ops.requirement_coverage(conn_of(request), epic or None, squad or None)
 
     @app.get(API_PREFIX + "/metrics/flaky")
-    async def metrics_flaky(request: Request, window: int = 5):
-        return metrics_ops.flaky(conn_of(request), window)
+    async def metrics_flaky(request: Request, window: int = 5, squad: str = ""):
+        return metrics_ops.flaky(conn_of(request), window, squad or None)
 
     @app.get(API_PREFIX + "/metrics/traceability")
-    async def metrics_traceability(request: Request, epic: str = "", sprint: str = ""):
-        return metrics_ops.traceability(conn_of(request), epic or None, sprint or None)
+    async def metrics_traceability(
+        request: Request, epic: str = "", sprint: str = "", squad: str = ""
+    ):
+        return metrics_ops.traceability(
+            conn_of(request), epic or None, sprint or None, squad or None
+        )
+
+    @app.get(API_PREFIX + "/squads")
+    async def list_squads(request: Request):
+        """Squads conhecidos: declarados no arbites.yaml + distintos no índice."""
+        ws, conn = ws_of(request), conn_of(request)
+        declared = ws.config().get("squads") or []
+        seen = {str(s) for s in declared if s}
+        for table, col in (
+            ("testcases", "squad_effective"),
+            ("requirements", "squad"),
+            ("executions", "squad"),
+        ):
+            for r in conn.execute(
+                f"SELECT DISTINCT {col} s FROM {table} WHERE {col} IS NOT NULL AND {col} != ''"
+            ):
+                seen.add(r["s"])
+        return {"squads": sorted(seen)}
 
     @app.get(API_PREFIX + "/metrics/traceability/export")
     async def metrics_traceability_export(
-        request: Request, format: str = "md", epic: str = "", sprint: str = ""
+        request: Request, format: str = "md", epic: str = "", sprint: str = "", squad: str = ""
     ):
-        matrix = metrics_ops.traceability(conn_of(request), epic or None, sprint or None)
+        matrix = metrics_ops.traceability(
+            conn_of(request), epic or None, sprint or None, squad or None
+        )
         if format == "md":
             return PlainTextResponse(
                 metrics_ops.matrix_markdown(matrix),

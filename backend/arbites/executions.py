@@ -73,6 +73,7 @@ def create(
     environment: str | None,
     testcases: list[dict[str, Any]],
     origin: str = "manual",
+    squad: str | None = None,
 ) -> dict[str, Any]:
     """Cria a execution com snapshot dos steps de cada CT (histórico fiel)."""
     exec_id = ws.next_id("execution")
@@ -104,6 +105,7 @@ def create(
         "owner": owner,
         "sprint": sprint,
         "environment": environment,
+        "squad": (squad.strip() or None) if squad else None,
         "origin": origin,
         "created_at": now,
         "closed_at": None,

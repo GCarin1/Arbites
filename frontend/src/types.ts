@@ -21,6 +21,7 @@ export interface Requirement {
   external_key: string | null;
   confluence_url: string | null;
   tags: string[];
+  squad: string | null;
   path: string;
   body?: string;
 }
@@ -35,6 +36,8 @@ export interface TestCase {
   path: string;
   automation_target: string | null;
   scenario_tag: string | null;
+  squad: string | null;
+  squad_effective: string | null;
   tags?: string[];
   body?: string;
 }
@@ -95,6 +98,7 @@ export interface Execution {
   sprint: string | null;
   environment: string | null;
   origin: string;
+  squad: string | null;
   created_at: string;
   closed_at: string | null;
   status: "draft" | "in_progress" | "closed";

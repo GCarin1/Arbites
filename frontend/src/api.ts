@@ -117,22 +117,27 @@ export const api = {
   createDefect: (body: object) =>
     request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
 
-  metricsSummary: (sprint: string, days: number) =>
+  squads: () => request<{ squads: string[] }>("/squads"),
+  metricsSummary: (sprint: string, days: number, squad = "") =>
     request<MetricsSummary>(
-      `/metrics/summary?sprint=${encodeURIComponent(sprint)}&days=${days}`,
+      `/metrics/summary?sprint=${encodeURIComponent(sprint)}&days=${days}` +
+        `&squad=${encodeURIComponent(squad)}`,
     ),
-  metricsTrend: (days: number, sprint: string) =>
+  metricsTrend: (days: number, sprint: string, squad = "") =>
     request<TrendPoint[]>(
-      `/metrics/trend?days=${days}&sprint=${encodeURIComponent(sprint)}`,
+      `/metrics/trend?days=${days}&sprint=${encodeURIComponent(sprint)}` +
+        `&squad=${encodeURIComponent(squad)}`,
     ),
   metricsFlaky: (window: number) =>
     request<FlakyReport>(`/metrics/flaky?window=${window}`),
-  traceability: (epic: string, sprint: string) =>
+  traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
-      `/metrics/traceability?epic=${encodeURIComponent(epic)}&sprint=${encodeURIComponent(sprint)}`,
+      `/metrics/traceability?epic=${encodeURIComponent(epic)}` +
+        `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
     ),
-  exportUrl: (format: "md" | "pdf", sprint: string) =>
-    `${BASE}/metrics/traceability/export?format=${format}&sprint=${encodeURIComponent(sprint)}`,
+  exportUrl: (format: "md" | "pdf", sprint: string, squad = "") =>
+    `${BASE}/metrics/traceability/export?format=${format}` +
+    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
   evidenceFileUrl: (execId: string, ctId: string, index: number) =>
     `${BASE}/executions/${execId}/results/${ctId}/evidences/${index}/file`,
 

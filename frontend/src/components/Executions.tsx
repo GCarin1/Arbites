@@ -78,6 +78,7 @@ export function ExecutionCreate({
   const [name, setName] = useState("");
   const [sprint, setSprint] = useState("");
   const [environment, setEnvironment] = useState("");
+  const [squad, setSquad] = useState("");
   const [available, setAvailable] = useState<TestCase[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
 
@@ -107,6 +108,7 @@ export function ExecutionCreate({
         name,
         sprint: sprint || null,
         environment: environment || null,
+        squad: squad || null,
         testcase_ids: [...chosen],
       });
       onCreated(execution.id);
@@ -130,6 +132,10 @@ export function ExecutionCreate({
         <div className="field">
           <label>Ambiente (texto livre)</label>
           <input value={environment} onChange={(e) => setEnvironment(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Squad (opcional)</label>
+          <input value={squad} onChange={(e) => setSquad(e.target.value)} />
         </div>
       </div>
       <div className="field wide">
@@ -180,6 +186,8 @@ export function ExecutionBoard({
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
   const [dragCt, setDragCt] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [squadFilter, setSquadFilter] = useState("");
+  const [squadOf, setSquadOf] = useState<Record<string, string | null>>({});
 
   const reload = useCallback(() => {
     api
@@ -190,8 +198,19 @@ export function ExecutionBoard({
 
   useEffect(() => {
     setSelectedCt(null);
+    setSquadFilter("");
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    // mapa CT → squad efetivo, para filtrar o board por squad
+    api
+      .testcases()
+      .then((tcs) =>
+        setSquadOf(Object.fromEntries(tcs.map((t) => [t.id, t.squad_effective]))),
+      )
+      .catch(() => {});
+  }, []);
 
   if (!execution) return <p className="empty">Carregando {id}…</p>;
 
@@ -221,8 +240,17 @@ export function ExecutionBoard({
   const selectedResult =
     execution.results.find((r) => r.testcase_id === selectedCt) ?? null;
 
-  const total = execution.results.length;
-  const passed = execution.results.filter((r) => (r.column || r.status) === "passed").length;
+  const squadsInExec = [
+    ...new Set(
+      execution.results.map((r) => squadOf[r.testcase_id]).filter((s): s is string => !!s),
+    ),
+  ].sort();
+  const visible = squadFilter
+    ? execution.results.filter((r) => squadOf[r.testcase_id] === squadFilter)
+    : execution.results;
+
+  const total = visible.length;
+  const passed = visible.filter((r) => (r.column || r.status) === "passed").length;
 
   return (
     <div>
@@ -236,6 +264,20 @@ export function ExecutionBoard({
           <span className="caption">
             {execution.sprint ?? "—"} · {execution.environment ?? "—"}
           </span>
+          {squadsInExec.length > 0 && (
+            <select
+              value={squadFilter}
+              onChange={(e) => setSquadFilter(e.target.value)}
+              aria-label="Filtrar por squad"
+            >
+              <option value="">Todas as squads</option>
+              {squadsInExec.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
           <span className={`status-dot dot-${closed ? "done" : "active"}`}>
             {execution.status}
           </span>
@@ -288,10 +330,10 @@ export function ExecutionBoard({
             <div className="kanban-col-title">
               <span className={`status-dot dot-col-${col.key}`}>{col.label}</span>
               <span className="count">
-                {execution.results.filter((r) => (r.column || r.status) === col.key).length}
+                {visible.filter((r) => (r.column || r.status) === col.key).length}
               </span>
             </div>
-            {execution.results
+            {visible
               .filter((r) => (r.column || r.status) === col.key)
               .map((result) => (
                 <div
@@ -304,6 +346,9 @@ export function ExecutionBoard({
                   onClick={() => setSelectedCt(result.testcase_id)}
                 >
                   <span className="mono">{result.testcase_id}</span>
+                  {squadOf[result.testcase_id] && !squadFilter && (
+                    <span className="muted"> · {squadOf[result.testcase_id]}</span>
+                  )}
                   {result.evidences.length > 0 && (
                     <span className="muted"> · {result.evidences.length} evid.</span>
                   )}

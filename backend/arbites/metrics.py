@@ -27,7 +27,18 @@ def _ratio(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 4) if denominator else None
 
 
-def _results_where(sprint: str | None, days: int | None) -> tuple[str, list[Any]]:
+_SQUAD_CT = " AND {col} IN (SELECT id FROM testcases WHERE squad_effective = ?)"
+
+# predicado do squad efetivo de uma story (própria squad → herda do epic)
+_SQUAD_STORY = (
+    " AND COALESCE(NULLIF(s.squad, ''),"
+    " (SELECT NULLIF(e2.squad, '') FROM requirements e2 WHERE e2.id = s.epic_id)) = ?"
+)
+
+
+def _results_where(
+    sprint: str | None, days: int | None, squad: str | None = None
+) -> tuple[str, list[Any]]:
     sql, params = "", []
     if sprint:
         sql += " AND e.sprint = ?"
@@ -36,16 +47,26 @@ def _results_where(sprint: str | None, days: int | None) -> tuple[str, list[Any]
     if cutoff:
         sql += " AND r.executed_at >= ?"
         params.append(cutoff)
+    if squad:
+        sql += _SQUAD_CT.format(col="r.testcase_id")
+        params.append(squad)
     return sql, params
 
 
-def requirement_coverage(conn: sqlite3.Connection, epic: str | None = None) -> dict:
+def requirement_coverage(
+    conn: sqlite3.Connection, epic: str | None = None, squad: str | None = None
+) -> dict:
     """stories `active` com ≥1 CT `ready` ÷ stories `active`."""
+    # `s.` alias já usado no COALESCE do squad — total também precisa do alias
     where, params = "", []
     if epic:
-        where, params = " AND epic_id = ?", [epic]
+        where += " AND s.epic_id = ?"
+        params.append(epic)
+    if squad:
+        where += _SQUAD_STORY
+        params.append(squad)
     total = conn.execute(
-        "SELECT COUNT(*) c FROM requirements WHERE kind='story' AND status='active'"
+        "SELECT COUNT(*) c FROM requirements s WHERE s.kind='story' AND s.status='active'"
         + where,
         params,
     ).fetchone()["c"]
@@ -65,13 +86,16 @@ def requirement_coverage(conn: sqlite3.Connection, epic: str | None = None) -> d
 
 
 def execution_coverage(
-    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None
+    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None,
+    squad: str | None = None,
 ) -> dict:
     """CTs distintos executados no período ÷ CTs `ready`."""
-    ready = conn.execute(
-        "SELECT COUNT(*) c FROM testcases WHERE status='ready'"
-    ).fetchone()["c"]
-    where, params = _results_where(sprint, days)
+    ready_sql, ready_params = "SELECT COUNT(*) c FROM testcases WHERE status='ready'", []
+    if squad:
+        ready_sql += " AND squad_effective = ?"
+        ready_params.append(squad)
+    ready = conn.execute(ready_sql, ready_params).fetchone()["c"]
+    where, params = _results_where(sprint, days, squad)
     executed = conn.execute(
         "SELECT COUNT(DISTINCT r.testcase_id) c FROM results r"
         " JOIN executions e ON e.id = r.execution_id"
@@ -87,10 +111,11 @@ def execution_coverage(
 
 
 def pass_rate(
-    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None
+    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None,
+    squad: str | None = None,
 ) -> dict:
     """`passed` ÷ resultados finais (`passed`+`failed`)."""
-    where, params = _results_where(sprint, days)
+    where, params = _results_where(sprint, days, squad)
     row = conn.execute(
         "SELECT SUM(CASE WHEN r.status='passed' THEN 1 ELSE 0 END) p,"
         " SUM(CASE WHEN r.status IN ('passed','failed') THEN 1 ELSE 0 END) f"
@@ -107,10 +132,11 @@ def pass_rate(
 
 
 def blocked_rate(
-    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None
+    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None,
+    squad: str | None = None,
 ) -> dict:
     """`blocked` ÷ total de resultados."""
-    where, params = _results_where(sprint, days)
+    where, params = _results_where(sprint, days, squad)
     row = conn.execute(
         "SELECT SUM(CASE WHEN r.status='blocked' THEN 1 ELSE 0 END) b, COUNT(*) t"
         " FROM results r JOIN executions e ON e.id = r.execution_id WHERE 1=1" + where,
@@ -126,10 +152,11 @@ def blocked_rate(
 
 
 def rework_rate(
-    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None
+    conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None,
+    squad: str | None = None,
 ) -> dict:
     """resultados que passaram por `retest` ÷ total de resultados."""
-    where, params = _results_where(sprint, days)
+    where, params = _results_where(sprint, days, squad)
     total = conn.execute(
         "SELECT COUNT(*) t FROM results r JOIN executions e ON e.id = r.execution_id"
         " WHERE 1=1" + where,
@@ -143,6 +170,9 @@ def rework_rate(
     if cutoff:
         ev_where += " AND v.at >= ?"
         ev_params.append(cutoff)
+    if squad:
+        ev_where += _SQUAD_CT.format(col="v.testcase_id")
+        ev_params.append(squad)
     reworked = conn.execute(
         "SELECT COUNT(DISTINCT v.execution_id || '/' || v.testcase_id) c"
         " FROM result_events v JOIN executions e ON e.id = v.execution_id"
@@ -157,13 +187,18 @@ def rework_rate(
     }
 
 
-def flaky(conn: sqlite3.Connection, window: int = 5) -> dict:
+def flaky(conn: sqlite3.Connection, window: int = 5, squad: str | None = None) -> dict:
     """CTs cujo resultado alternou pass/fail nas últimas N execuções."""
+    where, params = "", []
+    if squad:
+        where = _SQUAD_CT.format(col="r.testcase_id")
+        params.append(squad)
     rows = conn.execute(
         "SELECT r.testcase_id, r.status, e.created_at FROM results r"
         " JOIN executions e ON e.id = r.execution_id"
-        " WHERE r.status IN ('passed','failed')"
-        " ORDER BY r.testcase_id, e.created_at"
+        " WHERE r.status IN ('passed','failed')" + where +
+        " ORDER BY r.testcase_id, e.created_at",
+        params,
     ).fetchall()
     by_ct: dict[str, list[str]] = {}
     for row in rows:
@@ -181,7 +216,8 @@ def flaky(conn: sqlite3.Connection, window: int = 5) -> dict:
 
 
 def trend(
-    conn: sqlite3.Connection, days: int = 7, sprint: str | None = None
+    conn: sqlite3.Connection, days: int = 7, sprint: str | None = None,
+    squad: str | None = None,
 ) -> list[dict]:
     """Série diária de passed/failed/blocked pelo resultado líquido do dia.
 
@@ -195,6 +231,9 @@ def trend(
     if sprint:
         where += " AND e.sprint = ?"
         params.append(sprint)
+    if squad:
+        where += _SQUAD_CT.format(col="v.testcase_id")
+        params.append(squad)
     rows = conn.execute(
         "SELECT day, status, COUNT(*) c FROM ("
         "  SELECT substr(v.at, 1, 10) day, v.status,"
@@ -227,12 +266,14 @@ def trend(
 
 
 def traceability(
-    conn: sqlite3.Connection, epic: str | None = None, sprint: str | None = None
+    conn: sqlite3.Connection, epic: str | None = None, sprint: str | None = None,
+    squad: str | None = None,
 ) -> dict:
     """Matriz Epic → Story | CTs | Último resultado | Execution | Evidências | Defeitos."""
     epic_where, epic_params = "", []
     if epic:
         epic_where, epic_params = " AND id = ?", [epic]
+    ct_squad_where = " AND squad_effective = ?" if squad else ""
     epics = conn.execute(
         "SELECT id, title, status FROM requirements WHERE kind='epic'" + epic_where +
         " ORDER BY id",
@@ -264,9 +305,12 @@ def traceability(
         out_stories = []
         for story in stories:
             cts = conn.execute(
-                "SELECT id, title, status FROM testcases WHERE story_id = ? ORDER BY id",
-                (story["id"],),
+                "SELECT id, title, status FROM testcases WHERE story_id = ?"
+                + ct_squad_where + " ORDER BY id",
+                ([story["id"], squad] if squad else [story["id"]]),
             ).fetchall()
+            if squad and not cts:
+                continue  # squad: oculta stories sem CT no squad
             ct_rows = []
             lasts = []
             for ct in cts:
@@ -305,8 +349,11 @@ def traceability(
                     "testcases": ct_rows,
                 }
             )
+        if squad and not out_stories:
+            continue  # squad: oculta epics sem story no squad
         out_epics.append({**dict(epic_row), "stories": out_stories})
-    return {"epic_filter": epic, "sprint_filter": sprint, "epics": out_epics}
+    return {"epic_filter": epic, "sprint_filter": sprint, "squad_filter": squad,
+            "epics": out_epics}
 
 
 def matrix_markdown(matrix: dict) -> str:

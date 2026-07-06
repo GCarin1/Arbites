@@ -21,18 +21,21 @@ from .workspace import Workspace
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS requirements(
   id TEXT PRIMARY KEY, kind TEXT, title TEXT, epic_id TEXT, status TEXT,
-  external_key TEXT, confluence_url TEXT, tags TEXT, path TEXT, mtime REAL);
+  external_key TEXT, confluence_url TEXT, tags TEXT, path TEXT, mtime REAL,
+  squad TEXT);
 CREATE TABLE IF NOT EXISTS testcases(
   id TEXT PRIMARY KEY, title TEXT, type TEXT, priority TEXT, status TEXT,
   story_id TEXT, path TEXT, mtime REAL,
-  automation_target TEXT, scenario_tag TEXT, external_key TEXT);
+  automation_target TEXT, scenario_tag TEXT, external_key TEXT,
+  squad TEXT, squad_effective TEXT);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
 CREATE TABLE IF NOT EXISTS scenarios(
   target TEXT, tag TEXT PRIMARY KEY, feature_path TEXT,
   scenario_name TEXT, line INTEGER, language TEXT);
 CREATE TABLE IF NOT EXISTS executions(
   id TEXT PRIMARY KEY, name TEXT, owner TEXT, sprint TEXT, environment TEXT,
-  origin TEXT, status TEXT, created_at TEXT, closed_at TEXT, path TEXT);
+  origin TEXT, status TEXT, created_at TEXT, closed_at TEXT, path TEXT,
+  squad TEXT);
 CREATE TABLE IF NOT EXISTS results(
   execution_id TEXT, testcase_id TEXT, status TEXT, executed_at TEXT,
   duration_seconds REAL, PRIMARY KEY(execution_id, testcase_id));
@@ -58,10 +61,17 @@ def connect(ws: Workspace) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     # migração tolerante para índices criados antes da coluna (descartável)
-    try:
-        conn.execute("ALTER TABLE testcases ADD COLUMN external_key TEXT")
-    except sqlite3.OperationalError:
-        pass
+    for ddl in (
+        "ALTER TABLE testcases ADD COLUMN external_key TEXT",
+        "ALTER TABLE testcases ADD COLUMN squad TEXT",
+        "ALTER TABLE testcases ADD COLUMN squad_effective TEXT",
+        "ALTER TABLE requirements ADD COLUMN squad TEXT",
+        "ALTER TABLE executions ADD COLUMN squad TEXT",
+    ):
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
     return conn
 
 
@@ -168,6 +178,7 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
             rel = ws.relpath(path)
             _index_execution(conn, ws, path, rel, max_by_prefix)
 
+    _recompute_effective_squads(conn)
     _relational_checks(conn)
 
     # scan dos feature files dos automation targets (spec indexing / ADR 0003)
@@ -237,6 +248,8 @@ def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
             m = _ID_RE.match(doc.id)
             if m:
                 ws.bump_counter_to(m.group(1), int(m.group(2)))
+    if rel.split("/", 1)[0] in ("requirements", "testcases"):
+        _recompute_effective_squads(conn)  # herança pode mudar com o arquivo editado
     conn.commit()
 
 
@@ -253,11 +266,20 @@ def _flush_doc_warnings(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> N
         _add_warning(conn, rel, code, message)
 
 
+def _squad(doc: ParsedDoc) -> str | None:
+    raw = doc.meta.get("squad")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    return value or None
+
+
 def _insert_requirement(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO requirements"
-        "(id, kind, title, epic_id, status, external_key, confluence_url, tags, path, mtime)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "(id, kind, title, epic_id, status, external_key, confluence_url, tags, path, mtime,"
+        " squad)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("kind", "")),
@@ -269,17 +291,19 @@ def _insert_requirement(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> N
             ",".join(_tags(doc)),
             rel,
             doc.path.stat().st_mtime,
+            _squad(doc),
         ),
     )
 
 
 def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
     automation = doc.meta.get("automation") or {}
+    squad = _squad(doc)
     conn.execute(
         "INSERT OR REPLACE INTO testcases"
         "(id, title, type, priority, status, story_id, path, mtime,"
-        " automation_target, scenario_tag, external_key)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        " automation_target, scenario_tag, external_key, squad, squad_effective)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -292,10 +316,29 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
             automation.get("target") if isinstance(automation, dict) else None,
             automation.get("scenario_tag") if isinstance(automation, dict) else None,
             doc.meta.get("external_key"),
+            squad,
+            squad,  # placeholder; a herança é resolvida por _recompute_effective_squads
         ),
     )
     for tag in _tags(doc):
         conn.execute("INSERT INTO tc_tags(testcase_id, tag) VALUES (?,?)", (doc.id, tag))
+
+
+def _recompute_effective_squads(conn: sqlite3.Connection) -> None:
+    """squad efetivo do CT: próprio → da story → do epic da story (SQL único).
+
+    Materializado para manter os filtros downstream triviais
+    (`WHERE squad_effective = ?`). Chamado ao fim do reindex e sempre que um
+    requisito ou test case muda no incremental.
+    """
+    conn.execute(
+        "UPDATE testcases SET squad_effective = COALESCE("
+        "  NULLIF(squad, ''),"
+        "  (SELECT NULLIF(s.squad, '') FROM requirements s WHERE s.id = testcases.story_id),"
+        "  (SELECT NULLIF(e.squad, '') FROM requirements e WHERE e.id = ("
+        "     SELECT s2.epic_id FROM requirements s2 WHERE s2.id = testcases.story_id))"
+        ")"
+    )
 
 
 def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
@@ -348,8 +391,9 @@ def _index_execution(
         ws.bump_counter_to(prefix, num)
     conn.execute(
         "INSERT OR REPLACE INTO executions"
-        "(id, name, owner, sprint, environment, origin, status, created_at, closed_at, path)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "(id, name, owner, sprint, environment, origin, status, created_at, closed_at, path,"
+        " squad)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (
             exec_id,
             data.get("name"),
@@ -361,6 +405,7 @@ def _index_execution(
             data.get("created_at"),
             data.get("closed_at"),
             rel,
+            (str(data.get("squad")).strip() or None) if data.get("squad") else None,
         ),
     )
     for result in data.get("results") or []:

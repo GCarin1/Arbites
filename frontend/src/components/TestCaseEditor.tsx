@@ -66,6 +66,7 @@ export function TestCaseEditor({
           priority: tc.priority,
           status: tc.status,
           story: tc.story_id || null,
+          squad: tc.squad || null,
           tags: tc.tags ?? [],
           body: tc.body ?? "",
         });
@@ -139,6 +140,17 @@ export function TestCaseEditor({
               value={<span className={`status-dot dot-${tc.status}`}>{tc.status}</span>}
             />
             <ReadField label="Story" value={tc.story_id} mono />
+            <ReadField
+              label="Squad"
+              value={
+                tc.squad_effective ? (
+                  <>
+                    {tc.squad_effective}
+                    {!tc.squad && <span className="muted"> (herdado)</span>}
+                  </>
+                ) : null
+              }
+            />
             <ReadField
               label="Tags"
               value={(tc.tags ?? []).length ? (tc.tags ?? []).join(", ") : null}
@@ -227,6 +239,14 @@ export function TestCaseEditor({
                 placeholder="ST-0000"
                 value={tc.story_id ?? ""}
                 onChange={(e) => set("story_id", e.target.value || null)}
+              />
+            </div>
+            <div className="field">
+              <label>Squad (vazio = herda da story)</label>
+              <input
+                placeholder="ex.: pagamentos"
+                value={tc.squad ?? ""}
+                onChange={(e) => set("squad", e.target.value || null)}
               />
             </div>
             <div className="field">

@@ -101,6 +101,17 @@
         ]
       },
       {
+        "id": "segmentation",
+        "path": ".doctrina/specs/segmentation/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-07-06",
+        "implementation": "verified — M7 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/metrics.py, backend/arbites/executions.py; frontend: Dashboard/Executions/TestCaseEditor/Requirements). Herança materializada em `squad_effective` (recalculada no reindex completo e incremental)",
+        "realizes": [
+          "SC9"
+        ]
+      },
+      {
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
@@ -381,6 +392,19 @@
         "status": "applied",
         "applied": "2026-07-06",
         "specs_affected": []
+      },
+      {
+        "id": "0013-implementar-m7-segmentation-campo-squad-em-epic",
+        "title": "implementar M7 segmentation: campo squad em epic/story, CT e execucao; heranca do squad efetivo do CT (CT -> story -> epic); indice do squad; filtro por squad em /testcases, /executions e /metrics; endpoint de squads; filtro no board do Kanban e no dashboard",
+        "path": ".doctrina/changes/archive/2026-07-06-0013-implementar-m7-segmentation-campo-squad-em-epic",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "segmentation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [

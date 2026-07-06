@@ -212,6 +212,7 @@ export function RequirementEditor({
         epic: req.epic_id || null,
         external_key: req.external_key || null,
         confluence_url: req.confluence_url || null,
+        squad: req.squad || null,
         tags: req.tags,
         body: req.body ?? "",
       });
@@ -281,6 +282,7 @@ export function RequirementEditor({
               value={<span className={`status-dot dot-${req.status}`}>{req.status}</span>}
             />
             {req.kind === "story" && <ReadField label="Epic" value={req.epic_id} mono />}
+            <ReadField label="Squad" value={req.squad} />
             <ReadField label="Chave externa" value={req.external_key} mono />
             {req.kind === "story" && (
               <ReadField
@@ -340,6 +342,14 @@ export function RequirementEditor({
             <option value="done">done</option>
             <option value="cancelled">cancelled</option>
           </select>
+        </div>
+        <div className="field">
+          <label>Squad</label>
+          <input
+            placeholder="ex.: pagamentos"
+            value={req.squad ?? ""}
+            onChange={(e) => set("squad", e.target.value || null)}
+          />
         </div>
         {req.kind === "story" && (
           <div className="field">
