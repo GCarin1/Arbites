@@ -193,3 +193,48 @@ export interface TraceabilityMatrix {
   sprint_filter: string | null;
   epics: MatrixEpic[];
 }
+
+// ------------------------------------------------------------------ IA (M5)
+
+export interface AiProvider {
+  name: string;
+  kind: string;
+  model: string;
+  base_url: string | null;
+  key_configured: boolean;
+}
+
+export interface AiProvidersInfo {
+  default_provider: string | null;
+  providers: AiProvider[];
+}
+
+export interface GeneratedTestcase {
+  title: string;
+  type: string;
+  priority: string;
+  tags: string[];
+  objetivo: string;
+  pre_condicoes: string[];
+  passos: string[];
+  resultado_esperado: string;
+  body: string;
+}
+
+export interface GeneratePreview {
+  preview: boolean;
+  testcases: GeneratedTestcase[];
+}
+
+export interface ReviewIssue {
+  kind: string;
+  message: string;
+  step_index: number | null;
+}
+
+export interface ReviewResponse {
+  preview: boolean;
+  similar_considered: { id: string; title: string }[];
+  issues: ReviewIssue[];
+  summary: string;
+}

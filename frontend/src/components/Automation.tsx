@@ -115,85 +115,101 @@ export function Automation({
 
   return (
     <div>
-      <h2 style={{ fontSize: 16, marginBottom: 12 }}>Automação local</h2>
-
-      <h3 className="section-title">Targets</h3>
-      <table className="dense" style={{ maxWidth: 880 }}>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Runner</th>
-            <th>Repo</th>
-            <th>Cenários</th>
-            <th>Fila</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {targets.map((target) => (
-            <tr key={target.name}>
-              <td className="mono">{target.name}</td>
-              <td>{target.kind}</td>
-              <td className="mono muted">{target.local_path}</td>
-              <td>{target.scenarios}</td>
-              <td>{target.queue_length}</td>
-              <td>
-                <button onClick={() => void scan(target.name)}>Re-scan</button>
-              </td>
-            </tr>
-          ))}
-          {targets.length === 0 && (
-            <tr>
-              <td colSpan={6} className="muted">
-                Nenhum target configurado — adicione em arbites.yaml
-                (automation_targets).
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-      <h3 className="section-title">Novo run</h3>
-      <div className="step-row" style={{ maxWidth: 880 }}>
-        <select
-          value={selection}
-          onChange={(e) => setSelection(e.target.value)}
-          style={{ maxWidth: 200 }}
-        >
-          {targets.map((target) => (
-            <option key={target.name} value={target.name}>
-              {target.name}
-            </option>
-          ))}
-        </select>
-        <input
-          placeholder="tags (ex.: @CT-0001, @smoke) — vazio não é permitido"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-        />
-        <button className="primary" onClick={() => void startRun()} disabled={!selection}>
-          Rodar
-        </button>
-        {run && run.status === "running" && (
-          <button className="danger" onClick={() => void cancelRun()}>
-            Cancelar
-          </button>
-        )}
+      <div className="page-head">
+        <h1 className="page-title">Automação</h1>
       </div>
 
-      {run && (
-        <>
-          <h3 className="section-title">
-            Run {run.exec_id} —{" "}
-            <span className={`status-dot dot-col-${run.status === "done" ? "passed" : run.status === "running" ? "in_progress" : "failed"}`}>
-              {run.status}
-            </span>
-          </h3>
-          <pre className="run-log">
-            {log.length > 0 ? log.join("\n") : "aguardando saída…"}
-          </pre>
-        </>
-      )}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-head">
+          <h3>Targets</h3>
+          <span className="spacer" />
+          <span className="caption">{targets.length} configurado(s)</span>
+        </div>
+        <div className="table-wrap">
+          <table className="dense">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Runner</th>
+                <th>Repo</th>
+                <th>Cenários</th>
+                <th>Fila</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {targets.map((target) => (
+                <tr key={target.name}>
+                  <td className="mono">{target.name}</td>
+                  <td>{target.kind}</td>
+                  <td className="mono muted">{target.local_path}</td>
+                  <td>{target.scenarios}</td>
+                  <td>{target.queue_length}</td>
+                  <td>
+                    <button className="btn-sm" onClick={() => void scan(target.name)}>
+                      Re-scan
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {targets.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="muted">
+                    Nenhum target configurado — adicione em arbites.yaml
+                    (automation_targets).
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-head">
+          <h3>Novo run local (Behave)</h3>
+        </div>
+        <div className="step-row">
+          <select
+            value={selection}
+            onChange={(e) => setSelection(e.target.value)}
+            style={{ maxWidth: 220, flex: "0 0 auto" }}
+          >
+            {targets.map((target) => (
+              <option key={target.name} value={target.name}>
+                {target.name}
+              </option>
+            ))}
+          </select>
+          <input
+            placeholder="tags (ex.: @CT-0001, @smoke) — vazio não é permitido"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
+          <button className="primary" onClick={() => void startRun()} disabled={!selection}>
+            Rodar
+          </button>
+          {run && run.status === "running" && (
+            <button className="danger" onClick={() => void cancelRun()}>
+              Cancelar
+            </button>
+          )}
+        </div>
+
+        {run && (
+          <>
+            <h4 className="section-title">
+              Run {run.exec_id} —{" "}
+              <span className={`status-dot dot-col-${run.status === "done" ? "passed" : run.status === "running" ? "in_progress" : "failed"}`}>
+                {run.status}
+              </span>
+            </h4>
+            <pre className="run-log">
+              {log.length > 0 ? log.join("\n") : "aguardando saída…"}
+            </pre>
+          </>
+        )}
+      </div>
 
       <CIPanel targets={targets} onChanged={onChanged} onError={onError} />
     </div>
@@ -320,11 +336,10 @@ function CIPanel({
         : "dot-col-pending";
 
   return (
-    <>
-      <h2 style={{ fontSize: 16, margin: "24px 0 12px" }}>GitHub Actions</h2>
-
-      <h3 className="section-title">Token (keyring do sistema)</h3>
-      <div className="step-row" style={{ maxWidth: 880 }}>
+    <div className="card">
+      <div className="card-head">
+        <h3>GitHub Actions</h3>
+        <span className="spacer" />
         <span className={`status-dot ${tokenConfigured ? "dot-col-passed" : "dot-col-pending"}`}>
           {tokenConfigured === null
             ? "status desconhecido"
@@ -332,6 +347,10 @@ function CIPanel({
               ? "PAT configurado"
               : "PAT não configurado"}
         </span>
+      </div>
+
+      <h4 className="section-title" style={{ marginTop: 0 }}>Token (keyring do sistema)</h4>
+      <div className="step-row">
         <input
           type="password"
           placeholder="PAT fine-grained (actions: read+write no repo)"
@@ -343,9 +362,13 @@ function CIPanel({
         </button>
       </div>
 
-      <h3 className="section-title">Disparar workflow</h3>
-      <div className="step-row" style={{ maxWidth: 880 }}>
-        <select value={target} onChange={(e) => setTarget(e.target.value)} style={{ maxWidth: 200 }}>
+      <h4 className="section-title">Disparar workflow</h4>
+      <div className="step-row">
+        <select
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          style={{ maxWidth: 220, flex: "0 0 auto" }}
+        >
           {targets.map((t) => (
             <option key={t.name} value={t.name}>
               {t.name}
@@ -364,7 +387,7 @@ function CIPanel({
 
       {status && (
         <>
-          <h3 className="section-title">
+          <h4 className="section-title">
             {status.execution_id} — workflow{" "}
             <span className={`status-dot ${dotFor(status.workflow.status, status.workflow.conclusion)}`}>
               {status.workflow.status}
@@ -378,9 +401,9 @@ function CIPanel({
             >
               abrir no GitHub
             </a>
-          </h3>
+          </h4>
           {status.jobs.map((job) => (
-            <div key={job.name} style={{ maxWidth: 880, marginBottom: 8 }}>
+            <div key={job.name} style={{ marginBottom: 8 }}>
               <div className="mono muted">{job.name}</div>
               {job.steps.map((step) => (
                 <div key={step.name} className="step-row">
@@ -403,6 +426,6 @@ function CIPanel({
           {collected && <p className="muted">{collected}</p>}
         </>
       )}
-    </>
+    </div>
   );
 }

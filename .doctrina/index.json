@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-04",
+  "last_updated": "2026-07-06",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,9 +15,9 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-03",
-        "implementation": "planned — deferido ao M5 (IA é opcional por princípio)",
+        "version": "0.2.0",
+        "last_updated": "2026-07-06",
+        "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
         ]
@@ -82,8 +82,8 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-04",
+        "version": "0.3.0",
+        "last_updated": "2026-07-06",
         "implementation": "verified — M1.5 (backend/arbites/metrics.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx); filtro target do pass rate entra no M3",
         "realizes": [
           "SC3"
@@ -323,9 +323,66 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0007-m5-ia-opcional-interface-aiprovider-providers-op",
+        "title": "M5 - IA opcional: interface AIProvider, providers OpenAI/Anthropic/Gemini/OpenAI-compativel, geracao de CTs a partir de story, revisao, casos negativos, tudo com preview e chaves no keyring",
+        "path": ".doctrina/changes/archive/2026-07-06-0007-m5-ia-opcional-interface-aiprovider-providers-op",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0008-refatorar-interface-seguindo-design-system-profi",
+        "title": "refatorar interface seguindo Design System profissional (AppShell, grid 8px, tipografia, cards, formularios 12 col, sidebar vertical, kanban, empty states, acessibilidade WCAG AA)",
+        "path": ".doctrina/changes/archive/2026-07-06-0008-refatorar-interface-seguindo-design-system-profi",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": []
+      },
+      {
+        "id": "0009-bug-grafico-de-tendencia-do-dashboard-infla-cont",
+        "title": "bug: grafico de Tendencia do Dashboard infla contagem porque conta cada transicao de status (result_events) em vez do resultado liquido por CT/execucao/dia; um unico CT arrastado por varios status aparece como varios resultados",
+        "path": ".doctrina/changes/archive/2026-07-06-0009-bug-grafico-de-tendencia-do-dashboard-infla-cont",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0010-substituir-os-window-prompt-window-confirm-nativ",
+        "title": "substituir os window.prompt/window.confirm nativos do browser por modais em tela com o design system da aplicacao (novo test case, novo epic/story, novo defeito, confirmacoes de exclusao e de fechar execucao)",
+        "path": ".doctrina/changes/archive/2026-07-06-0010-substituir-os-window-prompt-window-confirm-nativ",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": []
+      },
+      {
+        "id": "0011-editores-de-test-case-e-requisito-epic-story-dev",
+        "title": "editores de test case e requisito (epic/story) devem abrir em modo leitura apos salvar, com botao Editar para voltar ao modo de edicao, em vez de ficar sempre em modo de edicao",
+        "path": ".doctrina/changes/archive/2026-07-06-0011-editores-de-test-case-e-requisito-epic-story-dev",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": []
       }
     ],
-    "skills": [],
+    "skills": [
+      {
+        "id": "metricas-resultado-liquido",
+        "path": ".doctrina/skills/metricas-resultado-liquido.md",
+        "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
+        "last_updated": "2026-07-06"
+      }
+    ],
     "contracts": [
       {
         "id": "http-api",

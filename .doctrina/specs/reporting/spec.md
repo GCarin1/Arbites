@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1.5 (backend/arbites/metrics.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx); filtro target do pass rate entra no M3
 **Realizes:** SC3
-**Last updated:** 2026-07-04
-**Version:** 0.2.0
+**Last updated:** 2026-07-06
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -24,6 +24,10 @@ export PDF e Markdown (para colar no Confluence).
   taxa de bloqueio, retrabalho (passaram por `retest` ÷ total),
   instabilidade/flaky (alternância pass/fail em janela N) e tendência
   diária (7/15/30 dias).
+- The system shall calcular a tendência diária contando cada par
+  (execução, testcase) **uma vez por dia**, pelo status da última
+  transição registrada naquele dia — nunca somando transições
+  intermediárias.
 - The system shall expor `GET /metrics/summary`, `/metrics/trend`,
   `/metrics/coverage`, `/metrics/traceability`, `/metrics/flaky` com os
   filtros do contrato (sprint, days, epic, window).
@@ -48,6 +52,9 @@ export PDF e Markdown (para colar no Confluence).
 
 - The system shall not contabilizar resultados não-finais (`pending`,
   `in_progress`) no pass rate.
+- The system shall not inflar a tendência contabilizando transições
+  intermediárias de status: reordenar/re-arrastar um mesmo CT entre
+  colunas no mesmo dia não pode aumentar a contagem daquele dia.
 - The system shall not usar cor como único indicador de status (sempre
   ponto colorido + texto).
 
@@ -66,6 +73,9 @@ export PDF e Markdown (para colar no Confluence).
    perda de estrutura — verified by `backend/tests/test_export.py`.
 4. [verified] Export PDF gerado com a matriz navegada — verified by
    `backend/tests/test_export.py`.
+5. [verified] Um único CT arrastado por vários status no mesmo dia conta
+   como 1 no status final do dia na tendência, não como vários — verified
+   by `backend/tests/test_metrics.py`.
 
 ## Maturity
 

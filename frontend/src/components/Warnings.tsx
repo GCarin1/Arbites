@@ -2,13 +2,21 @@ import type { Warning } from "../types";
 
 export function WarningsView({ warnings }: { warnings: Warning[] }) {
   if (warnings.length === 0) {
-    return <p className="empty">Nenhum problema de integridade no workspace.</p>;
+    return (
+      <div className="empty-state">
+        <div className="empty-title">Tudo consistente</div>
+        <div className="empty-body">
+          Nenhum problema de integridade no workspace.
+        </div>
+      </div>
+    );
   }
   return (
     <div>
-      <h2 style={{ fontSize: 16, marginBottom: 12 }}>
-        Problemas ({warnings.length})
-      </h2>
+      <div className="page-head">
+        <h1 className="page-title">Problemas ({warnings.length})</h1>
+      </div>
+      <div className="table-wrap">
       <table className="dense">
         <thead>
           <tr>
@@ -27,6 +35,7 @@ export function WarningsView({ warnings }: { warnings: Warning[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

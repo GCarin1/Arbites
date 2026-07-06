@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { ConfirmModal, Modal } from "./Modal";
 import type { Execution, ExecutionSummary, ResultEntry, TestCase } from "../types";
 
 const COLUMNS: { key: string; label: string }[] = [
@@ -37,7 +38,7 @@ export function ExecutionsList({
 
   return (
     <div>
-      <div style={{ padding: "0 0 8px" }}>
+      <div className="list-toolbar">
         <button className="primary" onClick={onNew}>
           Nova execução
         </button>
@@ -178,6 +179,7 @@ export function ExecutionBoard({
   const [execution, setExecution] = useState<Execution | null>(null);
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
   const [dragCt, setDragCt] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const reload = useCallback(() => {
     api
@@ -206,7 +208,7 @@ export function ExecutionBoard({
   }
 
   async function closeExecution() {
-    if (!window.confirm(`Fechar ${id}? Resultados ficam imutáveis.`)) return;
+    setConfirmClose(false);
     try {
       const updated = await api.closeExecution(id);
       setExecution(updated);
@@ -219,20 +221,56 @@ export function ExecutionBoard({
   const selectedResult =
     execution.results.find((r) => r.testcase_id === selectedCt) ?? null;
 
+  const total = execution.results.length;
+  const passed = execution.results.filter((r) => (r.column || r.status) === "passed").length;
+
   return (
     <div>
-      <h2 style={{ fontSize: 16, display: "flex", gap: 12, alignItems: "baseline" }}>
-        <span className="mono muted">{execution.id}</span>
-        <span>{execution.name}</span>
-        <span className="muted" style={{ fontSize: 12 }}>
-          {execution.sprint ?? "—"} · {execution.environment ?? "—"} ·{" "}
+      <div className="page-head">
+        <h1 className="page-title">
+          <span className="mono muted">{execution.id}</span>
+          <span>{execution.name}</span>
+        </h1>
+        <span className="spacer" />
+        <div className="head-controls">
+          <span className="caption">
+            {execution.sprint ?? "—"} · {execution.environment ?? "—"}
+          </span>
           <span className={`status-dot dot-${closed ? "done" : "active"}`}>
             {execution.status}
           </span>
+          {!closed && (
+            <button onClick={() => setConfirmClose(true)}>Fechar execução</button>
+          )}
+        </div>
+      </div>
+
+      {confirmClose && (
+        <ConfirmModal
+          title="Fechar execução"
+          message={
+            <>
+              Fechar <span className="mono">{id}</span>? Os resultados ficam{" "}
+              <strong>imutáveis</strong> e a execução não poderá mais ser editada.
+            </>
+          }
+          confirmLabel="Fechar execução"
+          onConfirm={() => void closeExecution()}
+          onCancel={() => setConfirmClose(false)}
+        />
+      )}
+
+      <div className="exec-progress">
+        <div className="exec-progress-bar">
+          <div
+            className="exec-progress-fill"
+            style={{ width: `${total ? Math.round((passed / total) * 100) : 0}%` }}
+          />
+        </div>
+        <span className="caption mono">
+          {passed}/{total} passed
         </span>
-        <span style={{ flex: 1 }} />
-        {!closed && <button onClick={() => void closeExecution()}>Fechar execução</button>}
-      </h2>
+      </div>
 
       <div className="kanban">
         {COLUMNS.map((col) => (
@@ -249,7 +287,7 @@ export function ExecutionBoard({
           >
             <div className="kanban-col-title">
               <span className={`status-dot dot-col-${col.key}`}>{col.label}</span>
-              <span className="muted mono">
+              <span className="count">
                 {execution.results.filter((r) => (r.column || r.status) === col.key).length}
               </span>
             </div>
@@ -311,6 +349,7 @@ function ResultPanel({
 }) {
   const [note, setNote] = useState("");
   const [comment, setComment] = useState(result.comment ?? "");
+  const [creatingDefect, setCreatingDefect] = useState(false);
 
   useEffect(() => {
     setComment(result.comment ?? "");
@@ -356,10 +395,8 @@ function ResultPanel({
     }
   }
 
-  async function createDefect() {
-    const title = window.prompt("Título do defeito:");
-    if (!title) return;
-    const external = window.prompt("Chave externa (opcional, ex.: PROJ-123):") || null;
+  async function createDefect(title: string, external: string | null) {
+    setCreatingDefect(false);
     try {
       await api.createDefect({
         title,
@@ -441,10 +478,84 @@ function ResultPanel({
         <p className="muted">Nenhum defeito vinculado.</p>
       )}
       {!closed && (
-        <button onClick={() => void createDefect()}>
+        <button onClick={() => setCreatingDefect(true)}>
           Criar defeito a partir deste resultado
         </button>
       )}
+
+      {creatingDefect && (
+        <NewDefectModal
+          testcaseId={result.testcase_id}
+          onSubmit={createDefect}
+          onClose={() => setCreatingDefect(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function NewDefectModal({
+  testcaseId,
+  onSubmit,
+  onClose,
+}: {
+  testcaseId: string;
+  onSubmit: (title: string, external: string | null) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [external, setExternal] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  function submit() {
+    if (!title.trim()) return;
+    onSubmit(title.trim(), external.trim() || null);
+  }
+
+  return (
+    <Modal
+      title="Criar defeito"
+      onClose={onClose}
+      initialFocus={titleRef}
+      footer={
+        <>
+          <button onClick={onClose}>Cancelar</button>
+          <button className="primary" onClick={submit} disabled={!title.trim()}>
+            Criar defeito
+          </button>
+        </>
+      }
+    >
+      <p className="modal-text muted">
+        A partir de <span className="mono">{testcaseId}</span> · severidade{" "}
+        <span className="mono">high</span>.
+      </p>
+      <form
+        className="modal-field"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <label htmlFor="new-defect-title">Título</label>
+        <input
+          id="new-defect-title"
+          ref={titleRef}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex.: Botão de login não responde"
+        />
+      </form>
+      <div className="modal-field">
+        <label htmlFor="new-defect-external">Chave externa (opcional)</label>
+        <input
+          id="new-defect-external"
+          className="mono"
+          value={external}
+          onChange={(e) => setExternal(e.target.value)}
+          placeholder="PROJ-123"
+        />
+      </div>
+    </Modal>
   );
 }

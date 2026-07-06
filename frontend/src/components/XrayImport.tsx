@@ -110,6 +110,7 @@ export function XrayImport({
       {preview && (
         <>
           <h3 className="section-title">Preview — {preview.tests.length} testes</h3>
+          <div className="table-wrap">
           <table className="dense">
             <thead>
               <tr>
@@ -141,6 +142,7 @@ export function XrayImport({
               ))}
             </tbody>
           </table>
+          </div>
 
           {preview.stories.length > 0 && (
             <>

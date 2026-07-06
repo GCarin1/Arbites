@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { ConfirmModal, Modal } from "./Modal";
+import { DocBody, ReadField } from "./ReadView";
 import type { Requirement } from "../types";
 
 export function RequirementsList({
@@ -16,6 +18,7 @@ export function RequirementsList({
   onError: (message: string) => void;
 }) {
   const [items, setItems] = useState<Requirement[]>([]);
+  const [creating, setCreating] = useState<"epic" | "story" | null>(null);
 
   useEffect(() => {
     api
@@ -24,15 +27,10 @@ export function RequirementsList({
       .catch((e) => onError(e.message));
   }, [version, onError]);
 
-  async function create(kind: "epic" | "story") {
-    const title = window.prompt(`Título do novo ${kind}:`);
-    if (!title) return;
-    let epic: string | null = null;
-    if (kind === "story") {
-      epic = window.prompt("Epic pai (ex.: EP-0001 — vazio = nenhum):") || null;
-    }
+  async function create(kind: "epic" | "story", title: string, epic: string | null) {
     try {
       const created = await api.createRequirement({ kind, title, epic });
+      setCreating(null);
       onCreated(created.id);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -45,10 +43,17 @@ export function RequirementsList({
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, padding: "0 0 8px" }}>
-        <button onClick={() => void create("epic")}>Novo epic</button>
-        <button onClick={() => void create("story")}>Nova story</button>
+      <div className="list-toolbar">
+        <button onClick={() => setCreating("epic")}>Novo epic</button>
+        <button onClick={() => setCreating("story")}>Nova story</button>
       </div>
+      {creating && (
+        <NewRequirementModal
+          kind={creating}
+          onSubmit={(title, epic) => void create(creating, title, epic)}
+          onClose={() => setCreating(null)}
+        />
+      )}
       {epics.map((epic) => (
         <div key={epic.id}>
           <ReqItem item={epic} selected={selected} onSelect={onSelect} />
@@ -96,6 +101,71 @@ function ReqItem({
   );
 }
 
+function NewRequirementModal({
+  kind,
+  onSubmit,
+  onClose,
+}: {
+  kind: "epic" | "story";
+  onSubmit: (title: string, epic: string | null) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [epic, setEpic] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+  const label = kind === "epic" ? "epic" : "story";
+
+  function submit() {
+    if (!title.trim()) return;
+    onSubmit(title.trim(), kind === "story" ? epic.trim() || null : null);
+  }
+
+  return (
+    <Modal
+      title={`Novo ${label}`}
+      onClose={onClose}
+      initialFocus={titleRef}
+      footer={
+        <>
+          <button onClick={onClose}>Cancelar</button>
+          <button className="primary" onClick={submit} disabled={!title.trim()}>
+            Criar
+          </button>
+        </>
+      }
+    >
+      <form
+        className="modal-field"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <label htmlFor="new-req-title">Título</label>
+        <input
+          id="new-req-title"
+          ref={titleRef}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={kind === "epic" ? "Ex.: Autenticação" : "Ex.: Login"}
+        />
+      </form>
+      {kind === "story" && (
+        <div className="modal-field">
+          <label htmlFor="new-req-epic">Epic pai (opcional)</label>
+          <input
+            id="new-req-epic"
+            className="mono"
+            value={epic}
+            onChange={(e) => setEpic(e.target.value)}
+            placeholder="EP-0001 — vazio = nenhum"
+          />
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export function RequirementEditor({
   id,
   onChanged,
@@ -106,16 +176,23 @@ export function RequirementEditor({
   onDeleted: () => void;
 }) {
   const [req, setReq] = useState<Requirement | null>(null);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setError(null);
-    api
+    return api
       .requirement(id)
       .then(setReq)
       .catch((e) => setError(e.message));
   }, [id]);
+
+  useEffect(() => {
+    setEditing(false); // sempre abre em modo leitura
+    void load();
+  }, [id, load]);
 
   if (error) return <div className="error-banner">{error}</div>;
   if (!req) return <p className="empty">Carregando {id}…</p>;
@@ -139,6 +216,7 @@ export function RequirementEditor({
         body: req.body ?? "",
       });
       setReq(updated);
+      setEditing(false); // após salvar, volta ao modo leitura
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -147,8 +225,13 @@ export function RequirementEditor({
     }
   }
 
+  function cancelEdit() {
+    void load(); // descarta edições não salvas
+    setEditing(false);
+  }
+
   async function remove() {
-    if (!window.confirm(`Mover ${id} para a lixeira (.arbites/trash/)?`)) return;
+    setConfirmDelete(false);
     try {
       await api.deleteRequirement(id);
       onDeleted();
@@ -165,13 +248,76 @@ export function RequirementEditor({
         <span className={`status-dot dot-${req.status} muted`}>{req.status}</span>
       </h2>
       <div className="toolbar">
-        <button className="primary" onClick={() => void save()} disabled={saving}>
-          {saving ? "Salvando…" : "Salvar"}
-        </button>
-        <button className="danger" onClick={() => void remove()}>
+        {editing ? (
+          <>
+            <button className="primary" onClick={() => void save()} disabled={saving}>
+              {saving ? "Salvando…" : "Salvar"}
+            </button>
+            <button onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <button className="primary" onClick={() => setEditing(true)}>
+            Editar
+          </button>
+        )}
+        <span className="spacer" />
+        <button className="danger" onClick={() => setConfirmDelete(true)}>
           Excluir
         </button>
       </div>
+      {confirmDelete && (
+        <ConfirmModal
+          title="Excluir requisito"
+          message={
+            <>
+              Mover <span className="mono">{id}</span> para a lixeira
+              (<span className="mono">.arbites/trash/</span>)?
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+      {!editing ? (
+        <>
+          <div className="read-grid">
+            <ReadField label="Tipo" value={req.kind} />
+            <ReadField
+              label="Status"
+              value={<span className={`status-dot dot-${req.status}`}>{req.status}</span>}
+            />
+            {req.kind === "story" && <ReadField label="Epic" value={req.epic_id} mono />}
+            <ReadField label="Chave externa" value={req.external_key} mono />
+            {req.kind === "story" && (
+              <ReadField
+                label="Confluence"
+                wide
+                value={
+                  req.confluence_url ? (
+                    <a href={req.confluence_url} target="_blank" rel="noreferrer">
+                      {req.confluence_url}
+                    </a>
+                  ) : null
+                }
+              />
+            )}
+            <ReadField
+              label="Tags"
+              value={(req.tags ?? []).length ? (req.tags ?? []).join(", ") : null}
+            />
+            <ReadField label="Arquivo" value={req.path} mono />
+          </div>
+          <div className="field wide">
+            <label>Corpo</label>
+            <DocBody text={req.body} />
+          </div>
+        </>
+      ) : (
+        <>
       <div className="field-grid">
         <div className="field wide">
           <label>Título</label>
@@ -228,6 +374,8 @@ export function RequirementEditor({
           spellCheck={false}
         />
       </div>
+        </>
+      )}
     </div>
   );
 }

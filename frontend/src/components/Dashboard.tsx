@@ -51,27 +51,28 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
 
   return (
     <div>
-      <h2 style={{ fontSize: 16, marginBottom: 12, display: "flex", gap: 12 }}>
-        Dashboard
-        <span style={{ flex: 1 }} />
-        <input
-          placeholder="filtrar por sprint"
-          value={sprint}
-          onChange={(e) => setSprint(e.target.value)}
-          style={{ maxWidth: 200 }}
-        />
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-          <option value={7}>7 dias</option>
-          <option value={15}>15 dias</option>
-          <option value={30}>30 dias</option>
-        </select>
-        <a className="button-link" href={api.exportUrl("md", sprint)} download>
-          Export MD
-        </a>
-        <a className="button-link" href={api.exportUrl("pdf", sprint)} download>
-          Export PDF
-        </a>
-      </h2>
+      <div className="page-head">
+        <h1 className="page-title">Dashboard</h1>
+        <span className="spacer" />
+        <div className="head-controls">
+          <input
+            placeholder="filtrar por sprint"
+            value={sprint}
+            onChange={(e) => setSprint(e.target.value)}
+          />
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
+            <option value={7}>7 dias</option>
+            <option value={15}>15 dias</option>
+            <option value={30}>30 dias</option>
+          </select>
+          <a className="button-link" href={api.exportUrl("md", sprint)} download>
+            Export MD
+          </a>
+          <a className="button-link" href={api.exportUrl("pdf", sprint)} download>
+            Export PDF
+          </a>
+        </div>
+      </div>
 
       {summary && (
         <div className="metric-cards">
@@ -91,7 +92,7 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
       )}
 
       <h3 className="section-title">Tendência ({days} dias)</h3>
-      <div style={{ width: "100%", height: 220 }}>
+      <div className="chart-card" style={{ width: "100%", height: 260 }}>
         <ResponsiveContainer>
           <BarChart data={trend} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
             <CartesianGrid stroke="#30363d" vertical={false} />
@@ -111,13 +112,20 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
 
       <h3 className="section-title">Matriz de rastreabilidade</h3>
       {matrix && matrix.epics.length === 0 && (
-        <p className="muted">Nenhum epic no workspace.</p>
+        <div className="empty-state">
+          <div className="empty-title">Nenhum epic no workspace</div>
+          <div className="empty-body">
+            Crie epics e stories na aba Requisitos para ver a matriz de
+            rastreabilidade até a evidência.
+          </div>
+        </div>
       )}
       {matrix?.epics.map((epic) => (
         <div key={epic.id} className="matrix-epic">
           <div className="matrix-epic-title">
             <span className="mono muted">{epic.id}</span> {epic.title}
           </div>
+          <div className="table-wrap">
           <table className="dense">
             <thead>
               <tr>
@@ -135,6 +143,7 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ))}
     </div>

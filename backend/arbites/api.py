@@ -29,7 +29,9 @@ from pydantic import BaseModel, Field
 from . import __version__
 from . import executions as exec_ops
 from . import metrics as metrics_ops
+from . import ai as ai_ops
 from . import xray_import as xray_ops
+from .ai import AIKeyStore, AIProviderError
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .executions import ExecutionError
 from .gherkin_scan import scan_target
@@ -144,6 +146,28 @@ class TokenIn(BaseModel):
     token: str
 
 
+class AIProviderConfig(BaseModel):
+    name: str
+    kind: str = "openai_compatible"
+    model: str = ""
+    base_url: str | None = None
+
+
+class AIProvidersIn(BaseModel):
+    default_provider: str | None = None
+    providers: list[AIProviderConfig] = []
+    keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
+
+
+class GenerateIn(BaseModel):
+    source: str  # story_id (ST-XXXX) ou texto/markdown livre
+    provider: str | None = None  # default_provider se omitido
+
+
+class AIByCtIn(BaseModel):
+    provider: str | None = None
+
+
 class DefectIn(BaseModel):
     title: str
     severity: str = "medium"
@@ -188,10 +212,13 @@ def create_app(
     watch: bool = True,
     github_client=None,
     token_store: TokenStore | None = None,
+    ai_key_store: AIKeyStore | None = None,
+    ai_transport=None,
 ) -> FastAPI:
     ws = Workspace(workspace_root or os.environ.get("ARBITES_WORKSPACE", "workspace"))
     tokens = token_store or TokenStore()
     github = github_client or HttpxGitHub(tokens)
+    ai_keys = ai_key_store or AIKeyStore()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -203,6 +230,8 @@ def create_app(
         app.state.runner = RunManager(ws, app.state.conn)
         app.state.tokens = tokens
         app.state.ci = CIManager(ws, app.state.conn, github, tokens)
+        app.state.ai_keys = ai_keys
+        app.state.ai_transport = ai_transport
         observer = None
         if watch:
             watch_conn = connect(ws)
@@ -239,6 +268,13 @@ def create_app(
 
     @app.exception_handler(CIError)
     async def _ci_error(request: Request, exc: CIError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(AIProviderError)
+    async def _ai_error(request: Request, exc: AIProviderError):
         return JSONResponse(
             status_code=exc.status,
             content={"error": {"code": exc.code, "message": exc.message}},
@@ -984,6 +1020,122 @@ def _register_routes(app: FastAPI) -> None:
             media_type="application/zip",
             headers={"Content-Disposition": 'attachment; filename="testcases.zip"'},
         )
+
+    # -- IA opcional (M5) -----------------------------------------------------
+
+    def _ai_config(ws: Workspace) -> dict:
+        return ws.config().get("ai") or {"default_provider": None, "providers": []}
+
+    def _ai_provider(request: Request, name: str | None):
+        ws = ws_of(request)
+        config = _ai_config(ws)
+        chosen = name or config.get("default_provider")
+        if not chosen:
+            raise _error(409, "ai_disabled",
+                         "nenhum provider de IA configurado (IA é opcional; "
+                         "a plataforma segue 100% funcional)")
+        for provider_cfg in config.get("providers") or []:
+            if provider_cfg.get("name") == chosen:
+                return ai_ops.build_provider(
+                    provider_cfg, request.app.state.ai_keys,
+                    transport=request.app.state.ai_transport,
+                )
+        raise _error(404, "not_found", f"provider '{chosen}' não configurado")
+
+    def _providers_out(request: Request) -> dict:
+        ws = ws_of(request)
+        config = _ai_config(ws)
+        keys: AIKeyStore = request.app.state.ai_keys
+        return {
+            "default_provider": config.get("default_provider"),
+            "providers": [
+                {
+                    "name": p.get("name"),
+                    "kind": p.get("kind"),
+                    "model": p.get("model"),
+                    "base_url": p.get("base_url"),
+                    "key_configured": keys.configured(str(p.get("name"))),
+                }
+                for p in config.get("providers") or []
+            ],
+        }
+
+    @app.get(API_PREFIX + "/ai/providers")
+    async def get_ai_providers(request: Request):
+        return _providers_out(request)
+
+    @app.put(API_PREFIX + "/ai/providers")
+    async def put_ai_providers(request: Request, payload: AIProvidersIn):
+        ws = ws_of(request)
+        import yaml as _yaml
+
+        config = ws.config()
+        config["ai"] = {
+            "default_provider": payload.default_provider,
+            "providers": [
+                p.model_dump(exclude_none=True) for p in payload.providers
+            ],
+        }
+        ws.config_path.write_text(
+            _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        keys: AIKeyStore = request.app.state.ai_keys
+        for name, secret in payload.keys.items():
+            keys.set(name, secret)  # keyring — nunca no YAML
+        return _providers_out(request)
+
+    def _preview_out(generated: ai_ops.GeneratedTestcases) -> dict:
+        return {
+            "preview": True,  # nada foi gravado; aceite = POST /testcases
+            "testcases": [
+                {**item.model_dump(), "body": ai_ops.testcase_body(item)}
+                for item in generated.testcases
+            ],
+        }
+
+    @app.post(API_PREFIX + "/ai/generate-testcases")
+    async def ai_generate(request: Request, payload: GenerateIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        source = payload.source.strip()
+        if source.upper().startswith(("ST-", "EP-")) and len(source) < 32:
+            rel = _find_path(conn, "requirements", source.upper())
+            source = (ws.root / rel).read_text(encoding="utf-8-sig")
+        generated = await asyncio.to_thread(
+            ai_ops.generate_testcases, provider, source
+        )
+        return _preview_out(generated)
+
+    @app.post(API_PREFIX + "/ai/review/{ct_id}")
+    async def ai_review(request: Request, ct_id: str, payload: AIByCtIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "testcases", ct_id)
+        ct_md = (ws.root / rel).read_text(encoding="utf-8-sig")
+        row = conn.execute(
+            "SELECT title FROM testcases WHERE id = ?", (ct_id,)
+        ).fetchone()
+        tags = [
+            r["tag"] for r in conn.execute(
+                "SELECT tag FROM tc_tags WHERE testcase_id = ?", (ct_id,)
+            )
+        ]
+        similar = ai_ops.find_similar(conn, row["title"], tags, exclude_id=ct_id)
+        result = await asyncio.to_thread(
+            ai_ops.review_testcase, provider, ct_md, similar
+        )
+        return {"preview": True, "similar_considered": similar,
+                **result.model_dump()}
+
+    @app.post(API_PREFIX + "/ai/negative-cases/{ct_id}")
+    async def ai_negative(request: Request, ct_id: str, payload: AIByCtIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "testcases", ct_id)
+        ct_md = (ws.root / rel).read_text(encoding="utf-8-sig")
+        generated = await asyncio.to_thread(ai_ops.negative_cases, provider, ct_md)
+        return _preview_out(generated)
 
     # -- defects (M1, mínimo) ---------------------------------------------
 

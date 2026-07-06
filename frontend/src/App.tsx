@@ -1,18 +1,42 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { Modal } from "./components/Modal";
 import type { TreeNode, Warning, WorkspaceInfo } from "./types";
-import { Tree } from "./components/Tree";
-import { TestCaseEditor } from "./components/TestCaseEditor";
-import { RequirementsList, RequirementEditor } from "./components/Requirements";
-import { WarningsView } from "./components/Warnings";
-import {
-  ExecutionBoard,
-  ExecutionCreate,
-  ExecutionsList,
-} from "./components/Executions";
-import { Dashboard } from "./components/Dashboard";
-import { XrayImport } from "./components/XrayImport";
-import { Automation } from "./components/Automation";
+
+const Tree = lazy(() => import("./components/Tree").then((m) => ({ default: m.Tree })));
+const TestCaseEditor = lazy(() =>
+  import("./components/TestCaseEditor").then((m) => ({ default: m.TestCaseEditor }))
+);
+const RequirementsList = lazy(() =>
+  import("./components/Requirements").then((m) => ({ default: m.RequirementsList }))
+);
+const RequirementEditor = lazy(() =>
+  import("./components/Requirements").then((m) => ({ default: m.RequirementEditor }))
+);
+const WarningsView = lazy(() =>
+  import("./components/Warnings").then((m) => ({ default: m.WarningsView }))
+);
+const ExecutionBoard = lazy(() =>
+  import("./components/Executions").then((m) => ({ default: m.ExecutionBoard }))
+);
+const ExecutionCreate = lazy(() =>
+  import("./components/Executions").then((m) => ({ default: m.ExecutionCreate }))
+);
+const ExecutionsList = lazy(() =>
+  import("./components/Executions").then((m) => ({ default: m.ExecutionsList }))
+);
+const Dashboard = lazy(() =>
+  import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
+);
+const XrayImport = lazy(() =>
+  import("./components/XrayImport").then((m) => ({ default: m.XrayImport }))
+);
+const Automation = lazy(() =>
+  import("./components/Automation").then((m) => ({ default: m.Automation }))
+);
+const AiAssist = lazy(() =>
+  import("./components/AiAssist").then((m) => ({ default: m.AiAssist }))
+);
 
 type Tab =
   | "testcases"
@@ -20,8 +44,20 @@ type Tab =
   | "executions"
   | "dashboard"
   | "automation"
+  | "ia"
   | "migration"
   | "problems";
+
+const NAV: { key: Tab; label: string }[] = [
+  { key: "testcases", label: "Test cases" },
+  { key: "requirements", label: "Requisitos" },
+  { key: "executions", label: "Execuções" },
+  { key: "dashboard", label: "Dashboard" },
+  { key: "automation", label: "Automação" },
+  { key: "ia", label: "IA" },
+  { key: "migration", label: "Migração" },
+  { key: "problems", label: "Problemas" },
+];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("testcases");
@@ -35,6 +71,7 @@ export default function App() {
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reindexing, setReindexing] = useState(false);
+  const [creatingCt, setCreatingCt] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -71,12 +108,10 @@ export default function App() {
     }
   }
 
-  async function newTestcase() {
-    const title = window.prompt("Título do novo test case:");
-    if (!title) return;
-    const folder = window.prompt("Pasta (ex.: frontend/login — vazio = raiz):") ?? "";
+  async function createTestcase(title: string, folder: string) {
     try {
       const created = await api.createTestcase({ title, folder });
+      setCreatingCt(false);
       await refresh();
       setSelectedCt(created.id);
     } catch (e) {
@@ -88,7 +123,7 @@ export default function App() {
 
   return (
     <>
-      <header className="topbar">
+      <header className="app-header">
         <span className="brand">Arbites</span>
         <span className="meta">
           {workspace?.config.workspace?.name ?? "…"} ·{" "}
@@ -101,104 +136,88 @@ export default function App() {
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
       </header>
-      <div className="layout">
+      <div className="app-body">
         <aside className="sidebar">
-          <nav className="tabs">
-            <button
-              className={tab === "testcases" ? "active" : ""}
-              onClick={() => setTab("testcases")}
-            >
-              Test cases
-            </button>
-            <button
-              className={tab === "requirements" ? "active" : ""}
-              onClick={() => setTab("requirements")}
-            >
-              Requisitos
-            </button>
-            <button
-              className={tab === "executions" ? "active" : ""}
-              onClick={() => setTab("executions")}
-            >
-              Execuções
-            </button>
-            <button
-              className={tab === "dashboard" ? "active" : ""}
-              onClick={() => setTab("dashboard")}
-            >
-              Dashboard
-            </button>
-            <button
-              className={tab === "automation" ? "active" : ""}
-              onClick={() => setTab("automation")}
-            >
-              Automação
-            </button>
-            <button
-              className={tab === "migration" ? "active" : ""}
-              onClick={() => setTab("migration")}
-            >
-              Migração
-            </button>
-            <button
-              className={tab === "problems" ? "active" : ""}
-              onClick={() => setTab("problems")}
-            >
-              Problemas{problemCount > 0 ? ` (${problemCount})` : ""}
-            </button>
+          <nav className="nav">
+            {NAV.map((item) => (
+              <button
+                key={item.key}
+                className={`nav-item ${tab === item.key ? "active" : ""}`}
+                onClick={() => setTab(item.key)}
+                aria-current={tab === item.key ? "page" : undefined}
+              >
+                {item.label}
+                {item.key === "problems" && problemCount > 0 && (
+                  <span className="count">{problemCount}</span>
+                )}
+              </button>
+            ))}
           </nav>
-          <div className="scroll">
+          <div className="panel">
             {tab === "testcases" && tree && (
-              <Tree root={tree} selected={selectedCt} onSelect={setSelectedCt} />
+              <Suspense fallback={<p className="empty">Carregando árvore…</p>}>
+                <Tree root={tree} selected={selectedCt} onSelect={setSelectedCt} />
+              </Suspense>
             )}
             {tab === "requirements" && (
-              <RequirementsList
-                version={reqVersion}
-                selected={selectedReq}
-                onSelect={setSelectedReq}
-                onCreated={(id) => {
-                  setSelectedReq(id);
-                  void refresh();
-                }}
-                onError={setError}
-              />
+              <Suspense fallback={<p className="empty">Carregando requisitos…</p>}>
+                <RequirementsList
+                  version={reqVersion}
+                  selected={selectedReq}
+                  onSelect={setSelectedReq}
+                  onCreated={(id) => {
+                    setSelectedReq(id);
+                    void refresh();
+                  }}
+                  onError={setError}
+                />
+              </Suspense>
             )}
             {tab === "executions" && (
-              <ExecutionsList
-                version={reqVersion}
-                selected={selectedExec}
-                onSelect={(id) => {
-                  setExecCreating(false);
-                  setSelectedExec(id);
-                }}
-                onNew={() => {
-                  setSelectedExec(null);
-                  setExecCreating(true);
-                }}
-                onError={setError}
-              />
+              <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
+                <ExecutionsList
+                  version={reqVersion}
+                  selected={selectedExec}
+                  onSelect={(id) => {
+                    setExecCreating(false);
+                    setSelectedExec(id);
+                  }}
+                  onNew={() => {
+                    setSelectedExec(null);
+                    setExecCreating(true);
+                  }}
+                  onError={setError}
+                />
+              </Suspense>
             )}
             {tab === "dashboard" && (
-              <p className="muted" style={{ padding: 8 }}>
+              <p className="panel-hint">
                 Métricas, tendência e matriz de rastreabilidade no painel
                 principal. Cada linha da matriz expande até a evidência.
               </p>
             )}
             {tab === "automation" && (
-              <p className="muted" style={{ padding: 8 }}>
+              <p className="panel-hint">
                 Targets do arbites.yaml, re-scan de features e runs Behave
                 com log ao vivo no painel principal. Uma execução por
                 target; excedentes entram em fila FIFO.
               </p>
             )}
+            {tab === "ia" && (
+              <p className="panel-hint">
+                IA é opcional: configure providers (chaves no keyring) e gere,
+                revise ou proponha casos negativos no painel principal. Toda
+                saída é preview — nada é gravado sem você aceitar.
+              </p>
+            )}
             {tab === "migration" && (
-              <p className="muted" style={{ padding: 8 }}>
+              <p className="panel-hint">
                 Import do XML do Xray (preview → confirm, idempotente) no
                 painel principal. Export Markdown fica no próprio wizard.
               </p>
             )}
             {tab === "problems" && (
-              <p className="muted" style={{ padding: 8 }}>
+              <p className="panel-hint">
                 {problemCount === 0
                   ? "Nenhum problema de integridade."
                   : "Detalhes no painel principal."}
@@ -207,64 +226,170 @@ export default function App() {
           </div>
           {tab === "testcases" && (
             <div className="actions">
-              <button className="primary" onClick={() => void newTestcase()}>
+              <button className="primary" onClick={() => setCreatingCt(true)}>
                 Novo test case
               </button>
             </div>
           )}
         </aside>
         <main className="main">
+          <div className="main-inner">
           {error && <div className="error-banner">{error}</div>}
           {tab === "problems" ? (
-            <WarningsView warnings={warnings} />
+            <Suspense fallback={<p className="empty">Carregando problemas…</p>}>
+              <WarningsView warnings={warnings} />
+            </Suspense>
           ) : tab === "dashboard" ? (
-            <Dashboard onError={setError} />
+            <Suspense fallback={<p className="empty">Carregando dashboard…</p>}>
+              <Dashboard onError={setError} />
+            </Suspense>
           ) : tab === "automation" ? (
-            <Automation onChanged={() => void refresh()} onError={setError} />
+            <Suspense fallback={<p className="empty">Carregando automação…</p>}>
+              <Automation onChanged={() => void refresh()} onError={setError} />
+            </Suspense>
+          ) : tab === "ia" ? (
+            <Suspense fallback={<p className="empty">Carregando IA…</p>}>
+              <AiAssist onChanged={() => void refresh()} onError={setError} />
+            </Suspense>
           ) : tab === "migration" ? (
-            <XrayImport onImported={() => void refresh()} onError={setError} />
+            <Suspense fallback={<p className="empty">Carregando migração…</p>}>
+              <XrayImport onImported={() => void refresh()} onError={setError} />
+            </Suspense>
           ) : tab === "executions" ? (
             execCreating ? (
-              <ExecutionCreate
-                onCreated={(id) => {
-                  setExecCreating(false);
-                  setSelectedExec(id);
-                  void refresh();
-                }}
-                onError={setError}
-              />
+              <Suspense fallback={<p className="empty">Carregando criação…</p>}>
+                <ExecutionCreate
+                  onCreated={(id) => {
+                    setExecCreating(false);
+                    setSelectedExec(id);
+                    void refresh();
+                  }}
+                  onError={setError}
+                />
+              </Suspense>
             ) : selectedExec ? (
-              <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
+              <Suspense fallback={<p className="empty">Carregando execução…</p>}>
+                <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
+              </Suspense>
             ) : (
-              <p className="empty">Selecione uma execução ou crie uma nova.</p>
+              <div className="empty-state">
+                <div className="empty-title">Nenhuma execução aberta</div>
+                <div className="empty-body">
+                  Selecione uma execução na lista ou crie uma nova para começar
+                  a registrar resultados.
+                </div>
+              </div>
             )
           ) : tab === "requirements" ? (
             selectedReq ? (
-              <RequirementEditor
-                id={selectedReq}
+              <Suspense fallback={<p className="empty">Carregando requisito…</p>}>
+                <RequirementEditor
+                  id={selectedReq}
+                  onChanged={refresh}
+                  onDeleted={() => {
+                    setSelectedReq(null);
+                    void refresh();
+                  }}
+                />
+              </Suspense>
+            ) : (
+              <div className="empty-state">
+                <div className="empty-title">Nenhum requisito selecionado</div>
+                <div className="empty-body">
+                  Selecione um epic ou story na lista à esquerda, ou crie um novo
+                  requisito.
+                </div>
+              </div>
+            )
+          ) : selectedCt ? (
+            <Suspense fallback={<p className="empty">Carregando test case…</p>}>
+              <TestCaseEditor
+                id={selectedCt}
                 onChanged={refresh}
                 onDeleted={() => {
-                  setSelectedReq(null);
+                  setSelectedCt(null);
                   void refresh();
                 }}
               />
-            ) : (
-              <p className="empty">Selecione ou crie um requisito na lateral.</p>
-            )
-          ) : selectedCt ? (
-            <TestCaseEditor
-              id={selectedCt}
-              onChanged={refresh}
-              onDeleted={() => {
-                setSelectedCt(null);
-                void refresh();
-              }}
-            />
+            </Suspense>
           ) : (
-            <p className="empty">Selecione um test case na árvore ou crie um novo.</p>
+            <div className="empty-state">
+              <div className="empty-title">Nenhum test case selecionado</div>
+              <div className="empty-body">
+                Selecione um test case na árvore à esquerda ou crie um novo para
+                começar a editar.
+              </div>
+            </div>
           )}
+          </div>
         </main>
       </div>
+      {creatingCt && (
+        <NewTestcaseModal
+          onSubmit={createTestcase}
+          onClose={() => setCreatingCt(false)}
+        />
+      )}
     </>
+  );
+}
+
+function NewTestcaseModal({
+  onSubmit,
+  onClose,
+}: {
+  onSubmit: (title: string, folder: string) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [folder, setFolder] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  function submit() {
+    if (!title.trim()) return;
+    onSubmit(title.trim(), folder.trim());
+  }
+
+  return (
+    <Modal
+      title="Novo test case"
+      onClose={onClose}
+      initialFocus={titleRef}
+      footer={
+        <>
+          <button onClick={onClose}>Cancelar</button>
+          <button className="primary" onClick={submit} disabled={!title.trim()}>
+            Criar
+          </button>
+        </>
+      }
+    >
+      <form
+        className="modal-field"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <label htmlFor="new-ct-title">Título</label>
+        <input
+          id="new-ct-title"
+          ref={titleRef}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex.: Login com credenciais válidas"
+        />
+      </form>
+      <div className="modal-field">
+        <label htmlFor="new-ct-folder">Pasta (opcional)</label>
+        <input
+          id="new-ct-folder"
+          className="mono"
+          value={folder}
+          onChange={(e) => setFolder(e.target.value)}
+          placeholder="frontend/login — vazio = raiz"
+        />
+      </div>
+    </Modal>
   );
 }

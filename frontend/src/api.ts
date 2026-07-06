@@ -1,11 +1,14 @@
 import type {
+  AiProvidersInfo,
   Defect,
   EvidenceEntry,
   Execution,
   ExecutionSummary,
   FlakyReport,
+  GeneratePreview,
   MetricsSummary,
   Requirement,
+  ReviewResponse,
   TestCase,
   TraceabilityMatrix,
   TreeNode,
@@ -132,4 +135,26 @@ export const api = {
     `${BASE}/metrics/traceability/export?format=${format}&sprint=${encodeURIComponent(sprint)}`,
   evidenceFileUrl: (execId: string, ctId: string, index: number) =>
     `${BASE}/executions/${execId}/results/${ctId}/evidences/${index}/file`,
+
+  aiProviders: () => request<AiProvidersInfo>("/ai/providers"),
+  putAiProviders: (body: object) =>
+    request<AiProvidersInfo>("/ai/providers", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  aiGenerate: (body: { source: string; provider?: string | null }) =>
+    request<GeneratePreview>("/ai/generate-testcases", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  aiReview: (ctId: string, body: { provider?: string | null }) =>
+    request<ReviewResponse>(`/ai/review/${ctId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  aiNegativeCases: (ctId: string, body: { provider?: string | null }) =>
+    request<GeneratePreview>(`/ai/negative-cases/${ctId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

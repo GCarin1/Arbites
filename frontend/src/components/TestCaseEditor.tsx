@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { ConfirmModal } from "./Modal";
+import { DocBody, ReadField } from "./ReadView";
 import type { TestCase } from "../types";
 
 export function TestCaseEditor({
@@ -11,29 +13,36 @@ export function TestCaseEditor({
   onChanged: () => void;
   onDeleted: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const [mode, setMode] = useState<"form" | "raw">("form");
   const [tc, setTc] = useState<TestCase | null>(null);
   const [raw, setRaw] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setError(null);
-    setMode("form");
-    api
+    return api
       .testcase(id)
       .then(setTc)
       .catch((e) => setError(e.message));
   }, [id]);
 
   useEffect(() => {
-    if (mode === "raw") {
+    setMode("form");
+    setEditing(false); // sempre abre em modo leitura
+    void load();
+  }, [id, load]);
+
+  useEffect(() => {
+    if (editing && mode === "raw") {
       api
         .testcaseRaw(id)
         .then(setRaw)
         .catch((e) => setError(e.message));
     }
-  }, [mode, id]);
+  }, [editing, mode, id]);
 
   if (error) return <div className="error-banner">{error}</div>;
   if (!tc) return <p className="empty">Carregando {id}…</p>;
@@ -62,6 +71,7 @@ export function TestCaseEditor({
         });
         setTc(updated);
       }
+      setEditing(false); // após salvar, volta ao modo leitura
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -70,8 +80,14 @@ export function TestCaseEditor({
     }
   }
 
+  function cancelEdit() {
+    void load(); // descarta edições não salvas
+    setMode("form");
+    setEditing(false);
+  }
+
   async function remove() {
-    if (!window.confirm(`Mover ${id} para a lixeira (.arbites/trash/)?`)) return;
+    setConfirmDelete(false);
     try {
       await api.deleteTestcase(id);
       onDeleted();
@@ -88,22 +104,73 @@ export function TestCaseEditor({
         <span className={`status-dot dot-${tc.status} muted`}>{tc.status}</span>
       </h2>
       <div className="toolbar">
-        <button className={mode === "form" ? "primary" : ""} onClick={() => setMode("form")}>
-          Formulário
-        </button>
-        <button className={mode === "raw" ? "primary" : ""} onClick={() => setMode("raw")}>
-          Markdown cru
-        </button>
-        <span style={{ flex: 1 }} />
-        <button className="primary" onClick={() => void save()} disabled={saving}>
-          {saving ? "Salvando…" : "Salvar"}
-        </button>
-        <button className="danger" onClick={() => void remove()}>
+        {editing ? (
+          <>
+            <button className={mode === "form" ? "primary" : ""} onClick={() => setMode("form")}>
+              Formulário
+            </button>
+            <button className={mode === "raw" ? "primary" : ""} onClick={() => setMode("raw")}>
+              Markdown cru
+            </button>
+            <span className="spacer" />
+            <button className="primary" onClick={() => void save()} disabled={saving}>
+              {saving ? "Salvando…" : "Salvar"}
+            </button>
+            <button onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="primary" onClick={() => setEditing(true)}>
+              Editar
+            </button>
+            <span className="spacer" />
+          </>
+        )}
+        <button className="danger" onClick={() => setConfirmDelete(true)}>
           Excluir
         </button>
       </div>
 
-      {mode === "raw" ? (
+      {confirmDelete && (
+        <ConfirmModal
+          title="Excluir test case"
+          message={
+            <>
+              Mover <span className="mono">{id}</span> para a lixeira
+              (<span className="mono">.arbites/trash/</span>)?
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
+
+      {!editing ? (
+        <>
+          <div className="read-grid">
+            <ReadField label="Tipo" value={tc.type} />
+            <ReadField label="Prioridade" value={tc.priority} />
+            <ReadField
+              label="Status"
+              value={<span className={`status-dot dot-${tc.status}`}>{tc.status}</span>}
+            />
+            <ReadField label="Story" value={tc.story_id} mono />
+            <ReadField
+              label="Tags"
+              value={(tc.tags ?? []).length ? (tc.tags ?? []).join(", ") : null}
+            />
+            <ReadField label="Arquivo" value={tc.path} mono />
+          </div>
+          <div className="field wide">
+            <label>Corpo</label>
+            <DocBody text={tc.body} />
+          </div>
+        </>
+      ) : mode === "raw" ? (
         <textarea
           className="raw"
           value={raw}
@@ -171,7 +238,7 @@ export function TestCaseEditor({
             </div>
             <div className="field">
               <label>Arquivo</label>
-              <span className="mono muted" style={{ padding: "4px 0" }}>
+              <span className="path-value" title={tc.path}>
                 {tc.path}
               </span>
             </div>

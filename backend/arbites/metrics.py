@@ -183,17 +183,28 @@ def flaky(conn: sqlite3.Connection, window: int = 5) -> dict:
 def trend(
     conn: sqlite3.Connection, days: int = 7, sprint: str | None = None
 ) -> list[dict]:
-    """Série diária de passed/failed/blocked (eventos de resultado)."""
+    """Série diária de passed/failed/blocked pelo resultado líquido do dia.
+
+    Cada par (execução, testcase) conta uma vez por dia, pelo status da
+    última transição registrada naquele dia — arrastar o mesmo CT entre
+    colunas não infla a contagem (a fonte `result_events` é um log de
+    transições, não de resultados distintos).
+    """
     cutoff = _cutoff(days)
     where, params = " AND v.at >= ?", [cutoff]
     if sprint:
         where += " AND e.sprint = ?"
         params.append(sprint)
     rows = conn.execute(
-        "SELECT substr(v.at, 1, 10) day, v.status, COUNT(*) c"
-        " FROM result_events v JOIN executions e ON e.id = v.execution_id"
-        " WHERE v.status IN ('passed','failed','blocked')" + where +
-        " GROUP BY day, v.status",
+        "SELECT day, status, COUNT(*) c FROM ("
+        "  SELECT substr(v.at, 1, 10) day, v.status,"
+        "    ROW_NUMBER() OVER ("
+        "      PARTITION BY v.execution_id, v.testcase_id, substr(v.at, 1, 10)"
+        "      ORDER BY v.at DESC, v.rowid DESC) rn"
+        "  FROM result_events v JOIN executions e ON e.id = v.execution_id"
+        "  WHERE 1=1" + where +
+        ") WHERE rn = 1 AND status IN ('passed','failed','blocked')"
+        " GROUP BY day, status",
         params,
     ).fetchall()
     by_day: dict[str, dict[str, int]] = {}

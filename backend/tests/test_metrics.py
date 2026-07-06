@@ -87,6 +87,28 @@ def test_trend_counts_daily_events(client, dataset):
     assert today["passed"] == 1 and today["failed"] == 3 and today["blocked"] == 0
 
 
+def test_trend_does_not_inflate_from_repeated_moves(client):
+    """SC5: um CT arrastado por vários status no mesmo dia conta 1 vez,
+    pelo status final do dia — não soma cada transição intermediária."""
+    ct = client.post(
+        "/api/v1/testcases",
+        json={"title": "Arrastado", "status": "ready", "body": TC_BODY},
+    ).json()
+    execution = client.post(
+        "/api/v1/executions", json={"name": "Regressão", "testcase_ids": [ct["id"]]}
+    ).json()
+    # simula o usuário arrastando o mesmo card por várias colunas
+    for status in ["blocked", "failed", "passed", "retest", "blocked"]:
+        client.post(
+            f"/api/v1/executions/{execution['id']}/results/{ct['id']}/status",
+            json={"status": status},
+        )
+    series = client.get("/api/v1/metrics/trend", params={"days": 7}).json()
+    today = series[-1]
+    # status final do dia = blocked → conta 1 em blocked e nada nos demais
+    assert (today["passed"], today["failed"], today["blocked"]) == (0, 0, 1)
+
+
 def test_sprint_filter_isolates_data(client, dataset):
     m = client.get("/api/v1/metrics/summary", params={"sprint": "OutraSprint"}).json()
     assert m["pass_rate"]["denominator"] == 0

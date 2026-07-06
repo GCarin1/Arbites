@@ -2,10 +2,10 @@
 
 **Capability:** ai-assist
 **Status:** active
-**Implementation:** planned — deferido ao M5 (IA é opcional por princípio)
+**Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-03
-**Version:** 0.1.0
+**Last updated:** 2026-07-06
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -62,13 +62,13 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 
 ## Acceptance criteria
 
-1. [unverified] Gerar CTs de uma story real com LM Studio local e com um
-   provider cloud, aceitando/rejeitando item a item — verified by
-   `tests/test_ai_generate.py`.
-2. [unverified] Saída fora do schema Pydantic é rejeitada com erro claro,
-   sem escrita no disco — verified by `tests/test_ai_generate.py`.
-3. [unverified] Plataforma opera integralmente com `providers: []` —
-   verified by `tests/test_ai_optional.py`.
+1. [verified] Gerar CTs de uma story real com provider OpenAI-compatível e
+   Anthropic, aceitando/rejeitando item a item — verified by
+   `backend/tests/test_ai_generate.py`.
+2. [verified] Saída fora do schema Pydantic é rejeitada com erro claro,
+   sem escrita no disco — verified by `backend/tests/test_ai_generate.py`.
+3. [verified] Plataforma opera integralmente com `providers: []` —
+   verified by `backend/tests/test_ai_optional.py`.
 
 ## Maturity
 
