@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any
+from xml.sax.saxutils import escape as _xml_escape
 
 import frontmatter
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -221,6 +222,23 @@ class DailyGenerateIn(BaseModel):
     provider: str | None = None
 
 
+class MeetingIn(BaseModel):
+    title: str
+    date: str | None = None
+    body: str = ""
+
+
+class MeetingUpdate(BaseModel):
+    title: str | None = None
+    date: str | None = None
+    summary: str | None = None
+    body: str | None = None
+
+
+class MeetingSummarizeIn(BaseModel):
+    provider: str | None = None
+
+
 DEFAULT_TC_BODY = """## Objetivo
 
 ## Pré-condições
@@ -335,6 +353,39 @@ def _write_doc(path: Path, meta: dict[str, Any], body: str) -> None:
 def _load_doc(ws: Workspace, rel: str) -> tuple[dict[str, Any], str]:
     post = frontmatter.load(str(ws.root / rel))
     return dict(post.metadata), post.content
+
+
+def _todos_markdown(items: list[dict]) -> str:
+    lines = ["# Afazeres", "", f"Total: {len(items)}", ""]
+    for t in items:
+        lines.append(f"## {t['id']} — {t['title']}")
+        meta = [f"status: {t['status']}"]
+        if t.get("due"):
+            meta.append(f"prazo: {t['due']}")
+        if t.get("squad"):
+            meta.append(f"squad: {t['squad']}")
+        if t.get("links"):
+            meta.append(f"links: {t['links']}")
+        lines.append(" · ".join(meta))
+        if (t.get("body") or "").strip():
+            lines += ["", t["body"].strip()]
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _todos_xml(items: list[dict]) -> str:
+    out = ['<?xml version="1.0" encoding="UTF-8"?>', "<todos>"]
+    for t in items:
+        out.append(f'  <todo id="{_xml_escape(t["id"], {chr(34): "&quot;"})}">')
+        out.append(f"    <title>{_xml_escape(t['title'] or '')}</title>")
+        out.append(f"    <status>{_xml_escape(t['status'] or '')}</status>")
+        out.append(f"    <due>{_xml_escape(t.get('due') or '')}</due>")
+        out.append(f"    <squad>{_xml_escape(t.get('squad') or '')}</squad>")
+        out.append(f"    <links>{_xml_escape(t.get('links') or '')}</links>")
+        out.append(f"    <description>{_xml_escape((t.get('body') or '').strip())}</description>")
+        out.append("  </todo>")
+    out.append("</todos>")
+    return "\n".join(out)
 
 
 def _find_path(conn: sqlite3.Connection, table: str, entity_id: str) -> str:
@@ -1281,6 +1332,36 @@ def _register_routes(app: FastAPI) -> None:
         reindex_file(ws, conn, ws.root / rel)
         return _defect_out(conn, ws, defect_id)
 
+    # -- busca de entidades (autocomplete de links / menções @) -----------
+
+    @app.get(API_PREFIX + "/search")
+    async def search_entities(
+        request: Request, q: str = "", limit: int = 20, kinds: str = ""
+    ):
+        conn = conn_of(request)
+        like = f"%{q}%"
+        wanted = {k for k in kinds.split(",") if k}
+        sources = [
+            ("testcase", "SELECT id, title FROM testcases"),
+            ("requirement", "SELECT id, title FROM requirements"),
+            ("execution", "SELECT id, name title FROM executions"),
+            ("defect", "SELECT id, title FROM defects"),
+            ("todo", "SELECT id, title FROM todos"),
+            ("meeting", "SELECT id, title FROM meetings"),
+        ]
+        out = []
+        for kind, base in sources:
+            if wanted and kind not in wanted:
+                continue
+            for r in conn.execute(
+                base + " WHERE id LIKE ? OR title LIKE ? ORDER BY id LIMIT ?",
+                (like, like, limit),
+            ):
+                out.append({"id": r["id"], "title": r["title"], "kind": kind})
+        ql = q.lower()
+        out.sort(key=lambda e: (not e["id"].lower().startswith(ql), e["id"]))
+        return {"results": out[:limit]}
+
     # -- todos (M10) -------------------------------------------------------
 
     def _resolve_link(conn, link_id: str) -> dict:
@@ -1343,6 +1424,53 @@ def _register_routes(app: FastAPI) -> None:
             item["links"] = [_resolve_link(conn, x) for x in link_ids]
             out.append(item)
         return out
+
+    @app.get(API_PREFIX + "/todos/export")
+    async def export_todos(
+        request: Request,
+        format: str = "md",
+        status: str = "",
+        squad: str = "",
+        due_from: str = "",
+        due_to: str = "",
+        ids: str = "",
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        if ids:
+            id_list = [x for x in ids.split(",") if x]
+            rows = [
+                conn.execute("SELECT * FROM todos WHERE id = ?", (i,)).fetchone()
+                for i in id_list
+            ]
+            rows = [r for r in rows if r]
+        else:
+            sql, params = "SELECT * FROM todos WHERE 1=1", []
+            for field, value in (("status", status), ("squad", squad)):
+                if value:
+                    sql += f" AND {field} = ?"
+                    params.append(value)
+            if due_from:
+                sql += " AND due >= ?"
+                params.append(due_from)
+            if due_to:
+                sql += " AND due <= ?"
+                params.append(due_to)
+            rows = conn.execute(sql + " ORDER BY due IS NULL, due, id", params).fetchall()
+        items = []
+        for r in rows:
+            _, body = _load_doc(ws, r["path"])
+            items.append({**dict(r), "body": body})
+        if format == "xml":
+            return PlainTextResponse(
+                _todos_xml(items),
+                media_type="application/xml; charset=utf-8",
+                headers={"Content-Disposition": 'attachment; filename="afazeres.xml"'},
+            )
+        return PlainTextResponse(
+            _todos_markdown(items),
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="afazeres.md"'},
+        )
 
     @app.post(API_PREFIX + "/todos", status_code=201)
     async def create_todo(request: Request, payload: TodoIn):
@@ -1447,6 +1575,77 @@ def _register_routes(app: FastAPI) -> None:
         meta = {"date": day, "action_items": payload.action_items or None}
         _write_doc(_daily_path(ws, day), meta, payload.body)
         return {"date": day, "action_items": payload.action_items, "body": payload.body}
+
+    # -- meetings / reuniões (M12) -----------------------------------------
+
+    def _meeting_out(conn, ws: Workspace, meeting_id: str) -> dict:
+        row = conn.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{meeting_id} não encontrada")
+        out = dict(row)
+        _, out["body"] = _load_doc(ws, row["path"])
+        return out
+
+    @app.get(API_PREFIX + "/meetings")
+    async def list_meetings(request: Request, date: str = ""):
+        conn = conn_of(request)
+        sql, params = "SELECT * FROM meetings WHERE 1=1", []
+        if date:
+            sql += " AND date = ?"
+            params.append(date)
+        return [dict(r) for r in conn.execute(sql + " ORDER BY date DESC, id DESC", params)]
+
+    @app.post(API_PREFIX + "/meetings", status_code=201)
+    async def create_meeting(request: Request, payload: MeetingIn):
+        ws, conn = ws_of(request), conn_of(request)
+        meeting_id = ws.next_id("meeting")
+        meta = {
+            "id": meeting_id,
+            "title": payload.title,
+            "date": payload.date or date.today().isoformat(),
+        }
+        path = ws.root / "meetings" / f"{meeting_id}-{slugify(payload.title)}.md"
+        _write_doc(path, meta, payload.body)
+        reindex_file(ws, conn, path)
+        return _meeting_out(conn, ws, meeting_id)
+
+    @app.get(API_PREFIX + "/meetings/{meeting_id}")
+    async def get_meeting(request: Request, meeting_id: str):
+        return _meeting_out(conn_of(request), ws_of(request), meeting_id)
+
+    @app.put(API_PREFIX + "/meetings/{meeting_id}")
+    async def update_meeting(request: Request, meeting_id: str, payload: MeetingUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        meta, body = _load_doc(ws, rel)
+        changes = payload.model_dump(exclude_unset=True)
+        body = changes.pop("body", body)
+        if "summary" in changes and not changes["summary"]:
+            meta.pop("summary", None)
+            changes.pop("summary")
+        meta.update(changes)
+        _write_doc(ws.root / rel, meta, body)
+        reindex_file(ws, conn, ws.root / rel)
+        return _meeting_out(conn, ws, meeting_id)
+
+    @app.delete(API_PREFIX + "/meetings/{meeting_id}", status_code=204)
+    async def delete_meeting(request: Request, meeting_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        path = ws.root / rel
+        ws.trash(path)
+        reindex_file(ws, conn, path)
+
+    @app.post(API_PREFIX + "/meetings/{meeting_id}/summarize")
+    async def summarize_meeting(request: Request, meeting_id: str, payload: MeetingSummarizeIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        if not body.strip():
+            raise _error(422, "empty_meeting", "reunião sem descrição/transcrição para resumir")
+        result = await asyncio.to_thread(ai_ops.summarize_meeting, provider, body)
+        return {"preview": True, "id": meeting_id, **result.model_dump()}
 
 
 def _mount_frontend(app: FastAPI) -> None:

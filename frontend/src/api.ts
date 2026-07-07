@@ -5,6 +5,8 @@ import type {
   Defect,
   DefectsReport,
   EvidenceEntry,
+  Meeting,
+  MeetingSummaryResult,
   SavedDaily,
   Execution,
   ExecutionSummary,
@@ -13,6 +15,7 @@ import type {
   MetricsSummary,
   Requirement,
   ReviewResponse,
+  SearchResult,
   TestCase,
   Todo,
   TraceabilityMatrix,
@@ -123,11 +126,20 @@ export const api = {
     request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
 
   todos: (query = "") => request<Todo[]>(`/todos${query}`),
+  todo: (id: string) => request<Todo>(`/todos/${id}`),
   createTodo: (body: object) =>
     request<Todo>("/todos", { method: "POST", body: JSON.stringify(body) }),
   updateTodo: (id: string, body: object) =>
     request<Todo>(`/todos/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteTodo: (id: string) => request<void>(`/todos/${id}`, { method: "DELETE" }),
+  todosExportUrl: (format: "md" | "xml", params: Record<string, string>) => {
+    const qs = new URLSearchParams({ format, ...params });
+    return `${BASE}/todos/export?${qs.toString()}`;
+  },
+  search: (q: string, limit = 8, kinds = "") =>
+    request<{ results: SearchResult[] }>(
+      `/search?q=${encodeURIComponent(q)}&limit=${limit}&kinds=${encodeURIComponent(kinds)}`,
+    ),
 
   metricsSnapshot: () => request<unknown>("/metrics/snapshot", { method: "POST" }),
   dailyContext: (day: string) => request<DailyContext>(`/daily/${day}/context`),
@@ -140,6 +152,19 @@ export const api = {
   getDaily: (day: string) => request<SavedDaily>(`/daily/${day}`),
   putDaily: (day: string, body: object) =>
     request<SavedDaily>(`/daily/${day}`, { method: "PUT", body: JSON.stringify(body) }),
+
+  meetings: (query = "") => request<Meeting[]>(`/meetings${query}`),
+  meeting: (id: string) => request<Meeting>(`/meetings/${id}`),
+  createMeeting: (body: object) =>
+    request<Meeting>("/meetings", { method: "POST", body: JSON.stringify(body) }),
+  updateMeeting: (id: string, body: object) =>
+    request<Meeting>(`/meetings/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteMeeting: (id: string) => request<void>(`/meetings/${id}`, { method: "DELETE" }),
+  summarizeMeeting: (id: string, provider?: string | null) =>
+    request<MeetingSummaryResult>(`/meetings/${id}/summarize`, {
+      method: "POST",
+      body: JSON.stringify({ provider: provider ?? null }),
+    }),
 
   squads: () => request<{ squads: string[] }>("/squads"),
   metricsSummary: (sprint: string, days: number, squad = "") =>

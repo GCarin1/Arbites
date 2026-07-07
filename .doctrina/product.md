@@ -102,6 +102,9 @@ Out of scope (deferred or rejected):
   diff de métricas (snapshot diário) + defeitos, com resumo executivo,
   impedimentos e action items em destaque; salvar por data e navegar por
   calendário; action items viram todos. IA opcional. (M11)
+- [SC13] Registrar reuniões (tema, data, descrição ou transcrição) e obter
+  um resumo executivo pela IA; as reuniões do dia entram na digestão da
+  daily. IA opcional. (M12)
 
 ## Delivery order (walking skeleton)
 

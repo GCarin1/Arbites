@@ -19,34 +19,42 @@ export function Modal({
   initialFocus?: React.RefObject<HTMLElement>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // onClose lido por ref: não pode entrar nas deps do efeito de foco, senão
+  // uma nova identidade de onClose (ex.: re-render do pai) re-dispara o foco
+  // e rouba o cursor do campo em que o usuário está digitando.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
+  // Foco inicial + scroll-lock: SÓ no mount (deps vazias). O initialFocus é
+  // capturado uma vez de propósito.
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
 
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-      }
-    }
-    document.addEventListener("keydown", onKey);
-
-    // foco inicial: campo indicado, senão o primeiro focável do painel
     const target =
       initialFocus?.current ??
-      panelRef.current?.querySelector<HTMLElement>(
-        "input, select, textarea, button",
-      );
+      panelRef.current?.querySelector<HTMLElement>("input, select, textarea, button");
     target?.focus();
 
     return () => {
-      document.removeEventListener("keydown", onKey);
       document.body.style.overflow = overflow;
       previouslyFocused?.focus();
     };
-  }, [onClose, initialFocus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Esc fecha — usa a ref para sempre ver o onClose atual sem re-focar.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onCloseRef.current();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div

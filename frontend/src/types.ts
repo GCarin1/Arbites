@@ -48,6 +48,12 @@ export interface TodoLink {
   title: string | null;
 }
 
+export interface SearchResult {
+  id: string;
+  title: string | null;
+  kind: string;
+}
+
 export interface Todo {
   id: string;
   title: string;
@@ -102,6 +108,23 @@ export interface SavedDaily {
   date: string;
   action_items: string[];
   body: string;
+}
+
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string | null;
+  summary: string | null;
+  path: string;
+  body?: string;
+}
+
+export interface MeetingSummaryResult {
+  preview: boolean;
+  id: string;
+  summary: string;
+  decisions: string[];
+  action_items: string[];
 }
 
 export interface TreeNode {

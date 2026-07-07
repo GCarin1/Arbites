@@ -122,6 +122,15 @@ def _todos_context(conn: sqlite3.Connection) -> dict:
     }
 
 
+def _meetings_of_day(conn: sqlite3.Connection, day: str) -> list[dict]:
+    return [
+        dict(r)
+        for r in conn.execute(
+            "SELECT id, title, summary FROM meetings WHERE date = ? ORDER BY id", (day,)
+        )
+    ]
+
+
 def build_context(ws: Workspace, conn: sqlite3.Connection, day: str) -> dict:
     """Contexto completo de um dia — insumo da daily (manual ou por IA)."""
     return {
@@ -130,6 +139,7 @@ def build_context(ws: Workspace, conn: sqlite3.Connection, day: str) -> dict:
         "activity": day_activity(conn, day),
         "metrics_diff": metrics_diff(ws, day),
         "defects_open": metrics_ops.defects_report(conn),
+        "meetings": _meetings_of_day(conn, day),
     }
 
 
@@ -181,4 +191,12 @@ def context_markdown(ctx: dict) -> str:
             + ", ".join(f"{k} {v}" for k, v in defects["by_severity"].items())
         )
     lines.append("")
+
+    meetings = ctx.get("meetings") or []
+    if meetings:
+        lines.append("## Reuniões do dia")
+        for m in meetings:
+            resumo = (m.get("summary") or "").strip() or "(sem resumo)"
+            lines.append(f"- {m['id']} {m['title']}: {resumo}")
+        lines.append("")
     return "\n".join(lines)

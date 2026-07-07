@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { LinksInput, MentionTextarea } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
+import { DocBody } from "./ReadView";
 import type { Todo } from "../types";
 
 const STATUS_DOT: Record<string, string> = {
@@ -11,23 +13,72 @@ const STATUS_DOT: Record<string, string> = {
 };
 const STATUSES: Todo["status"][] = ["open", "doing", "blocked", "done"];
 
-export function Todos({ onError }: { onError: (message: string) => void }) {
+export function Todos({
+  onError,
+  onNavigate,
+}: {
+  onError: (message: string) => void;
+  onNavigate: (id: string) => void;
+}) {
   const [items, setItems] = useState<Todo[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [bodies, setBodies] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<Todo | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+
+  const query = useCallback(() => {
+    const p = new URLSearchParams();
+    if (statusFilter) p.set("status", statusFilter);
+    if (dueFrom) p.set("due_from", dueFrom);
+    if (dueTo) p.set("due_to", dueTo);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  }, [statusFilter, dueFrom, dueTo]);
 
   const load = useCallback(() => {
-    const q = statusFilter ? `?status=${statusFilter}` : "";
     api
-      .todos(q)
-      .then(setItems)
+      .todos(query())
+      .then((data) => {
+        setItems(data);
+        setSelected((old) => new Set([...old].filter((id) => data.some((t) => t.id === id))));
+      })
       .catch((e) => onError(e.message));
-  }, [statusFilter, onError]);
+  }, [query, onError]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  function toggleSelect(id: string) {
+    setSelected((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function toggleExpand(t: Todo) {
+    setExpanded((old) => {
+      const next = new Set(old);
+      if (next.has(t.id)) next.delete(t.id);
+      else next.add(t.id);
+      return next;
+    });
+    if (!bodies[t.id]) {
+      try {
+        const full = await api.todo(t.id);
+        setBodies((old) => ({ ...old, [t.id]: full.body ?? "" }));
+      } catch {
+        /* silencioso */
+      }
+    }
+  }
 
   async function quickStatus(todo: Todo, status: Todo["status"]) {
     try {
@@ -48,9 +99,42 @@ export function Todos({ onError }: { onError: (message: string) => void }) {
     }
   }
 
+  async function removeSelected() {
+    setConfirmBulk(false);
+    try {
+      await Promise.all([...selected].map((id) => api.deleteTodo(id)));
+      setSelected(new Set());
+      load();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const active = items.filter((t) => t.status !== "done");
   const done = items.filter((t) => t.status === "done");
   const today = new Date().toISOString().slice(0, 10);
+  const exportParams: Record<string, string> = {};
+  if (selected.size) {
+    exportParams.ids = [...selected].join(",");
+  } else {
+    if (statusFilter) exportParams.status = statusFilter;
+    if (dueFrom) exportParams.due_from = dueFrom;
+    if (dueTo) exportParams.due_to = dueTo;
+  }
+
+  const rowProps = {
+    today,
+    selected,
+    expanded,
+    bodies,
+    editDisabled: selected.size > 1,
+    onSelect: toggleSelect,
+    onExpand: toggleExpand,
+    onEdit: setEditing,
+    onDelete: setConfirmDelete,
+    onStatus: quickStatus,
+    onNavigate,
+  };
 
   return (
     <div>
@@ -66,41 +150,47 @@ export function Todos({ onError }: { onError: (message: string) => void }) {
               </option>
             ))}
           </select>
+          <label className="caption">Prazo</label>
+          <input type="date" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} title="de" />
+          <input type="date" value={dueTo} onChange={(e) => setDueTo(e.target.value)} title="até" />
+          <a className="button-link" href={api.todosExportUrl("md", exportParams)} download>
+            Export MD
+          </a>
+          <a className="button-link" href={api.todosExportUrl("xml", exportParams)} download>
+            Export XML
+          </a>
           <button className="primary" onClick={() => setEditing("new")}>
             Novo afazer
           </button>
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <span>{selected.size} selecionado(s)</span>
+          <span className="spacer" style={{ flex: 1 }} />
+          <button onClick={() => setSelected(new Set())}>Limpar seleção</button>
+          <button className="danger" onClick={() => setConfirmBulk(true)}>
+            Excluir selecionados ({selected.size})
+          </button>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="empty-state">
           <div className="empty-title">Nenhum afazer</div>
           <div className="empty-body">
-            Crie afazeres com data, status e links para CTs, execuções ou stories.
-            Impedimentos (blocked) entram na daily.
+            Crie afazeres com prazo, status e links para CTs, execuções ou stories.
+            Expanda para ver a descrição; impedimentos (blocked) entram na daily.
           </div>
         </div>
       ) : (
         <>
-          {active.length > 0 && (
-            <TodoTable
-              rows={active}
-              today={today}
-              onEdit={setEditing}
-              onDelete={setConfirmDelete}
-              onStatus={quickStatus}
-            />
-          )}
+          {active.length > 0 && <TodoTable rows={active} {...rowProps} />}
           {done.length > 0 && (
             <>
               <h3 className="section-title">Concluídos ({done.length})</h3>
-              <TodoTable
-                rows={done}
-                today={today}
-                onEdit={setEditing}
-                onDelete={setConfirmDelete}
-                onStatus={quickStatus}
-              />
+              <TodoTable rows={done} {...rowProps} />
             </>
           )}
         </>
@@ -112,6 +202,7 @@ export function Todos({ onError }: { onError: (message: string) => void }) {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
+            setBodies({});
             load();
           }}
           onError={onError}
@@ -131,28 +222,47 @@ export function Todos({ onError }: { onError: (message: string) => void }) {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
+      {confirmBulk && (
+        <ConfirmModal
+          title="Excluir vários afazeres"
+          message={
+            <>
+              Tem certeza? Isso irá excluir <strong>{selected.size}</strong>{" "}
+              {selected.size === 1 ? "item" : "itens"}.
+            </>
+          }
+          confirmLabel={`Excluir ${selected.size} item(ns)`}
+          danger
+          onConfirm={() => void removeSelected()}
+          onCancel={() => setConfirmBulk(false)}
+        />
+      )}
     </div>
   );
 }
 
-function TodoTable({
-  rows,
-  today,
-  onEdit,
-  onDelete,
-  onStatus,
-}: {
-  rows: Todo[];
+type RowProps = {
   today: string;
+  selected: Set<string>;
+  expanded: Set<string>;
+  bodies: Record<string, string>;
+  editDisabled: boolean;
+  onSelect: (id: string) => void;
+  onExpand: (t: Todo) => void;
   onEdit: (t: Todo) => void;
   onDelete: (t: Todo) => void;
   onStatus: (t: Todo, s: Todo["status"]) => void;
-}) {
+  onNavigate: (id: string) => void;
+};
+
+function TodoTable({ rows, ...p }: { rows: Todo[] } & RowProps) {
   return (
     <div className="table-wrap" style={{ marginBottom: 24 }}>
       <table className="dense">
         <thead>
           <tr>
+            <th style={{ width: 28 }} />
+            <th style={{ width: 28 }} />
             <th>Status</th>
             <th>Afazer</th>
             <th>Prazo</th>
@@ -163,59 +273,94 @@ function TodoTable({
         </thead>
         <tbody>
           {rows.map((t) => {
-            const overdue = t.due && t.status !== "done" && t.due < today;
+            const overdue = t.due && t.status !== "done" && t.due < p.today;
+            const isOpen = p.expanded.has(t.id);
             return (
-              <tr key={t.id}>
-                <td>
-                  <select
-                    className="status-select"
-                    value={t.status}
-                    onChange={(e) => onStatus(t, e.target.value as Todo["status"])}
-                    aria-label="Status"
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <span className={`status-dot ${STATUS_DOT[t.status]}`} />{" "}
-                  <span className="mono muted">{t.id}</span> {t.title}
-                </td>
-                <td className="mono">
-                  {t.due ? (
-                    <span className={overdue ? "overdue" : ""}>{t.due}</span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>{t.squad ?? "—"}</td>
-                <td>
-                  {t.links.length === 0
-                    ? "—"
-                    : t.links.map((l) => (
-                        <span
-                          key={l.id}
-                          className="link-chip mono"
-                          title={l.title ?? "link pendente"}
-                        >
-                          {l.id}
-                        </span>
+              <Fragment key={t.id}>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={p.selected.has(t.id)}
+                      onChange={() => p.onSelect(t.id)}
+                      aria-label={`Selecionar ${t.id}`}
+                    />
+                  </td>
+                  <td>
+                    <button
+                      className="expand-btn"
+                      onClick={() => p.onExpand(t)}
+                      aria-label="Expandir descrição"
+                    >
+                      {isOpen ? "▾" : "▸"}
+                    </button>
+                  </td>
+                  <td>
+                    <select
+                      className="status-select"
+                      value={t.status}
+                      onChange={(e) => p.onStatus(t, e.target.value as Todo["status"])}
+                      aria-label="Status"
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
                       ))}
-                </td>
-                <td>
-                  <div className="step-actions">
-                    <button className="btn-sm" onClick={() => onEdit(t)}>
-                      Editar
-                    </button>
-                    <button className="btn-sm danger" onClick={() => onDelete(t)}>
-                      Excluir
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                    </select>
+                  </td>
+                  <td>
+                    <span className={`status-dot ${STATUS_DOT[t.status]}`} />{" "}
+                    <span className="mono muted">{t.id}</span> {t.title}
+                  </td>
+                  <td className="mono">
+                    {t.due ? <span className={overdue ? "overdue" : ""}>{t.due}</span> : "—"}
+                  </td>
+                  <td>{t.squad ?? "—"}</td>
+                  <td>
+                    {t.links.length === 0
+                      ? "—"
+                      : t.links.map((l) => (
+                          <button
+                            key={l.id}
+                            type="button"
+                            className="link-chip mono link-chip-btn"
+                            title={l.title ?? "link pendente (não encontrado)"}
+                            onClick={() => p.onNavigate(l.id)}
+                            disabled={!l.kind}
+                          >
+                            {l.id}
+                          </button>
+                        ))}
+                  </td>
+                  <td>
+                    <div className="step-actions">
+                      <button
+                        className="btn-sm"
+                        onClick={() => p.onEdit(t)}
+                        disabled={p.editDisabled}
+                        title={p.editDisabled ? "Desmarque para editar um item" : "Editar"}
+                      >
+                        Editar
+                      </button>
+                      <button className="btn-sm danger" onClick={() => p.onDelete(t)}>
+                        Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr className="todo-desc-row">
+                    <td colSpan={8}>
+                      {p.bodies[t.id]?.trim() ? (
+                        <DocBody text={p.bodies[t.id]} onMention={p.onNavigate} />
+                      ) : (
+                        <p className="muted">Sem descrição. Use Editar para adicionar.</p>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             );
           })}
         </tbody>
@@ -240,8 +385,18 @@ function TodoModal({
   const [due, setDue] = useState(todo?.due ?? "");
   const [squad, setSquad] = useState(todo?.squad ?? "");
   const [links, setLinks] = useState((todo?.links ?? []).map((l) => l.id).join(", "));
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (todo) {
+      api
+        .todo(todo.id)
+        .then((full) => setDescription(full.body ?? ""))
+        .catch(() => {});
+    }
+  }, [todo]);
 
   async function save() {
     if (!title.trim()) return;
@@ -255,6 +410,7 @@ function TodoModal({
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
+      body: description,
     };
     try {
       if (todo) await api.updateTodo(todo.id, body);
@@ -282,13 +438,7 @@ function TodoModal({
         </>
       }
     >
-      <form
-        className="modal-field"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
+      <div className="modal-field">
         <label htmlFor="todo-title">Título</label>
         <input
           id="todo-title"
@@ -297,9 +447,9 @@ function TodoModal({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Ex.: Revisar regressão do checkout"
         />
-      </form>
+      </div>
       <div className="field-grid">
-        <div className="field col-6">
+        <div className="field col-4">
           <label>Status</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as Todo["status"])}>
             {STATUSES.map((s) => (
@@ -309,23 +459,26 @@ function TodoModal({
             ))}
           </select>
         </div>
-        <div className="field col-6">
+        <div className="field col-4">
           <label>Prazo</label>
           <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
         </div>
-        <div className="field col-6">
-          <label>Squad (opcional)</label>
+        <div className="field col-4">
+          <label>Squad</label>
           <input value={squad} onChange={(e) => setSquad(e.target.value)} placeholder="pagamentos" />
         </div>
-        <div className="field col-6">
-          <label>Links (IDs, vírgula)</label>
-          <input
-            className="mono"
-            value={links}
-            onChange={(e) => setLinks(e.target.value)}
-            placeholder="CT-0001, EXEC-0002, ST-0003"
-          />
-        </div>
+      </div>
+      <div className="modal-field">
+        <label htmlFor="todo-links">Links (IDs, vírgula)</label>
+        <LinksInput id="todo-links" value={links} onChange={setLinks} />
+      </div>
+      <div className="modal-field">
+        <label>Descrição — digite @ para referenciar um documento</label>
+        <MentionTextarea
+          value={description}
+          onChange={setDescription}
+          placeholder="Detalhes do afazer. Ex.: bloqueado por @CT-0007…"
+        />
       </div>
     </Modal>
   );

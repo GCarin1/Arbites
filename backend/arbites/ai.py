@@ -86,6 +86,12 @@ class DailyDigest(BaseModel):
     action_items: list[str] = []  # viram todos com confirmação
 
 
+class MeetingSummary(BaseModel):
+    summary: str  # resumo executivo da reunião
+    decisions: list[str] = []  # decisões tomadas
+    action_items: list[str] = []  # próximos passos
+
+
 def testcase_body(item: GeneratedTestcase) -> str:
     """Converte o item gerado no corpo .md canônico (âncoras do parser)."""
     lines = ["## Objetivo", "", item.objetivo or "-", "", "## Pré-condições", ""]
@@ -252,6 +258,15 @@ class GeminiProvider(_BaseProvider):
             ) from exc
 
 
+# base_url default por tipo — endpoints locais NÃO devem cair no OpenAI quando
+# o usuário omite a URL (senão o modelo local é silenciosamente roteado p/ nuvem).
+_DEFAULT_BASE_URL = {
+    "lmstudio": "http://localhost:1234/v1",
+    "ollama": "http://localhost:11434/v1",
+    "vllm": "http://localhost:8000/v1",
+}
+
+
 def build_provider(config: dict[str, Any], keys: AIKeyStore,
                    transport: httpx.BaseTransport | None = None) -> _BaseProvider:
     name = str(config.get("name"))
@@ -259,7 +274,9 @@ def build_provider(config: dict[str, Any], keys: AIKeyStore,
     model = str(config.get("model", ""))
     if kind in ("openai", "openai_compatible", "openrouter", "ollama",
                 "lmstudio", "vllm"):
-        base = config.get("base_url") or "https://api.openai.com/v1"
+        base = config.get("base_url") or _DEFAULT_BASE_URL.get(
+            kind, "https://api.openai.com/v1"
+        )
         return OpenAICompatible(name, model, keys, base_url=str(base),
                                 transport=transport)
     if kind == "anthropic":
@@ -331,6 +348,19 @@ _DAILY_SYSTEM = (
 def generate_daily(provider: _BaseProvider, context_md: str) -> DailyDigest:
     result = provider.complete(_DAILY_SYSTEM, context_md, DailyDigest)
     assert isinstance(result, DailyDigest)
+    return result
+
+
+_MEETING_SYSTEM = (
+    "Você resume reuniões para um QA. A partir da descrição/transcrição "
+    "fornecida, produza um resumo executivo objetivo, as decisões tomadas e "
+    "os próximos passos (action items). Português do Brasil, sem enrolação."
+)
+
+
+def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
+    result = provider.complete(_MEETING_SYSTEM, body, MeetingSummary)
+    assert isinstance(result, MeetingSummary)
     return result
 
 

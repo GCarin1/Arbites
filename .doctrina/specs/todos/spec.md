@@ -2,10 +2,10 @@
 
 **Capability:** todos
 **Status:** active
-**Implementation:** verified — M10 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/workspace.py; frontend Todos.tsx). ID `TD-`, arquivos em `todos/`
+**Implementation:** verified — M10 + M10.1 (busca/autocomplete, export MD/XML, seleção múltipla, descrição com menções); backend/arbites/api.py, backend/arbites/indexer.py, backend/arbites/workspace.py; frontend Todos.tsx, Autocomplete.tsx. ID `TD-`, arquivos em `todos/`
 **Realizes:** SC11
 **Last updated:** 2026-07-06
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -31,11 +31,22 @@ por IA é M11.
   e filtros O(1).
 - The system shall resolver os títulos dos artefatos linkados (CT/execução/
   story) para exibição, a partir dos IDs.
+- The system shall expor `GET /search?q=&kinds=` que sugere entidades
+  (CT/requisito/execução/defeito/todo) por id ou título, para autocomplete de
+  links e menções.
+- The system shall exportar afazeres em Markdown e XML via
+  `GET /todos/export?format=`, respeitando os filtros atuais ou uma lista de
+  ids selecionados.
 
 ### Event-driven
 
 - When o usuário filtra por status ou por período (`due`), the system shall
   listar apenas o subconjunto correspondente.
+- When o usuário digita no campo de links ou `@` na descrição, the system
+  shall sugerir entidades filtradas pelo texto digitado, navegáveis por
+  teclado ou mouse.
+- When o usuário seleciona vários afazeres e pede excluir, the system shall
+  pedir confirmação informando a quantidade antes de excluir em massa.
 
 ### State-driven
 
@@ -48,6 +59,8 @@ por IA é M11.
   um todo mínimo é `title` + `status`.
 - The system shall not descartar todos concluídos: `done` permanece
   consultável por data (histórico).
+- The system shall not habilitar a edição individual enquanto houver mais de
+  um afazer selecionado.
 
 ### Optional
 
@@ -64,13 +77,19 @@ por IA é M11.
    se perde) — verified by `backend/tests/test_todos.py`.
 4. [verified] Links para CT/execução/story resolvem o título do artefato
    para exibição — verified by `backend/tests/test_todos.py`.
+5. [verified] `GET /search` sugere entidades por id/título, filtrável por
+   kind — verified by `backend/tests/test_todos.py`.
+6. [verified] Afazeres são exportáveis em Markdown e XML, respeitando
+   filtros ou uma seleção de ids — verified by `backend/tests/test_todos.py`.
 
 ## Maturity
 
 **MVP (committed):**
 
 - CRUD, `due`, `links` para CT/execução/story, status incl. `blocked`
-  (impedimento), filtro por status/período, histórico consultável.
+  (impedimento), filtro por status/período, histórico consultável,
+  autocomplete de links/menções (`@`), export MD/XML, seleção múltipla com
+  exclusão em massa, descrição expansível.
 
 **Future (aspirational, not committed):**
 

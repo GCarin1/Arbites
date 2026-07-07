@@ -1,6 +1,34 @@
 """Princípio 4 do intake: IA é opcional — plataforma 100% funcional sem
 nenhum provider (spec ai-assist, critério 3)."""
 
+from arbites.ai import AIKeyStore, build_provider
+
+
+class _NoKeys(AIKeyStore):
+    def get(self, provider):  # não toca o keyring
+        return None
+
+
+def test_local_provider_kinds_default_to_localhost_not_openai():
+    """Bug: kind local sem base_url caía no OpenAI (roteava o modelo local
+    para a nuvem). Agora cada tipo local tem seu default."""
+    cases = {
+        "lmstudio": "http://localhost:1234/v1",
+        "ollama": "http://localhost:11434/v1",
+        "vllm": "http://localhost:8000/v1",
+    }
+    for kind, expected in cases.items():
+        p = build_provider({"name": kind, "kind": kind, "model": "x"}, _NoKeys())
+        assert p.base_url == expected, kind
+    # openai_compatible sem url continua no OpenAI (correto)
+    p = build_provider({"name": "o", "kind": "openai_compatible", "model": "x"}, _NoKeys())
+    assert p.base_url == "https://api.openai.com/v1"
+    # base_url explícito sempre prevalece
+    p = build_provider(
+        {"name": "o", "kind": "lmstudio", "model": "x", "base_url": "http://x:9/v1"}, _NoKeys()
+    )
+    assert p.base_url == "http://x:9/v1"
+
 
 def test_platform_fully_functional_with_no_providers(client):
     # client padrão: arbites.yaml default tem ai.default_provider: null

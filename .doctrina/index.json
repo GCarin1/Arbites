@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-06",
+  "last_updated": "2026-07-07",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -101,6 +101,17 @@
         ]
       },
       {
+        "id": "meetings",
+        "path": ".doctrina/specs/meetings/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-07-07",
+        "implementation": "verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`",
+        "realizes": [
+          "SC13"
+        ]
+      },
+      {
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
@@ -148,9 +159,9 @@
         "id": "todos",
         "path": ".doctrina/specs/todos/spec.md",
         "status": "active",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "last_updated": "2026-07-06",
-        "implementation": "verified — M10 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/workspace.py; frontend Todos.tsx). ID `TD-`, arquivos em `todos/`",
+        "implementation": "verified — M10 + M10.1 (busca/autocomplete, export MD/XML, seleção múltipla, descrição com menções); backend/arbites/api.py, backend/arbites/indexer.py, backend/arbites/workspace.py; frontend Todos.tsx, Autocomplete.tsx. ID `TD-`, arquivos em `todos/`",
         "realizes": [
           "SC11"
         ]
@@ -494,9 +505,85 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0018-m10-1-todos-autocomplete-de-links-e-mencoes-na-d",
+        "title": "M10.1 todos: autocomplete de links e mencoes @ na descricao (endpoint de busca de entidades), export de todos em markdown e xml, filtro por data, selecao multipla com exclusao em massa e descricao expansivel",
+        "path": ".doctrina/changes/archive/2026-07-06-0018-m10-1-todos-autocomplete-de-links-e-mencoes-na-d",
+        "status": "applied",
+        "applied": "2026-07-06",
+        "specs_affected": [
+          {
+            "capability": "todos",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0019-fix-modal-rouba-o-foco-para-o-titulo-enquanto-se",
+        "title": "fix: modal rouba o foco para o titulo enquanto se digita em outro campo (efeito de foco re-disparava com nova identidade de onClose no re-render); e robustez do autocomplete (strip de @/! no termo de busca). O 404 em /search era backend desatualizado (endpoint novo da change anterior) — exige restart do uvicorn",
+        "path": ".doctrina/changes/archive/2026-07-07-0019-fix-modal-rouba-o-foco-para-o-titulo-enquanto-se",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": []
+      },
+      {
+        "id": "0020-fix-ux-descricao-expandida-do-afazer-cresce-late",
+        "title": "fix ux: descricao expandida do afazer cresce lateralmente (scroll horizontal) em vez de quebrar linha e expandir para baixo — a celula dentro da tabela com overflow-x nao quebrava tokens longos",
+        "path": ".doctrina/changes/archive/2026-07-07-0020-fix-ux-descricao-expandida-do-afazer-cresce-late",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": []
+      },
+      {
+        "id": "0021-afazeres-mencoes-na-descricao-e-os-chips-de-link",
+        "title": "afazeres: mencoes @ na descricao e os chips de link viram hiperlinks clicaveis que navegam ate o item (CT/requisito/execucao/todo), inferindo a aba pelo prefixo do id",
+        "path": ".doctrina/changes/archive/2026-07-07-0021-afazeres-mencoes-na-descricao-e-os-chips-de-link",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": []
+      },
+      {
+        "id": "0022-m12-meetings-capability-de-reunioes-crud-em-meet",
+        "title": "M12 meetings: capability de reunioes — CRUD em meetings/*.md (tema, data, corpo), resumo executivo por IA (preview), inclusao das reunioes do dia no contexto da daily; frontend aba Reunioes",
+        "path": ".doctrina/changes/archive/2026-07-07-0022-m12-meetings-capability-de-reunioes-crud-em-meet",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": [
+          {
+            "capability": "meetings",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0023-fix-ia-1-config-de-providers-nao-salvava-quando",
+        "title": "fix IA: (1) config de providers nao salvava quando o usuario preenchia o formulario e clicava Salvar sem 'Adicionar a lista' — Salvar passa a incluir o provider/chave pendente; (2) kind local (lmstudio/ollama/vllm) sem base_url caia no OpenAI — default de base_url por tipo",
+        "path": ".doctrina/changes/archive/2026-07-07-0023-fix-ia-1-config-de-providers-nao-salvava-quando",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": []
       }
     ],
     "skills": [
+      {
+        "id": "conteudo-longo-em-tabela-overflow",
+        "path": ".doctrina/skills/conteudo-longo-em-tabela-overflow.md",
+        "description": "Conteúdo longo dentro de tabela auto-layout com overflow-x cresce lateralmente; use overflow-wrap para zerar a min-content e forçar quebra para baixo.",
+        "last_updated": "2026-07-07"
+      },
+      {
+        "id": "default-por-tipo-de-provider",
+        "path": ".doctrina/skills/default-por-tipo-de-provider.md",
+        "description": "Fallback único (ex.: base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
+        "last_updated": "2026-07-07"
+      },
+      {
+        "id": "efeito-de-foco-so-no-mount",
+        "path": ".doctrina/skills/efeito-de-foco-so-no-mount.md",
+        "description": "Efeitos de foco/scroll-lock (modais, autofocus) devem rodar só no mount — callbacks instáveis nas deps re-disparam o efeito e roubam o cursor.",
+        "last_updated": "2026-07-07"
+      },
       {
         "id": "leitura-agrupada-em-card",
         "path": ".doctrina/skills/leitura-agrupada-em-card.md",
@@ -508,6 +595,12 @@
         "path": ".doctrina/skills/metricas-resultado-liquido.md",
         "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
         "last_updated": "2026-07-06"
+      },
+      {
+        "id": "salvar-inclui-formulario-pendente",
+        "path": ".doctrina/skills/salvar-inclui-formulario-pendente.md",
+        "description": "Formulário com \"Adicionar à lista\" + \"Salvar\" separados perde dados — o Salvar deve incluir o item pendente do formulário, senão o usuário preenche e nada persiste.",
+        "last_updated": "2026-07-07"
       }
     ],
     "contracts": [
