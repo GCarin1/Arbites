@@ -76,3 +76,39 @@ def test_todo_links_resolve_titles(client):
     # filtro por link
     linked = client.get("/api/v1/todos", params={"link": ct["id"]}).json()
     assert [t["title"] for t in linked] == ["Rodar login"]
+
+
+def test_search_entities_for_autocomplete(client):
+    """Busca cross-entidade p/ autocomplete de links e menções @."""
+    ct = make_ct(client, "Login válido")
+    client.post("/api/v1/requirements", json={"kind": "story", "title": "Autenticação"})
+    # por id (prefixo vem primeiro no ranqueamento)
+    by_id = client.get("/api/v1/search", params={"q": ct["id"]}).json()["results"]
+    assert by_id and by_id[0]["id"] == ct["id"] and by_id[0]["kind"] == "testcase"
+    # por título
+    by_title = client.get("/api/v1/search", params={"q": "Autentic"}).json()["results"]
+    assert any(r["kind"] == "requirement" and r["title"] == "Autenticação" for r in by_title)
+    # filtro por kind
+    only_tc = client.get("/api/v1/search", params={"q": "a", "kinds": "testcase"}).json()
+    assert all(r["kind"] == "testcase" for r in only_tc["results"])
+
+
+def test_export_todos_md_and_xml(client):
+    ct = make_ct(client, "Login")
+    client.post(
+        "/api/v1/todos",
+        json={"title": "Revisar", "status": "doing", "due": "2026-07-10",
+              "squad": "pagamentos", "links": [ct["id"]], "body": "Detalhes do afazer."},
+    )
+    md = client.get("/api/v1/todos/export", params={"format": "md"})
+    assert md.headers["content-type"].startswith("text/markdown")
+    assert "# Afazeres" in md.text and "Revisar" in md.text and "Detalhes do afazer." in md.text
+
+    xml = client.get("/api/v1/todos/export", params={"format": "xml"})
+    assert xml.headers["content-type"].startswith("application/xml")
+    assert "<todos>" in xml.text and "<title>Revisar</title>" in xml.text
+
+    # export de seleção específica
+    todo2 = client.post("/api/v1/todos", json={"title": "Outro"}).json()
+    only = client.get("/api/v1/todos/export", params={"format": "md", "ids": todo2["id"]})
+    assert "Outro" in only.text and "Revisar" not in only.text

@@ -260,7 +260,15 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0018-m10-1-todos-autocomplete-de-links-e-mencoes-na-d",
+        "title": "M10.1 todos: autocomplete de links e mencoes @ na descricao (endpoint de busca de entidades), export de todos em markdown e xml, filtro por data, selecao multipla com exclusao em massa e descricao expansivel",
+        "path": ".doctrina/changes/0018-m10-1-todos-autocomplete-de-links-e-mencoes-na-d",
+        "status": "proposed",
+        "opened": "2026-07-06"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
