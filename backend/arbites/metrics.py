@@ -9,7 +9,7 @@ o denominador. Nenhum estado é materializado — o índice é descartável
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 FINAL_STATUSES = ("passed", "failed", "blocked", "retest")
@@ -413,7 +413,9 @@ def defects_report(conn: sqlite3.Connection, squad: str | None = None) -> dict:
         params,
     ).fetchall()
 
-    today = datetime.now(timezone.utc).date()
+    # data local (o `opened` do defeito é carimbado com date.today() local);
+    # usar UTC aqui causaria aging off-by-one à noite em fusos atrás do UTC.
+    today = date.today()
     by_severity: dict[str, int] = {}
     by_squad: dict[str, int] = {}
     buckets = {"0-7": 0, "8-30": 0, "30+": 0}

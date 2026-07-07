@@ -712,6 +712,8 @@ textarea.raw {
   border-radius: var(--r-card);
   padding: var(--s2);
   line-height: 1.6;
+  /* quebra tokens longos em vez de estourar a largura do container */
+  overflow-wrap: anywhere;
 }
 .doc-body.empty {
   color: var(--text-subtle);
@@ -1201,7 +1203,91 @@ a {
   }
 }
 
+/* ------------------------------------------------------- Autocomplete */
+
+.ac-wrap {
+  position: relative;
+}
+.ac-box {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+  box-shadow: var(--shadow-pop);
+  padding: 4px;
+}
+.ac-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  min-height: 30px;
+  padding: 5px 8px;
+  background: none;
+  border: none;
+  border-radius: var(--r-control);
+  text-align: left;
+  font-weight: 400;
+}
+.ac-item.active,
+.ac-item:hover {
+  background: var(--surface-hover);
+  border: none;
+}
+.ac-item .ac-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-item .ac-kind {
+  font-size: var(--fs-caption);
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ---------------------------------------------------------- Afazeres */
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 10px 14px;
+  margin-bottom: var(--s2);
+  background: var(--selected);
+  border: 1px solid var(--selected-border);
+  border-radius: var(--r-control);
+}
+.expand-btn {
+  height: 24px;
+  width: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+}
+.expand-btn:hover {
+  background: var(--surface-hover);
+  border: none;
+}
+.todo-desc-row td {
+  background: var(--bg);
+  /* `overflow-wrap: anywhere` zera a min-content-width da célula: a tabela
+     (auto-layout, dentro de .table-wrap com overflow-x) deixa de crescer
+     lateralmente por causa da descrição — o texto se limita à largura visível
+     e expande para baixo, quebrando linha inclusive em tokens longos. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .link-chip {
   display: inline-block;
@@ -1211,6 +1297,38 @@ a {
   padding: 1px 8px;
   margin: 0 4px 2px 0;
   font-size: var(--fs-caption);
+}
+/* chip clicável (button) — navega até o artefato */
+button.link-chip-btn {
+  height: auto;
+  line-height: 1.5;
+  color: var(--primary);
+  cursor: pointer;
+}
+button.link-chip-btn:hover:not(:disabled) {
+  background: var(--selected);
+  border-color: var(--selected-border);
+}
+button.link-chip-btn:disabled {
+  color: var(--text-subtle);
+  opacity: 1;
+  cursor: default;
+}
+/* menção @ID no corpo — link inline de navegação */
+.mention-link {
+  height: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mention-link:hover {
+  background: none;
+  border: none;
+  text-decoration: underline;
 }
 .overdue {
   color: var(--danger);

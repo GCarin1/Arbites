@@ -13,6 +13,7 @@ import type {
   MetricsSummary,
   Requirement,
   ReviewResponse,
+  SearchResult,
   TestCase,
   Todo,
   TraceabilityMatrix,
@@ -123,11 +124,20 @@ export const api = {
     request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
 
   todos: (query = "") => request<Todo[]>(`/todos${query}`),
+  todo: (id: string) => request<Todo>(`/todos/${id}`),
   createTodo: (body: object) =>
     request<Todo>("/todos", { method: "POST", body: JSON.stringify(body) }),
   updateTodo: (id: string, body: object) =>
     request<Todo>(`/todos/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteTodo: (id: string) => request<void>(`/todos/${id}`, { method: "DELETE" }),
+  todosExportUrl: (format: "md" | "xml", params: Record<string, string>) => {
+    const qs = new URLSearchParams({ format, ...params });
+    return `${BASE}/todos/export?${qs.toString()}`;
+  },
+  search: (q: string, limit = 8, kinds = "") =>
+    request<{ results: SearchResult[] }>(
+      `/search?q=${encodeURIComponent(q)}&limit=${limit}&kinds=${encodeURIComponent(kinds)}`,
+    ),
 
   metricsSnapshot: () => request<unknown>("/metrics/snapshot", { method: "POST" }),
   dailyContext: (day: string) => request<DailyContext>(`/daily/${day}/context`),

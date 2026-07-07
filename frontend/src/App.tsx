@@ -118,6 +118,26 @@ export default function App() {
     }
   }
 
+  // Navega até um artefato pelo id (aba inferida do prefixo) — usado pelos
+  // links e menções @ dos afazeres.
+  const navigateTo = useCallback((id: string) => {
+    const prefix = id.split("-")[0];
+    if (prefix === "CT") {
+      setSelectedCt(id);
+      setTab("testcases");
+    } else if (prefix === "EP" || prefix === "ST") {
+      setSelectedReq(id);
+      setTab("requirements");
+    } else if (prefix === "EXEC") {
+      setExecCreating(false);
+      setSelectedExec(id);
+      setTab("executions");
+    } else if (prefix === "TD") {
+      setTab("todos");
+    }
+    // DF (defeito) não tem view dedicada — sem navegação
+  }, []);
+
   async function createTestcase(title: string, folder: string) {
     try {
       const created = await api.createTestcase({ title, folder });
@@ -277,7 +297,7 @@ export default function App() {
             </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
-              <Todos onError={setError} />
+              <Todos onError={setError} onNavigate={navigateTo} />
             </Suspense>
           ) : tab === "daily" ? (
             <Suspense fallback={<p className="empty">Carregando daily…</p>}>

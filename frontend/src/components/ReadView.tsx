@@ -62,7 +62,41 @@ export function ReadField({
  * cabeçalhos `#…`, linhas e parágrafos em branco. Suficiente para o modo
  * leitura de corpos de CT/requisito (Objetivo / Passos / Resultado esperado).
  */
-export function DocBody({ text }: { text: string | null | undefined }) {
+const MENTION_RE = /@([A-Z]{1,6}-\d+)/g;
+
+/** Renderiza uma linha, transformando menções `@ID` em links clicáveis. */
+function renderLine(line: string, onMention: (id: string) => void): ReactNode {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  for (const m of line.matchAll(MENTION_RE)) {
+    const start = m.index ?? 0;
+    if (start > last) parts.push(line.slice(last, start));
+    const id = m[1];
+    parts.push(
+      <button
+        key={`m${key++}`}
+        type="button"
+        className="mention-link"
+        onClick={() => onMention(id)}
+        title={`Ir para ${id}`}
+      >
+        @{id}
+      </button>,
+    );
+    last = start + m[0].length;
+  }
+  if (last < line.length) parts.push(line.slice(last));
+  return parts.length ? parts : line;
+}
+
+export function DocBody({
+  text,
+  onMention,
+}: {
+  text: string | null | undefined;
+  onMention?: (id: string) => void;
+}) {
   const content = (text ?? "").replace(/\r\n/g, "\n").trimEnd();
   if (!content.trim()) {
     return <div className="doc-body empty">Sem conteúdo. Clique em Editar para preencher.</div>;
@@ -84,7 +118,7 @@ export function DocBody({ text }: { text: string | null | undefined }) {
         }
         return (
           <p key={i} className="doc-line">
-            {line}
+            {onMention ? renderLine(line, onMention) : line}
           </p>
         );
       })}

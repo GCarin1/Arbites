@@ -48,6 +48,12 @@ export interface TodoLink {
   title: string | null;
 }
 
+export interface SearchResult {
+  id: string;
+  title: string | null;
+  kind: string;
+}
+
 export interface Todo {
   id: string;
   title: string;
