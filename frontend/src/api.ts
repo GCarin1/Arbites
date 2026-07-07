@@ -5,6 +5,8 @@ import type {
   Defect,
   DefectsReport,
   EvidenceEntry,
+  Meeting,
+  MeetingSummaryResult,
   SavedDaily,
   Execution,
   ExecutionSummary,
@@ -150,6 +152,19 @@ export const api = {
   getDaily: (day: string) => request<SavedDaily>(`/daily/${day}`),
   putDaily: (day: string, body: object) =>
     request<SavedDaily>(`/daily/${day}`, { method: "PUT", body: JSON.stringify(body) }),
+
+  meetings: (query = "") => request<Meeting[]>(`/meetings${query}`),
+  meeting: (id: string) => request<Meeting>(`/meetings/${id}`),
+  createMeeting: (body: object) =>
+    request<Meeting>("/meetings", { method: "POST", body: JSON.stringify(body) }),
+  updateMeeting: (id: string, body: object) =>
+    request<Meeting>(`/meetings/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteMeeting: (id: string) => request<void>(`/meetings/${id}`, { method: "DELETE" }),
+  summarizeMeeting: (id: string, provider?: string | null) =>
+    request<MeetingSummaryResult>(`/meetings/${id}/summarize`, {
+      method: "POST",
+      body: JSON.stringify({ provider: provider ?? null }),
+    }),
 
   squads: () => request<{ squads: string[] }>("/squads"),
   metricsSummary: (sprint: string, days: number, squad = "") =>

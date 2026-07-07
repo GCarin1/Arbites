@@ -110,6 +110,23 @@ export interface SavedDaily {
   body: string;
 }
 
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string | null;
+  summary: string | null;
+  path: string;
+  body?: string;
+}
+
+export interface MeetingSummaryResult {
+  preview: boolean;
+  id: string;
+  summary: string;
+  decisions: string[];
+  action_items: string[];
+}
+
 export interface TreeNode {
   name: string;
   path: string;

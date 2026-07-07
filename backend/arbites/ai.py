@@ -86,6 +86,12 @@ class DailyDigest(BaseModel):
     action_items: list[str] = []  # viram todos com confirmação
 
 
+class MeetingSummary(BaseModel):
+    summary: str  # resumo executivo da reunião
+    decisions: list[str] = []  # decisões tomadas
+    action_items: list[str] = []  # próximos passos
+
+
 def testcase_body(item: GeneratedTestcase) -> str:
     """Converte o item gerado no corpo .md canônico (âncoras do parser)."""
     lines = ["## Objetivo", "", item.objetivo or "-", "", "## Pré-condições", ""]
@@ -331,6 +337,19 @@ _DAILY_SYSTEM = (
 def generate_daily(provider: _BaseProvider, context_md: str) -> DailyDigest:
     result = provider.complete(_DAILY_SYSTEM, context_md, DailyDigest)
     assert isinstance(result, DailyDigest)
+    return result
+
+
+_MEETING_SYSTEM = (
+    "Você resume reuniões para um QA. A partir da descrição/transcrição "
+    "fornecida, produza um resumo executivo objetivo, as decisões tomadas e "
+    "os próximos passos (action items). Português do Brasil, sem enrolação."
+)
+
+
+def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
+    result = provider.complete(_MEETING_SYSTEM, body, MeetingSummary)
+    assert isinstance(result, MeetingSummary)
     return result
 
 

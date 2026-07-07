@@ -101,6 +101,17 @@
         ]
       },
       {
+        "id": "meetings",
+        "path": ".doctrina/specs/meetings/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-07-07",
+        "implementation": "verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`",
+        "realizes": [
+          "SC13"
+        ]
+      },
+      {
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
@@ -531,6 +542,19 @@
         "status": "applied",
         "applied": "2026-07-07",
         "specs_affected": []
+      },
+      {
+        "id": "0022-m12-meetings-capability-de-reunioes-crud-em-meet",
+        "title": "M12 meetings: capability de reunioes — CRUD em meetings/*.md (tema, data, corpo), resumo executivo por IA (preview), inclusao das reunioes do dia no contexto da daily; frontend aba Reunioes",
+        "path": ".doctrina/changes/archive/2026-07-07-0022-m12-meetings-capability-de-reunioes-crud-em-meet",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": [
+          {
+            "capability": "meetings",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [

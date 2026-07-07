@@ -43,6 +43,9 @@ const Todos = lazy(() =>
 const Daily = lazy(() =>
   import("./components/Daily").then((m) => ({ default: m.Daily }))
 );
+const Meetings = lazy(() =>
+  import("./components/Meetings").then((m) => ({ default: m.Meetings }))
+);
 
 type Tab =
   | "testcases"
@@ -50,6 +53,7 @@ type Tab =
   | "executions"
   | "todos"
   | "daily"
+  | "meetings"
   | "dashboard"
   | "automation"
   | "ia"
@@ -62,6 +66,7 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "executions", label: "Execuções" },
   { key: "todos", label: "Afazeres" },
   { key: "daily", label: "Daily" },
+  { key: "meetings", label: "Reuniões" },
   { key: "dashboard", label: "Dashboard" },
   { key: "automation", label: "Automação" },
   { key: "ia", label: "IA" },
@@ -254,6 +259,13 @@ export default function App() {
                 com action items — que viram afazeres.
               </p>
             )}
+            {tab === "meetings" && (
+              <p className="panel-hint">
+                Registre tema, data e o que foi falado (descrição ou
+                transcrição). A IA (opcional) gera o resumo executivo — e as
+                reuniões do dia entram na daily.
+              </p>
+            )}
             {tab === "migration" && (
               <p className="panel-hint">
                 Import do XML do Xray (preview → confirm, idempotente) no
@@ -302,6 +314,10 @@ export default function App() {
           ) : tab === "daily" ? (
             <Suspense fallback={<p className="empty">Carregando daily…</p>}>
               <Daily onError={setError} />
+            </Suspense>
+          ) : tab === "meetings" ? (
+            <Suspense fallback={<p className="empty">Carregando reuniões…</p>}>
+              <Meetings onError={setError} />
             </Suspense>
           ) : tab === "migration" ? (
             <Suspense fallback={<p className="empty">Carregando migração…</p>}>

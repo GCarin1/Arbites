@@ -1174,6 +1174,13 @@ a {
   color: #c9d1d9;
 }
 
+/* ----------------------------------------------------------- Reuniões */
+
+.meeting-summary {
+  border-left: 3px solid var(--primary);
+  padding-left: var(--s2);
+}
+
 /* -------------------------------------------------------------- Daily */
 
 .daily-history {

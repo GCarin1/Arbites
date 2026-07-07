@@ -222,6 +222,23 @@ class DailyGenerateIn(BaseModel):
     provider: str | None = None
 
 
+class MeetingIn(BaseModel):
+    title: str
+    date: str | None = None
+    body: str = ""
+
+
+class MeetingUpdate(BaseModel):
+    title: str | None = None
+    date: str | None = None
+    summary: str | None = None
+    body: str | None = None
+
+
+class MeetingSummarizeIn(BaseModel):
+    provider: str | None = None
+
+
 DEFAULT_TC_BODY = """## Objetivo
 
 ## Pré-condições
@@ -1330,6 +1347,7 @@ def _register_routes(app: FastAPI) -> None:
             ("execution", "SELECT id, name title FROM executions"),
             ("defect", "SELECT id, title FROM defects"),
             ("todo", "SELECT id, title FROM todos"),
+            ("meeting", "SELECT id, title FROM meetings"),
         ]
         out = []
         for kind, base in sources:
@@ -1557,6 +1575,77 @@ def _register_routes(app: FastAPI) -> None:
         meta = {"date": day, "action_items": payload.action_items or None}
         _write_doc(_daily_path(ws, day), meta, payload.body)
         return {"date": day, "action_items": payload.action_items, "body": payload.body}
+
+    # -- meetings / reuniões (M12) -----------------------------------------
+
+    def _meeting_out(conn, ws: Workspace, meeting_id: str) -> dict:
+        row = conn.execute("SELECT * FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{meeting_id} não encontrada")
+        out = dict(row)
+        _, out["body"] = _load_doc(ws, row["path"])
+        return out
+
+    @app.get(API_PREFIX + "/meetings")
+    async def list_meetings(request: Request, date: str = ""):
+        conn = conn_of(request)
+        sql, params = "SELECT * FROM meetings WHERE 1=1", []
+        if date:
+            sql += " AND date = ?"
+            params.append(date)
+        return [dict(r) for r in conn.execute(sql + " ORDER BY date DESC, id DESC", params)]
+
+    @app.post(API_PREFIX + "/meetings", status_code=201)
+    async def create_meeting(request: Request, payload: MeetingIn):
+        ws, conn = ws_of(request), conn_of(request)
+        meeting_id = ws.next_id("meeting")
+        meta = {
+            "id": meeting_id,
+            "title": payload.title,
+            "date": payload.date or date.today().isoformat(),
+        }
+        path = ws.root / "meetings" / f"{meeting_id}-{slugify(payload.title)}.md"
+        _write_doc(path, meta, payload.body)
+        reindex_file(ws, conn, path)
+        return _meeting_out(conn, ws, meeting_id)
+
+    @app.get(API_PREFIX + "/meetings/{meeting_id}")
+    async def get_meeting(request: Request, meeting_id: str):
+        return _meeting_out(conn_of(request), ws_of(request), meeting_id)
+
+    @app.put(API_PREFIX + "/meetings/{meeting_id}")
+    async def update_meeting(request: Request, meeting_id: str, payload: MeetingUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        meta, body = _load_doc(ws, rel)
+        changes = payload.model_dump(exclude_unset=True)
+        body = changes.pop("body", body)
+        if "summary" in changes and not changes["summary"]:
+            meta.pop("summary", None)
+            changes.pop("summary")
+        meta.update(changes)
+        _write_doc(ws.root / rel, meta, body)
+        reindex_file(ws, conn, ws.root / rel)
+        return _meeting_out(conn, ws, meeting_id)
+
+    @app.delete(API_PREFIX + "/meetings/{meeting_id}", status_code=204)
+    async def delete_meeting(request: Request, meeting_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        path = ws.root / rel
+        ws.trash(path)
+        reindex_file(ws, conn, path)
+
+    @app.post(API_PREFIX + "/meetings/{meeting_id}/summarize")
+    async def summarize_meeting(request: Request, meeting_id: str, payload: MeetingSummarizeIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        if not body.strip():
+            raise _error(422, "empty_meeting", "reunião sem descrição/transcrição para resumir")
+        result = await asyncio.to_thread(ai_ops.summarize_meeting, provider, body)
+        return {"preview": True, "id": meeting_id, **result.model_dump()}
 
 
 def _mount_frontend(app: FastAPI) -> None:
