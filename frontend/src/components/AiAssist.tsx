@@ -140,18 +140,39 @@ function ProvidersCard({
 
   async function save() {
     setSaving(true);
+    // Inclui o provider digitado no formulário mesmo sem clicar "Adicionar à
+    // lista" — senão o usuário preenche, salva e nada persiste.
+    let effProviders = providers;
+    let effKeys = keys;
+    let effDefault = defaultProvider;
+    if (name.trim()) {
+      const pending: AiProvider = {
+        name: name.trim(),
+        kind,
+        model: model.trim(),
+        base_url: baseUrl.trim() || null,
+        key_configured: false,
+      };
+      effProviders = [...providers.filter((p) => p.name !== pending.name), pending];
+      if (newKey.trim()) effKeys = { ...keys, [pending.name]: newKey.trim() };
+      if (!effDefault) effDefault = pending.name;
+    }
     try {
       const updated = await api.putAiProviders({
-        default_provider: defaultProvider,
-        providers: providers.map((p) => ({
+        default_provider: effDefault,
+        providers: effProviders.map((p) => ({
           name: p.name,
           kind: p.kind,
           model: p.model,
           base_url: p.base_url,
         })),
-        keys,
+        keys: effKeys,
       });
       setKeys({});
+      setName("");
+      setModel("");
+      setBaseUrl("");
+      setNewKey("");
       onSaved();
       setProviders(updated.providers);
       setDefaultProvider(updated.default_provider);
@@ -278,6 +299,9 @@ function ProvidersCard({
         <button className="primary" onClick={() => void save()} disabled={saving}>
           {saving ? "Salvando…" : "Salvar configuração"}
         </button>
+        <span className="caption muted">
+          preencha acima e salve — o provider é incluído automaticamente
+        </span>
       </div>
     </div>
   );

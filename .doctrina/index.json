@@ -555,6 +555,14 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0023-fix-ia-1-config-de-providers-nao-salvava-quando",
+        "title": "fix IA: (1) config de providers nao salvava quando o usuario preenchia o formulario e clicava Salvar sem 'Adicionar a lista' — Salvar passa a incluir o provider/chave pendente; (2) kind local (lmstudio/ollama/vllm) sem base_url caia no OpenAI — default de base_url por tipo",
+        "path": ".doctrina/changes/archive/2026-07-07-0023-fix-ia-1-config-de-providers-nao-salvava-quando",
+        "status": "applied",
+        "applied": "2026-07-07",
+        "specs_affected": []
       }
     ],
     "skills": [
@@ -562,6 +570,12 @@
         "id": "conteudo-longo-em-tabela-overflow",
         "path": ".doctrina/skills/conteudo-longo-em-tabela-overflow.md",
         "description": "Conteúdo longo dentro de tabela auto-layout com overflow-x cresce lateralmente; use overflow-wrap para zerar a min-content e forçar quebra para baixo.",
+        "last_updated": "2026-07-07"
+      },
+      {
+        "id": "default-por-tipo-de-provider",
+        "path": ".doctrina/skills/default-por-tipo-de-provider.md",
+        "description": "Fallback único (ex.: base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
         "last_updated": "2026-07-07"
       },
       {
@@ -581,6 +595,12 @@
         "path": ".doctrina/skills/metricas-resultado-liquido.md",
         "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
         "last_updated": "2026-07-06"
+      },
+      {
+        "id": "salvar-inclui-formulario-pendente",
+        "path": ".doctrina/skills/salvar-inclui-formulario-pendente.md",
+        "description": "Formulário com \"Adicionar à lista\" + \"Salvar\" separados perde dados — o Salvar deve incluir o item pendente do formulário, senão o usuário preenche e nada persiste.",
+        "last_updated": "2026-07-07"
       }
     ],
     "contracts": [

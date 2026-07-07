@@ -258,6 +258,15 @@ class GeminiProvider(_BaseProvider):
             ) from exc
 
 
+# base_url default por tipo — endpoints locais NÃO devem cair no OpenAI quando
+# o usuário omite a URL (senão o modelo local é silenciosamente roteado p/ nuvem).
+_DEFAULT_BASE_URL = {
+    "lmstudio": "http://localhost:1234/v1",
+    "ollama": "http://localhost:11434/v1",
+    "vllm": "http://localhost:8000/v1",
+}
+
+
 def build_provider(config: dict[str, Any], keys: AIKeyStore,
                    transport: httpx.BaseTransport | None = None) -> _BaseProvider:
     name = str(config.get("name"))
@@ -265,7 +274,9 @@ def build_provider(config: dict[str, Any], keys: AIKeyStore,
     model = str(config.get("model", ""))
     if kind in ("openai", "openai_compatible", "openrouter", "ollama",
                 "lmstudio", "vllm"):
-        base = config.get("base_url") or "https://api.openai.com/v1"
+        base = config.get("base_url") or _DEFAULT_BASE_URL.get(
+            kind, "https://api.openai.com/v1"
+        )
         return OpenAICompatible(name, model, keys, base_url=str(base),
                                 transport=transport)
     if kind == "anthropic":
