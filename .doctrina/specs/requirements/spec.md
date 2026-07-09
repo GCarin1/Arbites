@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)
 **Realizes:** SC1
-**Last updated:** 2026-07-03
-**Version:** 0.2.0
+**Last updated:** 2026-07-09
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -28,6 +28,9 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
   `GET/PUT/DELETE /requirements/{id}`, com filtros `kind` e `status`.
 - The system shall suportar critérios de aceite em formato EARS no corpo
   da story (insumo para geração de CTs por IA no M5).
+
+- The system shall carimbar `created` (data) no frontmatter do requisito na
+  criação, indexá-lo e expô-lo na listagem/detalhe.
 
 ### Event-driven
 
@@ -59,6 +62,9 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
 2. [verified] `GET /requirements?kind=story&status=active` filtra
    corretamente — verified by `backend/tests/test_requirements.py`.
 3. [verified] Story com `epic` inexistente aparece em `/warnings` —
+   verified by `backend/tests/test_requirements.py`.
+
+4. [verified] Requisito criado recebe `created` e a listagem o expõe —
    verified by `backend/tests/test_requirements.py`.
 
 ## Maturity

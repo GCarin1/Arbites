@@ -15,8 +15,8 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-06",
+        "version": "0.3.0",
+        "last_updated": "2026-07-09",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
@@ -137,8 +137,8 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.3.0",
+        "last_updated": "2026-07-09",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC1"
@@ -282,15 +282,7 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [
-      {
-        "id": "0028-afazeres-substituir-a-tabela-por-layout-de-cards",
-        "title": "afazeres: substituir a tabela por layout de cards/blocos estilo sticky notes, preservando selecao multipla, expandir descricao, status rapido, links clicaveis, prazo com atraso e acoes",
-        "path": ".doctrina/changes/0028-afazeres-substituir-a-tabela-por-layout-de-cards",
-        "status": "proposed",
-        "opened": "2026-07-09"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -628,6 +620,40 @@
         "status": "applied",
         "applied": "2026-07-09",
         "specs_affected": []
+      },
+      {
+        "id": "0028-afazeres-substituir-a-tabela-por-layout-de-cards",
+        "title": "afazeres: substituir a tabela por layout de cards/blocos estilo sticky notes, preservando selecao multipla, expandir descricao, status rapido, links clicaveis, prazo com atraso e acoes",
+        "path": ".doctrina/changes/archive/2026-07-09-0028-afazeres-substituir-a-tabela-por-layout-de-cards",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": []
+      },
+      {
+        "id": "0029-requisitos-e-execucoes-replicam-o-layout-de-repo",
+        "title": "requisitos e execucoes replicam o layout de repositorio: hierarquia centralizada no conteudo (epic-story com drag-and-drop de story entre epics; execucoes agrupadas por ano), detalhe por clique com botao Voltar, exclusao com confirmacao e data de criacao registrada/exibida",
+        "path": ".doctrina/changes/archive/2026-07-09-0029-requisitos-e-execucoes-replicam-o-layout-de-repo",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0030-importacao-inteligente-em-massa-upload-de-txt-md",
+        "title": "importacao inteligente em massa: upload de txt/md/xml com casos de teste em formato livre; a IA identifica cada caso, sugere uma pasta pelo contexto e converte para BDD (Given/When/Then) em preview aceitavel item a item; prompt otimizado para modelos de ate 9B",
+        "path": ".doctrina/changes/archive/2026-07-09-0030-importacao-inteligente-em-massa-upload-de-txt-md",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [

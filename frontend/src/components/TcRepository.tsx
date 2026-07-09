@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
-import type { TreeNode } from "../types";
+import { DocBody } from "./ReadView";
+import type { GeneratedTestcase, TreeNode } from "../types";
 
 /**
  * Repositório de test cases (doc §1.1) — árvore de pastas centralizada no
@@ -29,6 +30,7 @@ export function TcRepository({
   const [creatingFolder, setCreatingFolder] = useState<string | null>(null); // pasta pai
   const [deletingFolder, setDeletingFolder] = useState<TreeNode | null>(null);
   const [deletingCt, setDeletingCt] = useState<{ id: string; title: string } | null>(null);
+  const [importing, setImporting] = useState(false);
 
   function toggle(path: string) {
     setCollapsed((old) => {
@@ -183,6 +185,7 @@ export function TcRepository({
         <span className="spacer" />
         <div className="head-controls">
           {extraActions}
+          <button onClick={() => setImporting(true)}>Importar com IA</button>
           <button onClick={() => setCreatingFolder(root.path)}>Nova pasta</button>
           <button className="primary" onClick={onNew}>
             Novo test case
@@ -216,6 +219,13 @@ export function TcRepository({
         )}
       </div>
 
+      {importing && (
+        <AiImportModal
+          onClose={() => setImporting(false)}
+          onChanged={onChanged}
+          onError={onError}
+        />
+      )}
       {creatingFolder !== null && (
         <NewFolderModal
           parent={creatingFolder === root.path ? "" : relFolder(creatingFolder)}
@@ -297,6 +307,100 @@ function NewFolderModal({
           }}
         />
       </div>
+    </Modal>
+  );
+}
+
+// ------------------------------------------- importação via IA (doc §1.1)
+
+function AiImportModal({
+  onClose,
+  onChanged,
+  onError,
+}: {
+  onClose: () => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [folder, setFolder] = useState("");
+  const [items, setItems] = useState<GeneratedTestcase[] | null>(null);
+
+  async function upload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    try {
+      const data = await api.aiImportFile(files[0]);
+      setFolder(data.folder);
+      setItems(data.testcases);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function accept(item: GeneratedTestcase) {
+    try {
+      await api.createTestcase({ title: item.title, folder, body: item.body });
+      setItems((old) => (old ?? []).filter((i) => i !== item));
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <Modal
+      title="Importar test cases com IA"
+      onClose={onClose}
+      footer={<button onClick={onClose}>Fechar</button>}
+    >
+      <p className="modal-text muted">
+        Envie um .txt, .md ou .xml com casos de teste em formato livre. A IA
+        identifica cada caso, sugere uma pasta e converte para BDD — nada é
+        gravado sem você aceitar.
+      </p>
+      <div className="modal-field">
+        <label>Arquivo</label>
+        <input type="file" accept=".txt,.md,.xml" onChange={(e) => void upload(e.target.files)} />
+        {busy && <span className="muted caption">Processando com a IA…</span>}
+      </div>
+
+      {items && (
+        <>
+          <div className="modal-field">
+            <label>Pasta de destino (sugerida pela IA)</label>
+            <input
+              className="mono"
+              value={folder}
+              onChange={(e) => setFolder(e.target.value)}
+            />
+          </div>
+          {items.length === 0 ? (
+            <p className="muted">
+              Todos os itens foram aceitos ou nenhum caso foi identificado.
+            </p>
+          ) : (
+            items.map((item, i) => (
+              <div key={i} className="card" style={{ background: "var(--bg)", marginBottom: 8 }}>
+                <div className="card-head" style={{ marginBottom: 8 }}>
+                  <strong>{item.title}</strong>
+                </div>
+                <DocBody text={item.body} />
+                <div className="toolbar">
+                  <button className="primary" onClick={() => void accept(item)}>
+                    Aceitar (criar CT)
+                  </button>
+                  <button onClick={() => setItems((old) => (old ?? []).filter((x) => x !== item))}>
+                    Rejeitar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      )}
     </Modal>
   );
 }

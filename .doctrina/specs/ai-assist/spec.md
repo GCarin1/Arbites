@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-06
-**Version:** 0.2.0
+**Last updated:** 2026-07-09
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -31,6 +31,11 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   `POST /ai/negative-cases/{testcase_id}`.
 - The system shall validar a saída de geração de CTs contra schema
   Pydantic antes de apresentar o preview.
+
+- The system shall expor `POST /import/ai` (upload .txt/.md/.xml) que usa a
+  IA para identificar casos de teste em texto livre, sugerir uma pasta e
+  convertê-los para BDD — sempre preview; o aceite é o `POST /testcases`
+  normal. Prompt enxuto (modelos ≤ 9B).
 
 ### Event-driven
 
@@ -69,6 +74,10 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
    sem escrita no disco — verified by `backend/tests/test_ai_generate.py`.
 3. [verified] Plataforma opera integralmente com `providers: []` —
    verified by `backend/tests/test_ai_optional.py`.
+
+4. [verified] Arquivo livre vira preview BDD (pasta sugerida + Given/When/
+   Then), nada gravado sem aceite; extensão inválida/arquivo vazio → 422 —
+   verified by `backend/tests/test_ai_import.py`.
 
 ## Maturity
 

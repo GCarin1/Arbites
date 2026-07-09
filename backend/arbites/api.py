@@ -1580,6 +1580,32 @@ def _register_routes(app: FastAPI) -> None:
         )
         return _preview_out(generated)
 
+    @app.post(API_PREFIX + "/import/ai")
+    async def import_ai_preview(
+        request: Request, file: UploadFile = File(...), provider: str = Form(default="")
+    ):
+        """Importação inteligente (doc §1.1): txt/md/xml livre → CTs BDD em preview."""
+        ws = ws_of(request)
+        name = file.filename or "arquivo.txt"
+        ext = Path(name).suffix.lower()
+        if ext not in (".txt", ".md", ".xml"):
+            raise _error(422, "invalid_file", "envie um arquivo .txt, .md ou .xml")
+        text = (await file.read()).decode("utf-8", errors="replace")
+        if not text.strip():
+            raise _error(422, "empty_file", "arquivo vazio")
+        prov = _ai_provider(request, provider or None)
+        conversion = await asyncio.to_thread(
+            ai_ops.convert_import, prov, name, _with_memory(ws, text)
+        )
+        return {
+            "preview": True,  # nada gravado; aceite = POST /testcases por item
+            "folder": conversion.folder,
+            "testcases": [
+                {**item.model_dump(), "body": ai_ops.testcase_body_bdd(item)}
+                for item in conversion.testcases
+            ],
+        }
+
     # -- defects (M1, mínimo) ---------------------------------------------
 
     def _defect_out(conn, ws: Workspace, defect_id: str) -> dict:

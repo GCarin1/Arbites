@@ -80,6 +80,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ folder }),
     }),
+  aiImportFile: async (file: File): Promise<GeneratePreview & { folder: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch(`${BASE}/import/ai`, { method: "POST", body: form });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error?.message ?? `${resp.status}`);
+    return data;
+  },
   createTcFolder: (path: string) =>
     request<{ path: string }>("/testcases/folders", {
       method: "POST",

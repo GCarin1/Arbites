@@ -92,6 +92,26 @@ class MeetingSummary(BaseModel):
     action_items: list[str] = []  # próximos passos
 
 
+class ImportConversion(BaseModel):
+    folder: str = "importados"  # pasta sugerida pelo contexto do arquivo
+    testcases: list[GeneratedTestcase]
+
+
+def testcase_body_bdd(item: GeneratedTestcase, feature: str = "") -> str:
+    """Renderiza o item gerado no formato BDD canônico (doc §1.1)."""
+    lines = [f"Feature: {feature or item.title}", ""]
+    lines.append(f"  Scenario: {item.title}")
+    pre = item.pre_condicoes or ["que o sistema está disponível"]
+    lines.append(f"    Given {pre[0]}")
+    lines += [f"    And {p}" for p in pre[1:]]
+    passos = item.passos or ["executar a ação principal"]
+    lines.append(f"    When {passos[0]}")
+    lines += [f"    And {p}" for p in passos[1:]]
+    lines.append(f"    Then {item.resultado_esperado}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def testcase_body(item: GeneratedTestcase) -> str:
     """Converte o item gerado no corpo .md canônico (âncoras do parser)."""
     lines = ["## Objetivo", "", item.objetivo or "-", "", "## Pré-condições", ""]
@@ -361,6 +381,26 @@ _MEETING_SYSTEM = (
 def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
     result = provider.complete(_MEETING_SYSTEM, body, MeetingSummary)
     assert isinstance(result, MeetingSummary)
+    return result
+
+
+# Prompt curto de propósito: a importação precisa rodar bem em modelos de
+# até 9B (doc §1.1 — baixo consumo de tokens, sem exemplos longos).
+_IMPORT_SYSTEM = (
+    "Extraia os casos de teste do texto (formato livre). Para cada caso: "
+    "title, passos (lista de ações) e resultado_esperado; infira "
+    "pre_condicoes quando houver. Sugira 'folder' (kebab-case) pelo contexto "
+    "do arquivo. Não invente casos que não estão no texto. PT-BR."
+)
+
+
+def convert_import(provider: _BaseProvider, filename: str, text: str,
+                   max_chars: int = 24000) -> ImportConversion:
+    """Converte um arquivo livre (txt/md/xml) em CTs BDD — preview apenas."""
+    clipped = text[:max_chars]
+    user = f"Arquivo: {filename}\n\n{clipped}"
+    result = provider.complete(_IMPORT_SYSTEM, user, ImportConversion)
+    assert isinstance(result, ImportConversion)
     return result
 
 
