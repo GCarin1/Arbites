@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-07",
+  "last_updated": "2026-07-09",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -37,8 +37,8 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-04",
+        "version": "0.3.0",
+        "last_updated": "2026-07-09",
         "implementation": "verified — M4 (backend/arbites/ci.py, frontend/src/components/Automation.tsx, docs/examples/tests.yml); orquestração provada com fake client — validação contra a API real pendente do primeiro uso com o repo da B3",
         "realizes": [
           "SC6"
@@ -93,9 +93,9 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-04",
-        "implementation": "verified — M3 (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
+        "version": "0.3.0",
+        "last_updated": "2026-07-09",
+        "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
           "SC5"
         ]
@@ -109,6 +109,17 @@
         "implementation": "verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`",
         "realizes": [
           "SC13"
+        ]
+      },
+      {
+        "id": "profile",
+        "path": ".doctrina/specs/profile/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-09",
+        "implementation": "verified — M13 (backend/arbites/api.py; frontend Profile.tsx). Memória injetada nos 5 usos de IA",
+        "realizes": [
+          "SC14"
         ]
       },
       {
@@ -148,9 +159,9 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.3.0",
-        "last_updated": "2026-07-04",
-        "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)",
+        "version": "0.4.0",
+        "last_updated": "2026-07-09",
+        "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
         ]
@@ -271,7 +282,15 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0028-afazeres-substituir-a-tabela-por-layout-de-cards",
+        "title": "afazeres: substituir a tabela por layout de cards/blocos estilo sticky notes, preservando selecao multipla, expandir descricao, status rapido, links clicaveis, prazo com atraso e acoes",
+        "path": ".doctrina/changes/0028-afazeres-substituir-a-tabela-por-layout-de-cards",
+        "status": "proposed",
+        "opened": "2026-07-09"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -563,6 +582,52 @@
         "status": "applied",
         "applied": "2026-07-07",
         "specs_affected": []
+      },
+      {
+        "id": "0024-sidebar-reorganizar-em-categorias-colapsaveis-pl",
+        "title": "sidebar: reorganizar em categorias colapsaveis (Planejamento, Acompanhamento, Ferramentas, Suporte) com secao Acesso Rapido alimentada por pin/unpin por item (persistido localmente)",
+        "path": ".doctrina/changes/archive/2026-07-09-0024-sidebar-reorganizar-em-categorias-colapsaveis-pl",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": []
+      },
+      {
+        "id": "0025-test-cases-como-repositorio-arvore-de-pastas-cen",
+        "title": "test cases como repositorio: arvore de pastas centralizada no conteudo (nao no sidebar), detalhe so por clique com botao Voltar, pastas ilimitadas (criar/excluir/drag-and-drop de CTs), formato BDD (Gherkin) como padrao do corpo com steps extraidos de Given/When/Then, data de criacao exibida",
+        "path": ".doctrina/changes/archive/2026-07-09-0025-test-cases-como-repositorio-arvore-de-pastas-cen",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0026-automacao-selecao-de-arquivo-feature-tag-no-run",
+        "title": "automacao: selecao de arquivo .feature + tag no run local (comando behave montado na UI), terminal ao vivo ja existente, acesso a artefatos (logs/screenshots/analise) do repo do target, editor visual do .env com catalogo de variaveis descritas, e disparo remoto GitHub Actions com feature/tag/ambiente/navegador/repositorio",
+        "path": ".doctrina/changes/archive/2026-07-09-0026-automacao-selecao-de-arquivo-feature-tag-no-run",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0027-perfil-do-usuario-nome-editavel-memoria-de-longo",
+        "title": "perfil do usuario: nome editavel + memoria de longo prazo (markdown com Preferencias & Estilo e Contexto Ativo) persistida em profile.md, editavel na UI e injetada como contexto em toda interacao com IA (geracao/revisao/negativos/daily/reuniao)",
+        "path": ".doctrina/changes/archive/2026-07-09-0027-perfil-do-usuario-nome-editavel-memoria-de-longo",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": []
       }
     ],
     "skills": [
@@ -595,6 +660,12 @@
         "path": ".doctrina/skills/metricas-resultado-liquido.md",
         "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
         "last_updated": "2026-07-06"
+      },
+      {
+        "id": "rota-estatica-antes-da-dinamica",
+        "path": ".doctrina/skills/rota-estatica-antes-da-dinamica.md",
+        "description": "No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.",
+        "last_updated": "2026-07-09"
       },
       {
         "id": "salvar-inclui-formulario-pendente",

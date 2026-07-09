@@ -81,6 +81,221 @@ export function RequirementsList({
   );
 }
 
+/**
+ * Repositório de requisitos centralizado (doc §1.2) — hierarquia epic→story
+ * com expandir/colapsar, drag & drop de story para outro epic (reassocia),
+ * exclusão com confirmação e data de criação. Detalhe abre só por clique.
+ */
+export function ReqRepository({
+  version,
+  onOpen,
+  onChanged,
+  onError,
+}: {
+  version: number;
+  onOpen: (id: string) => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}) {
+  const [items, setItems] = useState<Requirement[]>([]);
+  const [creating, setCreating] = useState<"epic" | "story" | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [dragStory, setDragStory] = useState<string | null>(null);
+  const [dropEpic, setDropEpic] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Requirement | null>(null);
+
+  const load = useCallback(() => {
+    api
+      .requirements()
+      .then(setItems)
+      .catch((e) => onError(e.message));
+  }, [onError]);
+
+  useEffect(() => {
+    load();
+  }, [load, version]);
+
+  async function create(kind: "epic" | "story", title: string, epic: string | null) {
+    try {
+      const created = await api.createRequirement({ kind, title, epic });
+      setCreating(null);
+      onChanged();
+      onOpen(created.id);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function moveStory(epicId: string | null) {
+    if (!dragStory) return;
+    try {
+      await api.updateRequirement(dragStory, { epic: epicId });
+      onChanged();
+      load();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDragStory(null);
+      setDropEpic(null);
+    }
+  }
+
+  async function remove(item: Requirement) {
+    setDeleting(null);
+    try {
+      await api.deleteRequirement(item.id);
+      onChanged();
+      load();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function toggle(id: string) {
+    setCollapsed((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const epics = items.filter((r) => r.kind === "epic");
+  const stories = items.filter((r) => r.kind === "story");
+  const orphans = stories.filter((s) => !epics.some((e) => e.id === s.epic_id));
+
+  const storyRow = (story: Requirement) => (
+    <div
+      key={story.id}
+      className={`repo-row repo-file ${dragStory === story.id ? "dragging" : ""}`}
+      style={{ paddingLeft: 28 }}
+      draggable
+      onDragStart={() => setDragStory(story.id)}
+      onDragEnd={() => {
+        setDragStory(null);
+        setDropEpic(null);
+      }}
+    >
+      <button className="repo-file-main" onClick={() => onOpen(story.id)}>
+        <span className="mono muted">{story.id}</span>
+        <span className="repo-file-title">{story.title}</span>
+      </button>
+      <span className={`status-dot dot-${story.status} caption`}>{story.status}</span>
+      <span className="caption mono muted">{story.created ?? ""}</span>
+      <span className="repo-actions">
+        <button className="btn-sm danger" onClick={() => setDeleting(story)}>
+          Excluir
+        </button>
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="repo">
+      <div className="page-head">
+        <h1 className="page-title">Requisitos</h1>
+        <span className="spacer" />
+        <div className="head-controls">
+          <button onClick={() => setCreating("epic")}>Novo epic</button>
+          <button className="primary" onClick={() => setCreating("story")}>
+            Nova story
+          </button>
+        </div>
+      </div>
+
+      <div className="repo-tree card">
+        {items.length === 0 ? (
+          <div className="empty-state" style={{ border: "none" }}>
+            <div className="empty-title">Nenhum requisito</div>
+            <div className="empty-body">
+              Crie epics e stories. Arraste uma story para outro epic para
+              reassociá-la.
+            </div>
+          </div>
+        ) : (
+          <>
+            {epics.map((epic) => {
+              const isCollapsed = collapsed.has(epic.id);
+              const children = stories.filter((s) => s.epic_id === epic.id);
+              return (
+                <div key={epic.id} className="repo-dir">
+                  <div
+                    className={`repo-row repo-folder ${dropEpic === epic.id ? "drop-target" : ""}`}
+                    onDragOver={(e) => {
+                      if (dragStory) {
+                        e.preventDefault();
+                        setDropEpic(epic.id);
+                      }
+                    }}
+                    onDragLeave={() => setDropEpic((t) => (t === epic.id ? null : t))}
+                    onDrop={() => void moveStory(epic.id)}
+                  >
+                    <button className="expand-btn" onClick={() => toggle(epic.id)}>
+                      {isCollapsed ? "▸" : "▾"}
+                    </button>
+                    <button className="repo-file-main" onClick={() => onOpen(epic.id)}>
+                      <span className="mono muted">{epic.id}</span>
+                      <span className="repo-folder-name">{epic.title}</span>
+                    </button>
+                    <span className="caption muted">{children.length}</span>
+                    <span className="caption mono muted">{epic.created ?? ""}</span>
+                    <span className="repo-actions">
+                      <button className="btn-sm danger" onClick={() => setDeleting(epic)}>
+                        Excluir
+                      </button>
+                    </span>
+                  </div>
+                  {!isCollapsed && children.map(storyRow)}
+                </div>
+              );
+            })}
+            {orphans.length > 0 && (
+              <div
+                className={`repo-row repo-folder ${dropEpic === "__none__" ? "drop-target" : ""}`}
+                onDragOver={(e) => {
+                  if (dragStory) {
+                    e.preventDefault();
+                    setDropEpic("__none__");
+                  }
+                }}
+                onDragLeave={() => setDropEpic((t) => (t === "__none__" ? null : t))}
+                onDrop={() => void moveStory(null)}
+              >
+                <span className="repo-folder-name muted">sem epic/</span>
+              </div>
+            )}
+            {orphans.map(storyRow)}
+          </>
+        )}
+      </div>
+
+      {creating && (
+        <NewRequirementModal
+          kind={creating}
+          onSubmit={(title, epic) => void create(creating, title, epic)}
+          onClose={() => setCreating(null)}
+        />
+      )}
+      {deleting && (
+        <ConfirmModal
+          title={`Excluir ${deleting.kind === "epic" ? "epic" : "story"}`}
+          message={
+            <>
+              Mover <span className="mono">{deleting.id}</span> ({deleting.title})
+              para a lixeira?
+              {deleting.kind === "epic" && " As stories dele ficam sem epic."}
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void remove(deleting)}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 function ReqItem({
   item,
   selected,

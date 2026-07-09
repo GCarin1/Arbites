@@ -69,9 +69,9 @@ def test_raw_roundtrip_and_filters(client):
     ).json()
     raw = client.get(f"/api/v1/testcases/{created['id']}/raw")
     assert raw.status_code == 200
-    assert "## Passos" in raw.text
+    assert "Scenario:" in raw.text  # template default agora é BDD (doc §1.1)
 
-    edited = raw.text.replace("## Objetivo", "## Objetivo\n\nEditado via raw")
+    edited = raw.text.replace("Scenario: [Nome do Cenário]", "Scenario: Editado via raw")
     client.put(f"/api/v1/testcases/{created['id']}/raw", json={"content": edited})
     assert "Editado via raw" in client.get(f"/api/v1/testcases/{created['id']}").json()["body"]
 

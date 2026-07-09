@@ -194,6 +194,28 @@ def test_dispatch_correlates_run_and_creates_execution(ci_client):
     assert status["poll_interval_seconds"] == 10
 
 
+def test_dispatch_forwards_optional_workflow_inputs(ci_client):
+    """Doc §1.5.2: feature/ambiente/navegador/repositório viram inputs."""
+    resp = ci_client.post(
+        "/api/v1/runs/ci",
+        json={
+            "target": "frontend-web",
+            "tags": ["@CT-9001"],
+            "feature": "features/login.feature",
+            "environment": "cer",
+            "browser": "chrome",
+            "source_repo": "org/app-web",
+        },
+    )
+    assert resp.status_code == 201
+    inputs = ci_client.fake.dispatched[-1]["inputs"]
+    assert inputs["tags"] == "@CT-9001"
+    assert inputs["feature"] == "features/login.feature"
+    assert inputs["environment"] == "cer"
+    assert inputs["browser"] == "chrome"
+    assert inputs["source_repo"] == "org/app-web"
+
+
 def test_collect_produces_execution_identical_to_local_run(ci_client):
     execution = ci_client.post(
         "/api/v1/runs/ci", json={"target": "frontend-web", "tags": ["@CT-9001"]}

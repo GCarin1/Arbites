@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { LinksInput, MentionTextarea } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
@@ -255,116 +255,102 @@ type RowProps = {
   onNavigate: (id: string) => void;
 };
 
+/** Cards estilo bloco de anotações (doc §1.4) — substitui a tabela. */
 function TodoTable({ rows, ...p }: { rows: Todo[] } & RowProps) {
   return (
-    <div className="table-wrap" style={{ marginBottom: 24 }}>
-      <table className="dense">
-        <thead>
-          <tr>
-            <th style={{ width: 28 }} />
-            <th style={{ width: 28 }} />
-            <th>Status</th>
-            <th>Afazer</th>
-            <th>Prazo</th>
-            <th>Squad</th>
-            <th>Links</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((t) => {
-            const overdue = t.due && t.status !== "done" && t.due < p.today;
-            const isOpen = p.expanded.has(t.id);
-            return (
-              <Fragment key={t.id}>
-                <tr>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={p.selected.has(t.id)}
-                      onChange={() => p.onSelect(t.id)}
-                      aria-label={`Selecionar ${t.id}`}
-                    />
-                  </td>
-                  <td>
-                    <button
-                      className="expand-btn"
-                      onClick={() => p.onExpand(t)}
-                      aria-label="Expandir descrição"
-                    >
-                      {isOpen ? "▾" : "▸"}
-                    </button>
-                  </td>
-                  <td>
-                    <select
-                      className="status-select"
-                      value={t.status}
-                      onChange={(e) => p.onStatus(t, e.target.value as Todo["status"])}
-                      aria-label="Status"
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <span className={`status-dot ${STATUS_DOT[t.status]}`} />{" "}
-                    <span className="mono muted">{t.id}</span> {t.title}
-                  </td>
-                  <td className="mono">
-                    {t.due ? <span className={overdue ? "overdue" : ""}>{t.due}</span> : "—"}
-                  </td>
-                  <td>{t.squad ?? "—"}</td>
-                  <td>
-                    {t.links.length === 0
-                      ? "—"
-                      : t.links.map((l) => (
-                          <button
-                            key={l.id}
-                            type="button"
-                            className="link-chip mono link-chip-btn"
-                            title={l.title ?? "link pendente (não encontrado)"}
-                            onClick={() => p.onNavigate(l.id)}
-                            disabled={!l.kind}
-                          >
-                            {l.id}
-                          </button>
-                        ))}
-                  </td>
-                  <td>
-                    <div className="step-actions">
-                      <button
-                        className="btn-sm"
-                        onClick={() => p.onEdit(t)}
-                        disabled={p.editDisabled}
-                        title={p.editDisabled ? "Desmarque para editar um item" : "Editar"}
-                      >
-                        Editar
-                      </button>
-                      <button className="btn-sm danger" onClick={() => p.onDelete(t)}>
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                {isOpen && (
-                  <tr className="todo-desc-row">
-                    <td colSpan={8}>
-                      {p.bodies[t.id]?.trim() ? (
-                        <DocBody text={p.bodies[t.id]} onMention={p.onNavigate} />
-                      ) : (
-                        <p className="muted">Sem descrição. Use Editar para adicionar.</p>
-                      )}
-                    </td>
-                  </tr>
+    <div className="todo-cards">
+      {rows.map((t) => {
+        const overdue = t.due && t.status !== "done" && t.due < p.today;
+        const isOpen = p.expanded.has(t.id);
+        const isSelected = p.selected.has(t.id);
+        return (
+          <div
+            key={t.id}
+            className={`todo-card note-${t.status} ${isSelected ? "selected" : ""}`}
+          >
+            <div className="todo-card-head">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => p.onSelect(t.id)}
+                aria-label={`Selecionar ${t.id}`}
+              />
+              <span className="mono muted">{t.id}</span>
+              <span className="spacer" style={{ flex: 1 }} />
+              <select
+                className="status-select"
+                value={t.status}
+                onChange={(e) => p.onStatus(t, e.target.value as Todo["status"])}
+                aria-label="Status"
+              >
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button className="todo-card-title" onClick={() => p.onExpand(t)}>
+              <span className={`status-dot ${STATUS_DOT[t.status]}`} /> {t.title}
+            </button>
+
+            <div className="todo-card-meta">
+              {t.due && (
+                <span className={`mono caption ${overdue ? "overdue" : "muted"}`}>
+                  📅 {t.due}
+                </span>
+              )}
+              {t.squad && <span className="caption muted">{t.squad}</span>}
+            </div>
+
+            {t.links.length > 0 && (
+              <div className="todo-card-links">
+                {t.links.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className="link-chip mono link-chip-btn"
+                    title={l.title ?? "link pendente (não encontrado)"}
+                    onClick={() => p.onNavigate(l.id)}
+                    disabled={!l.kind}
+                  >
+                    {l.id}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isOpen && (
+              <div className="todo-card-body">
+                {p.bodies[t.id]?.trim() ? (
+                  <DocBody text={p.bodies[t.id]} onMention={p.onNavigate} />
+                ) : (
+                  <p className="muted caption">Sem descrição. Use Editar para adicionar.</p>
                 )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+              </div>
+            )}
+
+            <div className="todo-card-actions">
+              <button className="expand-btn" onClick={() => p.onExpand(t)} title="Descrição">
+                {isOpen ? "▾" : "▸"}
+              </button>
+              <span className="spacer" style={{ flex: 1 }} />
+              <button
+                className="btn-sm"
+                onClick={() => p.onEdit(t)}
+                disabled={p.editDisabled}
+                title={p.editDisabled ? "Desmarque para editar um item" : "Editar"}
+              >
+                Editar
+              </button>
+              <button className="btn-sm danger" onClick={() => p.onDelete(t)}>
+                Excluir
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

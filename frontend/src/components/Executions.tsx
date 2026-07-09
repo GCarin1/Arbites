@@ -66,6 +66,119 @@ export function ExecutionsList({
   );
 }
 
+/**
+ * Repositório de execuções centralizado (doc §1.3) — agrupado por ano de
+ * criação (a "pasta" natural da execution), com expandir/colapsar e data.
+ * Detalhe (board) abre só por clique.
+ */
+export function ExecutionsRepo({
+  version,
+  onOpen,
+  onNew,
+  onError,
+}: {
+  version: number;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onError: (message: string) => void;
+}) {
+  const [items, setItems] = useState<ExecutionSummary[]>([]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    api
+      .executions()
+      .then(setItems)
+      .catch((e) => onError(e.message));
+  }, [version, onError]);
+
+  function toggle(year: string) {
+    setCollapsed((old) => {
+      const next = new Set(old);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  }
+
+  const byYear = new Map<string, ExecutionSummary[]>();
+  for (const item of items) {
+    const year = (item.created_at ?? "").slice(0, 4) || "sem data";
+    byYear.set(year, [...(byYear.get(year) ?? []), item]);
+  }
+  const years = [...byYear.keys()].sort().reverse();
+
+  return (
+    <div className="repo">
+      <div className="page-head">
+        <h1 className="page-title">Execuções</h1>
+        <span className="spacer" />
+        <div className="head-controls">
+          <button className="primary" onClick={onNew}>
+            Nova execução
+          </button>
+        </div>
+      </div>
+
+      <div className="repo-tree card">
+        {items.length === 0 ? (
+          <div className="empty-state" style={{ border: "none" }}>
+            <div className="empty-title">Nenhuma execução</div>
+            <div className="empty-body">
+              Crie uma execução para registrar resultados no kanban.
+            </div>
+          </div>
+        ) : (
+          years.map((year) => {
+            const isCollapsed = collapsed.has(year);
+            const list = byYear.get(year) ?? [];
+            return (
+              <div key={year} className="repo-dir">
+                <div className="repo-row repo-folder">
+                  <button className="expand-btn" onClick={() => toggle(year)}>
+                    {isCollapsed ? "▸" : "▾"}
+                  </button>
+                  <span className="repo-folder-name" onClick={() => toggle(year)}>
+                    📁 {year}/
+                  </span>
+                  <span className="caption muted">{list.length}</span>
+                </div>
+                {!isCollapsed &&
+                  list.map((item) => {
+                    const total = Object.values(item.result_counts).reduce(
+                      (a, b) => a + b,
+                      0,
+                    );
+                    const passed = item.result_counts["passed"] ?? 0;
+                    return (
+                      <div key={item.id} className="repo-row repo-file" style={{ paddingLeft: 28 }}>
+                        <button className="repo-file-main" onClick={() => onOpen(item.id)}>
+                          <span className="mono muted">{item.id}</span>
+                          <span className="repo-file-title">{item.name}</span>
+                        </button>
+                        <span className="caption mono muted">
+                          {passed}/{total}
+                        </span>
+                        <span
+                          className={`status-dot dot-${item.status === "closed" ? "done" : "active"} caption`}
+                        >
+                          {item.status}
+                        </span>
+                        <span className="caption mono muted">
+                          {(item.created_at ?? "").slice(0, 10)}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- criação
 
 export function ExecutionCreate({

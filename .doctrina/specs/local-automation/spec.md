@@ -2,10 +2,10 @@
 
 **Capability:** local-automation
 **Status:** active
-**Implementation:** verified — M3 (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
+**Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
-**Last updated:** 2026-07-04
-**Version:** 0.2.0
+**Last updated:** 2026-07-09
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -36,6 +36,16 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - The system shall isolar o parser do JSON do Behave atrás de uma
   interface de adapter, com testes de contrato sobre JSONs de exemplo
   versionados.
+
+- The system shall expor `GET /targets/{name}/features` (arquivos .feature e
+  tags do target) para os dropdowns do run, e aceitar `feature` opcional em
+  `POST /runs/local` (argumento posicional do behave).
+- The system shall listar e servir artefatos pós-execução do target
+  (`./logs`, `./screenshots`, `./analise`) via
+  `GET /targets/{name}/artifacts[/file]`, com guarda de path traversal.
+- The system shall expor edição visual do `.env` do target
+  (`GET/PUT /targets/{name}/env` + `GET /env/catalog`), preservando
+  comentários e linhas desconhecidas no PUT.
 
 ### Event-driven
 
@@ -78,6 +88,13 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
    `error: "timeout"` — verified by `backend/tests/test_local_runs.py`.
 4. [verified] Screenshot de falha do hook aparece hasheado em
    `evidences/` — verified by `backend/tests/test_local_runs.py`.
+
+5. [verified] Features e tags do target expostos p/ seleção; run aceita
+   feature específico — verified by `backend/tests/test_automation_flow.py`.
+6. [verified] Artefatos listados e baixáveis com traversal bloqueado —
+   verified by `backend/tests/test_automation_flow.py`.
+7. [verified] `.env` editável por chave com comentários preservados e
+   catálogo com descrições — verified by `backend/tests/test_automation_flow.py`.
 
 ## Maturity
 

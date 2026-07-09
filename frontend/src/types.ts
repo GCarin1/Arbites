@@ -22,6 +22,7 @@ export interface Requirement {
   confluence_url: string | null;
   tags: string[];
   squad: string | null;
+  created?: string | null;
   path: string;
   body?: string;
 }
@@ -137,6 +138,7 @@ export interface TreeNode {
     title: string;
     type: string | null;
     status: string | null;
+    created: string | null;
   }[];
 }
 

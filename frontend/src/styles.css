@@ -298,6 +298,75 @@ textarea.raw {
   gap: 2px;
   padding: var(--s1);
   border-bottom: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+/* Grupos semânticos do menu (colapsáveis) */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.nav-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 24px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+button.nav-group-title:hover {
+  color: var(--text-muted);
+  background: none;
+  border: none;
+}
+.nav-chevron {
+  font-size: 10px;
+}
+
+/* Linha do item: botão de navegação + pin que aparece no hover */
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.nav-row .nav-item {
+  flex: 1;
+  min-width: 0;
+}
+.nav-pin {
+  height: 28px;
+  width: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.nav-row:hover .nav-pin,
+.nav-pin.pinned {
+  opacity: 1;
+}
+.nav-pin:hover {
+  background: var(--surface-hover);
+  border: none;
+  color: var(--text);
+}
+.nav-pin.pinned {
+  color: var(--warning);
 }
 .nav-item {
   height: var(--h-control);
@@ -1174,6 +1243,76 @@ a {
   color: #c9d1d9;
 }
 
+/* ------------------------------------------------- Repositório (§1.1) */
+
+.back-bar {
+  margin-bottom: var(--s2);
+}
+.repo-tree {
+  padding: var(--s1);
+  min-height: 320px;
+  max-height: calc(100vh - var(--h-header) - 160px);
+  overflow-y: auto;
+}
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 2px 8px;
+  border-radius: var(--r-control);
+}
+.repo-row:hover {
+  background: var(--surface-hover);
+}
+.repo-row .repo-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.repo-row:hover .repo-actions {
+  opacity: 1;
+}
+.repo-folder-name {
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.repo-file-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-weight: 400;
+  cursor: pointer;
+}
+.repo-file-main:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--primary);
+}
+.repo-file-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-file.dragging {
+  opacity: 0.4;
+}
+.repo-row.drop-target,
+.repo-tree.drop-target {
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+  background: var(--selected);
+}
+
 /* ----------------------------------------------------------- Reuniões */
 
 .meeting-summary {
@@ -1285,6 +1424,83 @@ a {
   background: var(--surface-hover);
   border: none;
 }
+/* Cards de afazeres (doc §1.4) — bloco de anotações / sticky notes */
+.todo-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+  align-items: start;
+}
+.todo-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.todo-card.selected {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+.todo-card.note-open { border-left-color: var(--text-subtle); }
+.todo-card.note-doing { border-left-color: var(--primary); }
+.todo-card.note-blocked { border-left-color: var(--warning); }
+.todo-card.note-done { border-left-color: var(--success); opacity: 0.75; }
+.todo-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.todo-card-title {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.todo-card-title:hover {
+  background: none;
+  border: none;
+  color: var(--primary);
+}
+.todo-card-meta {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.todo-card-links {
+  display: flex;
+  flex-wrap: wrap;
+}
+.todo-card-body {
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+.todo-card-body .doc-body {
+  background: var(--bg);
+  border: none;
+  padding: var(--s1);
+}
+.todo-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+}
+
 .todo-desc-row td {
   background: var(--bg);
   /* `overflow-wrap: anywhere` zera a min-content-width da célula: a tabela

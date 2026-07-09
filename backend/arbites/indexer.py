@@ -22,12 +22,12 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS requirements(
   id TEXT PRIMARY KEY, kind TEXT, title TEXT, epic_id TEXT, status TEXT,
   external_key TEXT, confluence_url TEXT, tags TEXT, path TEXT, mtime REAL,
-  squad TEXT);
+  squad TEXT, created TEXT);
 CREATE TABLE IF NOT EXISTS testcases(
   id TEXT PRIMARY KEY, title TEXT, type TEXT, priority TEXT, status TEXT,
   story_id TEXT, path TEXT, mtime REAL,
   automation_target TEXT, scenario_tag TEXT, external_key TEXT,
-  squad TEXT, squad_effective TEXT);
+  squad TEXT, squad_effective TEXT, created TEXT);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
 CREATE TABLE IF NOT EXISTS scenarios(
   target TEXT, tag TEXT PRIMARY KEY, feature_path TEXT,
@@ -74,6 +74,8 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE requirements ADD COLUMN squad TEXT",
         "ALTER TABLE executions ADD COLUMN squad TEXT",
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
+        "ALTER TABLE testcases ADD COLUMN created TEXT",
+        "ALTER TABLE requirements ADD COLUMN created TEXT",
     ):
         try:
             conn.execute(ddl)
@@ -305,8 +307,8 @@ def _insert_requirement(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> N
     conn.execute(
         "INSERT OR REPLACE INTO requirements"
         "(id, kind, title, epic_id, status, external_key, confluence_url, tags, path, mtime,"
-        " squad)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        " squad, created)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("kind", "")),
@@ -319,6 +321,7 @@ def _insert_requirement(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> N
             rel,
             doc.path.stat().st_mtime,
             _squad(doc),
+            str(doc.meta.get("created")) if doc.meta.get("created") else None,
         ),
     )
 
@@ -329,8 +332,8 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
     conn.execute(
         "INSERT OR REPLACE INTO testcases"
         "(id, title, type, priority, status, story_id, path, mtime,"
-        " automation_target, scenario_tag, external_key, squad, squad_effective)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " automation_target, scenario_tag, external_key, squad, squad_effective, created)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -345,6 +348,7 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
             doc.meta.get("external_key"),
             squad,
             squad,  # placeholder; a herança é resolvida por _recompute_effective_squads
+            str(doc.meta.get("created")) if doc.meta.get("created") else None,
         ),
     )
     for tag in _tags(doc):

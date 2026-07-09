@@ -75,6 +75,20 @@ export const api = {
   deleteTestcase: (id: string) =>
     request<void>(`/testcases/${id}`, { method: "DELETE" }),
   testcaseRaw: (id: string) => request<string>(`/testcases/${id}/raw`),
+  moveTestcase: (id: string, folder: string) =>
+    request<TestCase>(`/testcases/${id}/move`, {
+      method: "POST",
+      body: JSON.stringify({ folder }),
+    }),
+  createTcFolder: (path: string) =>
+    request<{ path: string }>("/testcases/folders", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
+  deleteTcFolder: (path: string) =>
+    request<void>(`/testcases/folders?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    }),
   putTestcaseRaw: (id: string, content: string) =>
     request<TestCase>(`/testcases/${id}/raw`, {
       method: "PUT",

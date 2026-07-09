@@ -41,6 +41,9 @@ export function Automation({
   const [targets, setTargets] = useState<Target[]>([]);
   const [selection, setSelection] = useState("");
   const [tags, setTags] = useState("");
+  const [feature, setFeature] = useState("");
+  const [features, setFeatures] = useState<{ path: string; scenarios: number }[]>([]);
+  const [knownTags, setKnownTags] = useState<string[]>([]);
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const sourceRef = useRef<EventSource | null>(null);
@@ -58,6 +61,22 @@ export function Automation({
     loadTargets();
     return () => sourceRef.current?.close();
   }, [loadTargets]);
+
+  // features + tags do target selecionado (dropdowns do comando behave)
+  useEffect(() => {
+    if (!selection) return;
+    json<{ features: { path: string; scenarios: number }[]; tags: string[] }>(
+      `${BASE}/targets/${selection}/features`,
+    )
+      .then((data) => {
+        setFeatures(data.features);
+        setKnownTags(data.tags);
+      })
+      .catch(() => {
+        setFeatures([]);
+        setKnownTags([]);
+      });
+  }, [selection]);
 
   async function scan(name: string) {
     try {
@@ -79,7 +98,11 @@ export function Automation({
         `${BASE}/runs/local`,
         {
           method: "POST",
-          body: JSON.stringify({ target: selection, tags: tagList }),
+          body: JSON.stringify({
+            target: selection,
+            tags: tagList,
+            feature: feature || null,
+          }),
         },
       );
       setRun(data.run);
@@ -168,25 +191,54 @@ export function Automation({
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-head">
           <h3>Novo run local (Behave)</h3>
+          <span className="spacer" />
+          <span className="caption mono">
+            behave {feature || "./features"} {tags.trim() ? `--tags=${tags}` : ""}
+          </span>
         </div>
-        <div className="step-row">
-          <select
-            value={selection}
-            onChange={(e) => setSelection(e.target.value)}
-            style={{ maxWidth: 220, flex: "0 0 auto" }}
+        <div className="field-grid">
+          <div className="field col-3">
+            <label>Target</label>
+            <select value={selection} onChange={(e) => setSelection(e.target.value)}>
+              {targets.map((target) => (
+                <option key={target.name} value={target.name}>
+                  {target.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field col-6">
+            <label>Arquivo .feature (vazio = todos)</label>
+            <select value={feature} onChange={(e) => setFeature(e.target.value)}>
+              <option value="">(todos os features)</option>
+              {features.map((f) => (
+                <option key={f.path} value={f.path}>
+                  {f.path} ({f.scenarios})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field col-3">
+            <label>Tag (autocomplete)</label>
+            <input
+              list="behave-tags"
+              placeholder="@smoke, @CT-0001"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+            />
+            <datalist id="behave-tags">
+              {knownTags.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+          </div>
+        </div>
+        <div className="toolbar">
+          <button
+            className="primary"
+            onClick={() => void startRun()}
+            disabled={!selection || (!feature && !tags.trim())}
           >
-            {targets.map((target) => (
-              <option key={target.name} value={target.name}>
-                {target.name}
-              </option>
-            ))}
-          </select>
-          <input
-            placeholder="tags (ex.: @CT-0001, @smoke) — vazio não é permitido"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-          />
-          <button className="primary" onClick={() => void startRun()} disabled={!selection}>
             Rodar
           </button>
           {run && run.status === "running" && (
@@ -210,6 +262,9 @@ export function Automation({
           </>
         )}
       </div>
+
+      {selection && <ArtifactsCard target={selection} refreshKey={run?.status ?? ""} />}
+      {selection && <EnvCard target={selection} onError={onError} />}
 
       <CIPanel targets={targets} onChanged={onChanged} onError={onError} />
     </div>
@@ -248,6 +303,10 @@ function CIPanel({
   const [tokenInput, setTokenInput] = useState("");
   const [target, setTarget] = useState("");
   const [tags, setTags] = useState("");
+  const [ciFeature, setCiFeature] = useState("");
+  const [ciEnv, setCiEnv] = useState("dev");
+  const [ciBrowser, setCiBrowser] = useState("chrome");
+  const [ciRepo, setCiRepo] = useState("");
   const [execId, setExecId] = useState<string | null>(null);
   const [status, setStatus] = useState<CIStatus | null>(null);
   const [collected, setCollected] = useState<string | null>(null);
@@ -301,7 +360,14 @@ function CIPanel({
     try {
       const execution = await json<{ id: string }>(`${BASE}/runs/ci`, {
         method: "POST",
-        body: JSON.stringify({ target, tags: tagList }),
+        body: JSON.stringify({
+          target,
+          tags: tagList,
+          feature: ciFeature || null,
+          environment: ciEnv || null,
+          browser: ciBrowser || null,
+          source_repo: ciRepo || null,
+        }),
       });
       setExecId(execution.id);
       setCollected(null);
@@ -363,26 +429,65 @@ function CIPanel({
       </div>
 
       <h4 className="section-title">Disparar workflow</h4>
-      <div className="step-row">
-        <select
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          style={{ maxWidth: 220, flex: "0 0 auto" }}
-        >
-          {targets.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        <input
-          placeholder="tags (ex.: @CT-0001)"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-        />
-        <button className="primary" onClick={() => void dispatch()} disabled={!target}>
-          workflow_dispatch
-        </button>
+      <div className="field-grid">
+        <div className="field col-3">
+          <label>Target</label>
+          <select value={target} onChange={(e) => setTarget(e.target.value)}>
+            {targets.map((t) => (
+              <option key={t.name} value={t.name}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field col-3">
+          <label>Arquivo .feature (opcional)</label>
+          <input
+            className="mono"
+            placeholder="features/login.feature"
+            value={ciFeature}
+            onChange={(e) => setCiFeature(e.target.value)}
+          />
+        </div>
+        <div className="field col-3">
+          <label>Tag do Behave</label>
+          <input
+            placeholder="@regressao, @smoke"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
+        </div>
+        <div className="field col-3">
+          <label>Ambiente</label>
+          <select value={ciEnv} onChange={(e) => setCiEnv(e.target.value)}>
+            <option value="dev">dev</option>
+            <option value="cer">cer</option>
+            <option value="prd">prd</option>
+          </select>
+        </div>
+        <div className="field col-3">
+          <label>Navegador</label>
+          <select value={ciBrowser} onChange={(e) => setCiBrowser(e.target.value)}>
+            <option value="chrome">chrome</option>
+            <option value="edge">edge</option>
+            <option value="firefox">firefox</option>
+          </select>
+        </div>
+        <div className="field col-6">
+          <label>Repositório de origem (opcional)</label>
+          <input
+            className="mono"
+            placeholder="org/repositorio-que-disparou"
+            value={ciRepo}
+            onChange={(e) => setCiRepo(e.target.value)}
+          />
+        </div>
+        <div className="field col-3" style={{ justifyContent: "flex-end" }}>
+          <label>&nbsp;</label>
+          <button className="primary" onClick={() => void dispatch()} disabled={!target}>
+            workflow_dispatch
+          </button>
+        </div>
       </div>
 
       {status && (
@@ -424,6 +529,169 @@ function CIPanel({
             </button>
           )}
           {collected && <p className="muted">{collected}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------- artefatos (doc §1.5.1)
+
+interface ArtifactFile {
+  path: string;
+  size: number;
+  mtime: string;
+}
+
+function ArtifactsCard({ target, refreshKey }: { target: string; refreshKey: string }) {
+  const [artifacts, setArtifacts] = useState<Record<string, ArtifactFile[]>>({});
+
+  useEffect(() => {
+    json<Record<string, ArtifactFile[]>>(`${BASE}/targets/${target}/artifacts`)
+      .then(setArtifacts)
+      .catch(() => setArtifacts({}));
+  }, [target, refreshKey]);
+
+  const kinds: { key: string; label: string }[] = [
+    { key: "logs", label: "Logs (./logs)" },
+    { key: "screenshots", label: "Screenshots (./screenshots)" },
+    { key: "analise", label: "Análise de IA (./analise)" },
+  ];
+  const total = Object.values(artifacts).reduce((a, files) => a + files.length, 0);
+
+  return (
+    <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card-head">
+        <h3>Artefatos pós-execução</h3>
+        <span className="spacer" />
+        <span className="caption">{total} arquivo(s)</span>
+      </div>
+      {total === 0 ? (
+        <p className="muted">
+          Nenhum artefato ainda — rode a automação e os arquivos de ./logs,
+          ./screenshots e ./analise aparecem aqui.
+        </p>
+      ) : (
+        kinds.map((k) =>
+          (artifacts[k.key] ?? []).length === 0 ? null : (
+            <div key={k.key} style={{ marginBottom: 12 }}>
+              <h4 className="section-title" style={{ marginTop: 0 }}>{k.label}</h4>
+              {(artifacts[k.key] ?? []).map((f) => (
+                <div key={f.path} className="step-row">
+                  <a
+                    className="mono"
+                    href={`${BASE}/targets/${target}/artifacts/file?kind=${k.key}&path=${encodeURIComponent(f.path)}`}
+                    download
+                  >
+                    {f.path}
+                  </a>
+                  <span className="caption muted">
+                    {(f.size / 1024).toFixed(1)} KB · {f.mtime}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ),
+        )
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------- .env visual (doc §1.5.1 e5)
+
+interface CatalogEntry {
+  section: string;
+  key: string;
+  description: string;
+}
+
+function EnvCard({ target, onError }: { target: string; onError: (m: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    Promise.all([
+      json<{ catalog: CatalogEntry[] }>(`${BASE}/env/catalog`),
+      json<{ values: Record<string, string> }>(`${BASE}/targets/${target}/env`),
+    ])
+      .then(([c, e]) => {
+        setCatalog(c.catalog);
+        setValues(e.values);
+        setDirty({});
+      })
+      .catch((e) => onError(e instanceof Error ? e.message : String(e)));
+  }, [open, target, onError]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await json(`${BASE}/targets/${target}/env`, {
+        method: "PUT",
+        body: JSON.stringify({ values: dirty }),
+      });
+      setValues((old) => ({ ...old, ...dirty }));
+      setDirty({});
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const sections = [...new Set(catalog.map((c) => c.section))];
+  const dirtyCount = Object.keys(dirty).length;
+
+  return (
+    <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card-head">
+        <h3>Configuração local (.env)</h3>
+        <span className="spacer" />
+        <button className="btn-sm" onClick={() => setOpen(!open)}>
+          {open ? "Recolher" : "Editar variáveis"}
+        </button>
+      </div>
+      {open && (
+        <>
+          {sections.map((section) => (
+            <div key={section}>
+              <h4 className="section-title">{section}</h4>
+              <div className="field-grid">
+                {catalog
+                  .filter((c) => c.section === section)
+                  .map((entry) => (
+                    <div key={entry.key} className="field col-6">
+                      <label title={entry.description}>{entry.key}</label>
+                      <input
+                        className="mono"
+                        placeholder={entry.description}
+                        value={dirty[entry.key] ?? values[entry.key] ?? ""}
+                        onChange={(e) =>
+                          setDirty((old) => ({ ...old, [entry.key]: e.target.value }))
+                        }
+                      />
+                      <span className="caption muted">{entry.description}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+          <div className="toolbar">
+            <button
+              className="primary"
+              onClick={() => void save()}
+              disabled={saving || dirtyCount === 0}
+            >
+              {saving ? "Salvando…" : `Salvar .env (${dirtyCount} alteração(ões))`}
+            </button>
+            <span className="caption muted">
+              comentários e variáveis desconhecidas do .env são preservados
+            </span>
+          </div>
         </>
       )}
     </div>
