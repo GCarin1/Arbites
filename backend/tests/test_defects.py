@@ -92,3 +92,42 @@ def test_defect_update_and_list(client):
     assert open_only == []
     all_defects = client.get("/api/v1/defects").json()
     assert [d["id"] for d in all_defects] == [defect["id"]]
+
+
+def test_get_single_defect_includes_body(client):
+    created = client.post(
+        "/api/v1/defects",
+        json={"title": "Avulso", "severity": "high", "body": "Passos para reproduzir…"},
+    ).json()
+    # a listagem NÃO inclui o corpo — só o GET individual (usado pelo editor)
+    assert "body" not in client.get("/api/v1/defects").json()[0]
+    fetched = client.get(f"/api/v1/defects/{created['id']}").json()
+    assert fetched["body"] == "Passos para reproduzir…"
+    assert fetched["title"] == "Avulso"
+
+    assert client.get("/api/v1/defects/DF-9999").status_code == 404
+
+
+def test_delete_defect_moves_to_trash(client):
+    defect = client.post(
+        "/api/v1/defects", json={"title": "Descartável", "severity": "low"}
+    ).json()
+    resp = client.delete(f"/api/v1/defects/{defect['id']}")
+    assert resp.status_code == 204
+    assert client.get(f"/api/v1/defects/{defect['id']}").status_code == 404
+    assert client.get("/api/v1/defects").json() == []
+    ws = client.ws
+    trash = list(ws.trash_dir.rglob("*.md"))
+    assert any("descartavel" in p.name.lower() for p in trash)
+
+
+def test_create_defect_avulso_without_testcase_or_execution(client):
+    """Bug reportado: só existia GET/POST/PUT — sem lugar pra gerenciar
+    (listar/editar/excluir) sem passar por um resultado de execução."""
+    defect = client.post(
+        "/api/v1/defects", json={"title": "Encontrado manualmente", "severity": "medium"}
+    ).json()
+    assert defect["testcase_id"] is None and defect["execution_id"] is None
+    assert defect["status"] == "open"
+    listed = client.get("/api/v1/defects").json()
+    assert listed[0]["id"] == defect["id"]

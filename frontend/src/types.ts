@@ -216,6 +216,8 @@ export interface Defect {
   execution_id: string | null;
   external_key: string | null;
   path: string;
+  opened_at: string | null;
+  body?: string;
 }
 
 export interface MetricValue {
@@ -267,6 +269,31 @@ export interface DefectsReport {
   by_squad: Record<string, number>;
   aging_buckets: Record<string, number>;
   items: DefectItem[];
+}
+
+export interface AutomationRepoRow {
+  repo: string;
+  runs: number;
+  passed: number;
+  failed: number;
+  other: number;
+  pass_rate: number | null;
+  failure_rate: number | null;
+  envs: string[];
+  last_run_at: string | null;
+  last_outcome: string | null;
+}
+
+export interface AutomationReport {
+  total_runs: number;
+  passed_runs: number;
+  failed_runs: number;
+  pass_rate: number | null;
+  by_repo: AutomationRepoRow[];
+  by_env: { env: string; runs: number; failed: number; failure_rate: number | null }[];
+  unparsed: number;
+  pattern: string;
+  pattern_error: string | null;
 }
 
 export interface MatrixLastResult {

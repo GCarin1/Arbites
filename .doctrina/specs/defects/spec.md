@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)
 **Realizes:** SC2
 **Last updated:** 2026-07-10
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -21,8 +21,12 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 - The system shall representar defeito como `.md` em `defects/` com
   frontmatter `id`, `title`, `status (open|fixed|closed)`, `severity`,
   `testcase`, `execution`, `external_key`, `opened` (data de abertura).
-- The system shall expor `GET /defects`, `POST /defects`,
-  `PUT /defects/{id}`.
+- The system shall expor `GET /defects`, `GET /defects/{id}` (com corpo),
+  `POST /defects`, `PUT /defects/{id}`, `DELETE /defects/{id}` (lixeira).
+- The system shall expor uma página dedicada de gerenciamento de defeitos
+  (aba "Defeitos") com listagem, filtro por status e severidade, criação
+  avulsa (sem exigir CT/execução), edição e exclusão — não apenas criação a
+  partir de um resultado `failed` numa execução.
 - The system shall permitir vincular defeitos a um resultado de execution
   (`results[].defects[]`).
 - The system shall expor `POST /executions/{exec_id}/results/{ct_id}/defects`
@@ -35,6 +39,8 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 
 - When um defeito é criado a partir de um resultado `failed`, the system
   shall preencher automaticamente `testcase` e `execution` no frontmatter.
+- When o usuário navega por uma menção/link `@DF-XXXX`, the system shall
+  abrir a aba Defeitos com o editor daquele defeito já aberto.
 
 ### State-driven
 
@@ -68,11 +74,16 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
    `defect_id` inexistente e execution fechada são rejeitados — verified by
    `backend/tests/test_executions.py`.
 
+5. [verified] `GET /defects/{id}` devolve o defeito com corpo; `DELETE
+   /defects/{id}` move para a lixeira e o defeito some da listagem e do
+   individual (404) — verified by `backend/tests/test_defects.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
-- CRUD mínimo, vínculo com resultado/execution, listagem na UI.
+- CRUD mínimo, vínculo com resultado/execution, listagem na UI, página
+  dedicada de gerenciamento (criar/editar/excluir avulso).
 
 **Future (aspirational, not committed):**
 

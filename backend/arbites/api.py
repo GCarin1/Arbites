@@ -1062,6 +1062,12 @@ def _register_routes(app: FastAPI) -> None:
     async def metrics_defects(request: Request, squad: str = ""):
         return metrics_ops.defects_report(conn_of(request), squad or None)
 
+    @app.get(API_PREFIX + "/metrics/automation")
+    async def metrics_automation(request: Request, days: int = 0):
+        ws = ws_of(request)
+        pattern = (ws.config().get("ci_monitoring") or {}).get("name_pattern")
+        return metrics_ops.automation_report(conn_of(request), pattern, days or None)
+
     @app.get(API_PREFIX + "/metrics/traceability")
     async def metrics_traceability(
         request: Request, epic: str = "", sprint: str = "", squad: str = ""
@@ -1788,6 +1794,10 @@ def _register_routes(app: FastAPI) -> None:
             _save_and_index(ws, conn, execution)
         return _defect_out(conn, ws, defect_id)
 
+    @app.get(API_PREFIX + "/defects/{defect_id}")
+    async def get_defect(request: Request, defect_id: str):
+        return _defect_out(conn_of(request), ws_of(request), defect_id)
+
     @app.put(API_PREFIX + "/defects/{defect_id}")
     async def update_defect(request: Request, defect_id: str, payload: DefectUpdate):
         ws, conn = ws_of(request), conn_of(request)
@@ -1799,6 +1809,14 @@ def _register_routes(app: FastAPI) -> None:
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
         return _defect_out(conn, ws, defect_id)
+
+    @app.delete(API_PREFIX + "/defects/{defect_id}", status_code=204)
+    async def delete_defect(request: Request, defect_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "defects", defect_id)
+        path = ws.root / rel
+        ws.trash(path)
+        reindex_file(ws, conn, path)
 
     # -- busca de entidades (autocomplete de links / menções @) -----------
 

@@ -8,6 +8,7 @@ o denominador. Nenhum estado é materializado — o índice é descartável
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -15,6 +16,13 @@ from typing import Any
 FINAL_STATUSES = ("passed", "failed", "blocked", "retest")
 # pior primeiro — agregação do "último resultado" de uma story
 _WORST_ORDER = ["failed", "blocked", "retest", "in_progress", "pending", "passed"]
+
+# Padrão GENÉRICO (sem referência a empresa/projeto) que separa o nome de uma
+# execução de automação em `<nome> <sep> <repo>.<ambiente>`. Ex.:
+# "Regression . acme/web-core.cer" → name=Regression repo=acme/web-core env=cer.
+# O usuário sobrescreve em arbites.yaml (`ci_monitoring.name_pattern`) para o
+# seu próprio padrão de nomes; grupo `repo` é obrigatório, `env` é opcional.
+DEFAULT_CI_NAME_PATTERN = r"^(?P<name>.+?)\s*[.\-]\s*(?P<repo>\S+)\.(?P<env>[^.\s]+)\s*$"
 
 
 def _cutoff(days: int | None) -> str | None:
@@ -448,6 +456,133 @@ def defects_report(conn: sqlite3.Connection, squad: str | None = None) -> dict:
         "by_squad": dict(sorted(by_squad.items())),
         "aging_buckets": buckets,
         "items": items,
+    }
+
+
+def _run_outcome(passed: int, failed: int, blocked: int, total: int) -> str:
+    """Desfecho de UMA execução de automação a partir dos seus resultados."""
+    if total == 0:
+        return "no_results"  # run sem resultados (workflow errou / artifact vazio)
+    if failed:
+        return "failed"
+    if blocked:
+        return "blocked"
+    if passed == total:
+        return "passed"
+    return "partial"  # parte passou, resto pendente/in_progress
+
+
+def automation_report(
+    conn: sqlite3.Connection,
+    name_pattern: str | None = None,
+    days: int | None = None,
+) -> dict:
+    """Monitoramento das execuções de automação agrupado por REPOSITÓRIO.
+
+    Cada execução não-manual (github_actions/local_run) é um run; o repo/env
+    saem do `name` pelo `name_pattern` (regex com grupos nomeados). Agrega por
+    repo com pior-primeiro (mais falhas) para responder "quais repos falham
+    mais". Runs cujo nome não casa o padrão contam em `unparsed` (sinal de que
+    o padrão precisa de ajuste) e não entram no ranking.
+    """
+    raw_pattern = name_pattern or DEFAULT_CI_NAME_PATTERN
+    pattern_error = None
+    try:
+        pattern = re.compile(raw_pattern)
+    except re.error as exc:
+        pattern_error = str(exc)
+        pattern = re.compile(DEFAULT_CI_NAME_PATTERN)
+
+    sql = (
+        "SELECT e.id, e.name, e.created_at,"
+        " SUM(CASE WHEN r.status='passed' THEN 1 ELSE 0 END) passed,"
+        " SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) failed,"
+        " SUM(CASE WHEN r.status='blocked' THEN 1 ELSE 0 END) blocked,"
+        " COUNT(r.testcase_id) total"
+        " FROM executions e LEFT JOIN results r ON r.execution_id = e.id"
+        " WHERE e.origin != 'manual'"
+    )
+    params: list[Any] = []
+    cutoff = _cutoff(days)
+    if cutoff:
+        sql += " AND e.created_at >= ?"
+        params.append(cutoff)
+    sql += " GROUP BY e.id ORDER BY e.created_at ASC"  # asc → o último vira "last"
+
+    repos: dict[str, dict] = {}
+    envs: dict[str, dict] = {}
+    total_runs = passed_runs = failed_runs = unparsed = 0
+    for row in conn.execute(sql, params):
+        m = pattern.match(row["name"] or "")
+        if not m or "repo" not in m.groupdict() or not m.group("repo"):
+            unparsed += 1
+            continue
+        repo = m.group("repo")
+        env = m.groupdict().get("env")
+        outcome = _run_outcome(
+            row["passed"] or 0, row["failed"] or 0, row["blocked"] or 0, row["total"] or 0
+        )
+        total_runs += 1
+        passed_runs += outcome == "passed"
+        failed_runs += outcome == "failed"
+
+        agg = repos.setdefault(
+            repo,
+            {"repo": repo, "runs": 0, "passed": 0, "failed": 0, "other": 0,
+             "envs": set(), "last_run_at": None, "last_outcome": None},
+        )
+        agg["runs"] += 1
+        agg["passed"] += outcome == "passed"
+        agg["failed"] += outcome == "failed"
+        agg["other"] += outcome not in ("passed", "failed")
+        if env:
+            agg["envs"].add(env)
+        agg["last_run_at"] = row["created_at"]  # asc → última linha ganha
+        agg["last_outcome"] = outcome
+
+        if env:
+            ea = envs.setdefault(env, {"env": env, "runs": 0, "failed": 0})
+            ea["runs"] += 1
+            ea["failed"] += outcome == "failed"
+
+    by_repo = [
+        {
+            "repo": a["repo"],
+            "runs": a["runs"],
+            "passed": a["passed"],
+            "failed": a["failed"],
+            "other": a["other"],
+            "pass_rate": _ratio(a["passed"], a["passed"] + a["failed"]),
+            "failure_rate": _ratio(a["failed"], a["runs"]),
+            "envs": sorted(a["envs"]),
+            "last_run_at": a["last_run_at"],
+            "last_outcome": a["last_outcome"],
+        }
+        for a in repos.values()
+    ]
+    # pior primeiro: mais falhas, depois maior taxa de falha, depois mais runs
+    by_repo.sort(
+        key=lambda x: (x["failed"], x["failure_rate"] or 0, x["runs"]), reverse=True
+    )
+    by_env = sorted(
+        (
+            {"env": e["env"], "runs": e["runs"], "failed": e["failed"],
+             "failure_rate": _ratio(e["failed"], e["runs"])}
+            for e in envs.values()
+        ),
+        key=lambda x: (x["failed"], x["failure_rate"] or 0),
+        reverse=True,
+    )
+    return {
+        "total_runs": total_runs,
+        "passed_runs": passed_runs,
+        "failed_runs": failed_runs,
+        "pass_rate": _ratio(passed_runs, passed_runs + failed_runs),
+        "by_repo": by_repo,
+        "by_env": by_env,
+        "unparsed": unparsed,
+        "pattern": raw_pattern,
+        "pattern_error": pattern_error,
     }
 
 

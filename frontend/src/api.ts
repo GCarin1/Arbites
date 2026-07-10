@@ -1,5 +1,6 @@
 import type {
   AiProvidersInfo,
+  AutomationReport,
   DailyContext,
   DailyDigestResult,
   Defect,
@@ -157,9 +158,13 @@ export const api = {
   closeExecution: (id: string) =>
     request<Execution>(`/executions/${id}/close`, { method: "POST" }),
 
-  defects: () => request<Defect[]>("/defects"),
+  defects: (query = "") => request<Defect[]>(`/defects${query}`),
+  defect: (id: string) => request<Defect>(`/defects/${id}`),
   createDefect: (body: object) =>
     request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
+  updateDefect: (id: string, body: object) =>
+    request<Defect>(`/defects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteDefect: (id: string) => request<void>(`/defects/${id}`, { method: "DELETE" }),
 
   todos: (query = "") => request<Todo[]>(`/todos${query}`),
   todo: (id: string) => request<Todo>(`/todos/${id}`),
@@ -217,6 +222,8 @@ export const api = {
     request<FlakyReport>(`/metrics/flaky?window=${window}`),
   metricsDefects: (squad = "") =>
     request<DefectsReport>(`/metrics/defects?squad=${encodeURIComponent(squad)}`),
+  metricsAutomation: (days = 0) =>
+    request<AutomationReport>(`/metrics/automation?days=${days}`),
   traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +

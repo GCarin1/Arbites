@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
-**Last updated:** 2026-07-06
-**Version:** 0.5.0
+**Last updated:** 2026-07-10
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -44,6 +44,17 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall expor `GET /metrics/defects` com um resumo dos defeitos
   abertos: contagem total, por severidade, por squad e por faixa de aging
   (dias em aberto), além da lista, filtrável por squad.
+- The system shall expor `GET /metrics/automation` que agrega as execuções de
+  automação (`origin != manual`) do período, agrupadas por REPOSITÓRIO
+  extraído do NOME da execução via regex configurável
+  (`ci_monitoring.name_pattern` no `arbites.yaml`, com grupos nomeados `repo`
+  obrigatório e `env` opcional; default genérico, sem referência a
+  empresa/projeto), com o desfecho de cada run (passed/failed/…) derivado dos
+  seus `results[]`.
+- The system shall ordenar os repositórios do relatório de automação
+  pior-primeiro (mais falhas, depois maior taxa de falha), reportar
+  passed/failed/pass_rate por repo e por ambiente, e contar em `unparsed` os
+  runs cujo nome não casa o padrão (sinal de padrão a ajustar).
 
 ### Event-driven
 
@@ -67,6 +78,12 @@ export PDF e Markdown (para colar no Confluence).
   colunas no mesmo dia não pode aumentar a contagem daquele dia.
 - The system shall not usar cor como único indicador de status (sempre
   ponto colorido + texto).
+- The system shall not derrubar `GET /metrics/automation` quando a regex
+  configurada é inválida; deve cair no padrão default e reportar
+  `pattern_error`.
+- The system shall not referenciar nenhuma empresa/organização/projeto
+  específico no padrão default nem na spec (o padrão é genérico e
+  sobrescrevível).
 
 ### Optional
 
@@ -93,12 +110,20 @@ export PDF e Markdown (para colar no Confluence).
    severidade, squad e faixa de aging, e filtra por squad — verified by
    `backend/tests/test_defects.py`.
 
+8. [verified] `GET /metrics/automation` agrupa runs de automação por repo
+   (pior-primeiro), deriva passed/failed por run dos resultados, ignora
+   execuções manuais, conta `unparsed` e respeita um `name_pattern`
+   customizado; regex inválida não derruba a rota (reporta `pattern_error`)
+   — verified by `backend/tests/test_automation_report.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
 - 7 métricas, tendência, matriz navegável, export PDF/MD, metas/thresholds
-  por métrica (semáforo), painel de defeitos abertos (aging/severidade/squad).
+  por métrica (semáforo), painel de defeitos abertos (aging/severidade/squad),
+  monitoramento de automação por repositório (pior-primeiro, padrão de nome
+  configurável).
 
 **Future (aspirational, not committed):**
 

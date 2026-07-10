@@ -59,7 +59,7 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
@@ -126,8 +126,8 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-07-06",
+        "version": "0.6.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
@@ -807,6 +807,32 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0044-aba-defeitos-pagina-dedicada-de-gerenciamento-de",
+        "title": "aba Defeitos: pagina dedicada de gerenciamento de bugs (antes so dava pra criar um defeito a partir de um resultado failed numa execucao, sem lista/edicao/exclusao proprias). Nova aba na navegacao com filtro por status/severidade, criacao avulsa (vincular CT/execucao opcional via autocomplete), edicao, mudanca rapida de status, exclusao, e navegacao @DF-XXXX abre direto no editor. Backend ganha GET /defects/{id} (com corpo) e DELETE /defects/{id}",
+        "path": ".doctrina/changes/archive/2026-07-10-0044-aba-defeitos-pagina-dedicada-de-gerenciamento-de",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0045-dashboard-monitoramento-de-automacao-por-reposit",
+        "title": "dashboard: monitoramento de automacao por repositorio. Novo GET /metrics/automation agrega execucoes de automacao (origin != manual) agrupadas por repositorio extraido do NOME da execucao via regex configuravel (ci_monitoring.name_pattern em arbites.yaml; default generico <nome> <sep> <repo>.<env> sem citar empresa/projeto), com pass/fail por run derivado dos resultados, ranking pior-primeiro (repos que mais falham), quebra por ambiente e contagem de runs fora do padrao. Nova secao na Dashboard",
+        "path": ".doctrina/changes/archive/2026-07-10-0045-dashboard-monitoramento-de-automacao-por-reposit",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -835,10 +861,22 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "descobrir-em-vez-de-digitar-config-de-caminho-externo",
+        "path": ".doctrina/skills/descobrir-em-vez-de-digitar-config-de-caminho-externo.md",
+        "description": "Quando um formulário de config pede um caminho externo (pasta/glob de outro repositório) que o usuário não decora, ofereça um botão que ESCANEIA o filesystem de verdade e devolve a lista real para escolher — não deixe o usuário digitar um padrão às cegas.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "efeito-de-foco-so-no-mount",
         "path": ".doctrina/skills/efeito-de-foco-so-no-mount.md",
         "description": "Efeitos de foco/scroll-lock (modais, autofocus) devem rodar só no mount — callbacks instáveis nas deps re-disparam o efeito e roubam o cursor.",
         "last_updated": "2026-07-07"
+      },
+      {
+        "id": "entidade-so-com-crud-encaixado-precisa-de-view-propria",
+        "path": ".doctrina/skills/entidade-so-com-crud-encaixado-precisa-de-view-propria.md",
+        "description": "Uma entidade com API CRUD completa (GET/POST/PUT) mas cuja UNICA porta de entrada na UI é um modal aninhado dentro de outro fluxo (ex.: \"criar defeito a partir de um resultado de execução\") não tem gerenciamento de verdade — falta listar/editar/excluir fora daquele contexto específico.",
+        "last_updated": "2026-07-10"
       },
       {
         "id": "heuristica-de-continuacao-sem-teste-vira-bug",
@@ -931,9 +969,9 @@
         "last_updated": "2026-07-10"
       },
       {
-        "id": "descobrir-em-vez-de-digitar-config-de-caminho-externo",
-        "path": ".doctrina/skills/descobrir-em-vez-de-digitar-config-de-caminho-externo.md",
-        "description": "Quando um formulário de config pede um caminho externo (pasta/glob de outro repositório) que o usuário não decora, ofereça um botão que ESCANEIA o filesystem de verdade e devolve a lista real para escolher — não deixe o usuário digitar um padrão às cegas.",
+        "id": "formato-especifico-do-usuario-vira-config-regex",
+        "path": ".doctrina/skills/formato-especifico-do-usuario-vira-config-regex.md",
+        "description": "Quando um recurso depende de um formato de string específico da organização do usuário (nome de run, convenção de branch, padrão de arquivo), NÃO hardcode o formato — extraia com uma regex configurável (grupos nomeados) em arbites.yaml, com um default genérico e degradação graciosa quando nada casa. Mantém o produto white-label.",
         "last_updated": "2026-07-10"
       }
     ],

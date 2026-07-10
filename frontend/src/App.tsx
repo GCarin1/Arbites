@@ -42,6 +42,9 @@ const AiAssist = lazy(() =>
 const Todos = lazy(() =>
   import("./components/Todos").then((m) => ({ default: m.Todos }))
 );
+const Defects = lazy(() =>
+  import("./components/Defects").then((m) => ({ default: m.Defects }))
+);
 const Daily = lazy(() =>
   import("./components/Daily").then((m) => ({ default: m.Daily }))
 );
@@ -56,6 +59,7 @@ type Tab =
   | "testcases"
   | "requirements"
   | "executions"
+  | "defects"
   | "todos"
   | "daily"
   | "meetings"
@@ -70,6 +74,7 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "testcases", label: "Test cases" },
   { key: "requirements", label: "Requisitos" },
   { key: "executions", label: "Execuções" },
+  { key: "defects", label: "Defeitos" },
   { key: "todos", label: "Afazeres" },
   { key: "daily", label: "Daily" },
   { key: "meetings", label: "Reuniões" },
@@ -84,7 +89,7 @@ const NAV: { key: Tab; label: string }[] = [
 // Agrupamento semântico do menu (doc de ajustes §3)
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["todos", "dashboard", "daily", "meetings"] },
+  { title: "Acompanhamento", keys: ["defects", "todos", "dashboard", "daily", "meetings"] },
   { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
   { title: "Suporte", keys: ["problems", "profile"] },
 ];
@@ -150,6 +155,7 @@ export default function App() {
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [selectedExec, setSelectedExec] = useState<string | null>(null);
+  const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -227,8 +233,10 @@ export default function App() {
       setTab("executions");
     } else if (prefix === "TD") {
       setTab("todos");
+    } else if (prefix === "DF") {
+      setSelectedDefect(id);
+      setTab("defects");
     }
-    // DF (defeito) não tem view dedicada — sem navegação
   }, []);
 
   async function createTestcase(title: string, folder: string) {
@@ -329,6 +337,13 @@ export default function App() {
                 abrir o board kanban.
               </p>
             )}
+            {tab === "defects" && (
+              <p className="panel-hint">
+                Lista de defeitos no painel principal: crie avulso ou a partir
+                de um resultado failed numa execução. Vincule a um CT/execução,
+                mude o status e acompanhe há quanto tempo está aberto.
+              </p>
+            )}
             {tab === "dashboard" && (
               <p className="panel-hint">
                 Métricas, tendência e matriz de rastreabilidade no painel
@@ -403,6 +418,15 @@ export default function App() {
           ) : tab === "ia" ? (
             <Suspense fallback={<p className="empty">Carregando IA…</p>}>
               <AiAssist onChanged={() => void refresh()} onError={setError} />
+            </Suspense>
+          ) : tab === "defects" ? (
+            <Suspense fallback={<p className="empty">Carregando defeitos…</p>}>
+              <Defects
+                onError={setError}
+                onNavigate={navigateTo}
+                openId={selectedDefect}
+                onOpened={() => setSelectedDefect(null)}
+              />
             </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
