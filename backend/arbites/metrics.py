@@ -695,6 +695,97 @@ def automation_report(
     }
 
 
+_ACTIVITY_DATE_EXPRS = (
+    "substr(at,1,10)",  # result_events
+    "opened_at",  # defects
+    "created",  # testcases
+    "created",  # requirements
+    "substr(created_at,1,10)",  # executions (auto)
+)
+_ACTIVITY_YEAR_SQL = (
+    "SELECT substr(at,1,4) y FROM result_events WHERE at IS NOT NULL"
+    " UNION SELECT substr(opened_at,1,4) FROM defects WHERE opened_at IS NOT NULL"
+    " UNION SELECT substr(created,1,4) FROM testcases WHERE created IS NOT NULL"
+    " UNION SELECT substr(created,1,4) FROM requirements WHERE created IS NOT NULL"
+    " UNION SELECT substr(created_at,1,4) FROM executions WHERE created_at IS NOT NULL"
+)
+
+
+def _activity_years(conn: sqlite3.Connection) -> list[int]:
+    years = set()
+    for row in conn.execute(_ACTIVITY_YEAR_SQL):
+        if row["y"] and row["y"].isdigit():
+            years.add(int(row["y"]))
+    return sorted(years)
+
+
+def activity_heatmap(
+    conn: sqlite3.Connection, days: int = 371, year: int | None = None
+) -> dict:
+    """Heatmap estilo GitHub da atividade de QA por dia.
+
+    Cada dia agrega vários sinais datados do índice: casos executados
+    (transições de resultado), bugs abertos, CTs/requisitos criados e runs de
+    automação. Janela: `year` (ano civil) ou os últimos `days` dias; sempre
+    começa alinhada à SEGUNDA (grade Seg→Dom × semanas). Devolve só os dias COM
+    atividade (o frontend preenche os zeros) + os anos que têm atividade (p/ o
+    seletor de ano).
+    """
+    today = date.today()
+    if year:
+        start = date(year, 1, 1)
+        end = min(date(year, 12, 31), today)
+    else:
+        end = today
+        start = end - timedelta(days=max(days, 1) - 1)
+    start = start - timedelta(days=start.weekday())  # alinha à segunda-feira
+    from_str, to_str = start.isoformat(), end.isoformat()
+
+    per_day: dict[str, dict[str, int]] = {}
+
+    def bump(day: str | None, key: str, n: int) -> None:
+        if not day or not (from_str <= day <= to_str):
+            return
+        slot = per_day.setdefault(
+            day,
+            {"executions": 0, "defects": 0, "testcases": 0,
+             "requirements": 0, "auto_runs": 0},
+        )
+        slot[key] += n
+
+    sources = [
+        # (chave, SQL que devolve (dia 'YYYY-MM-DD', n))
+        ("executions", "SELECT substr(at,1,10) d, COUNT(*) n FROM result_events GROUP BY d"),
+        ("defects", "SELECT opened_at d, COUNT(*) n FROM defects WHERE opened_at IS NOT NULL GROUP BY d"),
+        ("testcases", "SELECT created d, COUNT(*) n FROM testcases WHERE created IS NOT NULL GROUP BY d"),
+        ("requirements", "SELECT created d, COUNT(*) n FROM requirements WHERE created IS NOT NULL GROUP BY d"),
+        ("auto_runs", "SELECT substr(created_at,1,10) d, COUNT(*) n"
+                      " FROM executions WHERE origin != 'manual' GROUP BY d"),
+    ]
+    for key, sql in sources:
+        for row in conn.execute(sql):
+            bump(row["d"], key, row["n"])
+
+    days_list = []
+    totals = {"executions": 0, "defects": 0, "testcases": 0,
+              "requirements": 0, "auto_runs": 0, "total": 0}
+    for day, counts in sorted(per_day.items()):
+        total = sum(counts.values())
+        days_list.append({"date": day, **counts, "total": total})
+        for k, v in counts.items():
+            totals[k] += v
+        totals["total"] += total
+
+    return {
+        "from": from_str,
+        "to": to_str,
+        "days": days_list,
+        "totals": totals,
+        "years": _activity_years(conn),  # anos com atividade (p/ o seletor)
+        "year_filter": year,
+    }
+
+
 def matrix_markdown(matrix: dict) -> str:
     """Renderiza a matriz em Markdown colável no Confluence."""
     lines = ["# Matriz de rastreabilidade", ""]

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import type { TreeNode, Warning, WorkspaceInfo } from "./types";
 
@@ -403,6 +404,7 @@ export default function App() {
         <main className="main">
           <div className="main-inner">
           {error && <div className="error-banner">{error}</div>}
+          <ErrorBoundary key={tab}>
           {tab === "problems" ? (
             <Suspense fallback={<p className="empty">Carregando problemas…</p>}>
               <WarningsView warnings={warnings} />
@@ -538,6 +540,7 @@ export default function App() {
           ) : (
             <p className="empty">Carregando repositório…</p>
           )}
+          </ErrorBoundary>
           </div>
         </main>
       </div>

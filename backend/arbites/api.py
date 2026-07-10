@@ -1062,6 +1062,10 @@ def _register_routes(app: FastAPI) -> None:
     async def metrics_defects(request: Request, squad: str = ""):
         return metrics_ops.defects_report(conn_of(request), squad or None)
 
+    @app.get(API_PREFIX + "/metrics/activity")
+    async def metrics_activity(request: Request, days: int = 371, year: int = 0):
+        return metrics_ops.activity_heatmap(conn_of(request), days, year or None)
+
     @app.get(API_PREFIX + "/metrics/automation")
     async def metrics_automation(request: Request, days: int = 0, env: str = ""):
         ws = ws_of(request)

@@ -313,6 +313,32 @@ export interface AutomationReport {
   pattern_error: string | null;
 }
 
+export interface ActivityDay {
+  date: string;
+  executions: number;
+  defects: number;
+  testcases: number;
+  requirements: number;
+  auto_runs: number;
+  total: number;
+}
+
+export interface ActivityHeatmapData {
+  from: string;
+  to: string;
+  days: ActivityDay[];
+  totals: {
+    executions: number;
+    defects: number;
+    testcases: number;
+    requirements: number;
+    auto_runs: number;
+    total: number;
+  };
+  years: number[];
+  year_filter: number | null;
+}
+
 export interface MatrixLastResult {
   status: string;
   execution_id: string;

@@ -1048,6 +1048,116 @@ table.dense tbody tr:hover td {
 .exec-seg.col-retest { background: var(--retest); }
 .exec-seg.col-passed { background: var(--success); }
 
+/* ------------------------------------------------- Activity heatmap */
+/* Preenche a largura do card: colunas flexíveis (flex:1) e células que
+   escalam por aspect-ratio — card maior = quadrados maiores. */
+.heatmap {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: stretch;
+}
+.heatmap-weekdays {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 20px; /* abaixo da linha de meses */
+  flex: 0 0 auto;
+}
+.heatmap-weekday {
+  flex: 1;
+  min-height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 26px;
+}
+.heatmap-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.heatmap-months {
+  display: flex;
+  gap: 4px;
+  height: 20px;
+}
+.heatmap-month {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+.heatmap-grid {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+.heatmap-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.heatmap-cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.heatmap-empty {
+  visibility: hidden;
+}
+.heat-0 { background: var(--surface); }
+.heat-1 { background: color-mix(in srgb, var(--success) 25%, var(--surface)); }
+.heat-2 { background: color-mix(in srgb, var(--success) 50%, var(--surface)); }
+.heat-3 { background: color-mix(in srgb, var(--success) 75%, var(--surface)); }
+.heat-4 { background: var(--success); }
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+/* na legenda as células têm tamanho fixo (não escalam) */
+.heatmap-legend .heatmap-cell {
+  width: 12px;
+  height: 12px;
+  aspect-ratio: auto;
+  flex: 0 0 auto;
+}
+/* tooltip flutuante no cursor — mostra as mudanças do dia */
+.heatmap-tip {
+  position: fixed;
+  transform: translate(14px, 14px);
+  z-index: 60;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  max-width: 260px;
+}
+.heatmap-tip-title {
+  font-size: var(--fs-caption);
+}
+.heatmap-tip-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
 /* cabeçalho de seção com controles à direita (ex.: filtro de ambiente) */
 .section-head {
   display: flex;

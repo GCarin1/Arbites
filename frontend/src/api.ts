@@ -1,4 +1,5 @@
 import type {
+  ActivityHeatmapData,
   AiProvidersInfo,
   AutomationReport,
   DailyContext,
@@ -226,6 +227,8 @@ export const api = {
     request<AutomationReport>(
       `/metrics/automation?days=${days}&env=${encodeURIComponent(env)}`,
     ),
+  metricsActivity: (days = 371, year = 0) =>
+    request<ActivityHeatmapData>(`/metrics/activity?days=${days}&year=${year}`),
   traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +

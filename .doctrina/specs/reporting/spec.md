@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-10
-**Version:** 0.7.0
+**Version:** 0.9.0
 
 ## Purpose
 
@@ -64,11 +64,23 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall aceitar o filtro opcional `env` em `GET /metrics/automation`
   (ambiente extraído do nome), mantendo `envs` com todos os ambientes
   disponíveis para o seletor mesmo quando filtrado.
+- The system shall expor `GET /metrics/activity` que agrega a atividade de QA
+  por dia nos últimos ~12 meses (janela alinhada à segunda-feira, para a grade
+  Seg→Dom × semanas), somando por dia: casos executados (transições de
+  resultado), bugs abertos, CTs e requisitos criados e runs de automação;
+  devolvendo apenas os dias com atividade (o cliente preenche os zeros) mais os
+  totais do período.
+- The system shall aceitar o filtro opcional `year` em `GET /metrics/activity`
+  (janela do ano civil, alinhada à segunda-feira), e devolver `years` — os
+  anos que têm atividade — para o seletor de ano do heatmap.
 
 ### Event-driven
 
 - When o usuário aplica filtro de epic ou sprint, the system shall
   recalcular matriz e métricas sobre o subconjunto filtrado.
+- When o usuário passa o mouse sobre uma célula do heatmap de atividade, the
+  system shall exibir um tooltip com o número de mudanças (atividade) daquele
+  dia e o detalhamento por tipo.
 
 ### State-driven
 
@@ -130,6 +142,15 @@ export PDF e Markdown (para colar no Confluence).
    filtro `env` (com `envs` completo) — verified by
    `backend/tests/test_automation_report.py`.
 
+10. [verified] `GET /metrics/activity` agrega os sinais datados por dia
+    (casos executados/bugs/CTs/requisitos/runs), com a janela começando numa
+    segunda-feira e cobrindo ~53 semanas, e devolve os totais — verified by
+    `backend/tests/test_activity_heatmap.py`.
+
+11. [verified] `GET /metrics/activity?year=` janela o ano civil (alinhado à
+    segunda) e a resposta lista os anos com atividade; sem filtro segue os
+    últimos ~12 meses — verified by `backend/tests/test_activity_heatmap.py`.
+
 ## Maturity
 
 **MVP (committed):**
@@ -138,7 +159,7 @@ export PDF e Markdown (para colar no Confluence).
   por métrica (semáforo), painel de defeitos abertos (aging/severidade/squad),
   monitoramento de automação por repositório (pior-primeiro, padrão de nome
   configurável, sparkline/MTTR/flaky por repo, CTs que mais falham, filtro de
-  ambiente).
+  ambiente), heatmap de atividade de QA no perfil (estilo GitHub).
 
 **Future (aspirational, not committed):**
 

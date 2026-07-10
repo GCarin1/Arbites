@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ActivityHeatmap } from "./ActivityHeatmap";
 
 const BASE = "/api/v1";
 
@@ -73,6 +74,8 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
           </div>
         </div>
       </div>
+
+      <ActivityHeatmap onError={onError} />
 
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-head">
