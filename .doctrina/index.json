@@ -59,8 +59,8 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-06",
+        "version": "0.5.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -70,8 +70,8 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.4.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
@@ -735,6 +735,52 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0038-kanban-de-execucoes-card-mostra-titulo-do-ct-e-b",
+        "title": "kanban de execucoes: card mostra titulo do CT e barra de progresso de % de passos aprovados, alem do id; permitir vincular/desvincular um defeito ja existente (criado separadamente) a um resultado via API dedicada; edicao do resultado abre como modal centralizado com botao X para fechar em vez de painel inline abaixo do kanban",
+        "path": ".doctrina/changes/archive/2026-07-10-0038-kanban-de-execucoes-card-mostra-titulo-do-ct-e-b",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0039-bugs-do-modal-de-execucao-1-botao-fechar-duplica",
+        "title": "bugs do modal de execucao: (1) botao Fechar duplicado no footer alem do X do header — manter so o X (footer do Modal vira opcional); (2) salvar comentario sem feedback e efeito de reset preso a result.comment — dar feedback (Salvar/Salvando/Salvo, desabilita quando sem mudanca) e resetar so ao trocar de CT",
+        "path": ".doctrina/changes/archive/2026-07-10-0039-bugs-do-modal-de-execucao-1-botao-fechar-duplica",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0040-kanban-barra-de-progresso-segmentada-e-multicolo",
+        "title": "kanban: barra de progresso segmentada e multicolor. No card, um segmento por passo colorido pelo status (verde passed, vermelho failed, laranja blocked), enchendo ate onde a execucao chegou. Na barra da execucao, empilhar todos os status por contagem com suas cores, nao so os passed",
+        "path": ".doctrina/changes/archive/2026-07-10-0040-kanban-barra-de-progresso-segmentada-e-multicolo",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0041-autocomplete-em-todos-os-campos-que-referenciam",
+        "title": "autocomplete em todos os campos que referenciam um item existente, reutilizando GET /search: novo SingleRefInput (referencia unica por id/titulo) substitui o select de vincular defeito e o campo cru de story do CT; comentario do resultado vira MentionTextarea (@ referencia um card); rende links clicaveis ja existentes",
+        "path": ".doctrina/changes/archive/2026-07-10-0041-autocomplete-em-todos-os-campos-que-referenciam",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
       }
     ],
     "skills": [
@@ -763,6 +809,12 @@
         "last_updated": "2026-07-07"
       },
       {
+        "id": "heuristica-de-continuacao-sem-teste-vira-bug",
+        "path": ".doctrina/skills/heuristica-de-continuacao-sem-teste-vira-bug.md",
+        "description": "Ao escrever um parser de linhas (Gherkin, logs, markdown), não adivinhe regras de \"continuação\"/\"comentário\" (ex.:# ou aspas) sem um caso real que as exija — símbolos genéricos colidem com formatação legítima do usuário (cabeçalhos markdown, numeração) e colam texto onde não devia.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "leitura-agrupada-em-card",
         "path": ".doctrina/skills/leitura-agrupada-em-card.md",
         "description": "Como estruturar telas de leitura no frontend Arbites — agrupar metadados num card com cabeçalho (título/status/ações), evitando campos flutuantes sobre o fundo.",
@@ -773,6 +825,12 @@
         "path": ".doctrina/skills/metricas-resultado-liquido.md",
         "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
         "last_updated": "2026-07-06"
+      },
+      {
+        "id": "modais-aninhados-esc-fecha-so-o-do-topo",
+        "path": ".doctrina/skills/modais-aninhados-esc-fecha-so-o-do-topo.md",
+        "description": "Um componente Modal com listener de Esc no document fecha TODOS os modais abertos simultaneamente quando dois são aninhados, não só o do topo — porque stopPropagation() não impede outros listeners registrados no mesmo alvo (document). Precisa de uma pilha de modais abertos.",
+        "last_updated": "2026-07-10"
       },
       {
         "id": "modelo-de-raciocinio-content-vazio",
@@ -817,9 +875,21 @@
         "last_updated": "2026-07-10"
       },
       {
-        "id": "heuristica-de-continuacao-sem-teste-vira-bug",
-        "path": ".doctrina/skills/heuristica-de-continuacao-sem-teste-vira-bug.md",
-        "description": "Ao escrever um parser de linhas (Gherkin, logs, markdown), não adivinhe regras de \"continuação\"/\"comentário\" (ex.:# ou aspas) sem um caso real que as exija — símbolos genéricos colidem com formatação legítima do usuário (cabeçalhos markdown, numeração) e colam texto onde não devia.",
+        "id": "modal-fechar-duplicado-x-e-footer",
+        "path": ".doctrina/skills/modal-fechar-duplicado-x-e-footer.md",
+        "description": "Um componente Modal com X no header E um footer sempre-presente com botão \"Fechar\" mostra dois controles de fechar redundantes. Torne o footer opcional e, para modais só de leitura/edição-inline, feche só pelo X.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "salvar-manual-feedback-e-reset-por-id",
+        "path": ".doctrina/skills/salvar-manual-feedback-e-reset-por-id.md",
+        "description": "Botão de salvar manual sem estado de dirty/saving/saved parece \"não funcionar\" (salva mas nada muda na tela); e um efeito que reseta o campo a partir do valor do servidor (não do id do registro) reescreve o que o usuário digita quando há refresh de fundo.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "campos-de-referencia-com-autocomplete",
+        "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
+        "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
         "last_updated": "2026-07-10"
       }
     ],

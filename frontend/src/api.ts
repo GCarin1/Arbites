@@ -140,6 +140,15 @@ export const api = {
     request<Execution>(`/executions/${execId}/results/${ctId}/evidences/${index}`, {
       method: "DELETE",
     }),
+  linkDefect: (execId: string, ctId: string, defectId: string) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/defects`, {
+      method: "POST",
+      body: JSON.stringify({ defect_id: defectId }),
+    }),
+  unlinkDefect: (execId: string, ctId: string, defectId: string) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/defects/${defectId}`, {
+      method: "DELETE",
+    }),
   closeExecution: (id: string) =>
     request<Execution>(`/executions/${id}/close`, { method: "POST" }),
 

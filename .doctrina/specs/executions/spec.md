@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
-**Last updated:** 2026-07-03
-**Version:** 0.2.0
+**Last updated:** 2026-07-10
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -38,6 +38,17 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   `POST/DELETE .../results/{ct}/evidences`, `POST .../close`.
 - The system shall apresentar o Kanban com colunas
   `Pending | In Progress | Blocked | Failed | Retest | Passed`.
+- The system shall exibir em cada card do Kanban, além do `testcase_id` e do
+  título do CT, uma barra de progresso SEGMENTADA por passo: um segmento por
+  step colorido pelo status (verde `passed`, vermelho `failed`, laranja
+  `blocked`, trilho para `pending`), preenchendo até onde a execução chegou e
+  misturando as cores na mesma linha.
+- The system shall exibir a barra de progresso da execução como barra
+  EMPILHADA por status: um segmento por status de resultado, largura
+  proporcional à contagem, cada um na cor da sua coluna (não apenas `passed`).
+- The system shall abrir a edição de um resultado (passos, evidências,
+  comentário, defeitos) num modal centralizado com botão de fechar (X),
+  não mais como painel inline abaixo do Kanban.
 
 ### Event-driven
 
@@ -78,6 +89,11 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
    verified by `backend/tests/test_executions.py`.
 4. [verified] Mesmo CT com resultados distintos em duas executions não
    gera conflito — verified by `backend/tests/test_executions.py`.
+
+5. [verified] O card reflete os status dos passos na barra segmentada e a
+   barra da execução empilha todos os status (não só passed) — derivado de
+   `results[].steps[]`/colunas, sem novo campo no backend — verified by
+   `backend/tests/test_executions.py`.
 
 ## Maturity
 

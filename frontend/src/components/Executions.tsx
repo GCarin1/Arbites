@@ -1,7 +1,64 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
 import type { Execution, ExecutionSummary, ResultEntry, TestCase } from "../types";
+
+/**
+ * Barra de progresso por PASSO: um segmento por step, colorido pelo status
+ * (passed=verde, failed=vermelho, blocked=laranja, pending=trilho). "Enche" até
+ * onde a execução chegou e mistura as cores na mesma linha.
+ */
+function StepBar({ steps }: { steps: ResultEntry["steps"] }) {
+  if (steps.length === 0) return null;
+  const marked = steps.filter((s) => s.status !== "pending").length;
+  return (
+    <div
+      className="kanban-card-progress"
+      title={`${marked}/${steps.length} passos executados`}
+    >
+      <div className="stepbar">
+        {steps.map((s) => (
+          <span key={s.index} className={`stepbar-seg seg-${s.status}`} />
+        ))}
+      </div>
+      <span className="caption mono muted">
+        {marked}/{steps.length}
+      </span>
+    </div>
+  );
+}
+
+// ordem visual das colunas na barra empilhada da execução (concluídas primeiro).
+const STACK_ORDER = ["passed", "retest", "failed", "blocked", "in_progress", "pending"];
+
+/**
+ * Barra empilhada da execução: um segmento por status, largura proporcional à
+ * contagem, cada um na cor da sua coluna — não considera só os `passed`.
+ */
+function ExecStackBar({ results }: { results: ResultEntry[] }) {
+  const counts: Record<string, number> = {};
+  for (const r of results) {
+    const key = r.column || r.status;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  const total = results.length;
+  return (
+    <div className="exec-progress-bar exec-stack">
+      {STACK_ORDER.map((key) =>
+        counts[key] ? (
+          <span
+            key={key}
+            className={`exec-seg col-${key}`}
+            style={{ flexGrow: counts[key] }}
+            title={`${key}: ${counts[key]}`}
+          />
+        ) : null,
+      )}
+      {total === 0 && <span className="exec-seg col-pending" style={{ flexGrow: 1 }} />}
+    </div>
+  );
+}
 
 const COLUMNS: { key: string; label: string }[] = [
   { key: "pending", label: "Pending" },
@@ -307,6 +364,7 @@ export function ExecutionBoard({
   const [confirmClose, setConfirmClose] = useState(false);
   const [squadFilter, setSquadFilter] = useState("");
   const [squadOf, setSquadOf] = useState<Record<string, string | null>>({});
+  const [titleOf, setTitleOf] = useState<Record<string, string>>({});
 
   const reload = useCallback(() => {
     api
@@ -322,12 +380,13 @@ export function ExecutionBoard({
   }, [reload]);
 
   useEffect(() => {
-    // mapa CT → squad efetivo, para filtrar o board por squad
+    // mapa CT → squad efetivo (filtro do board) e título (exibição no card)
     api
       .testcases()
-      .then((tcs) =>
-        setSquadOf(Object.fromEntries(tcs.map((t) => [t.id, t.squad_effective]))),
-      )
+      .then((tcs) => {
+        setSquadOf(Object.fromEntries(tcs.map((t) => [t.id, t.squad_effective])));
+        setTitleOf(Object.fromEntries(tcs.map((t) => [t.id, t.title])));
+      })
       .catch(() => {});
   }, []);
 
@@ -422,12 +481,7 @@ export function ExecutionBoard({
       )}
 
       <div className="exec-progress">
-        <div className="exec-progress-bar">
-          <div
-            className="exec-progress-fill"
-            style={{ width: `${total ? Math.round((passed / total) * 100) : 0}%` }}
-          />
-        </div>
+        <ExecStackBar results={visible} />
         <span className="caption mono">
           {passed}/{total} passed
         </span>
@@ -464,15 +518,23 @@ export function ExecutionBoard({
                   onDragStart={() => setDragCt(result.testcase_id)}
                   onClick={() => setSelectedCt(result.testcase_id)}
                 >
-                  <span className="mono">{result.testcase_id}</span>
-                  {squadOf[result.testcase_id] && !squadFilter && (
-                    <span className="muted"> · {squadOf[result.testcase_id]}</span>
+                  <div className="kanban-card-head">
+                    <span className="mono">{result.testcase_id}</span>
+                    {squadOf[result.testcase_id] && !squadFilter && (
+                      <span className="muted"> · {squadOf[result.testcase_id]}</span>
+                    )}
+                  </div>
+                  {titleOf[result.testcase_id] && (
+                    <div className="kanban-card-title">{titleOf[result.testcase_id]}</div>
                   )}
-                  {result.evidences.length > 0 && (
-                    <span className="muted"> · {result.evidences.length} evid.</span>
-                  )}
-                  {result.defects.length > 0 && (
-                    <span className="muted"> · {result.defects.join(", ")}</span>
+                  <StepBar steps={result.steps} />
+                  {(result.evidences.length > 0 || result.defects.length > 0) && (
+                    <div className="kanban-card-meta caption muted">
+                      {result.evidences.length > 0 && <span>{result.evidences.length} evid.</span>}
+                      {result.defects.length > 0 && (
+                        <span className="mono">{result.defects.join(", ")}</span>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -481,16 +543,21 @@ export function ExecutionBoard({
       </div>
 
       {selectedResult && (
-        <ResultPanel
-          execution={execution}
-          result={selectedResult}
-          closed={closed}
-          onUpdate={(updated) => {
-            setExecution(updated);
-            onChanged();
-          }}
-          onError={onError}
-        />
+        <Modal
+          title={`${selectedResult.testcase_id} · ${titleOf[selectedResult.testcase_id] ?? ""}`}
+          onClose={() => setSelectedCt(null)}
+        >
+          <ResultPanel
+            execution={execution}
+            result={selectedResult}
+            closed={closed}
+            onUpdate={(updated) => {
+              setExecution(updated);
+              onChanged();
+            }}
+            onError={onError}
+          />
+        </Modal>
       )}
     </div>
   );
@@ -513,11 +580,19 @@ function ResultPanel({
 }) {
   const [note, setNote] = useState("");
   const [comment, setComment] = useState(result.comment ?? "");
+  const [savingComment, setSavingComment] = useState(false);
   const [creatingDefect, setCreatingDefect] = useState(false);
+  const [linkingDefect, setLinkingDefect] = useState(false);
+  const [pickedDefect, setPickedDefect] = useState("");
 
+  // Reseta só ao TROCAR de CT — nunca por `result.comment`, senão um refresh de
+  // fundo (ou outra ação) reescreve o campo por baixo do que o usuário digitou.
   useEffect(() => {
     setComment(result.comment ?? "");
-  }, [result.testcase_id, result.comment]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result.testcase_id]);
+
+  const commentDirty = comment !== (result.comment ?? "");
 
   async function markStep(step: number, status: string) {
     try {
@@ -528,15 +603,20 @@ function ResultPanel({
   }
 
   async function saveComment() {
+    setSavingComment(true);
     try {
+      // preserva a coluna atual (status e coluna podem divergir); só grava o texto.
       onUpdate(
         await api.resultStatus(execution.id, result.testcase_id, {
           status: result.status,
+          column: result.column || result.status,
           comment,
         }),
       );
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingComment(false);
     }
   }
 
@@ -575,10 +655,27 @@ function ResultPanel({
     }
   }
 
+  async function linkExistingDefect() {
+    if (!pickedDefect) return;
+    try {
+      onUpdate(await api.linkDefect(execution.id, result.testcase_id, pickedDefect));
+      setLinkingDefect(false);
+      setPickedDefect("");
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function unlinkDefect(defectId: string) {
+    try {
+      onUpdate(await api.unlinkDefect(execution.id, result.testcase_id, defectId));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <div className="result-panel">
-      <h3 className="mono">{result.testcase_id}</h3>
-
       <h4>Passos</h4>
       {result.steps.length === 0 && <p className="muted">CT sem passos estruturados.</p>}
       {result.steps.map((step) => (
@@ -626,25 +723,73 @@ function ResultPanel({
       )}
 
       <h4>Comentário</h4>
-      <div className="step-row">
-        <input
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          disabled={closed}
-        />
-        {!closed && <button onClick={() => void saveComment()}>Salvar</button>}
-      </div>
+      {closed ? (
+        <p className="muted">{comment || "—"}</p>
+      ) : (
+        <>
+          <MentionTextarea
+            value={comment}
+            onChange={setComment}
+            placeholder="Comentário — digite @ para referenciar um card (ex.: @DF-0007)"
+          />
+          <div className="toolbar">
+            <button
+              className="primary"
+              onClick={() => void saveComment()}
+              disabled={!commentDirty || savingComment}
+            >
+              {savingComment ? "Salvando…" : commentDirty ? "Salvar comentário" : "Salvo"}
+            </button>
+          </div>
+        </>
+      )}
 
       <h4>Defeitos</h4>
       {result.defects.length > 0 ? (
-        <p className="mono">{result.defects.join(", ")}</p>
+        result.defects.map((defectId) => (
+          <div key={defectId} className="step-row">
+            <span className="mono" style={{ flex: 1 }}>
+              {defectId}
+            </span>
+            {!closed && (
+              <button className="danger" onClick={() => void unlinkDefect(defectId)}>
+                desvincular
+              </button>
+            )}
+          </div>
+        ))
       ) : (
         <p className="muted">Nenhum defeito vinculado.</p>
       )}
       {!closed && (
-        <button onClick={() => setCreatingDefect(true)}>
-          Criar defeito a partir deste resultado
-        </button>
+        <div className="toolbar">
+          <button onClick={() => setCreatingDefect(true)}>
+            Criar defeito a partir deste resultado
+          </button>
+          <button onClick={() => setLinkingDefect((v) => !v)}>
+            Vincular defeito existente
+          </button>
+        </div>
+      )}
+
+      {linkingDefect && !closed && (
+        <div className="step-row">
+          <SingleRefInput
+            value={pickedDefect}
+            onChange={setPickedDefect}
+            kinds="defect"
+            placeholder="DF-0001 — digite id ou título do defeito"
+            onEnterNoMatch={() => void linkExistingDefect()}
+          />
+          <button
+            className="primary"
+            disabled={!pickedDefect}
+            onClick={() => void linkExistingDefect()}
+          >
+            Vincular
+          </button>
+          <button onClick={() => setLinkingDefect(false)}>Cancelar</button>
+        </div>
       )}
 
       {creatingDefect && (

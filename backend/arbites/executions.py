@@ -285,6 +285,24 @@ def link_defect(
         )
 
 
+def unlink_defect(
+    execution: dict[str, Any], testcase_id: str, defect_id: str, who: str
+) -> None:
+    _guard_open(execution)
+    result = _find_result(execution, testcase_id)
+    if defect_id in result["defects"]:
+        result["defects"].remove(defect_id)
+        execution["history"].append(
+            {
+                "at": _now(),
+                "who": who,
+                "event": "defect_removed",
+                "testcase_id": testcase_id,
+                "defect_id": defect_id,
+            }
+        )
+
+
 def close(execution: dict[str, Any], who: str) -> None:
     if execution["status"] == "closed":
         raise ExecutionError("execution_closed", f"{execution['id']} já está fechada", 409)

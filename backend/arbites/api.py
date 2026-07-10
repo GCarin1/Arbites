@@ -144,6 +144,11 @@ class StepStatusIn(BaseModel):
     who: str = "local"
 
 
+class DefectLinkIn(BaseModel):
+    defect_id: str
+    who: str = "local"
+
+
 class LocalRunIn(BaseModel):
     target: str
     tags: list[str] = []
@@ -945,6 +950,25 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
         exec_ops.remove_evidence(ws, execution, ct_id, index, "local")
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/defects")
+    async def post_link_defect(
+        request: Request, exec_id: str, ct_id: str, payload: DefectLinkIn
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        _find_path(conn, "defects", payload.defect_id)  # 404 se o defeito não existe
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.link_defect(execution, ct_id, payload.defect_id, payload.who)
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.delete(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/defects/{defect_id}")
+    async def delete_link_defect(request: Request, exec_id: str, ct_id: str, defect_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.unlink_defect(execution, ct_id, defect_id, "local")
         _save_and_index(ws, conn, execution)
         return execution
 

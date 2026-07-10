@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)
 **Realizes:** SC2
-**Last updated:** 2026-07-06
-**Version:** 0.4.0
+**Last updated:** 2026-07-10
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -25,6 +25,11 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
   `PUT /defects/{id}`.
 - The system shall permitir vincular defeitos a um resultado de execution
   (`results[].defects[]`).
+- The system shall expor `POST /executions/{exec_id}/results/{ct_id}/defects`
+  (vincular um defeito já existente, por id) e
+  `DELETE /executions/{exec_id}/results/{ct_id}/defects/{defect_id}`
+  (desvincular), além do vínculo automático ao criar defeito a partir de um
+  resultado `failed`.
 
 ### Event-driven
 
@@ -40,6 +45,8 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 
 - The system shall not tentar ser um bug tracker completo (sem workflow de
   triagem, atribuição, comentários); é ponteiro + metadados.
+- The system shall not aceitar vincular um `defect_id` inexistente (404) nem
+  vincular/desvincular numa execution `closed` (409).
 
 ### Optional
 
@@ -55,6 +62,11 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 3. [verified] Defeito é carimbado com `opened` na criação e o report expõe
    sua idade (dias em aberto), severidade e squad do CT vinculado —
    verified by `backend/tests/test_defects.py`.
+
+4. [verified] Vincular um defeito pré-existente a um resultado, vincular de
+   novo (idempotente, sem duplicar) e desvincular funcionam via API dedicada;
+   `defect_id` inexistente e execution fechada são rejeitados — verified by
+   `backend/tests/test_executions.py`.
 
 ## Maturity
 

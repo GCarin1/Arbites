@@ -993,6 +993,65 @@ table.dense tbody tr:hover td {
 .kanban-card:active {
   cursor: grabbing;
 }
+.kanban-card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kanban-card-title {
+  margin-top: 4px;
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.kanban-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* barra segmentada: um pedaço por passo, cor pelo status (enche até onde foi) */
+.stepbar {
+  display: flex;
+  flex: 1;
+  gap: 1px;
+  height: 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.stepbar-seg {
+  flex: 1;
+}
+.seg-pending { background: transparent; }
+.seg-passed { background: var(--success); }
+.seg-failed { background: var(--danger); }
+.seg-blocked { background: var(--warning); }
+/* barra empilhada da execução: um segmento por status, cor da coluna */
+.exec-stack {
+  display: flex;
+  gap: 1px;
+  padding: 0;
+}
+.exec-seg:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.exec-seg:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.exec-seg.col-pending { background: var(--text-subtle); }
+.exec-seg.col-in_progress { background: var(--primary); }
+.exec-seg.col-blocked { background: var(--warning); }
+.exec-seg.col-failed { background: var(--danger); }
+.exec-seg.col-retest { background: var(--retest); }
+.exec-seg.col-passed { background: var(--success); }
+.kanban-card-meta {
+  display: flex;
+  gap: var(--s2);
+  margin-top: 4px;
+}
 .dot-col-pending { --dot: var(--text-subtle); }
 .dot-col-in_progress { --dot: var(--primary); }
 .dot-col-blocked { --dot: var(--warning); }
