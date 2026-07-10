@@ -234,7 +234,30 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
 
 
 def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
-    """Incremental: reparseia um único arquivo (edição externa → UI em segundos)."""
+    """Incremental: reparseia um único arquivo (edição externa → UI em segundos).
+
+    O watcher (thread própria, conexão própria) e os handlers HTTP (outra
+    conexão) podem chamar isto quase ao mesmo tempo — uma operação em lote
+    (ex.: mover uma pasta com vários CTs) dispara uma rajada de eventos do
+    watcher que colide com o loop de reindex do próprio handler. `busy_timeout`
+    (PRAGMA, 5s) cobre a maioria dos casos, mas não todos — por isso retenta
+    aqui, com rollback entre tentativas para não deixar a transação num
+    estado parcial.
+    """
+    for attempt in range(5):
+        try:
+            _reindex_file_once(ws, conn, path)
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower():
+                raise
+            conn.rollback()
+            if attempt == 4:
+                raise
+            time.sleep(0.05 * (attempt + 1))
+
+
+def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
     rel = ws.relpath(path)
     if rel.split("/", 1)[0] == "executions" and path.name == "execution.json":
         _drop_execution_rows(conn, rel)

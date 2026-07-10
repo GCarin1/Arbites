@@ -36,7 +36,7 @@ from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .executions import ExecutionError
-from .gherkin_scan import scan_target
+from .gherkin_scan import list_feature_files, scan_target
 from .runner import RunManager
 from .xray_import import XrayImportError
 from .indexer import connect, reindex_file, reindex_full
@@ -110,6 +110,11 @@ class RawIn(BaseModel):
 
 class FolderIn(BaseModel):
     path: str  # relativo a <área>/, ex.: "frontend/login"
+
+
+class FolderMoveIn(BaseModel):
+    path: str  # pasta de origem, relativa a <área>/
+    dest: str = ""  # pasta de destino, relativa a <área>/ (vazio = raiz)
 
 
 class MoveIn(BaseModel):
@@ -207,6 +212,20 @@ class AIProvidersIn(BaseModel):
     default_provider: str | None = None
     providers: list[AIProviderConfig] = []
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
+
+
+class AutomationTargetIn(BaseModel):
+    name: str
+    kind: str = "behave"
+    local_path: str
+    features_glob: str = "features/**/*.feature"
+    python_path: str | None = None
+    working_dir: str | None = None
+    timeout_minutes: float | None = None
+
+
+class AutomationTargetsIn(BaseModel):
+    targets: list[AutomationTargetIn] = []
 
 
 class GenerateIn(BaseModel):
@@ -764,6 +783,33 @@ def _register_routes(app: FastAPI) -> None:
             reindex_file(ws, conn, md)  # não existe mais → remove do índice
         return None
 
+    @app.post(API_PREFIX + "/testcases/folders/move")
+    async def move_tc_folder(request: Request, payload: FolderMoveIn):
+        # rota estática ("/testcases/folders/move") ANTES de "/testcases/{entity_id}"
+        # (mesma armadilha de roteamento das demais rotas de pasta acima).
+        ws, conn = ws_of(request), conn_of(request)
+        src = _safe_area_dir(ws, "testcases", payload.path)
+        if src == ws.root / "testcases" or not src.is_dir():
+            raise _error(422, "invalid_folder", "pasta de origem inválida")
+        dest_parent = _safe_area_dir(ws, "testcases", payload.dest)
+        dest = dest_parent / src.name
+        if dest.resolve() == src.resolve():
+            return {"path": ws.relpath(src)}  # já está lá — no-op
+        if str(dest.resolve()).startswith(str(src.resolve()) + os.sep):
+            raise _error(
+                422, "invalid_folder", "não é possível mover uma pasta para dentro dela mesma"
+            )
+        if dest.exists():
+            raise _error(409, "conflict", f"{src.name} já existe no destino")
+        affected = list(src.rglob("*.md"))  # caminhos antigos, antes do rename
+        dest_parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dest)
+        for old_md in affected:
+            reindex_file(ws, conn, old_md)  # caminho antigo não existe mais → remove
+        for new_md in dest.rglob("*.md"):
+            reindex_file(ws, conn, new_md)  # indexa no caminho novo
+        return {"path": ws.relpath(dest)}
+
     @app.get(API_PREFIX + "/testcases/{entity_id}")
     async def get_testcase(request: Request, entity_id: str):
         return _tc_out(conn_of(request), ws_of(request), entity_id)
@@ -1091,10 +1137,7 @@ def _register_routes(app: FastAPI) -> None:
                 return target
         raise _error(404, "not_found", f"target '{name}' não configurado")
 
-    @app.get(API_PREFIX + "/targets")
-    async def list_targets(request: Request):
-        ws, conn = ws_of(request), conn_of(request)
-        runner: RunManager = request.app.state.runner
+    def _targets_out(ws: Workspace, conn, runner: RunManager) -> list[dict]:
         out = []
         for target in ws.config().get("automation_targets") or []:
             name = target.get("name")
@@ -1107,11 +1150,58 @@ def _register_routes(app: FastAPI) -> None:
                     "kind": target.get("kind", "behave"),
                     "local_path": target.get("local_path"),
                     "features_glob": target.get("features_glob"),
+                    "python_path": target.get("python_path"),
+                    "working_dir": target.get("working_dir"),
+                    "timeout_minutes": target.get("timeout_minutes"),
                     "scenarios": scenarios,
                     "queue_length": runner.queue_length(str(name)),
                 }
             )
         return out
+
+    @app.get(API_PREFIX + "/targets")
+    async def list_targets(request: Request):
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        return _targets_out(ws, conn, runner)
+
+    @app.put(API_PREFIX + "/targets")
+    async def put_targets(request: Request, payload: AutomationTargetsIn):
+        """Substitui `automation_targets` no arbites.yaml (mesmo padrão do
+        PUT /ai/providers) — sem precisar abrir o YAML na mão."""
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        import yaml as _yaml
+
+        config = ws.config()
+        config["automation_targets"] = [
+            t.model_dump(exclude_none=True) for t in payload.targets
+        ]
+        ws.config_path.write_text(
+            _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        for target in config["automation_targets"]:
+            scan_target(ws, conn, target)  # já popula cenários/warnings
+        return _targets_out(ws, conn, runner)
+
+    @app.get(API_PREFIX + "/automation/browse-features")
+    async def browse_feature_files(
+        request: Request,
+        local_path: str,
+        features_glob: str = "features/**/*.feature",
+    ):
+        """Lista os .feature encontrados em `local_path` (scan avulso, sem
+        exigir que o target já exista) — para o form de target mostrar a
+        lista real em vez do usuário digitar um glob às cegas."""
+        path = Path(local_path)
+        if not path.is_dir():
+            raise _error(422, "invalid_path", f"pasta não encontrada: {local_path}")
+        try:
+            features = list_feature_files(path, features_glob)
+        except Exception as exc:
+            raise _error(422, "scan_error", f"falha ao escanear: {exc}") from exc
+        return {"local_path": local_path, "features": features}
 
     @app.post(API_PREFIX + "/targets/{name}/scan")
     async def scan_target_route(request: Request, name: str):

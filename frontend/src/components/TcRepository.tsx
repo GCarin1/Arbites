@@ -4,6 +4,15 @@ import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
 import type { GeneratedTestcase, TreeNode } from "../types";
 
+type DragState =
+  | { kind: "ct"; id: string }
+  | { kind: "folder"; path: string; ctCount: number };
+
+/** true se `destPath` for a própria `srcPath` ou algum descendente dela. */
+function isDescendantOrSelf(destPath: string, srcPath: string): boolean {
+  return destPath === srcPath || destPath.startsWith(`${srcPath}/`);
+}
+
 /**
  * Repositório de test cases (doc §1.1) — árvore de pastas centralizada no
  * conteúdo, com expandir/colapsar, drag & drop de CTs entre pastas, criação e
@@ -25,12 +34,17 @@ export function TcRepository({
   extraActions?: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState<string | null>(null); // pasta pai
   const [deletingFolder, setDeletingFolder] = useState<TreeNode | null>(null);
   const [deletingCt, setDeletingCt] = useState<{ id: string; title: string } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [pendingFolderMove, setPendingFolderMove] = useState<{
+    srcPath: string;
+    destPath: string;
+    ctCount: number;
+  } | null>(null);
 
   function toggle(path: string) {
     setCollapsed((old) => {
@@ -46,16 +60,36 @@ export function TcRepository({
     return path.replace(/^testcases\/?/, "");
   }
 
-  async function moveTo(folderPath: string) {
-    if (!dragId) return;
+  async function moveTo(destFolderPath: string) {
+    const d = drag;
+    setDrag(null);
+    setDropTarget(null);
+    if (!d) return;
+    if (d.kind === "ct") {
+      try {
+        await api.moveTestcase(d.id, relFolder(destFolderPath));
+        onChanged();
+      } catch (e) {
+        onError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
+    // pasta: soltar nela mesma ou numa descendente é inválido — ignora.
+    if (isDescendantOrSelf(destFolderPath, d.path)) return;
+    if (d.ctCount > 0) {
+      // contém CTs: confirma antes de arrastar tudo junto.
+      setPendingFolderMove({ srcPath: d.path, destPath: destFolderPath, ctCount: d.ctCount });
+      return;
+    }
+    await doMoveFolder(d.path, destFolderPath);
+  }
+
+  async function doMoveFolder(srcPath: string, destPath: string) {
     try {
-      await api.moveTestcase(dragId, relFolder(folderPath));
+      await api.moveTcFolder(relFolder(srcPath), relFolder(destPath));
       onChanged();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDragId(null);
-      setDropTarget(null);
     }
   }
 
@@ -105,12 +139,24 @@ export function TcRepository({
           return (
             <div key={d.path} className="repo-dir">
               <div
-                className={`repo-row repo-folder ${dropTarget === d.path ? "drop-target" : ""}`}
+                className={`repo-row repo-folder ${dropTarget === d.path ? "drop-target" : ""} ${
+                  drag?.kind === "folder" && drag.path === d.path ? "dragging" : ""
+                }`}
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  setDrag({ kind: "folder", path: d.path, ctCount: countAll(d) });
+                }}
+                onDragEnd={() => {
+                  setDrag(null);
+                  setDropTarget(null);
+                }}
                 onDragOver={(e) => {
-                  if (dragId) {
-                    e.preventDefault();
-                    setDropTarget(d.path);
-                  }
+                  if (!drag) return;
+                  // não permite soltar uma pasta dentro dela mesma ou de uma descendente
+                  if (drag.kind === "folder" && isDescendantOrSelf(d.path, drag.path)) return;
+                  e.preventDefault();
+                  setDropTarget(d.path);
                 }}
                 onDragLeave={() => setDropTarget((t) => (t === d.path ? null : t))}
                 onDrop={() => void moveTo(d.path)}
@@ -143,11 +189,16 @@ export function TcRepository({
         render: (branch: string) => (
           <div
             key={f.path}
-            className={`repo-row repo-file ${dragId === f.id ? "dragging" : ""}`}
+            className={`repo-row repo-file ${
+              drag?.kind === "ct" && drag.id === f.id ? "dragging" : ""
+            }`}
             draggable={!!f.id}
-            onDragStart={() => f.id && setDragId(f.id)}
+            onDragStart={(e) => {
+              e.stopPropagation();
+              if (f.id) setDrag({ kind: "ct", id: f.id });
+            }}
             onDragEnd={() => {
-              setDragId(null);
+              setDrag(null);
               setDropTarget(null);
             }}
           >
@@ -206,7 +257,7 @@ export function TcRepository({
         className={`repo-tree card ${dropTarget === root.path ? "drop-target" : ""}`}
         onDragOver={(e) => {
           // soltar no "vazio" = mover para a raiz
-          if (dragId && e.target === e.currentTarget) {
+          if (drag && e.target === e.currentTarget) {
             e.preventDefault();
             setDropTarget(root.path);
           }
@@ -271,6 +322,30 @@ export function TcRepository({
           danger
           onConfirm={() => void deleteCt(deletingCt.id)}
           onCancel={() => setDeletingCt(null)}
+        />
+      )}
+      {pendingFolderMove && (
+        <ConfirmModal
+          title="Mover pasta"
+          message={
+            <>
+              A pasta{" "}
+              <span className="mono">
+                {pendingFolderMove.srcPath.split("/").pop()}/
+              </span>{" "}
+              contém <strong>{pendingFolderMove.ctCount}</strong> caso
+              {pendingFolderMove.ctCount === 1 ? "" : "s"} de teste, que{" "}
+              {pendingFolderMove.ctCount === 1 ? "será movido" : "serão movidos"} junto.
+              Continuar?
+            </>
+          }
+          confirmLabel="Mover pasta e casos de teste"
+          onConfirm={() => {
+            const p = pendingFolderMove;
+            setPendingFolderMove(null);
+            void doMoveFolder(p.srcPath, p.destPath);
+          }}
+          onCancel={() => setPendingFolderMove(null)}
         />
       )}
     </div>

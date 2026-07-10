@@ -74,6 +74,71 @@ def test_folder_create_move_and_delete(client):
     assert any("dentro" in p.name.lower() for p in trash)
 
 
+def test_folder_move_preserves_cts_and_reindexes_new_path(client):
+    client.post("/api/v1/testcases/folders", json={"path": "origem"})
+    client.post("/api/v1/testcases/folders", json={"path": "destino"})
+    ct = client.post(
+        "/api/v1/testcases", json={"title": "Dentro da origem", "body": BDD_BODY, "folder": "origem"}
+    ).json()
+
+    resp = client.post(
+        "/api/v1/testcases/folders/move", json={"path": "origem", "dest": "destino"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["path"] == "testcases/destino/origem"
+
+    # o CT continua acessível pelo mesmo id, agora sob destino/origem/
+    fetched = client.get(f"/api/v1/testcases/{ct['id']}").json()
+    assert fetched["path"].startswith("testcases/destino/origem/")
+
+    tree = client.get("/api/v1/tree").json()
+    destino = next(d for d in tree["dirs"] if d["name"] == "destino")
+    assert any(sub["name"] == "origem" for sub in destino["dirs"])
+    assert not any(d["name"] == "origem" for d in tree["dirs"])  # não sobrou na raiz
+
+
+def test_folder_move_into_itself_or_descendant_rejected(client):
+    client.post("/api/v1/testcases/folders", json={"path": "pai/filha"})
+    resp = client.post(
+        "/api/v1/testcases/folders/move", json={"path": "pai", "dest": "pai/filha"}
+    )
+    assert resp.status_code == 422
+    resp2 = client.post(
+        "/api/v1/testcases/folders/move", json={"path": "pai", "dest": "pai"}
+    )
+    assert resp2.status_code == 422
+
+
+def test_folder_move_conflict_when_dest_already_has_same_name(client):
+    client.post("/api/v1/testcases/folders", json={"path": "a/login"})
+    client.post("/api/v1/testcases/folders", json={"path": "b/login"})
+    resp = client.post("/api/v1/testcases/folders/move", json={"path": "a/login", "dest": "b"})
+    assert resp.status_code == 409
+
+
+def test_folder_move_noop_when_already_at_destination(client):
+    client.post("/api/v1/testcases/folders", json={"path": "solta"})
+    resp = client.post("/api/v1/testcases/folders/move", json={"path": "solta", "dest": ""})
+    assert resp.status_code == 200
+    assert resp.json()["path"] == "testcases/solta"
+
+
+def test_folder_move_traversal_guard(client):
+    assert (
+        client.post(
+            "/api/v1/testcases/folders/move", json={"path": "../fora", "dest": ""}
+        ).status_code
+        == 422
+    )
+    client.post("/api/v1/testcases/folders", json={"path": "legit"})
+    assert (
+        client.post(
+            "/api/v1/testcases/folders/move", json={"path": "legit", "dest": "../../etc"}
+        ).status_code
+        == 422
+    )
+
+
 def test_folder_traversal_guard(client):
     assert client.post("/api/v1/testcases/folders", json={"path": "../fora"}).status_code == 422
     ct = client.post("/api/v1/testcases", json={"title": "X", "body": BDD_BODY}).json()

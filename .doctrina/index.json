@@ -93,8 +93,8 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.3.0",
-        "last_updated": "2026-07-09",
+        "version": "0.4.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
           "SC5"
@@ -159,8 +159,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-09",
+        "version": "0.5.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -781,6 +781,32 @@
         "status": "applied",
         "applied": "2026-07-10",
         "specs_affected": []
+      },
+      {
+        "id": "0042-arrastar-pastas-para-dentro-de-outras-pastas-em",
+        "title": "arrastar pastas para dentro de outras pastas em Test cases: nova rota POST /testcases/folders/move (reindexa recursivamente, guarda contra path traversal e mover pasta para dentro dela mesma/descendente); pasta vira draggable no repo; se contiver CTs (recursivo), abre modal de confirmacao antes de mover pois os casos de teste vao junto",
+        "path": ".doctrina/changes/archive/2026-07-10-0042-arrastar-pastas-para-dentro-de-outras-pastas-em",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0043-cadastro-de-automation-targets-pela-ui-sem-edita",
+        "title": "cadastro de automation targets pela UI (sem editar arbites.yaml na mao): novo card em Automacao com formulario (nome, caminho, python, working dir, timeout, features_glob) e PUT /targets substituindo a lista inteira (mesmo padrao de PUT /ai/providers); ao digitar o caminho do repo, botao Buscar arquivos .feature chama novo GET /automation/browse-features que escaneia o filesystem e devolve a lista real para o usuario selecionar (inclusive restringir a um arquivo especifico), antes mesmo do target existir",
+        "path": ".doctrina/changes/archive/2026-07-10-0043-cadastro-de-automation-targets-pela-ui-sem-edita",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -788,6 +814,12 @@
         "id": "botao-como-item-de-lista-heranca-justify",
         "path": ".doctrina/skills/botao-como-item-de-lista-heranca-justify.md",
         "description": "Um <button> reestilizado como item de lista/linha herda justify-content:center do estilo base de button — o conteúdo aparece centralizado; sobrescreva para flex-start.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "campos-de-referencia-com-autocomplete",
+        "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
+        "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
         "last_updated": "2026-07-10"
       },
       {
@@ -833,9 +865,21 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "modal-fechar-duplicado-x-e-footer",
+        "path": ".doctrina/skills/modal-fechar-duplicado-x-e-footer.md",
+        "description": "Um componente Modal com X no header E um footer sempre-presente com botão \"Fechar\" mostra dois controles de fechar redundantes. Torne o footer opcional e, para modais só de leitura/edição-inline, feche só pelo X.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "modelo-de-raciocinio-content-vazio",
         "path": ".doctrina/skills/modelo-de-raciocinio-content-vazio.md",
         "description": "Modelos de raciocínio (glm-4.7-flash, qwen-thinking) via LM Studio devolvem o pensamento em reasoning_content e podem deixar content vazio; timeouts curtos os matam no meio e prompts ambíguos os fazem entrar em loop.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "mover-pasta-inteira-confirmar-se-tem-filhos",
+        "path": ".doctrina/skills/mover-pasta-inteira-confirmar-se-tem-filhos.md",
+        "description": "Ao permitir arrastar/mover uma pasta inteira (não só um item) numa árvore, distinga o tipo do item arrastado (item vs container), bloqueie soltar um container nele mesmo/numa descendente, e confirme antes de mover se o container tiver filhos que \"vão junto\" sem o usuário ter escolhido cada um.",
         "last_updated": "2026-07-10"
       },
       {
@@ -869,27 +913,27 @@
         "last_updated": "2026-07-10"
       },
       {
-        "id": "truncar-titulo-em-card",
-        "path": ".doctrina/skills/truncar-titulo-em-card.md",
-        "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
-        "last_updated": "2026-07-10"
-      },
-      {
-        "id": "modal-fechar-duplicado-x-e-footer",
-        "path": ".doctrina/skills/modal-fechar-duplicado-x-e-footer.md",
-        "description": "Um componente Modal com X no header E um footer sempre-presente com botão \"Fechar\" mostra dois controles de fechar redundantes. Torne o footer opcional e, para modais só de leitura/edição-inline, feche só pelo X.",
-        "last_updated": "2026-07-10"
-      },
-      {
         "id": "salvar-manual-feedback-e-reset-por-id",
         "path": ".doctrina/skills/salvar-manual-feedback-e-reset-por-id.md",
         "description": "Botão de salvar manual sem estado de dirty/saving/saved parece \"não funcionar\" (salva mas nada muda na tela); e um efeito que reseta o campo a partir do valor do servidor (não do id do registro) reescreve o que o usuário digita quando há refresh de fundo.",
         "last_updated": "2026-07-10"
       },
       {
-        "id": "campos-de-referencia-com-autocomplete",
-        "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
-        "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
+        "id": "truncar-titulo-em-card",
+        "path": ".doctrina/skills/truncar-titulo-em-card.md",
+        "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "watcher-vs-handler-mesma-rajada-database-locked",
+        "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
+        "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "descobrir-em-vez-de-digitar-config-de-caminho-externo",
+        "path": ".doctrina/skills/descobrir-em-vez-de-digitar-config-de-caminho-externo.md",
+        "description": "Quando um formulário de config pede um caminho externo (pasta/glob de outro repositório) que o usuário não decora, ofereça um botão que ESCANEIA o filesystem de verdade e devolve a lista real para escolher — não deixe o usuário digitar um padrão às cegas.",
         "last_updated": "2026-07-10"
       }
     ],

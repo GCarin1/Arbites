@@ -7,8 +7,17 @@ interface Target {
   kind: string;
   local_path: string | null;
   features_glob: string | null;
+  python_path: string | null;
+  working_dir: string | null;
+  timeout_minutes: number | null;
   scenarios: number;
   queue_length: number;
+}
+
+interface FoundFeature {
+  path: string;
+  scenarios: number;
+  parseable: boolean;
 }
 
 interface RunSnapshot {
@@ -142,51 +151,7 @@ export function Automation({
         <h1 className="page-title">Automação</h1>
       </div>
 
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-head">
-          <h3>Targets</h3>
-          <span className="spacer" />
-          <span className="caption">{targets.length} configurado(s)</span>
-        </div>
-        <div className="table-wrap">
-          <table className="dense">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Runner</th>
-                <th>Repo</th>
-                <th>Cenários</th>
-                <th>Fila</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {targets.map((target) => (
-                <tr key={target.name}>
-                  <td className="mono">{target.name}</td>
-                  <td>{target.kind}</td>
-                  <td className="mono muted">{target.local_path}</td>
-                  <td>{target.scenarios}</td>
-                  <td>{target.queue_length}</td>
-                  <td>
-                    <button className="btn-sm" onClick={() => void scan(target.name)}>
-                      Re-scan
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {targets.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="muted">
-                    Nenhum target configurado — adicione em arbites.yaml
-                    (automation_targets).
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <TargetsCard targets={targets} onScan={scan} onSaved={loadTargets} onError={onError} />
 
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-head">
@@ -288,6 +253,335 @@ interface CIStatus {
     steps: { name: string; status: string; conclusion: string | null }[];
   }[];
   poll_interval_seconds: number;
+}
+
+// ------------------------------------------------------------ targets CRUD
+
+const DEFAULT_GLOB = "features/**/*.feature";
+
+function emptyTarget(): Target {
+  return {
+    name: "",
+    kind: "behave",
+    local_path: "",
+    features_glob: DEFAULT_GLOB,
+    python_path: null,
+    working_dir: null,
+    timeout_minutes: null,
+    scenarios: 0,
+    queue_length: 0,
+  };
+}
+
+/**
+ * CRUD de targets direto na UI — evita ter que abrir o arbites.yaml na mão.
+ * "Adicionar/atualizar na lista" faz staging local; "Salvar configuração"
+ * grava tudo de uma vez (PUT /targets), igual ao padrão de Providers de IA.
+ */
+function TargetsCard({
+  targets,
+  onScan,
+  onSaved,
+  onError,
+}: {
+  targets: Target[];
+  onScan: (name: string) => void;
+  onSaved: () => void;
+  onError: (message: string) => void;
+}) {
+  const [staged, setStaged] = useState<Target[]>(targets);
+  const [saving, setSaving] = useState(false);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [form, setForm] = useState<Target>(emptyTarget());
+  const [timeoutText, setTimeoutText] = useState("");
+  const [browsing, setBrowsing] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
+  const [found, setFound] = useState<FoundFeature[] | null>(null);
+
+  useEffect(() => {
+    setStaged(targets);
+  }, [targets]);
+
+  function resetForm() {
+    setEditingName(null);
+    setForm(emptyTarget());
+    setTimeoutText("");
+    setFound(null);
+    setBrowseError(null);
+  }
+
+  function editTarget(t: Target) {
+    setEditingName(t.name);
+    setForm({ ...t });
+    setTimeoutText(t.timeout_minutes != null ? String(t.timeout_minutes) : "");
+    setFound(null);
+    setBrowseError(null);
+  }
+
+  function currentDraft(): Target | null {
+    if (!form.name.trim() || !form.local_path?.trim()) return null;
+    return {
+      ...form,
+      name: form.name.trim(),
+      local_path: form.local_path.trim(),
+      features_glob: form.features_glob?.trim() || DEFAULT_GLOB,
+      python_path: form.python_path?.trim() || null,
+      working_dir: form.working_dir?.trim() || null,
+      timeout_minutes: timeoutText.trim() ? Number(timeoutText) : null,
+    };
+  }
+
+  function stageTarget() {
+    const draft = currentDraft();
+    if (!draft) return;
+    setStaged((old) => [...old.filter((x) => x.name !== draft.name), draft]);
+    resetForm();
+  }
+
+  function removeTarget(name: string) {
+    setStaged((old) => old.filter((x) => x.name !== name));
+  }
+
+  async function browse() {
+    const localPath = form.local_path?.trim();
+    if (!localPath) return;
+    setBrowsing(true);
+    setBrowseError(null);
+    try {
+      const params = new URLSearchParams({
+        local_path: localPath,
+        features_glob: form.features_glob?.trim() || DEFAULT_GLOB,
+      });
+      const data = await json<{ features: FoundFeature[] }>(
+        `${BASE}/automation/browse-features?${params.toString()}`,
+      );
+      setFound(data.features);
+    } catch (e) {
+      setFound(null);
+      setBrowseError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBrowsing(false);
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    // inclui o que está no formulário mesmo sem "adicionar à lista" antes —
+    // senão o usuário preenche, salva e nada persiste (mesmo cuidado do
+    // form de providers de IA).
+    const draft = currentDraft();
+    const effStaged = draft
+      ? [...staged.filter((x) => x.name !== draft.name), draft]
+      : staged;
+    try {
+      await json(`${BASE}/targets`, {
+        method: "PUT",
+        body: JSON.stringify({
+          targets: effStaged.map((t) => ({
+            name: t.name,
+            kind: t.kind,
+            local_path: t.local_path,
+            features_glob: t.features_glob,
+            python_path: t.python_path,
+            working_dir: t.working_dir,
+            timeout_minutes: t.timeout_minutes,
+          })),
+        }),
+      });
+      resetForm();
+      onSaved();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card-head">
+        <h3>Targets</h3>
+        <span className="spacer" />
+        <span className="caption">{staged.length} configurado(s)</span>
+      </div>
+
+      {staged.length > 0 ? (
+        <div className="table-wrap" style={{ marginBottom: 16 }}>
+          <table className="dense">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Runner</th>
+                <th>Repo</th>
+                <th>Cenários</th>
+                <th>Fila</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {staged.map((target) => (
+                <tr key={target.name}>
+                  <td className="mono">{target.name}</td>
+                  <td>{target.kind}</td>
+                  <td className="mono muted">{target.local_path}</td>
+                  <td>{target.scenarios}</td>
+                  <td>{target.queue_length}</td>
+                  <td className="repo-actions">
+                    <button className="btn-sm" onClick={() => void onScan(target.name)}>
+                      Re-scan
+                    </button>
+                    <button className="btn-sm" onClick={() => editTarget(target)}>
+                      Editar
+                    </button>
+                    <button className="btn-sm danger" onClick={() => removeTarget(target.name)}>
+                      Remover
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="muted" style={{ marginBottom: 16 }}>
+          Nenhum target configurado ainda — preencha abaixo para adicionar um
+          (sem precisar editar o arbites.yaml na mão).
+        </p>
+      )}
+
+      <h4 className="section-title" style={{ marginTop: 0 }}>
+        {editingName ? `Editando "${editingName}"` : "Adicionar target"}
+      </h4>
+      <div className="field-grid">
+        <div className="field col-6">
+          <label>Nome</label>
+          <input
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="ex.: frontend-web"
+          />
+        </div>
+        <div className="field col-6">
+          <label>Timeout (minutos, opcional)</label>
+          <input
+            className="mono"
+            value={timeoutText}
+            onChange={(e) => setTimeoutText(e.target.value)}
+            placeholder="30"
+          />
+        </div>
+        <div className="field wide">
+          <label>Caminho do repositório de automação</label>
+          <div className="toolbar" style={{ margin: 0, gap: 6 }}>
+            <input
+              className="mono"
+              style={{ flex: 1 }}
+              value={form.local_path ?? ""}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, local_path: e.target.value }));
+                setFound(null);
+              }}
+              placeholder="C:/caminho/para/o/repo-de-automacao"
+            />
+            <button
+              type="button"
+              onClick={() => void browse()}
+              disabled={!form.local_path?.trim() || browsing}
+            >
+              {browsing ? "Buscando…" : "Buscar arquivos .feature"}
+            </button>
+          </div>
+        </div>
+        <div className="field wide">
+          <label>Padrão de arquivos .feature (avançado)</label>
+          <input
+            className="mono"
+            value={form.features_glob ?? ""}
+            onChange={(e) => {
+              setForm((f) => ({ ...f, features_glob: e.target.value }));
+              setFound(null);
+            }}
+          />
+          <span className="caption muted">
+            Deixe como está para incluir todos os cenários; use "Buscar" abaixo
+            para restringir a um arquivo específico.
+          </span>
+        </div>
+        <div className="field">
+          <label>Python (venv, opcional)</label>
+          <input
+            className="mono"
+            value={form.python_path ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, python_path: e.target.value }))}
+            placeholder="C:/repo/.venv/Scripts/python.exe"
+          />
+        </div>
+        <div className="field">
+          <label>Diretório de trabalho (opcional)</label>
+          <input
+            className="mono"
+            value={form.working_dir ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, working_dir: e.target.value }))}
+            placeholder="vazio = usa o caminho do repositório"
+          />
+        </div>
+      </div>
+
+      {browseError && (
+        <p className="caption" style={{ color: "var(--danger)" }}>
+          {browseError}
+        </p>
+      )}
+
+      {found && (
+        <div className="modal-field">
+          <label>
+            {found.length === 0
+              ? "Nenhum arquivo .feature encontrado com esse padrão."
+              : `${found.length} arquivo(s) .feature encontrado(s):`}
+          </label>
+          {found.map((f) => (
+            <div key={f.path} className="step-row">
+              <span className="mono" style={{ flex: 1 }}>
+                {f.path}
+              </span>
+              <span className="muted caption">
+                {f.parseable ? `${f.scenarios} cenário(s)` : "não parseável"}
+              </span>
+              <button
+                className="btn-sm"
+                onClick={() => setForm((old) => ({ ...old, features_glob: f.path }))}
+              >
+                Usar só este
+              </button>
+            </div>
+          ))}
+          {found.length > 0 && (
+            <button
+              className="btn-sm"
+              onClick={() => setForm((old) => ({ ...old, features_glob: DEFAULT_GLOB }))}
+            >
+              Usar todos (padrão)
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="toolbar">
+        <button
+          onClick={stageTarget}
+          disabled={!form.name.trim() || !form.local_path?.trim()}
+        >
+          {editingName ? "Atualizar na lista" : "Adicionar à lista"}
+        </button>
+        {editingName && <button onClick={resetForm}>Cancelar edição</button>}
+        <span className="spacer" />
+        <button className="primary" onClick={() => void save()} disabled={saving}>
+          {saving ? "Salvando…" : "Salvar configuração"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function CIPanel({

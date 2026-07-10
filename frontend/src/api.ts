@@ -97,6 +97,11 @@ export const api = {
     request<void>(`/testcases/folders?path=${encodeURIComponent(path)}`, {
       method: "DELETE",
     }),
+  moveTcFolder: (path: string, dest: string) =>
+    request<{ path: string }>("/testcases/folders/move", {
+      method: "POST",
+      body: JSON.stringify({ path, dest }),
+    }),
   putTestcaseRaw: (id: string, content: string) =>
     request<TestCase>(`/testcases/${id}/raw`, {
       method: "PUT",
