@@ -297,9 +297,9 @@ textarea.raw {
   flex-direction: column;
   gap: 2px;
   padding: var(--s1);
-  border-bottom: 1px solid var(--border);
   overflow-y: auto;
-  max-height: 60vh;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Grupos semânticos do menu (colapsáveis) */
@@ -414,18 +414,6 @@ button.nav-group-title:hover {
   color: var(--text);
 }
 
-.sidebar .panel {
-  overflow-y: auto;
-  flex: 1;
-  padding: var(--s1);
-  min-height: 0;
-}
-.sidebar .panel-hint {
-  color: var(--text-muted);
-  font-size: var(--fs-caption);
-  padding: var(--s1);
-  line-height: 1.5;
-}
 .sidebar .actions {
   padding: var(--s1);
   border-top: 1px solid var(--border);
