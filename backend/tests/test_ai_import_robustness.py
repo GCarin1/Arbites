@@ -17,6 +17,7 @@ from arbites.ai import (
     ImportConversion,
     OpenAICompatible,
     _example_from_model,
+    _salvage_import,
     convert_import,
 )
 
@@ -52,10 +53,11 @@ def _provider(handler):
     )
 
 
-def _chat_response(content: str) -> httpx.Response:
-    return httpx.Response(
-        200, json={"choices": [{"message": {"content": content}}]}
-    )
+def _chat_response(content: str, reasoning: str | None = None) -> httpx.Response:
+    message: dict = {"content": content}
+    if reasoning is not None:
+        message["reasoning_content"] = reasoning
+    return httpx.Response(200, json={"choices": [{"message": message}]})
 
 
 def test_example_from_model_is_compact_not_json_schema():
@@ -109,6 +111,51 @@ def test_json_mode_sent_and_falls_back_when_unsupported():
     result = convert_import(_provider(handler), "f.txt", "x")
     assert isinstance(result, ImportConversion)
     assert seen["with_rf"] == 1 and seen["without_rf"] == 1  # tentou json_mode e caiu no fallback
+
+
+def test_reasoning_content_used_when_content_empty():
+    # glm-4.7-flash: content vazio, JSON acabou saindo no reasoning_content.
+    reasoning = (
+        "Vou analisar o schema e extrair os casos.\n"
+        f"Resultado: {json.dumps(DATA, ensure_ascii=False)}"
+    )
+    result = _provider(
+        lambda req: _chat_response("", reasoning=reasoning)
+    ).complete("sys", "user", ImportConversion)
+    assert isinstance(result, ImportConversion)
+    assert result.testcases[0].title == "CT01 login válido"
+
+
+def test_salvages_complete_testcases_from_truncated_output():
+    # geração cortada por timeout: objeto externo não fecha, CT03 vem pela metade.
+    truncated = (
+        '{"folder": "google_search", "testcases": [\n'
+        '  {"title": "CT01", "passos": ["p1"], "resultado_esperado": "r1"},\n'
+        '  {"title": "CT02", "passos": ["p2"], "resultado_esperado": "r2"},\n'
+        '  {"title": "CT03", "passos": ["p3"], "pre_condicoes": ["o usuário acessa a página inicial'
+    )
+    result = _provider(lambda req: _chat_response(truncated)).complete(
+        "sys", "user", ImportConversion, salvage=_salvage_import,
+    )
+    assert isinstance(result, ImportConversion)
+    # recupera os dois CTs inteiros e a pasta do cabeçalho, descarta o truncado.
+    assert [tc.title for tc in result.testcases] == ["CT01", "CT02"]
+    assert result.folder == "google_search"
+
+
+def test_convert_import_salvages_end_to_end():
+    from arbites.ai import convert_import
+
+    truncated = (
+        '{"folder": "login", "testcases": [\n'
+        '  {"title": "CT01 ok", "pre_condicoes": ["cadastrado"], "passos": ["abrir"], "resultado_esperado": "dashboard"},\n'
+        '  {"title": "CT02 inv'
+    )
+    result = convert_import(
+        _provider(lambda req: _chat_response(truncated)), "casos.txt", "x"
+    )
+    assert result.folder == "login"
+    assert [tc.title for tc in result.testcases] == ["CT01 ok"]
 
 
 def test_no_valid_json_raises_clear_error():

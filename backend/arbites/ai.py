@@ -174,6 +174,48 @@ def _balanced_objects(text: str) -> list[Any]:
     return out
 
 
+def _all_objects(text: str) -> list[Any]:
+    """Todo objeto `{…}` que faz parse, EM QUALQUER nível (inclusive aninhados).
+
+    Diferente de `_balanced_objects`, não pula o conteúdo de um objeto: assim,
+    quando o objeto externo vem truncado (geração cortada por timeout), ainda
+    recupera os objetos internos completos — ex.: os CTs que já saíram inteiros.
+    """
+    out: list[Any] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "{":
+            i += 1
+            continue
+        depth = 0
+        in_str = esc = False
+        j = i
+        while j < n:
+            c = text[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        out.append(json.loads(text[i : j + 1]))
+                    except ValueError:
+                        pass
+                    break
+            j += 1
+        i += 1  # avança 1 (não pula o objeto) p/ também achar os aninhados
+    return out
+
+
 def _json_candidates(text: str) -> list[Any]:
     """Objetos JSON candidatos, priorizando blocos cercados e a resposta final.
 
@@ -244,7 +286,9 @@ class _BaseProvider:
         self.transport = transport
 
     def _client(self) -> httpx.Client:
-        return httpx.Client(timeout=120, transport=self.transport)
+        # modelos locais de raciocínio (glm/qwen) podem levar minutos p/ um
+        # documento longo — timeout curto derruba a geração no meio.
+        return httpx.Client(timeout=300, transport=self.transport)
 
     def _post(self, url: str, headers: dict, payload: dict) -> dict:
         with self._client() as client:
@@ -260,8 +304,14 @@ class _BaseProvider:
                       json_mode: bool = False) -> str:
         raise NotImplementedError
 
-    def complete(self, system: str, user: str,
-                 schema: type[BaseModel] | None = None) -> str | BaseModel:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        schema: type[BaseModel] | None = None,
+        *,
+        salvage: "typing.Callable[[str], BaseModel | None] | None" = None,
+    ) -> str | BaseModel:
         if schema is not None:
             example = json.dumps(_example_from_model(schema), ensure_ascii=False)
             system = (
@@ -281,6 +331,12 @@ class _BaseProvider:
                 return schema.model_validate(cand)
             except ValidationError as exc:
                 last_err = exc
+        # Nenhum objeto completo validou. Se houver salvamento parcial (ex.: a
+        # geração foi cortada no meio), tenta recuperar o que já saiu inteiro.
+        if salvage is not None:
+            recovered = salvage(text)
+            if recovered is not None:
+                return recovered
         if last_err is None:
             raise AIProviderError("invalid_output", "resposta sem JSON", 422)
         raise AIProviderError(
@@ -326,11 +382,18 @@ class OpenAICompatible(_BaseProvider):
             payload.pop("response_format", None)
             data = self._post(url, headers, payload)
         try:
-            return data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
         except (KeyError, IndexError) as exc:
             raise AIProviderError(
                 "provider_error", f"{self.name}: resposta sem choices"
             ) from exc
+        content = message.get("content") or ""
+        # modelos de raciocínio (glm-4.7-flash) devolvem o pensamento em
+        # `reasoning_content` e às vezes deixam `content` vazio — o JSON útil,
+        # quando existe, pode estar lá; usa como fallback.
+        if not content.strip():
+            content = message.get("reasoning_content") or ""
+        return content
 
 
 class AnthropicProvider(_BaseProvider):
@@ -494,20 +557,59 @@ def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
 # Prompt curto de propósito: a importação precisa rodar bem em modelos de
 # até 9B (doc §1.1 — baixo consumo de tokens, sem exemplos longos).
 _IMPORT_SYSTEM = (
-    "Extraia TODOS os casos de teste do texto (formato livre ou BDD/Gherkin). "
-    "Mapeamento BDD: Given/Dado → pre_condicoes; When/And/Quando → passos; "
-    "Then/Então → resultado_esperado. Um objeto por caso — gere todos (CT01..CTnn), "
-    "nunca abrevie com 'repita para os demais' ou '...'. Sugira 'folder' "
-    "(kebab-case) pelo contexto do arquivo. Não invente casos fora do texto. PT-BR."
+    "Extraia os casos de teste do texto. Cada Scenario/cenário é um caso. "
+    "Regra simples, sem analisar idioma: linha Given/Dado → pre_condicoes; "
+    "linha When/Quando/And/E → passos; linha Then/Então → resultado_esperado. "
+    "Copie o texto da linha SEM a palavra-chave, como está. Gere TODOS os casos, "
+    "um objeto por caso, sem abreviar. 'folder' = nome curto kebab-case pelo "
+    "assunto do arquivo. Não invente casos. PT-BR. Responda só o JSON."
 )
+
+
+def _salvage_import(text: str) -> ImportConversion | None:
+    """Recupera os CTs completos de uma resposta cuja saída foi cortada no meio.
+
+    Quando a geração é truncada (timeout do modelo local), o objeto externo
+    fica sem fechar e não valida — mas os CTs que já saíram inteiros estão lá.
+    Percorre TODO objeto `{…}` (inclusive aninhado), fica com os que têm cara
+    de test case e monta um `ImportConversion` parcial em vez de perder tudo.
+    """
+    clean = _strip_reasoning(text)
+    folder = "importados"
+    testcases: list[GeneratedTestcase] = []
+    for obj in _all_objects(clean):
+        if not isinstance(obj, dict):
+            continue
+        val = obj.get("folder")
+        if isinstance(val, str) and val and "testcases" in obj:
+            folder = val  # objeto externo íntegro traz a pasta
+        if "title" in obj and ("passos" in obj or "resultado_esperado" in obj):
+            try:
+                testcases.append(GeneratedTestcase.model_validate(obj))
+            except ValidationError:
+                continue
+    if not testcases:
+        return None
+    if folder == "importados":
+        # objeto externo truncado (não fechou): recupera a pasta do cabeçalho.
+        head = re.search(r'"folder"\s*:\s*"([^"\\]+)"', clean)
+        if head:
+            folder = head.group(1)
+    return ImportConversion(folder=folder, testcases=testcases)
 
 
 def convert_import(provider: _BaseProvider, filename: str, text: str,
                    max_chars: int = 24000) -> ImportConversion:
-    """Converte um arquivo livre (txt/md/xml) em CTs BDD — preview apenas."""
+    """Converte um arquivo livre (txt/md/xml) em CTs BDD — preview apenas.
+
+    Tolerante a truncamento: se a resposta completa não validar, aproveita os
+    casos que saíram inteiros (`_salvage_import`) em vez de falhar por completo.
+    """
     clipped = text[:max_chars]
     user = f"Arquivo: {filename}\n\n{clipped}"
-    result = provider.complete(_IMPORT_SYSTEM, user, ImportConversion)
+    result = provider.complete(
+        _IMPORT_SYSTEM, user, ImportConversion, salvage=_salvage_import
+    )
     assert isinstance(result, ImportConversion)
     return result
 

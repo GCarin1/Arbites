@@ -15,7 +15,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.4.0",
+        "version": "0.6.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -683,6 +683,32 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0034-importacao-ai-confiavel-com-modelos-de-raciocini",
+        "title": "importacao AI confiavel com modelos de raciocinio (glm-4.7-flash): usar reasoning_content quando content vier vazio, aumentar timeout do cliente HTTP, simplificar prompt de import para nao induzir loop de raciocinio; e no modal de importacao adicionar botao Enviar explicito em vez de submeter no onChange do arquivo",
+        "path": ".doctrina/changes/archive/2026-07-10-0034-importacao-ai-confiavel-com-modelos-de-raciocini",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0035-importacao-ai-tolerante-a-truncamento-quando-a-g",
+        "title": "importacao AI tolerante a truncamento: quando a geracao do modelo local e cortada (timeout) e o JSON externo fica incompleto, recuperar os casos de teste que ja sairam inteiros (_all_objects + _salvage_import) e montar um ImportConversion parcial em vez de falhar sem preview; recuperar folder do cabecalho",
+        "path": ".doctrina/changes/archive/2026-07-10-0035-importacao-ai-tolerante-a-truncamento-quando-a-g",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -723,10 +749,22 @@
         "last_updated": "2026-07-06"
       },
       {
+        "id": "modelo-de-raciocinio-content-vazio",
+        "path": ".doctrina/skills/modelo-de-raciocinio-content-vazio.md",
+        "description": "Modelos de raciocínio (glm-4.7-flash, qwen-thinking) via LM Studio devolvem o pensamento em reasoning_content e podem deixar content vazio; timeouts curtos os matam no meio e prompts ambíguos os fazem entrar em loop.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "rota-estatica-antes-da-dinamica",
         "path": ".doctrina/skills/rota-estatica-antes-da-dinamica.md",
         "description": "No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.",
         "last_updated": "2026-07-09"
+      },
+      {
+        "id": "saida-estruturada-llm-modelo-pequeno",
+        "path": ".doctrina/skills/saida-estruturada-llm-modelo-pequeno.md",
+        "description": "Para saída JSON confiável em modelos locais ≤ 9B, envie um EXEMPLO compacto (não o JSON Schema), ligue response_format json_object com fallback, e extraia o objeto que valida no schema ignorando raciocínio vazado.",
+        "last_updated": "2026-07-10"
       },
       {
         "id": "salvar-inclui-formulario-pendente",
@@ -741,9 +779,9 @@
         "last_updated": "2026-07-10"
       },
       {
-        "id": "saida-estruturada-llm-modelo-pequeno",
-        "path": ".doctrina/skills/saida-estruturada-llm-modelo-pequeno.md",
-        "description": "Para saída JSON confiável em modelos locais ≤ 9B, envie um EXEMPLO compacto (não o JSON Schema), ligue response_format json_object com fallback, e extraia o objeto que valida no schema ignorando raciocínio vazado.",
+        "id": "salvar-json-truncado-de-llm",
+        "path": ".doctrina/skills/salvar-json-truncado-de-llm.md",
+        "description": "Quando a geração de um LLM local é cortada (timeout) no meio de um JSON grande, o objeto externo não fecha e o parse falha — perdendo TUDO. Recupere os objetos internos que já saíram inteiros em vez de retornar erro sem preview.",
         "last_updated": "2026-07-10"
       }
     ],

@@ -332,14 +332,15 @@ function AiImportModal({
   onError: (message: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const [folder, setFolder] = useState("");
   const [items, setItems] = useState<GeneratedTestcase[] | null>(null);
 
-  async function upload(files: FileList | null) {
-    if (!files || files.length === 0) return;
+  async function upload() {
+    if (!file) return;
     setBusy(true);
     try {
-      const data = await api.aiImportFile(files[0]);
+      const data = await api.aiImportFile(file);
       setFolder(data.folder);
       setItems(data.testcases);
     } catch (e) {
@@ -372,8 +373,23 @@ function AiImportModal({
       </p>
       <div className="modal-field">
         <label>Arquivo</label>
-        <input type="file" accept=".txt,.md,.xml" onChange={(e) => void upload(e.target.files)} />
-        {busy && <span className="muted caption">Processando com a IA…</span>}
+        <input
+          type="file"
+          accept=".txt,.md,.xml"
+          disabled={busy}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+        <div className="toolbar" style={{ marginTop: 8 }}>
+          <button className="primary" disabled={!file || busy} onClick={() => void upload()}>
+            {busy ? "Processando com a IA…" : "Enviar"}
+          </button>
+          {file && !busy && <span className="muted caption">{file.name}</span>}
+        </div>
+        {busy && (
+          <span className="muted caption">
+            Modelos locais de raciocínio podem levar alguns minutos.
+          </span>
+        )}
       </div>
 
       {items && (
