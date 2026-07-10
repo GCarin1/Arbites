@@ -126,7 +126,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.6.0",
+        "version": "0.7.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -833,6 +833,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0046-dashboard-automacao-expandir-o-monitoramento-com",
+        "title": "dashboard automacao: expandir o monitoramento com (1) ranking de CTs que mais falham nos runs de automacao, (2) sparkline dos runs recentes por repo, (3) contagem de CTs flaky por repo + lista global de flaky, (4) MTTR (tempo ate voltar ao verde) e quebrado-desde por repo, (5) filtro por ambiente no GET /metrics/automation e dropdown na Dashboard",
+        "path": ".doctrina/changes/archive/2026-07-10-0046-dashboard-automacao-expandir-o-monitoramento-com",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -876,6 +889,12 @@
         "id": "entidade-so-com-crud-encaixado-precisa-de-view-propria",
         "path": ".doctrina/skills/entidade-so-com-crud-encaixado-precisa-de-view-propria.md",
         "description": "Uma entidade com API CRUD completa (GET/POST/PUT) mas cuja UNICA porta de entrada na UI é um modal aninhado dentro de outro fluxo (ex.: \"criar defeito a partir de um resultado de execução\") não tem gerenciamento de verdade — falta listar/editar/excluir fora daquele contexto específico.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "formato-especifico-do-usuario-vira-config-regex",
+        "path": ".doctrina/skills/formato-especifico-do-usuario-vira-config-regex.md",
+        "description": "Quando um recurso depende de um formato de string específico da organização do usuário (nome de run, convenção de branch, padrão de arquivo), NÃO hardcode o formato — extraia com uma regex configurável (grupos nomeados) em arbites.yaml, com um default genérico e degradação graciosa quando nada casa. Mantém o produto white-label.",
         "last_updated": "2026-07-10"
       },
       {
@@ -966,12 +985,6 @@
         "id": "watcher-vs-handler-mesma-rajada-database-locked",
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
-        "last_updated": "2026-07-10"
-      },
-      {
-        "id": "formato-especifico-do-usuario-vira-config-regex",
-        "path": ".doctrina/skills/formato-especifico-do-usuario-vira-config-regex.md",
-        "description": "Quando um recurso depende de um formato de string específico da organização do usuário (nome de run, convenção de branch, padrão de arquivo), NÃO hardcode o formato — extraia com uma regex configurável (grupos nomeados) em arbites.yaml, com um default genérico e degradação graciosa quando nada casa. Mantém o produto white-label.",
         "last_updated": "2026-07-10"
       }
     ],

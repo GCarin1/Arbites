@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-10
-**Version:** 0.6.0
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -55,6 +55,15 @@ export PDF e Markdown (para colar no Confluence).
   pior-primeiro (mais falhas, depois maior taxa de falha), reportar
   passed/failed/pass_rate por repo e por ambiente, e contar em `unparsed` os
   runs cujo nome não casa o padrão (sinal de padrão a ajustar).
+- The system shall enriquecer `GET /metrics/automation` com: os CTs que mais
+  falham nos runs de automação (`top_failing_testcases`, pior-primeiro); por
+  repositório, o histórico recente de desfechos (`recent`, para sparkline), o
+  MTTR em horas (tempo médio até voltar ao verde) e `broken_since` quando o
+  repo segue vermelho, e a contagem de CTs flaky (`flaky`); e a lista global
+  de CTs flaky em automação (`flaky_testcases`).
+- The system shall aceitar o filtro opcional `env` em `GET /metrics/automation`
+  (ambiente extraído do nome), mantendo `envs` com todos os ambientes
+  disponíveis para o seletor mesmo quando filtrado.
 
 ### Event-driven
 
@@ -116,6 +125,11 @@ export PDF e Markdown (para colar no Confluence).
    customizado; regex inválida não derruba a rota (reporta `pattern_error`)
    — verified by `backend/tests/test_automation_report.py`.
 
+9. [verified] `GET /metrics/automation` expõe ranking de CTs que mais falham,
+   sparkline/MTTR/`broken_since`/flaky por repo, lista global de flaky, e o
+   filtro `env` (com `envs` completo) — verified by
+   `backend/tests/test_automation_report.py`.
+
 ## Maturity
 
 **MVP (committed):**
@@ -123,7 +137,8 @@ export PDF e Markdown (para colar no Confluence).
 - 7 métricas, tendência, matriz navegável, export PDF/MD, metas/thresholds
   por métrica (semáforo), painel de defeitos abertos (aging/severidade/squad),
   monitoramento de automação por repositório (pior-primeiro, padrão de nome
-  configurável).
+  configurável, sparkline/MTTR/flaky por repo, CTs que mais falham, filtro de
+  ambiente).
 
 **Future (aspirational, not committed):**
 

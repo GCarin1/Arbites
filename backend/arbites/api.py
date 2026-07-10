@@ -1063,10 +1063,12 @@ def _register_routes(app: FastAPI) -> None:
         return metrics_ops.defects_report(conn_of(request), squad or None)
 
     @app.get(API_PREFIX + "/metrics/automation")
-    async def metrics_automation(request: Request, days: int = 0):
+    async def metrics_automation(request: Request, days: int = 0, env: str = ""):
         ws = ws_of(request)
         pattern = (ws.config().get("ci_monitoring") or {}).get("name_pattern")
-        return metrics_ops.automation_report(conn_of(request), pattern, days or None)
+        return metrics_ops.automation_report(
+            conn_of(request), pattern, days or None, env or None
+        )
 
     @app.get(API_PREFIX + "/metrics/traceability")
     async def metrics_traceability(

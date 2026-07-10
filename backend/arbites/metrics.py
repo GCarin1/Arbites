@@ -472,18 +472,45 @@ def _run_outcome(passed: int, failed: int, blocked: int, total: int) -> str:
     return "partial"  # parte passou, resto pendente/in_progress
 
 
+def _mttr_and_broken(runs: list[dict]) -> tuple[float | None, str | None]:
+    """MTTR (horas) e desde-quando-quebrado de uma sequência de runs (asc).
+
+    "Verde" = `passed`; qualquer outro desfecho mantém o repo vermelho. Um
+    incidente começa no 1º run não-verde após um verde (ou no início) e fecha
+    no próximo verde; MTTR = média das durações fechadas. Se a série termina
+    vermelha, `broken_since` = início do incidente aberto.
+    """
+    durations: list[float] = []
+    fail_start: str | None = None
+    for run in runs:
+        green = run["outcome"] == "passed"
+        if not green and fail_start is None:
+            fail_start = run["at"]
+        elif green and fail_start is not None:
+            try:
+                delta = datetime.fromisoformat(run["at"]) - datetime.fromisoformat(fail_start)
+                durations.append(delta.total_seconds())
+            except (ValueError, TypeError):
+                pass
+            fail_start = None
+    mttr_hours = round(sum(durations) / len(durations) / 3600, 2) if durations else None
+    return mttr_hours, fail_start
+
+
 def automation_report(
     conn: sqlite3.Connection,
     name_pattern: str | None = None,
     days: int | None = None,
+    env: str | None = None,
 ) -> dict:
     """Monitoramento das execuções de automação agrupado por REPOSITÓRIO.
 
     Cada execução não-manual (github_actions/local_run) é um run; o repo/env
     saem do `name` pelo `name_pattern` (regex com grupos nomeados). Agrega por
-    repo com pior-primeiro (mais falhas) para responder "quais repos falham
-    mais". Runs cujo nome não casa o padrão contam em `unparsed` (sinal de que
-    o padrão precisa de ajuste) e não entram no ranking.
+    repo com pior-primeiro (mais falhas), com sparkline dos runs recentes,
+    MTTR (tempo até voltar ao verde) e nº de CTs flaky por repo; e no topo
+    lista os CTs que mais falham e os flaky. `env` (opcional) filtra por
+    ambiente. Runs cujo nome não casa o padrão contam em `unparsed`.
     """
     raw_pattern = name_pattern or DEFAULT_CI_NAME_PATTERN
     pattern_error = None
@@ -493,32 +520,43 @@ def automation_report(
         pattern_error = str(exc)
         pattern = re.compile(DEFAULT_CI_NAME_PATTERN)
 
-    sql = (
+    def parse(name: str | None) -> tuple[str, str | None] | None:
+        m = pattern.match(name or "")
+        if not m or "repo" not in m.groupdict() or not m.group("repo"):
+            return None
+        return m.group("repo"), m.groupdict().get("env")
+
+    cutoff = _cutoff(days)
+    where = " WHERE e.origin != 'manual'"
+    params: list[Any] = []
+    if cutoff:
+        where += " AND e.created_at >= ?"
+        params.append(cutoff)
+
+    # --- Query A: por RUN (desfecho, ranking por repo, sparkline, MTTR) ------
+    run_sql = (
         "SELECT e.id, e.name, e.created_at,"
         " SUM(CASE WHEN r.status='passed' THEN 1 ELSE 0 END) passed,"
         " SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) failed,"
         " SUM(CASE WHEN r.status='blocked' THEN 1 ELSE 0 END) blocked,"
         " COUNT(r.testcase_id) total"
         " FROM executions e LEFT JOIN results r ON r.execution_id = e.id"
-        " WHERE e.origin != 'manual'"
+        + where + " GROUP BY e.id ORDER BY e.created_at ASC"  # asc → último = last
     )
-    params: list[Any] = []
-    cutoff = _cutoff(days)
-    if cutoff:
-        sql += " AND e.created_at >= ?"
-        params.append(cutoff)
-    sql += " GROUP BY e.id ORDER BY e.created_at ASC"  # asc → o último vira "last"
-
     repos: dict[str, dict] = {}
-    envs: dict[str, dict] = {}
+    env_agg: dict[str, dict] = {}
+    all_envs: set[str] = set()
     total_runs = passed_runs = failed_runs = unparsed = 0
-    for row in conn.execute(sql, params):
-        m = pattern.match(row["name"] or "")
-        if not m or "repo" not in m.groupdict() or not m.group("repo"):
+    for row in conn.execute(run_sql, params):
+        parsed = parse(row["name"])
+        if parsed is None:
             unparsed += 1
             continue
-        repo = m.group("repo")
-        env = m.groupdict().get("env")
+        repo, run_env = parsed
+        if run_env:
+            all_envs.add(run_env)
+        if env and run_env != env:  # filtro de ambiente
+            continue
         outcome = _run_outcome(
             row["passed"] or 0, row["failed"] or 0, row["blocked"] or 0, row["total"] or 0
         )
@@ -529,46 +567,113 @@ def automation_report(
         agg = repos.setdefault(
             repo,
             {"repo": repo, "runs": 0, "passed": 0, "failed": 0, "other": 0,
-             "envs": set(), "last_run_at": None, "last_outcome": None},
+             "envs": set(), "series": []},
         )
         agg["runs"] += 1
         agg["passed"] += outcome == "passed"
         agg["failed"] += outcome == "failed"
         agg["other"] += outcome not in ("passed", "failed")
-        if env:
-            agg["envs"].add(env)
-        agg["last_run_at"] = row["created_at"]  # asc → última linha ganha
-        agg["last_outcome"] = outcome
+        if run_env:
+            agg["envs"].add(run_env)
+        agg["series"].append({"at": row["created_at"], "outcome": outcome})
 
-        if env:
-            ea = envs.setdefault(env, {"env": env, "runs": 0, "failed": 0})
+        if run_env:
+            ea = env_agg.setdefault(run_env, {"env": run_env, "runs": 0, "failed": 0})
             ea["runs"] += 1
             ea["failed"] += outcome == "failed"
 
-    by_repo = [
-        {
-            "repo": a["repo"],
-            "runs": a["runs"],
-            "passed": a["passed"],
-            "failed": a["failed"],
-            "other": a["other"],
-            "pass_rate": _ratio(a["passed"], a["passed"] + a["failed"]),
-            "failure_rate": _ratio(a["failed"], a["runs"]),
-            "envs": sorted(a["envs"]),
-            "last_run_at": a["last_run_at"],
-            "last_outcome": a["last_outcome"],
-        }
-        for a in repos.values()
-    ]
-    # pior primeiro: mais falhas, depois maior taxa de falha, depois mais runs
-    by_repo.sort(
-        key=lambda x: (x["failed"], x["failure_rate"] or 0, x["runs"]), reverse=True
+    # --- Query B: por RESULTADO (CTs que mais falham + flaky por repo) -------
+    res_sql = (
+        "SELECT e.name, r.testcase_id, r.status, t.title"
+        " FROM results r JOIN executions e ON e.id = r.execution_id"
+        " LEFT JOIN testcases t ON t.id = r.testcase_id" + where
     )
+    ct_stats: dict[str, dict] = {}
+    repo_ct_status: dict[str, dict[str, set]] = {}  # repo -> ct -> {statuses}
+    for row in conn.execute(res_sql, params):
+        parsed = parse(row["name"])
+        if parsed is None:
+            continue
+        repo, run_env = parsed
+        if env and run_env != env:
+            continue
+        ct = row["testcase_id"]
+        status = row["status"]
+        cs = ct_stats.setdefault(
+            ct, {"testcase_id": ct, "title": row["title"], "failed": 0, "final": 0, "repos": set()}
+        )
+        cs["repos"].add(repo)
+        if status in ("passed", "failed"):
+            cs["final"] += 1
+            cs["failed"] += status == "failed"
+        repo_ct_status.setdefault(repo, {}).setdefault(ct, set()).add(status)
+
+    # flaky por repo = CTs que passaram E falharam dentro dos runs daquele repo
+    repo_flaky: dict[str, int] = {}
+    flaky_ct: dict[str, set] = {}  # ct -> repos onde é flaky
+    for repo, cts in repo_ct_status.items():
+        for ct, statuses in cts.items():
+            if "passed" in statuses and "failed" in statuses:
+                repo_flaky[repo] = repo_flaky.get(repo, 0) + 1
+                flaky_ct.setdefault(ct, set()).add(repo)
+
+    by_repo = []
+    for a in repos.values():
+        mttr, broken_since = _mttr_and_broken(a["series"])
+        by_repo.append(
+            {
+                "repo": a["repo"],
+                "runs": a["runs"],
+                "passed": a["passed"],
+                "failed": a["failed"],
+                "other": a["other"],
+                "pass_rate": _ratio(a["passed"], a["passed"] + a["failed"]),
+                "failure_rate": _ratio(a["failed"], a["runs"]),
+                "envs": sorted(a["envs"]),
+                "last_run_at": a["series"][-1]["at"] if a["series"] else None,
+                "last_outcome": a["series"][-1]["outcome"] if a["series"] else None,
+                "recent": a["series"][-12:],  # sparkline dos últimos runs
+                "mttr_hours": mttr,
+                "broken_since": broken_since,
+                "flaky": repo_flaky.get(a["repo"], 0),
+            }
+        )
+    by_repo.sort(key=lambda x: (x["failed"], x["failure_rate"] or 0, x["runs"]), reverse=True)
+
+    top_failing = sorted(
+        (
+            {
+                "testcase_id": c["testcase_id"],
+                "title": c["title"],
+                "failed": c["failed"],
+                "runs": c["final"],
+                "failure_rate": _ratio(c["failed"], c["final"]),
+                "repos": sorted(c["repos"]),
+            }
+            for c in ct_stats.values()
+            if c["failed"] > 0
+        ),
+        key=lambda x: (x["failed"], x["failure_rate"] or 0),
+        reverse=True,
+    )[:10]
+
+    flaky_testcases = sorted(
+        (
+            {
+                "testcase_id": ct,
+                "title": ct_stats.get(ct, {}).get("title"),
+                "repos": sorted(reps),
+            }
+            for ct, reps in flaky_ct.items()
+        ),
+        key=lambda x: x["testcase_id"],
+    )
+
     by_env = sorted(
         (
             {"env": e["env"], "runs": e["runs"], "failed": e["failed"],
              "failure_rate": _ratio(e["failed"], e["runs"])}
-            for e in envs.values()
+            for e in env_agg.values()
         ),
         key=lambda x: (x["failed"], x["failure_rate"] or 0),
         reverse=True,
@@ -580,6 +685,10 @@ def automation_report(
         "pass_rate": _ratio(passed_runs, passed_runs + failed_runs),
         "by_repo": by_repo,
         "by_env": by_env,
+        "envs": sorted(all_envs),
+        "env_filter": env,
+        "top_failing_testcases": top_failing,
+        "flaky_testcases": flaky_testcases,
         "unparsed": unparsed,
         "pattern": raw_pattern,
         "pattern_error": pattern_error,

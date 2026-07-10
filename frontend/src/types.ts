@@ -282,6 +282,19 @@ export interface AutomationRepoRow {
   envs: string[];
   last_run_at: string | null;
   last_outcome: string | null;
+  recent: { at: string; outcome: string }[];
+  mttr_hours: number | null;
+  broken_since: string | null;
+  flaky: number;
+}
+
+export interface AutomationFailingCt {
+  testcase_id: string;
+  title: string | null;
+  failed: number;
+  runs: number;
+  failure_rate: number | null;
+  repos: string[];
 }
 
 export interface AutomationReport {
@@ -291,6 +304,10 @@ export interface AutomationReport {
   pass_rate: number | null;
   by_repo: AutomationRepoRow[];
   by_env: { env: string; runs: number; failed: number; failure_rate: number | null }[];
+  envs: string[];
+  env_filter: string | null;
+  top_failing_testcases: AutomationFailingCt[];
+  flaky_testcases: { testcase_id: string; title: string | null; repos: string[] }[];
   unparsed: number;
   pattern: string;
   pattern_error: string | null;

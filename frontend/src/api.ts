@@ -222,8 +222,10 @@ export const api = {
     request<FlakyReport>(`/metrics/flaky?window=${window}`),
   metricsDefects: (squad = "") =>
     request<DefectsReport>(`/metrics/defects?squad=${encodeURIComponent(squad)}`),
-  metricsAutomation: (days = 0) =>
-    request<AutomationReport>(`/metrics/automation?days=${days}`),
+  metricsAutomation: (days = 0, env = "") =>
+    request<AutomationReport>(
+      `/metrics/automation?days=${days}&env=${encodeURIComponent(env)}`,
+    ),
   traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +
