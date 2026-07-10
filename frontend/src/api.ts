@@ -1,5 +1,7 @@
 import type {
+  ActivityHeatmapData,
   AiProvidersInfo,
+  AutomationReport,
   DailyContext,
   DailyDigestResult,
   Defect,
@@ -75,6 +77,33 @@ export const api = {
   deleteTestcase: (id: string) =>
     request<void>(`/testcases/${id}`, { method: "DELETE" }),
   testcaseRaw: (id: string) => request<string>(`/testcases/${id}/raw`),
+  moveTestcase: (id: string, folder: string) =>
+    request<TestCase>(`/testcases/${id}/move`, {
+      method: "POST",
+      body: JSON.stringify({ folder }),
+    }),
+  aiImportFile: async (file: File): Promise<GeneratePreview & { folder: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch(`${BASE}/import/ai`, { method: "POST", body: form });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error?.message ?? `${resp.status}`);
+    return data;
+  },
+  createTcFolder: (path: string) =>
+    request<{ path: string }>("/testcases/folders", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
+  deleteTcFolder: (path: string) =>
+    request<void>(`/testcases/folders?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    }),
+  moveTcFolder: (path: string, dest: string) =>
+    request<{ path: string }>("/testcases/folders/move", {
+      method: "POST",
+      body: JSON.stringify({ path, dest }),
+    }),
   putTestcaseRaw: (id: string, content: string) =>
     request<TestCase>(`/testcases/${id}/raw`, {
       method: "PUT",
@@ -118,12 +147,25 @@ export const api = {
     request<Execution>(`/executions/${execId}/results/${ctId}/evidences/${index}`, {
       method: "DELETE",
     }),
+  linkDefect: (execId: string, ctId: string, defectId: string) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/defects`, {
+      method: "POST",
+      body: JSON.stringify({ defect_id: defectId }),
+    }),
+  unlinkDefect: (execId: string, ctId: string, defectId: string) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/defects/${defectId}`, {
+      method: "DELETE",
+    }),
   closeExecution: (id: string) =>
     request<Execution>(`/executions/${id}/close`, { method: "POST" }),
 
-  defects: () => request<Defect[]>("/defects"),
+  defects: (query = "") => request<Defect[]>(`/defects${query}`),
+  defect: (id: string) => request<Defect>(`/defects/${id}`),
   createDefect: (body: object) =>
     request<Defect>("/defects", { method: "POST", body: JSON.stringify(body) }),
+  updateDefect: (id: string, body: object) =>
+    request<Defect>(`/defects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteDefect: (id: string) => request<void>(`/defects/${id}`, { method: "DELETE" }),
 
   todos: (query = "") => request<Todo[]>(`/todos${query}`),
   todo: (id: string) => request<Todo>(`/todos/${id}`),
@@ -181,6 +223,12 @@ export const api = {
     request<FlakyReport>(`/metrics/flaky?window=${window}`),
   metricsDefects: (squad = "") =>
     request<DefectsReport>(`/metrics/defects?squad=${encodeURIComponent(squad)}`),
+  metricsAutomation: (days = 0, env = "") =>
+    request<AutomationReport>(
+      `/metrics/automation?days=${days}&env=${encodeURIComponent(env)}`,
+    ),
+  metricsActivity: (days = 371, year = 0) =>
+    request<ActivityHeatmapData>(`/metrics/activity?days=${days}&year=${year}`),
   traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +

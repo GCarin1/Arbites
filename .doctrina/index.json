@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-07",
+  "last_updated": "2026-07-10",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,8 +15,8 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-06",
+        "version": "0.8.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
@@ -37,8 +37,8 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-04",
+        "version": "0.3.0",
+        "last_updated": "2026-07-09",
         "implementation": "verified — M4 (backend/arbites/ci.py, frontend/src/components/Automation.tsx, docs/examples/tests.yml); orquestração provada com fake client — validação contra a API real pendente do primeiro uso com o repo da B3",
         "realizes": [
           "SC6"
@@ -59,8 +59,8 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-06",
+        "version": "0.6.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -70,8 +70,8 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.4.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
@@ -93,9 +93,9 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-04",
-        "implementation": "verified — M3 (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
+        "version": "0.4.0",
+        "last_updated": "2026-07-10",
+        "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
           "SC5"
         ]
@@ -112,11 +112,22 @@
         ]
       },
       {
+        "id": "profile",
+        "path": ".doctrina/specs/profile/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-09",
+        "implementation": "verified — M13 (backend/arbites/api.py; frontend Profile.tsx). Memória injetada nos 5 usos de IA",
+        "realizes": [
+          "SC14"
+        ]
+      },
+      {
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-07-06",
+        "version": "0.9.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
@@ -126,8 +137,8 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.3.0",
+        "last_updated": "2026-07-09",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC1"
@@ -148,9 +159,9 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.3.0",
-        "last_updated": "2026-07-04",
-        "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)",
+        "version": "0.5.0",
+        "last_updated": "2026-07-10",
+        "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
         ]
@@ -563,9 +574,327 @@
         "status": "applied",
         "applied": "2026-07-07",
         "specs_affected": []
+      },
+      {
+        "id": "0024-sidebar-reorganizar-em-categorias-colapsaveis-pl",
+        "title": "sidebar: reorganizar em categorias colapsaveis (Planejamento, Acompanhamento, Ferramentas, Suporte) com secao Acesso Rapido alimentada por pin/unpin por item (persistido localmente)",
+        "path": ".doctrina/changes/archive/2026-07-09-0024-sidebar-reorganizar-em-categorias-colapsaveis-pl",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": []
+      },
+      {
+        "id": "0025-test-cases-como-repositorio-arvore-de-pastas-cen",
+        "title": "test cases como repositorio: arvore de pastas centralizada no conteudo (nao no sidebar), detalhe so por clique com botao Voltar, pastas ilimitadas (criar/excluir/drag-and-drop de CTs), formato BDD (Gherkin) como padrao do corpo com steps extraidos de Given/When/Then, data de criacao exibida",
+        "path": ".doctrina/changes/archive/2026-07-09-0025-test-cases-como-repositorio-arvore-de-pastas-cen",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0026-automacao-selecao-de-arquivo-feature-tag-no-run",
+        "title": "automacao: selecao de arquivo .feature + tag no run local (comando behave montado na UI), terminal ao vivo ja existente, acesso a artefatos (logs/screenshots/analise) do repo do target, editor visual do .env com catalogo de variaveis descritas, e disparo remoto GitHub Actions com feature/tag/ambiente/navegador/repositorio",
+        "path": ".doctrina/changes/archive/2026-07-09-0026-automacao-selecao-de-arquivo-feature-tag-no-run",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0027-perfil-do-usuario-nome-editavel-memoria-de-longo",
+        "title": "perfil do usuario: nome editavel + memoria de longo prazo (markdown com Preferencias & Estilo e Contexto Ativo) persistida em profile.md, editavel na UI e injetada como contexto em toda interacao com IA (geracao/revisao/negativos/daily/reuniao)",
+        "path": ".doctrina/changes/archive/2026-07-09-0027-perfil-do-usuario-nome-editavel-memoria-de-longo",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": []
+      },
+      {
+        "id": "0028-afazeres-substituir-a-tabela-por-layout-de-cards",
+        "title": "afazeres: substituir a tabela por layout de cards/blocos estilo sticky notes, preservando selecao multipla, expandir descricao, status rapido, links clicaveis, prazo com atraso e acoes",
+        "path": ".doctrina/changes/archive/2026-07-09-0028-afazeres-substituir-a-tabela-por-layout-de-cards",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": []
+      },
+      {
+        "id": "0029-requisitos-e-execucoes-replicam-o-layout-de-repo",
+        "title": "requisitos e execucoes replicam o layout de repositorio: hierarquia centralizada no conteudo (epic-story com drag-and-drop de story entre epics; execucoes agrupadas por ano), detalhe por clique com botao Voltar, exclusao com confirmacao e data de criacao registrada/exibida",
+        "path": ".doctrina/changes/archive/2026-07-09-0029-requisitos-e-execucoes-replicam-o-layout-de-repo",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0030-importacao-inteligente-em-massa-upload-de-txt-md",
+        "title": "importacao inteligente em massa: upload de txt/md/xml com casos de teste em formato livre; a IA identifica cada caso, sugere uma pasta pelo contexto e converte para BDD (Given/When/Then) em preview aceitavel item a item; prompt otimizado para modelos de ate 9B",
+        "path": ".doctrina/changes/archive/2026-07-09-0030-importacao-inteligente-em-massa-upload-de-txt-md",
+        "status": "applied",
+        "applied": "2026-07-09",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0031-afazeres-titulo-de-card-muito-grande-estoura-o-c",
+        "title": "afazeres: titulo de card muito grande estoura o card (overflow-wrap:anywhere cresce verticalmente) — truncar com line-clamp e reticencias sem aumentar o card; tooltip com o titulo completo",
+        "path": ".doctrina/changes/archive/2026-07-10-0031-afazeres-titulo-de-card-muito-grande-estoura-o-c",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0032-repositorios-test-cases-requisitos-execucoes-nom",
+        "title": "repositorios (test cases/requisitos/execucoes): nomes aparecem centralizados na linha (botao herda justify-content:center do estilo base) — alinhar a esquerda; e nova visualizacao com box-drawing tree connectors (branches ├── └── e linhas │) para hierarquia intuitiva",
+        "path": ".doctrina/changes/archive/2026-07-10-0032-repositorios-test-cases-requisitos-execucoes-nom",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0033-importacao-bdd-via-llm-parar-loops-de-raciocinio",
+        "title": "importacao BDD via LLM: parar loops de raciocinio/reconstrucao de schema em modelos locais pequenos; enviar exemplo compacto em vez de JSON Schema; usar response_format json_object; extrair JSON ignorando raciocinio e escolhendo o objeto que valida no schema",
+        "path": ".doctrina/changes/archive/2026-07-10-0033-importacao-bdd-via-llm-parar-loops-de-raciocinio",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0034-importacao-ai-confiavel-com-modelos-de-raciocini",
+        "title": "importacao AI confiavel com modelos de raciocinio (glm-4.7-flash): usar reasoning_content quando content vier vazio, aumentar timeout do cliente HTTP, simplificar prompt de import para nao induzir loop de raciocinio; e no modal de importacao adicionar botao Enviar explicito em vez de submeter no onChange do arquivo",
+        "path": ".doctrina/changes/archive/2026-07-10-0034-importacao-ai-confiavel-com-modelos-de-raciocini",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0035-importacao-ai-tolerante-a-truncamento-quando-a-g",
+        "title": "importacao AI tolerante a truncamento: quando a geracao do modelo local e cortada (timeout) e o JSON externo fica incompleto, recuperar os casos de teste que ja sairam inteiros (_all_objects + _salvage_import) e montar um ImportConversion parcial em vez de falhar sem preview; recuperar folder do cabecalho",
+        "path": ".doctrina/changes/archive/2026-07-10-0035-importacao-ai-tolerante-a-truncamento-quando-a-g",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0036-import-quando-o-arquivo-ja-esta-em-gherkin-bdd-p",
+        "title": "import: quando o arquivo ja esta em Gherkin/BDD, preservar verbatim (parser deterministico, sem IA e sem exigir provider) em vez de parafrasear via LLM que troca a Feature, remove que, adiciona pontuacao e funde passos And",
+        "path": ".doctrina/changes/archive/2026-07-10-0036-import-quando-o-arquivo-ja-esta-em-gherkin-bdd-p",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0037-parse-gherkin-nao-tratar-linhas-comecando-com-ou",
+        "title": "parse_gherkin: nao tratar linhas comecando com # ou aspas como continuacao de passo — isso colava cabecalhos markdown (### CTxx) e comentarios do documento de origem dentro do ultimo passo do cenario anterior; agora linhas nao reconhecidas sao ignoradas, so tabelas Gherkin de verdade (| a | b |) continuam sendo anexadas",
+        "path": ".doctrina/changes/archive/2026-07-10-0037-parse-gherkin-nao-tratar-linhas-comecando-com-ou",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0038-kanban-de-execucoes-card-mostra-titulo-do-ct-e-b",
+        "title": "kanban de execucoes: card mostra titulo do CT e barra de progresso de % de passos aprovados, alem do id; permitir vincular/desvincular um defeito ja existente (criado separadamente) a um resultado via API dedicada; edicao do resultado abre como modal centralizado com botao X para fechar em vez de painel inline abaixo do kanban",
+        "path": ".doctrina/changes/archive/2026-07-10-0038-kanban-de-execucoes-card-mostra-titulo-do-ct-e-b",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0039-bugs-do-modal-de-execucao-1-botao-fechar-duplica",
+        "title": "bugs do modal de execucao: (1) botao Fechar duplicado no footer alem do X do header — manter so o X (footer do Modal vira opcional); (2) salvar comentario sem feedback e efeito de reset preso a result.comment — dar feedback (Salvar/Salvando/Salvo, desabilita quando sem mudanca) e resetar so ao trocar de CT",
+        "path": ".doctrina/changes/archive/2026-07-10-0039-bugs-do-modal-de-execucao-1-botao-fechar-duplica",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0040-kanban-barra-de-progresso-segmentada-e-multicolo",
+        "title": "kanban: barra de progresso segmentada e multicolor. No card, um segmento por passo colorido pelo status (verde passed, vermelho failed, laranja blocked), enchendo ate onde a execucao chegou. Na barra da execucao, empilhar todos os status por contagem com suas cores, nao so os passed",
+        "path": ".doctrina/changes/archive/2026-07-10-0040-kanban-barra-de-progresso-segmentada-e-multicolo",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0041-autocomplete-em-todos-os-campos-que-referenciam",
+        "title": "autocomplete em todos os campos que referenciam um item existente, reutilizando GET /search: novo SingleRefInput (referencia unica por id/titulo) substitui o select de vincular defeito e o campo cru de story do CT; comentario do resultado vira MentionTextarea (@ referencia um card); rende links clicaveis ja existentes",
+        "path": ".doctrina/changes/archive/2026-07-10-0041-autocomplete-em-todos-os-campos-que-referenciam",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0042-arrastar-pastas-para-dentro-de-outras-pastas-em",
+        "title": "arrastar pastas para dentro de outras pastas em Test cases: nova rota POST /testcases/folders/move (reindexa recursivamente, guarda contra path traversal e mover pasta para dentro dela mesma/descendente); pasta vira draggable no repo; se contiver CTs (recursivo), abre modal de confirmacao antes de mover pois os casos de teste vao junto",
+        "path": ".doctrina/changes/archive/2026-07-10-0042-arrastar-pastas-para-dentro-de-outras-pastas-em",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0043-cadastro-de-automation-targets-pela-ui-sem-edita",
+        "title": "cadastro de automation targets pela UI (sem editar arbites.yaml na mao): novo card em Automacao com formulario (nome, caminho, python, working dir, timeout, features_glob) e PUT /targets substituindo a lista inteira (mesmo padrao de PUT /ai/providers); ao digitar o caminho do repo, botao Buscar arquivos .feature chama novo GET /automation/browse-features que escaneia o filesystem e devolve a lista real para o usuario selecionar (inclusive restringir a um arquivo especifico), antes mesmo do target existir",
+        "path": ".doctrina/changes/archive/2026-07-10-0043-cadastro-de-automation-targets-pela-ui-sem-edita",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0044-aba-defeitos-pagina-dedicada-de-gerenciamento-de",
+        "title": "aba Defeitos: pagina dedicada de gerenciamento de bugs (antes so dava pra criar um defeito a partir de um resultado failed numa execucao, sem lista/edicao/exclusao proprias). Nova aba na navegacao com filtro por status/severidade, criacao avulsa (vincular CT/execucao opcional via autocomplete), edicao, mudanca rapida de status, exclusao, e navegacao @DF-XXXX abre direto no editor. Backend ganha GET /defects/{id} (com corpo) e DELETE /defects/{id}",
+        "path": ".doctrina/changes/archive/2026-07-10-0044-aba-defeitos-pagina-dedicada-de-gerenciamento-de",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0045-dashboard-monitoramento-de-automacao-por-reposit",
+        "title": "dashboard: monitoramento de automacao por repositorio. Novo GET /metrics/automation agrega execucoes de automacao (origin != manual) agrupadas por repositorio extraido do NOME da execucao via regex configuravel (ci_monitoring.name_pattern em arbites.yaml; default generico <nome> <sep> <repo>.<env> sem citar empresa/projeto), com pass/fail por run derivado dos resultados, ranking pior-primeiro (repos que mais falham), quebra por ambiente e contagem de runs fora do padrao. Nova secao na Dashboard",
+        "path": ".doctrina/changes/archive/2026-07-10-0045-dashboard-monitoramento-de-automacao-por-reposit",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0046-dashboard-automacao-expandir-o-monitoramento-com",
+        "title": "dashboard automacao: expandir o monitoramento com (1) ranking de CTs que mais falham nos runs de automacao, (2) sparkline dos runs recentes por repo, (3) contagem de CTs flaky por repo + lista global de flaky, (4) MTTR (tempo ate voltar ao verde) e quebrado-desde por repo, (5) filtro por ambiente no GET /metrics/automation e dropdown na Dashboard",
+        "path": ".doctrina/changes/archive/2026-07-10-0046-dashboard-automacao-expandir-o-monitoramento-com",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0047-perfil-heatmap-de-atividade-estilo-github-contri",
+        "title": "perfil: heatmap de atividade estilo GitHub (contribution graph) com a atividade de QA do projeto. Novo GET /metrics/activity agrega por dia os ultimos ~12 meses (janela alinhada a segunda-feira): casos executados (transicoes de resultado), bugs abertos, CTs/requisitos criados e runs de automacao; devolve so os dias com atividade. Componente ActivityHeatmap na pagina de Perfil (grade Seg-Dom x semanas, cores no verde do projeto por intensidade, seletor de metrica, tooltips)",
+        "path": ".doctrina/changes/archive/2026-07-10-0047-perfil-heatmap-de-atividade-estilo-github-contri",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0048-ajustes-no-heatmap-de-atividade-1-preencher-a-la",
+        "title": "ajustes no heatmap de atividade: (1) preencher a largura do card (colunas flexiveis + celulas com aspect-ratio, escalam com o card em vez de 11px fixos), (2) filtro por ano (GET /metrics/activity aceita year; resposta lista os anos com atividade para o seletor), (3) tooltip flutuante no cursor mostrando quantas mudancas houve no dia + breakdown",
+        "path": ".doctrina/changes/archive/2026-07-10-0048-ajustes-no-heatmap-de-atividade-1-preencher-a-la",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0049-fix-aba-perfil-dava-tela-preta-causa-o-activityh",
+        "title": "fix: aba Perfil dava tela preta. Causa: o ActivityHeatmap fazia [...data.years] e a resposta do backend nao-reiniciado (shape 0047, sem o campo years) deixava years=undefined -> TypeError no render -> React desmontava o app (fundo escuro = tela preta); erro so aparecia no console do browser, nao nos logs. Fix: guardar data.years com ?? [] e adicionar um ErrorBoundary keyado por aba para que o crash de UMA view nunca derrube o app inteiro",
+        "path": ".doctrina/changes/archive/2026-07-10-0049-fix-aba-perfil-dava-tela-preta-causa-o-activityh",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
       }
     ],
     "skills": [
+      {
+        "id": "botao-como-item-de-lista-heranca-justify",
+        "path": ".doctrina/skills/botao-como-item-de-lista-heranca-justify.md",
+        "description": "Um <button> reestilizado como item de lista/linha herda justify-content:center do estilo base de button — o conteúdo aparece centralizado; sobrescreva para flex-start.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "campos-de-referencia-com-autocomplete",
+        "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
+        "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
+        "last_updated": "2026-07-10"
+      },
       {
         "id": "conteudo-longo-em-tabela-overflow",
         "path": ".doctrina/skills/conteudo-longo-em-tabela-overflow.md",
@@ -575,14 +904,44 @@
       {
         "id": "default-por-tipo-de-provider",
         "path": ".doctrina/skills/default-por-tipo-de-provider.md",
-        "description": "Fallback único (ex.: base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
-        "last_updated": "2026-07-07"
+        "description": "Fallback único (ex. base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "descobrir-em-vez-de-digitar-config-de-caminho-externo",
+        "path": ".doctrina/skills/descobrir-em-vez-de-digitar-config-de-caminho-externo.md",
+        "description": "Quando um formulário de config pede um caminho externo (pasta/glob de outro repositório) que o usuário não decora, ofereça um botão que ESCANEIA o filesystem de verdade e devolve a lista real para escolher — não deixe o usuário digitar um padrão às cegas.",
+        "last_updated": "2026-07-10"
       },
       {
         "id": "efeito-de-foco-so-no-mount",
         "path": ".doctrina/skills/efeito-de-foco-so-no-mount.md",
         "description": "Efeitos de foco/scroll-lock (modais, autofocus) devem rodar só no mount — callbacks instáveis nas deps re-disparam o efeito e roubam o cursor.",
         "last_updated": "2026-07-07"
+      },
+      {
+        "id": "entidade-so-com-crud-encaixado-precisa-de-view-propria",
+        "path": ".doctrina/skills/entidade-so-com-crud-encaixado-precisa-de-view-propria.md",
+        "description": "Uma entidade com API CRUD completa (GET/POST/PUT) mas cuja UNICA porta de entrada na UI é um modal aninhado dentro de outro fluxo (ex.: \"criar defeito a partir de um resultado de execução\") não tem gerenciamento de verdade — falta listar/editar/excluir fora daquele contexto específico.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "formato-especifico-do-usuario-vira-config-regex",
+        "path": ".doctrina/skills/formato-especifico-do-usuario-vira-config-regex.md",
+        "description": "Quando um recurso depende de um formato de string específico da organização do usuário (nome de run, convenção de branch, padrão de arquivo), NÃO hardcode o formato — extraia com uma regex configurável (grupos nomeados) em arbites.yaml, com um default genérico e degradação graciosa quando nada casa. Mantém o produto white-label.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "grade-de-quadrados-responsiva-e-tooltip-no-cursor",
+        "path": ".doctrina/skills/grade-de-quadrados-responsiva-e-tooltip-no-cursor.md",
+        "description": "Para uma grade de quadrados (heatmap/calendário) preencher um container e escalar com ele, use colunas flex:1 + células aspect-ratio:1 (não px fixos). E um tooltip que segue o cursor precisa de position:fixed com clientX/clientY — dentro de um ancestral position:relative, coordenadas de viewport ficam deslocadas.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "heuristica-de-continuacao-sem-teste-vira-bug",
+        "path": ".doctrina/skills/heuristica-de-continuacao-sem-teste-vira-bug.md",
+        "description": "Ao escrever um parser de linhas (Gherkin, logs, markdown), não adivinhe regras de \"continuação\"/\"comentário\" (ex.:# ou aspas) sem um caso real que as exija — símbolos genéricos colidem com formatação legítima do usuário (cabeçalhos markdown, numeração) e colam texto onde não devia.",
+        "last_updated": "2026-07-10"
       },
       {
         "id": "leitura-agrupada-em-card",
@@ -597,10 +956,82 @@
         "last_updated": "2026-07-06"
       },
       {
+        "id": "modais-aninhados-esc-fecha-so-o-do-topo",
+        "path": ".doctrina/skills/modais-aninhados-esc-fecha-so-o-do-topo.md",
+        "description": "Um componente Modal com listener de Esc no document fecha TODOS os modais abertos simultaneamente quando dois são aninhados, não só o do topo — porque stopPropagation() não impede outros listeners registrados no mesmo alvo (document). Precisa de uma pilha de modais abertos.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "modal-fechar-duplicado-x-e-footer",
+        "path": ".doctrina/skills/modal-fechar-duplicado-x-e-footer.md",
+        "description": "Um componente Modal com X no header E um footer sempre-presente com botão \"Fechar\" mostra dois controles de fechar redundantes. Torne o footer opcional e, para modais só de leitura/edição-inline, feche só pelo X.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "modelo-de-raciocinio-content-vazio",
+        "path": ".doctrina/skills/modelo-de-raciocinio-content-vazio.md",
+        "description": "Modelos de raciocínio (glm-4.7-flash, qwen-thinking) via LM Studio devolvem o pensamento em reasoning_content e podem deixar content vazio; timeouts curtos os matam no meio e prompts ambíguos os fazem entrar em loop.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "mover-pasta-inteira-confirmar-se-tem-filhos",
+        "path": ".doctrina/skills/mover-pasta-inteira-confirmar-se-tem-filhos.md",
+        "description": "Ao permitir arrastar/mover uma pasta inteira (não só um item) numa árvore, distinga o tipo do item arrastado (item vs container), bloqueie soltar um container nele mesmo/numa descendente, e confirme antes de mover se o container tiver filhos que \"vão junto\" sem o usuário ter escolhido cada um.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "nao-passar-dados-ja-estruturados-pela-llm",
+        "path": ".doctrina/skills/nao-passar-dados-ja-estruturados-pela-llm.md",
+        "description": "Se a entrada JÁ está num formato estruturado (Gherkin/BDD, CSV, JSON, Markdown com âncoras), NÃO a mande para a LLM — parseie deterministicamente e preserve verbatim. LLM extrai-em-campos-e-re-renderiza, o que parafraseia, funde itens e troca campos.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "rota-estatica-antes-da-dinamica",
+        "path": ".doctrina/skills/rota-estatica-antes-da-dinamica.md",
+        "description": "No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.",
+        "last_updated": "2026-07-09"
+      },
+      {
+        "id": "saida-estruturada-llm-modelo-pequeno",
+        "path": ".doctrina/skills/saida-estruturada-llm-modelo-pequeno.md",
+        "description": "Para saída JSON confiável em modelos locais ≤ 9B, envie um EXEMPLO compacto (não o JSON Schema), ligue response_format json_object com fallback, e extraia o objeto que valida no schema ignorando raciocínio vazado.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "salvar-inclui-formulario-pendente",
         "path": ".doctrina/skills/salvar-inclui-formulario-pendente.md",
         "description": "Formulário com \"Adicionar à lista\" + \"Salvar\" separados perde dados — o Salvar deve incluir o item pendente do formulário, senão o usuário preenche e nada persiste.",
         "last_updated": "2026-07-07"
+      },
+      {
+        "id": "salvar-json-truncado-de-llm",
+        "path": ".doctrina/skills/salvar-json-truncado-de-llm.md",
+        "description": "Quando a geração de um LLM local é cortada (timeout) no meio de um JSON grande, o objeto externo não fecha e o parse falha — perdendo TUDO. Recupere os objetos internos que já saíram inteiros em vez de retornar erro sem preview.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "salvar-manual-feedback-e-reset-por-id",
+        "path": ".doctrina/skills/salvar-manual-feedback-e-reset-por-id.md",
+        "description": "Botão de salvar manual sem estado de dirty/saving/saved parece \"não funcionar\" (salva mas nada muda na tela); e um efeito que reseta o campo a partir do valor do servidor (não do id do registro) reescreve o que o usuário digita quando há refresh de fundo.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "truncar-titulo-em-card",
+        "path": ".doctrina/skills/truncar-titulo-em-card.md",
+        "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "watcher-vs-handler-mesma-rajada-database-locked",
+        "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
+        "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "tela-preta-crash-de-render-sem-error-boundary",
+        "path": ".doctrina/skills/tela-preta-crash-de-render-sem-error-boundary.md",
+        "description": "Uma aba/tela que fica \"preta\" (em branco) SEM erro nos logs de servidor é quase sempre um crash de render do React — o erro está no console do browser, e sem ErrorBoundary o React 18 desmonta o app inteiro. Gatilho comum: front novo lê um campo que o backend não-reiniciado ainda não devolve (ex.: [...data.campo] com campo undefined).",
+        "last_updated": "2026-07-10"
       }
     ],
     "contracts": [

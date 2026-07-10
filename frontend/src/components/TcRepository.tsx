@@ -1,0 +1,506 @@
+import { useState } from "react";
+import { api } from "../api";
+import { ConfirmModal, Modal } from "./Modal";
+import { DocBody } from "./ReadView";
+import type { GeneratedTestcase, TreeNode } from "../types";
+
+type DragState =
+  | { kind: "ct"; id: string }
+  | { kind: "folder"; path: string; ctCount: number };
+
+/** true se `destPath` for a própria `srcPath` ou algum descendente dela. */
+function isDescendantOrSelf(destPath: string, srcPath: string): boolean {
+  return destPath === srcPath || destPath.startsWith(`${srcPath}/`);
+}
+
+/**
+ * Repositório de test cases (doc §1.1) — árvore de pastas centralizada no
+ * conteúdo, com expandir/colapsar, drag & drop de CTs entre pastas, criação e
+ * exclusão de pastas. O detalhe abre só por clique (App troca p/ editor).
+ */
+export function TcRepository({
+  root,
+  onOpen,
+  onChanged,
+  onError,
+  onNew,
+  extraActions,
+}: {
+  root: TreeNode;
+  onOpen: (id: string) => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+  onNew: () => void;
+  extraActions?: React.ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState<string | null>(null); // pasta pai
+  const [deletingFolder, setDeletingFolder] = useState<TreeNode | null>(null);
+  const [deletingCt, setDeletingCt] = useState<{ id: string; title: string } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [pendingFolderMove, setPendingFolderMove] = useState<{
+    srcPath: string;
+    destPath: string;
+    ctCount: number;
+  } | null>(null);
+
+  function toggle(path: string) {
+    setCollapsed((old) => {
+      const next = new Set(old);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
+
+  // caminho relativo a testcases/ (a API de pastas/move usa esse formato)
+  function relFolder(path: string): string {
+    return path.replace(/^testcases\/?/, "");
+  }
+
+  async function moveTo(destFolderPath: string) {
+    const d = drag;
+    setDrag(null);
+    setDropTarget(null);
+    if (!d) return;
+    if (d.kind === "ct") {
+      try {
+        await api.moveTestcase(d.id, relFolder(destFolderPath));
+        onChanged();
+      } catch (e) {
+        onError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
+    // pasta: soltar nela mesma ou numa descendente é inválido — ignora.
+    if (isDescendantOrSelf(destFolderPath, d.path)) return;
+    if (d.ctCount > 0) {
+      // contém CTs: confirma antes de arrastar tudo junto.
+      setPendingFolderMove({ srcPath: d.path, destPath: destFolderPath, ctCount: d.ctCount });
+      return;
+    }
+    await doMoveFolder(d.path, destFolderPath);
+  }
+
+  async function doMoveFolder(srcPath: string, destPath: string) {
+    try {
+      await api.moveTcFolder(relFolder(srcPath), relFolder(destPath));
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function createFolder(parent: string, name: string) {
+    const path = relFolder(parent) ? `${relFolder(parent)}/${name}` : name;
+    try {
+      await api.createTcFolder(path);
+      setCreatingFolder(null);
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function deleteFolder(node: TreeNode) {
+    setDeletingFolder(null);
+    try {
+      await api.deleteTcFolder(relFolder(node.path));
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function deleteCt(id: string) {
+    setDeletingCt(null);
+    try {
+      await api.deleteTestcase(id);
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  function countAll(node: TreeNode): number {
+    return node.files.length + node.dirs.reduce((acc, d) => acc + countAll(d), 0);
+  }
+
+  // Renderiza os filhos de um nó (dirs, depois files) com conectores box-drawing.
+  // `prefix` = string dos ancestrais ("│   "/"    "); cada filho recebe ├──/└──.
+  function renderChildren(node: TreeNode, prefix: string): React.ReactNode[] {
+    const kids: { key: string; render: (branch: string, childPrefix: string) => React.ReactNode }[] = [
+      ...node.dirs.map((d) => ({
+        key: d.path,
+        render: (branch: string, childPrefix: string) => {
+          const isCollapsed = collapsed.has(d.path);
+          return (
+            <div key={d.path} className="repo-dir">
+              <div
+                className={`repo-row repo-folder ${dropTarget === d.path ? "drop-target" : ""} ${
+                  drag?.kind === "folder" && drag.path === d.path ? "dragging" : ""
+                }`}
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  setDrag({ kind: "folder", path: d.path, ctCount: countAll(d) });
+                }}
+                onDragEnd={() => {
+                  setDrag(null);
+                  setDropTarget(null);
+                }}
+                onDragOver={(e) => {
+                  if (!drag) return;
+                  // não permite soltar uma pasta dentro dela mesma ou de uma descendente
+                  if (drag.kind === "folder" && isDescendantOrSelf(d.path, drag.path)) return;
+                  e.preventDefault();
+                  setDropTarget(d.path);
+                }}
+                onDragLeave={() => setDropTarget((t) => (t === d.path ? null : t))}
+                onDrop={() => void moveTo(d.path)}
+              >
+                <span className="tree-prefix">{prefix + branch}</span>
+                <button className="expand-btn" onClick={() => toggle(d.path)}>
+                  {isCollapsed ? "▸" : "▾"}
+                </button>
+                <span className="repo-folder-name" onClick={() => toggle(d.path)}>
+                  📁 {d.name}/
+                </span>
+                <span className="caption muted">{countAll(d)}</span>
+                <span className="spacer" style={{ flex: 1 }} />
+                <span className="repo-actions">
+                  <button className="btn-sm" onClick={() => setCreatingFolder(d.path)}>
+                    + pasta
+                  </button>
+                  <button className="btn-sm danger" onClick={() => setDeletingFolder(d)}>
+                    Excluir
+                  </button>
+                </span>
+              </div>
+              {!isCollapsed && renderChildren(d, childPrefix)}
+            </div>
+          );
+        },
+      })),
+      ...node.files.map((f) => ({
+        key: f.path,
+        render: (branch: string) => (
+          <div
+            key={f.path}
+            className={`repo-row repo-file ${
+              drag?.kind === "ct" && drag.id === f.id ? "dragging" : ""
+            }`}
+            draggable={!!f.id}
+            onDragStart={(e) => {
+              e.stopPropagation();
+              if (f.id) setDrag({ kind: "ct", id: f.id });
+            }}
+            onDragEnd={() => {
+              setDrag(null);
+              setDropTarget(null);
+            }}
+          >
+            <span className="tree-prefix">{prefix + branch}</span>
+            <button
+              className="repo-file-main"
+              onClick={() => f.id && onOpen(f.id)}
+              disabled={!f.id}
+              title={f.path}
+            >
+              <span className="mono muted">{f.id ?? "?"}</span>
+              <span className="repo-file-title">{f.title}</span>
+            </button>
+            {f.status && (
+              <span className={`status-dot dot-${f.status} caption`}>{f.status}</span>
+            )}
+            <span className="caption mono muted">{f.created ?? ""}</span>
+            <span className="repo-actions">
+              {f.id && (
+                <button
+                  className="btn-sm danger"
+                  onClick={() => setDeletingCt({ id: f.id!, title: f.title })}
+                >
+                  Excluir
+                </button>
+              )}
+            </span>
+          </div>
+        ),
+      })),
+    ];
+    return kids.map((kid, i) => {
+      const isLast = i === kids.length - 1;
+      return kid.render(isLast ? "└── " : "├── ", prefix + (isLast ? "    " : "│   "));
+    });
+  }
+
+  const empty = root.dirs.length === 0 && root.files.length === 0;
+
+  return (
+    <div className="repo">
+      <div className="page-head">
+        <h1 className="page-title">Test cases</h1>
+        <span className="spacer" />
+        <div className="head-controls">
+          {extraActions}
+          <button onClick={() => setImporting(true)}>Importar com IA</button>
+          <button onClick={() => setCreatingFolder(root.path)}>Nova pasta</button>
+          <button className="primary" onClick={onNew}>
+            Novo test case
+          </button>
+        </div>
+      </div>
+
+      <div
+        className={`repo-tree card ${dropTarget === root.path ? "drop-target" : ""}`}
+        onDragOver={(e) => {
+          // soltar no "vazio" = mover para a raiz
+          if (drag && e.target === e.currentTarget) {
+            e.preventDefault();
+            setDropTarget(root.path);
+          }
+        }}
+        onDrop={(e) => {
+          if (e.target === e.currentTarget) void moveTo(root.path);
+        }}
+      >
+        {empty ? (
+          <div className="empty-state" style={{ border: "none" }}>
+            <div className="empty-title">Repositório vazio</div>
+            <div className="empty-body">
+              Crie pastas para organizar e test cases em formato BDD
+              (Given / When / Then). Arraste CTs entre pastas.
+            </div>
+          </div>
+        ) : (
+          renderChildren(root, "")
+        )}
+      </div>
+
+      {importing && (
+        <AiImportModal
+          onClose={() => setImporting(false)}
+          onChanged={onChanged}
+          onError={onError}
+        />
+      )}
+      {creatingFolder !== null && (
+        <NewFolderModal
+          parent={creatingFolder === root.path ? "" : relFolder(creatingFolder)}
+          onCreate={(name) => void createFolder(creatingFolder, name)}
+          onClose={() => setCreatingFolder(null)}
+        />
+      )}
+      {deletingFolder && (
+        <ConfirmModal
+          title="Excluir pasta"
+          message={
+            <>
+              Excluir a pasta <span className="mono">{deletingFolder.name}/</span> e{" "}
+              <strong>{countAll(deletingFolder)}</strong> item(ns) dentro dela? Tudo
+              vai para a lixeira (<span className="mono">.arbites/trash/</span>).
+            </>
+          }
+          confirmLabel="Excluir pasta"
+          danger
+          onConfirm={() => void deleteFolder(deletingFolder)}
+          onCancel={() => setDeletingFolder(null)}
+        />
+      )}
+      {deletingCt && (
+        <ConfirmModal
+          title="Excluir test case"
+          message={
+            <>
+              Mover <span className="mono">{deletingCt.id}</span> ({deletingCt.title})
+              para a lixeira?
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void deleteCt(deletingCt.id)}
+          onCancel={() => setDeletingCt(null)}
+        />
+      )}
+      {pendingFolderMove && (
+        <ConfirmModal
+          title="Mover pasta"
+          message={
+            <>
+              A pasta{" "}
+              <span className="mono">
+                {pendingFolderMove.srcPath.split("/").pop()}/
+              </span>{" "}
+              contém <strong>{pendingFolderMove.ctCount}</strong> caso
+              {pendingFolderMove.ctCount === 1 ? "" : "s"} de teste, que{" "}
+              {pendingFolderMove.ctCount === 1 ? "será movido" : "serão movidos"} junto.
+              Continuar?
+            </>
+          }
+          confirmLabel="Mover pasta e casos de teste"
+          onConfirm={() => {
+            const p = pendingFolderMove;
+            setPendingFolderMove(null);
+            void doMoveFolder(p.srcPath, p.destPath);
+          }}
+          onCancel={() => setPendingFolderMove(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function NewFolderModal({
+  parent,
+  onCreate,
+  onClose,
+}: {
+  parent: string;
+  onCreate: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  return (
+    <Modal
+      title={parent ? `Nova pasta em ${parent}/` : "Nova pasta"}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose}>Cancelar</button>
+          <button
+            className="primary"
+            onClick={() => name.trim() && onCreate(name.trim())}
+            disabled={!name.trim()}
+          >
+            Criar pasta
+          </button>
+        </>
+      }
+    >
+      <div className="modal-field">
+        <label htmlFor="folder-name">Nome da pasta</label>
+        <input
+          id="folder-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="ex.: frontend/login (aninhamento com /)"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) onCreate(name.trim());
+          }}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+// ------------------------------------------- importação via IA (doc §1.1)
+
+function AiImportModal({
+  onClose,
+  onChanged,
+  onError,
+}: {
+  onClose: () => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [folder, setFolder] = useState("");
+  const [items, setItems] = useState<GeneratedTestcase[] | null>(null);
+
+  async function upload() {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const data = await api.aiImportFile(file);
+      setFolder(data.folder);
+      setItems(data.testcases);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function accept(item: GeneratedTestcase) {
+    try {
+      await api.createTestcase({ title: item.title, folder, body: item.body });
+      setItems((old) => (old ?? []).filter((i) => i !== item));
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <Modal
+      title="Importar test cases com IA"
+      onClose={onClose}
+      footer={<button onClick={onClose}>Fechar</button>}
+    >
+      <p className="modal-text muted">
+        Envie um .txt, .md ou .xml com casos de teste em formato livre. A IA
+        identifica cada caso, sugere uma pasta e converte para BDD — nada é
+        gravado sem você aceitar.
+      </p>
+      <div className="modal-field">
+        <label>Arquivo</label>
+        <input
+          type="file"
+          accept=".txt,.md,.xml"
+          disabled={busy}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+        <div className="toolbar" style={{ marginTop: 8 }}>
+          <button className="primary" disabled={!file || busy} onClick={() => void upload()}>
+            {busy ? "Processando com a IA…" : "Enviar"}
+          </button>
+          {file && !busy && <span className="muted caption">{file.name}</span>}
+        </div>
+        {busy && (
+          <span className="muted caption">
+            Modelos locais de raciocínio podem levar alguns minutos.
+          </span>
+        )}
+      </div>
+
+      {items && (
+        <>
+          <div className="modal-field">
+            <label>Pasta de destino (sugerida pela IA)</label>
+            <input
+              className="mono"
+              value={folder}
+              onChange={(e) => setFolder(e.target.value)}
+            />
+          </div>
+          {items.length === 0 ? (
+            <p className="muted">
+              Todos os itens foram aceitos ou nenhum caso foi identificado.
+            </p>
+          ) : (
+            items.map((item, i) => (
+              <div key={i} className="card" style={{ background: "var(--bg)", marginBottom: 8 }}>
+                <div className="card-head" style={{ marginBottom: 8 }}>
+                  <strong>{item.title}</strong>
+                </div>
+                <DocBody text={item.body} />
+                <div className="toolbar">
+                  <button className="primary" onClick={() => void accept(item)}>
+                    Aceitar (criar CT)
+                  </button>
+                  <button onClick={() => setItems((old) => (old ?? []).filter((x) => x !== item))}>
+                    Rejeitar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      )}
+    </Modal>
+  );
+}

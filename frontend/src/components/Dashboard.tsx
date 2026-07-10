@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { api } from "../api";
 import type {
+  AutomationReport,
   DefectsReport,
   Execution,
   FlakyReport,
@@ -31,6 +32,8 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
   const [flaky, setFlaky] = useState<FlakyReport | null>(null);
   const [matrix, setMatrix] = useState<TraceabilityMatrix | null>(null);
   const [defects, setDefects] = useState<DefectsReport | null>(null);
+  const [automation, setAutomation] = useState<AutomationReport | null>(null);
+  const [autoEnv, setAutoEnv] = useState("");
 
   useEffect(() => {
     api
@@ -61,6 +64,14 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Automação tem filtro próprio de ambiente — recarrega só essa seção.
+  useEffect(() => {
+    api
+      .metricsAutomation(days, autoEnv)
+      .then(setAutomation)
+      .catch((e) => onError(e instanceof Error ? e.message : String(e)));
+  }, [days, autoEnv, onError]);
 
   return (
     <div>
@@ -137,6 +148,24 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
         </ResponsiveContainer>
       </div>
 
+      <div className="section-head">
+        <h3 className="section-title" style={{ margin: 0 }}>
+          Automação por repositório ({days} dias)
+        </h3>
+        <span className="spacer" style={{ flex: 1 }} />
+        {automation && automation.envs.length > 0 && (
+          <select value={autoEnv} onChange={(e) => setAutoEnv(e.target.value)}>
+            <option value="">Todos os ambientes</option>
+            {automation.envs.map((env) => (
+              <option key={env} value={env}>
+                {env}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <AutomationPanel report={automation} />
+
       <h3 className="section-title">Defeitos abertos</h3>
       <DefectsPanel report={defects} />
 
@@ -210,6 +239,209 @@ const SEV_DOT: Record<string, string> = {
   medium: "dot-col-blocked",
   low: "dot-col-pending",
 };
+
+const OUTCOME_DOT: Record<string, string> = {
+  passed: "dot-col-passed",
+  failed: "dot-col-failed",
+  blocked: "dot-col-blocked",
+  partial: "dot-col-in_progress",
+  no_results: "dot-col-pending",
+};
+
+function pct(value: number | null): string {
+  return value === null ? "—" : `${Math.round(value * 100)}%`;
+}
+
+function mttrLabel(hours: number | null): string {
+  if (hours === null) return "—";
+  if (hours < 1) return `${Math.round(hours * 60)}min`;
+  if (hours < 48) return `${hours.toFixed(1)}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+function sinceLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (Number.isNaN(days)) return null;
+  return days === 0 ? "hoje" : `${days}d`;
+}
+
+/** Sparkline dos runs recentes: um quadradinho por run, colorido pelo desfecho. */
+function RunSparkline({ runs }: { runs: { at: string; outcome: string }[] }) {
+  if (runs.length === 0) return <span className="muted">—</span>;
+  return (
+    <span className="run-spark">
+      {runs.map((r, i) => (
+        <span
+          key={i}
+          className={`run-cell run-${r.outcome}`}
+          title={`${r.outcome} · ${r.at.slice(0, 10)}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function AutomationPanel({ report }: { report: AutomationReport | null }) {
+  if (!report) return null;
+
+  // Nada parseou: ou não há runs de automação, ou o padrão de nome precisa
+  // de ajuste. Explica como configurar (genérico, sem citar empresa/projeto).
+  if (report.by_repo.length === 0) {
+    return (
+      <div className="empty-state">
+        <div className="empty-title">
+          {report.unparsed > 0
+            ? "Runs de automação não reconhecidos"
+            : "Sem execuções de automação no período"}
+        </div>
+        <div className="empty-body">
+          {report.unparsed > 0 ? (
+            <>
+              {report.unparsed} execução(ões) de automação não casaram o padrão
+              de nome. Configure <span className="mono">ci_monitoring.name_pattern</span>{" "}
+              no <span className="mono">arbites.yaml</span> (regex com os grupos{" "}
+              <span className="mono">repo</span> e <span className="mono">env</span>)
+              para extrair o repositório do nome da execução.
+              {report.pattern_error && (
+                <>
+                  {" "}
+                  <strong>Regex inválida:</strong> {report.pattern_error}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              Execuções vindas de GitHub Actions ou runs locais aparecem aqui,
+              agrupadas pelo repositório (extraído do nome da execução).
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chart-card">
+      <div className="defects-summary">
+        <div className="defect-stat">
+          <div className="metric-value">{report.total_runs}</div>
+          <div className="metric-label">runs</div>
+        </div>
+        <div className="defect-breakdown">
+          <div className="defect-row">
+            <span className="status-dot dot-col-passed">passaram: {report.passed_runs}</span>
+            <span className="status-dot dot-col-failed">falharam: {report.failed_runs}</span>
+            <span className="status-dot dot-col-in_progress">pass rate: {pct(report.pass_rate)}</span>
+          </div>
+          {report.unparsed > 0 && (
+            <div className="defect-row caption">
+              <span className="muted">
+                {report.unparsed} run(s) fora do padrão de nome (não ranqueados)
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="table-wrap" style={{ marginTop: 16 }}>
+        <table className="dense">
+          <thead>
+            <tr>
+              <th>Repositório</th>
+              <th>Runs</th>
+              <th>Falhas</th>
+              <th>Taxa de falha</th>
+              <th>Recentes</th>
+              <th>MTTR</th>
+              <th>Flaky</th>
+              <th>Ambientes</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.by_repo.map((r) => {
+              const broken = sinceLabel(r.broken_since);
+              return (
+                <tr key={r.repo}>
+                  <td className="mono">{r.repo}</td>
+                  <td>{r.runs}</td>
+                  <td>{r.failed}</td>
+                  <td>{pct(r.failure_rate)}</td>
+                  <td>
+                    <RunSparkline runs={r.recent} />
+                  </td>
+                  <td className="caption mono" title="tempo médio até voltar ao verde">
+                    {mttrLabel(r.mttr_hours)}
+                  </td>
+                  <td>{r.flaky > 0 ? <span className="status-dot dot-col-blocked caption">{r.flaky}</span> : "—"}</td>
+                  <td className="caption mono muted">{r.envs.join(", ") || "—"}</td>
+                  <td>
+                    {broken ? (
+                      <span className="status-dot dot-col-failed caption" title="quebrado desde">
+                        quebrado {broken}
+                      </span>
+                    ) : (
+                      <span
+                        className={`status-dot ${OUTCOME_DOT[r.last_outcome ?? ""] ?? "dot-col-pending"} caption`}
+                      >
+                        {r.last_outcome ?? "—"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {report.top_failing_testcases.length > 0 && (
+        <>
+          <h4 className="section-title">Casos que mais falham (automação)</h4>
+          <div className="table-wrap">
+            <table className="dense">
+              <thead>
+                <tr>
+                  <th>CT</th>
+                  <th>Título</th>
+                  <th>Falhas</th>
+                  <th>Taxa de falha</th>
+                  <th>Repositórios</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.top_failing_testcases.map((c) => (
+                  <tr key={c.testcase_id}>
+                    <td className="mono">{c.testcase_id}</td>
+                    <td>{c.title ?? <span className="muted">— (CT ausente do índice)</span>}</td>
+                    <td>
+                      <span className="status-dot dot-col-failed caption">
+                        {c.failed}/{c.runs}
+                      </span>
+                    </td>
+                    <td>{pct(c.failure_rate)}</td>
+                    <td className="caption mono muted">{c.repos.join(", ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {report.flaky_testcases.length > 0 && (
+        <div className="defect-row caption" style={{ marginTop: 12 }}>
+          <span className="status-dot dot-col-blocked">
+            Flaky ({report.flaky_testcases.length})
+          </span>
+          <span className="mono muted">
+            {report.flaky_testcases.map((f) => f.testcase_id).join(", ")}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DefectsPanel({ report }: { report: DefectsReport | null }) {
   if (!report) return null;

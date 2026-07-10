@@ -120,6 +120,36 @@ def scan_target(
     return {"target": name, "scenarios": scenario_count, "features": feature_count}
 
 
+def list_feature_files(
+    local_path: Path, glob: str = "features/**/*.feature"
+) -> list[dict[str, Any]]:
+    """Lista .feature sob `local_path` sem tocar no índice (scan avulso).
+
+    Usado pelo formulário de target ANTES de ele existir/ser salvo — mostra
+    ao usuário o que o glob resolve de verdade, para ele escolher em vez de
+    digitar um path/glob às cegas.
+    """
+    if not local_path.is_dir():
+        raise FileNotFoundError(f"pasta não encontrada: {local_path}")
+    parser = Parser()
+    out: list[dict[str, Any]] = []
+    for feature_path in sorted(local_path.glob(glob)):
+        rel = feature_path.relative_to(local_path).as_posix()
+        scenarios = 0
+        parseable = True
+        try:
+            doc = parser.parse(feature_path.read_text(encoding="utf-8-sig"))
+            feature = doc.get("feature")
+            if feature:
+                scenarios = sum(
+                    1 for child in feature.get("children", []) if child.get("scenario")
+                )
+        except Exception:
+            parseable = False
+        out.append({"path": rel, "scenarios": scenarios, "parseable": parseable})
+    return out
+
+
 def scan_all_targets(ws, conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """Chamado pelo reindex completo: escaneia todos os targets da config."""
     results = []

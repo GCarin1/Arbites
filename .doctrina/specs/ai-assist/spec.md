@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-06
-**Version:** 0.2.0
+**Last updated:** 2026-07-10
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -31,6 +31,23 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   `POST /ai/negative-cases/{testcase_id}`.
 - The system shall validar a saída de geração de CTs contra schema
   Pydantic antes de apresentar o preview.
+- The system shall, ao pedir saída estruturada, guiar o modelo com um
+  **exemplo compacto preenchível** do JSON esperado — nunca com o dump do
+  JSON Schema (`$defs`/`properties`/`required`), que induz loops de
+  reconstrução de schema em modelos ≤ 9B.
+- The system shall solicitar `response_format: json_object` nos providers
+  OpenAI-compatíveis quando espera JSON (Gemini: `responseMimeType`), com
+  **fallback** transparente (repetir sem o campo) quando o endpoint não o
+  suporta.
+- The system shall, ao interpretar a saída, **descartar raciocínio vazado**
+  (`<think>…</think>` e afins) e escolher, dentre os objetos JSON
+  candidatos, o primeiro que **valida no schema** — ignorando planos/
+  reconstruções de schema emitidos antes dos dados.
+
+- The system shall expor `POST /import/ai` (upload .txt/.md/.xml) que usa a
+  IA para identificar casos de teste em texto livre, sugerir uma pasta e
+  convertê-los para BDD — sempre preview; o aceite é o `POST /testcases`
+  normal. Prompt enxuto (modelos ≤ 9B).
 
 ### Event-driven
 
@@ -42,18 +59,44 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   similares) e resultado esperado vago.
 - When o usuário solicita casos negativos, the system shall propor
   variações do CT positivo (campos vazios, caracteres especiais, limites).
+- When um provider local de raciocínio devolve `content` vazio mas preenche
+  `reasoning_content` (ex.: glm-4.7-flash via LM Studio), the system shall
+  usar `reasoning_content` como fonte de JSON de fallback antes de falhar.
+- When a resposta de conversão de import vem truncada (geração cortada por
+  timeout do modelo local — objeto JSON externo não fecha), the system shall
+  recuperar os casos de teste que saíram inteiros e apresentá-los como
+  preview parcial (com a pasta lida do cabeçalho), em vez de falhar sem
+  preview.
+- When o arquivo enviado para importação já está em Gherkin/BDD (contém
+  Scenario + passos Given/When/Then), the system shall separá-lo por um parser
+  determinístico e preservar o texto VERBATIM (Feature, título e cada passo,
+  inclusive múltiplos And), sem IA e sem exigir provider configurado — não
+  deve parafrasear, trocar a Feature pelo título, adicionar pontuação nem
+  fundir passos.
 
 ### State-driven
 
 - While nenhum provider está configurado (`default_provider: null`), the
   system shall ocultar/desabilitar as funções de IA mantendo todo o resto
   da plataforma funcional.
+- While a IA processa uma importação, the system shall submeter a conversão
+  apenas por ação explícita do usuário (botão "Enviar"), nunca no simples
+  `onChange` de seleção de arquivo, e sinalizar que modelos locais de
+  raciocínio podem levar minutos (timeout do cliente HTTP ≥ 300 s).
 
 ### Unwanted-behavior (must-not)
 
 - The system shall not gravar qualquer saída de IA no disco sem
   confirmação explícita do usuário na UI.
 - The system shall not armazenar chaves de API fora do keyring.
+- The system shall not incluir JSON Schema no prompt de saída estruturada,
+  nem falhar a conversão por raciocínio vazado ou por um objeto JSON extra
+  (schema reconstruído) preceder os dados válidos.
+- The system shall not anexar linhas não reconhecidas (cabeçalhos markdown
+  como `### CTxx - ...`, comentários, numeração, prosa entre cenários) ao
+  último passo de um cenário Gherkin durante o parse verbatim; apenas passos
+  Given/When/Then/And/But e linhas de tabela de dados (`| a | b |`) são
+  anexados.
 
 ### Optional
 
@@ -69,6 +112,36 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
    sem escrita no disco — verified by `backend/tests/test_ai_generate.py`.
 3. [verified] Plataforma opera integralmente com `providers: []` —
    verified by `backend/tests/test_ai_optional.py`.
+
+4. [verified] Arquivo livre vira preview BDD (pasta sugerida + Given/When/
+   Then), nada gravado sem aceite; extensão inválida/arquivo vazio → 422 —
+   verified by `backend/tests/test_ai_import.py`.
+
+5. [verified] Resposta com `<think>`, "Final Plan" e um objeto de schema
+   reconstruído antes dos dados ainda produz o `ImportConversion` correto; o
+   prompt leva exemplo compacto (não JSON Schema); `response_format:
+   json_object` é enviado, com fallback quando o servidor o rejeita (400) —
+   verified by `backend/tests/test_ai_import_robustness.py`.
+
+6. [verified] Resposta com `content` vazio e o JSON dentro de
+   `reasoning_content` (modelo de raciocínio) ainda produz o
+   `ImportConversion` correto — verified by
+   `backend/tests/test_ai_import_robustness.py`.
+
+7. [verified] Saída de import truncada no meio de um caso produz um
+   `ImportConversion` com os casos completos anteriores e a pasta recuperada
+   do cabeçalho; o caso incompleto é descartado — verified by
+   `backend/tests/test_ai_import_robustness.py`.
+
+8. [verified] Importar um .txt já em Gherkin devolve o corpo idêntico ao
+   enviado (Feature preservada, "que" e ambos os And intactos), com a pasta =
+   slug da Feature, sem tocar no provider de IA — verified by
+   `backend/tests/test_ai_import.py`.
+
+9. [verified] Um `### CTxx - ...` (cabeçalho markdown usado como separador
+   entre cenários no arquivo de origem) não aparece no corpo do cenário
+   anterior nem quebra a separação em dois cenários — verified by
+   `backend/tests/test_ai_import.py`.
 
 ## Maturity
 

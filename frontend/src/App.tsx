@@ -1,14 +1,17 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import type { TreeNode, Warning, WorkspaceInfo } from "./types";
 
-const Tree = lazy(() => import("./components/Tree").then((m) => ({ default: m.Tree })));
+const TcRepository = lazy(() =>
+  import("./components/TcRepository").then((m) => ({ default: m.TcRepository }))
+);
 const TestCaseEditor = lazy(() =>
   import("./components/TestCaseEditor").then((m) => ({ default: m.TestCaseEditor }))
 );
-const RequirementsList = lazy(() =>
-  import("./components/Requirements").then((m) => ({ default: m.RequirementsList }))
+const ReqRepository = lazy(() =>
+  import("./components/Requirements").then((m) => ({ default: m.ReqRepository }))
 );
 const RequirementEditor = lazy(() =>
   import("./components/Requirements").then((m) => ({ default: m.RequirementEditor }))
@@ -22,8 +25,8 @@ const ExecutionBoard = lazy(() =>
 const ExecutionCreate = lazy(() =>
   import("./components/Executions").then((m) => ({ default: m.ExecutionCreate }))
 );
-const ExecutionsList = lazy(() =>
-  import("./components/Executions").then((m) => ({ default: m.ExecutionsList }))
+const ExecutionsRepo = lazy(() =>
+  import("./components/Executions").then((m) => ({ default: m.ExecutionsRepo }))
 );
 const Dashboard = lazy(() =>
   import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
@@ -40,17 +43,24 @@ const AiAssist = lazy(() =>
 const Todos = lazy(() =>
   import("./components/Todos").then((m) => ({ default: m.Todos }))
 );
+const Defects = lazy(() =>
+  import("./components/Defects").then((m) => ({ default: m.Defects }))
+);
 const Daily = lazy(() =>
   import("./components/Daily").then((m) => ({ default: m.Daily }))
 );
 const Meetings = lazy(() =>
   import("./components/Meetings").then((m) => ({ default: m.Meetings }))
 );
+const Profile = lazy(() =>
+  import("./components/Profile").then((m) => ({ default: m.Profile }))
+);
 
 type Tab =
   | "testcases"
   | "requirements"
   | "executions"
+  | "defects"
   | "todos"
   | "daily"
   | "meetings"
@@ -58,12 +68,14 @@ type Tab =
   | "automation"
   | "ia"
   | "migration"
-  | "problems";
+  | "problems"
+  | "profile";
 
 const NAV: { key: Tab; label: string }[] = [
   { key: "testcases", label: "Test cases" },
   { key: "requirements", label: "Requisitos" },
   { key: "executions", label: "Execuções" },
+  { key: "defects", label: "Defeitos" },
   { key: "todos", label: "Afazeres" },
   { key: "daily", label: "Daily" },
   { key: "meetings", label: "Reuniões" },
@@ -72,7 +84,69 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "ia", label: "IA" },
   { key: "migration", label: "Migração" },
   { key: "problems", label: "Problemas" },
+  { key: "profile", label: "Perfil" },
 ];
+
+// Agrupamento semântico do menu (doc de ajustes §3)
+const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
+  { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
+  { title: "Acompanhamento", keys: ["defects", "todos", "dashboard", "daily", "meetings"] },
+  { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
+  { title: "Suporte", keys: ["problems", "profile"] },
+];
+
+const NAV_BY_KEY = Object.fromEntries(NAV.map((n) => [n.key, n])) as Record<
+  Tab,
+  { key: Tab; label: string }
+>;
+
+function loadJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function NavItem({
+  item,
+  tab,
+  setTab,
+  problemCount,
+  pinned,
+  onTogglePin,
+}: {
+  item: { key: Tab; label: string };
+  tab: Tab;
+  setTab: (t: Tab) => void;
+  problemCount: number;
+  pinned: boolean;
+  onTogglePin: () => void;
+}) {
+  return (
+    <div className={`nav-row ${tab === item.key ? "active" : ""}`}>
+      <button
+        className={`nav-item ${tab === item.key ? "active" : ""}`}
+        onClick={() => setTab(item.key)}
+        aria-current={tab === item.key ? "page" : undefined}
+      >
+        {item.label}
+        {item.key === "problems" && problemCount > 0 && (
+          <span className="count">{problemCount}</span>
+        )}
+      </button>
+      <button
+        className={`nav-pin ${pinned ? "pinned" : ""}`}
+        onClick={onTogglePin}
+        title={pinned ? "Desafixar do acesso rápido" : "Fixar no acesso rápido"}
+        aria-label={pinned ? `Desafixar ${item.label}` : `Fixar ${item.label}`}
+      >
+        {pinned ? "★" : "☆"}
+      </button>
+    </div>
+  );
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("testcases");
@@ -82,11 +156,32 @@ export default function App() {
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [selectedExec, setSelectedExec] = useState<string | null>(null);
+  const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reindexing, setReindexing] = useState(false);
   const [creatingCt, setCreatingCt] = useState(false);
+  const [pins, setPins] = useState<Tab[]>(() => loadJson<Tab[]>("arbites.pins", []));
+  const [collapsed, setCollapsed] = useState<string[]>(() =>
+    loadJson<string[]>("arbites.navCollapsed", []),
+  );
+
+  function togglePin(key: Tab) {
+    setPins((old) => {
+      const next = old.includes(key) ? old.filter((k) => k !== key) : [...old, key];
+      localStorage.setItem("arbites.pins", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function toggleGroup(title: string) {
+    setCollapsed((old) => {
+      const next = old.includes(title) ? old.filter((t) => t !== title) : [...old, title];
+      localStorage.setItem("arbites.navCollapsed", JSON.stringify(next));
+      return next;
+    });
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -139,8 +234,10 @@ export default function App() {
       setTab("executions");
     } else if (prefix === "TD") {
       setTab("todos");
+    } else if (prefix === "DF") {
+      setSelectedDefect(id);
+      setTab("defects");
     }
-    // DF (defeito) não tem view dedicada — sem navegação
   }, []);
 
   async function createTestcase(title: string, folder: string) {
@@ -174,123 +271,58 @@ export default function App() {
       <div className="app-body">
         <aside className="sidebar">
           <nav className="nav">
-            {NAV.map((item) => (
-              <button
-                key={item.key}
-                className={`nav-item ${tab === item.key ? "active" : ""}`}
-                onClick={() => setTab(item.key)}
-                aria-current={tab === item.key ? "page" : undefined}
-              >
-                {item.label}
-                {item.key === "problems" && problemCount > 0 && (
-                  <span className="count">{problemCount}</span>
-                )}
-              </button>
+            {pins.length > 0 && (
+              <div className="nav-group">
+                <div className="nav-group-title">
+                  <span>Acesso rápido</span>
+                </div>
+                {pins
+                  .filter((k) => NAV_BY_KEY[k])
+                  .map((k) => (
+                    <NavItem
+                      key={`pin-${k}`}
+                      item={NAV_BY_KEY[k]}
+                      tab={tab}
+                      setTab={setTab}
+                      problemCount={problemCount}
+                      pinned
+                      onTogglePin={() => togglePin(k)}
+                    />
+                  ))}
+              </div>
+            )}
+            {NAV_GROUPS.map((group) => (
+              <div key={group.title} className="nav-group">
+                <button
+                  className="nav-group-title"
+                  onClick={() => toggleGroup(group.title)}
+                  aria-expanded={!collapsed.includes(group.title)}
+                >
+                  <span>{group.title}</span>
+                  <span className="nav-chevron">
+                    {collapsed.includes(group.title) ? "▸" : "▾"}
+                  </span>
+                </button>
+                {!collapsed.includes(group.title) &&
+                  group.keys.map((k) => (
+                    <NavItem
+                      key={k}
+                      item={NAV_BY_KEY[k]}
+                      tab={tab}
+                      setTab={setTab}
+                      problemCount={problemCount}
+                      pinned={pins.includes(k)}
+                      onTogglePin={() => togglePin(k)}
+                    />
+                  ))}
+              </div>
             ))}
           </nav>
-          <div className="panel">
-            {tab === "testcases" && tree && (
-              <Suspense fallback={<p className="empty">Carregando árvore…</p>}>
-                <Tree root={tree} selected={selectedCt} onSelect={setSelectedCt} />
-              </Suspense>
-            )}
-            {tab === "requirements" && (
-              <Suspense fallback={<p className="empty">Carregando requisitos…</p>}>
-                <RequirementsList
-                  version={reqVersion}
-                  selected={selectedReq}
-                  onSelect={setSelectedReq}
-                  onCreated={(id) => {
-                    setSelectedReq(id);
-                    void refresh();
-                  }}
-                  onError={setError}
-                />
-              </Suspense>
-            )}
-            {tab === "executions" && (
-              <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
-                <ExecutionsList
-                  version={reqVersion}
-                  selected={selectedExec}
-                  onSelect={(id) => {
-                    setExecCreating(false);
-                    setSelectedExec(id);
-                  }}
-                  onNew={() => {
-                    setSelectedExec(null);
-                    setExecCreating(true);
-                  }}
-                  onError={setError}
-                />
-              </Suspense>
-            )}
-            {tab === "dashboard" && (
-              <p className="panel-hint">
-                Métricas, tendência e matriz de rastreabilidade no painel
-                principal. Cada linha da matriz expande até a evidência.
-              </p>
-            )}
-            {tab === "automation" && (
-              <p className="panel-hint">
-                Targets do arbites.yaml, re-scan de features e runs Behave
-                com log ao vivo no painel principal. Uma execução por
-                target; excedentes entram em fila FIFO.
-              </p>
-            )}
-            {tab === "ia" && (
-              <p className="panel-hint">
-                IA é opcional: configure providers (chaves no keyring) e gere,
-                revise ou proponha casos negativos no painel principal. Toda
-                saída é preview — nada é gravado sem você aceitar.
-              </p>
-            )}
-            {tab === "todos" && (
-              <p className="panel-hint">
-                Lista de afazeres com prazo, status e links para CT/execução/
-                story. Impedimentos (blocked) e concluídos ficam no histórico —
-                e alimentam a daily.
-              </p>
-            )}
-            {tab === "daily" && (
-              <p className="panel-hint">
-                Escolha o dia no calendário. A IA (opcional) digere afazeres +
-                atividade + diff de métricas + defeitos e gera o texto da daily
-                com action items — que viram afazeres.
-              </p>
-            )}
-            {tab === "meetings" && (
-              <p className="panel-hint">
-                Registre tema, data e o que foi falado (descrição ou
-                transcrição). A IA (opcional) gera o resumo executivo — e as
-                reuniões do dia entram na daily.
-              </p>
-            )}
-            {tab === "migration" && (
-              <p className="panel-hint">
-                Import do XML do Xray (preview → confirm, idempotente) no
-                painel principal. Export Markdown fica no próprio wizard.
-              </p>
-            )}
-            {tab === "problems" && (
-              <p className="panel-hint">
-                {problemCount === 0
-                  ? "Nenhum problema de integridade."
-                  : "Detalhes no painel principal."}
-              </p>
-            )}
-          </div>
-          {tab === "testcases" && (
-            <div className="actions">
-              <button className="primary" onClick={() => setCreatingCt(true)}>
-                Novo test case
-              </button>
-            </div>
-          )}
         </aside>
         <main className="main">
           <div className="main-inner">
           {error && <div className="error-banner">{error}</div>}
+          <ErrorBoundary key={tab}>
           {tab === "problems" ? (
             <Suspense fallback={<p className="empty">Carregando problemas…</p>}>
               <WarningsView warnings={warnings} />
@@ -307,6 +339,15 @@ export default function App() {
             <Suspense fallback={<p className="empty">Carregando IA…</p>}>
               <AiAssist onChanged={() => void refresh()} onError={setError} />
             </Suspense>
+          ) : tab === "defects" ? (
+            <Suspense fallback={<p className="empty">Carregando defeitos…</p>}>
+              <Defects
+                onError={setError}
+                onNavigate={navigateTo}
+                openId={selectedDefect}
+                onOpened={() => setSelectedDefect(null)}
+              />
+            </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
               <Todos onError={setError} onNavigate={navigateTo} />
@@ -319,6 +360,10 @@ export default function App() {
             <Suspense fallback={<p className="empty">Carregando reuniões…</p>}>
               <Meetings onError={setError} />
             </Suspense>
+          ) : tab === "profile" ? (
+            <Suspense fallback={<p className="empty">Carregando perfil…</p>}>
+              <Profile onError={setError} />
+            </Suspense>
           ) : tab === "migration" ? (
             <Suspense fallback={<p className="empty">Carregando migração…</p>}>
               <XrayImport onImported={() => void refresh()} onError={setError} />
@@ -326,6 +371,9 @@ export default function App() {
           ) : tab === "executions" ? (
             execCreating ? (
               <Suspense fallback={<p className="empty">Carregando criação…</p>}>
+                <div className="back-bar">
+                  <button onClick={() => setExecCreating(false)}>← Voltar</button>
+                </div>
                 <ExecutionCreate
                   onCreated={(id) => {
                     setExecCreating(false);
@@ -337,20 +385,33 @@ export default function App() {
               </Suspense>
             ) : selectedExec ? (
               <Suspense fallback={<p className="empty">Carregando execução…</p>}>
+                <div className="back-bar">
+                  <button onClick={() => setSelectedExec(null)}>← Voltar</button>
+                </div>
                 <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
               </Suspense>
             ) : (
-              <div className="empty-state">
-                <div className="empty-title">Nenhuma execução aberta</div>
-                <div className="empty-body">
-                  Selecione uma execução na lista ou crie uma nova para começar
-                  a registrar resultados.
-                </div>
-              </div>
+              <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
+                <ExecutionsRepo
+                  version={reqVersion}
+                  onOpen={(id) => {
+                    setExecCreating(false);
+                    setSelectedExec(id);
+                  }}
+                  onNew={() => {
+                    setSelectedExec(null);
+                    setExecCreating(true);
+                  }}
+                  onError={setError}
+                />
+              </Suspense>
             )
           ) : tab === "requirements" ? (
             selectedReq ? (
               <Suspense fallback={<p className="empty">Carregando requisito…</p>}>
+                <div className="back-bar">
+                  <button onClick={() => setSelectedReq(null)}>← Voltar</button>
+                </div>
                 <RequirementEditor
                   id={selectedReq}
                   onChanged={refresh}
@@ -361,16 +422,20 @@ export default function App() {
                 />
               </Suspense>
             ) : (
-              <div className="empty-state">
-                <div className="empty-title">Nenhum requisito selecionado</div>
-                <div className="empty-body">
-                  Selecione um epic ou story na lista à esquerda, ou crie um novo
-                  requisito.
-                </div>
-              </div>
+              <Suspense fallback={<p className="empty">Carregando requisitos…</p>}>
+                <ReqRepository
+                  version={reqVersion}
+                  onOpen={setSelectedReq}
+                  onChanged={() => void refresh()}
+                  onError={setError}
+                />
+              </Suspense>
             )
           ) : selectedCt ? (
             <Suspense fallback={<p className="empty">Carregando test case…</p>}>
+              <div className="back-bar">
+                <button onClick={() => setSelectedCt(null)}>← Voltar</button>
+              </div>
               <TestCaseEditor
                 id={selectedCt}
                 onChanged={refresh}
@@ -380,15 +445,20 @@ export default function App() {
                 }}
               />
             </Suspense>
+          ) : tree ? (
+            <Suspense fallback={<p className="empty">Carregando repositório…</p>}>
+              <TcRepository
+                root={tree}
+                onOpen={setSelectedCt}
+                onChanged={() => void refresh()}
+                onError={setError}
+                onNew={() => setCreatingCt(true)}
+              />
+            </Suspense>
           ) : (
-            <div className="empty-state">
-              <div className="empty-title">Nenhum test case selecionado</div>
-              <div className="empty-body">
-                Selecione um test case na árvore à esquerda ou crie um novo para
-                começar a editar.
-              </div>
-            </div>
+            <p className="empty">Carregando repositório…</p>
           )}
+          </ErrorBoundary>
           </div>
         </main>
       </div>

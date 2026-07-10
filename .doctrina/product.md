@@ -105,6 +105,9 @@ Out of scope (deferred or rejected):
 - [SC13] Registrar reuniões (tema, data, descrição ou transcrição) e obter
   um resumo executivo pela IA; as reuniões do dia entram na digestão da
   daily. IA opcional. (M12)
+- [SC14] Perfil do usuário com nome e memória de longo prazo em Markdown
+  (Preferências & Estilo / Contexto Ativo), editável na UI e injetada como
+  contexto em toda interação com IA, independente do provider. (M13)
 
 ## Delivery order (walking skeleton)
 

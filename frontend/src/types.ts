@@ -22,6 +22,7 @@ export interface Requirement {
   confluence_url: string | null;
   tags: string[];
   squad: string | null;
+  created?: string | null;
   path: string;
   body?: string;
 }
@@ -137,6 +138,7 @@ export interface TreeNode {
     title: string;
     type: string | null;
     status: string | null;
+    created: string | null;
   }[];
 }
 
@@ -214,6 +216,8 @@ export interface Defect {
   execution_id: string | null;
   external_key: string | null;
   path: string;
+  opened_at: string | null;
+  body?: string;
 }
 
 export interface MetricValue {
@@ -265,6 +269,74 @@ export interface DefectsReport {
   by_squad: Record<string, number>;
   aging_buckets: Record<string, number>;
   items: DefectItem[];
+}
+
+export interface AutomationRepoRow {
+  repo: string;
+  runs: number;
+  passed: number;
+  failed: number;
+  other: number;
+  pass_rate: number | null;
+  failure_rate: number | null;
+  envs: string[];
+  last_run_at: string | null;
+  last_outcome: string | null;
+  recent: { at: string; outcome: string }[];
+  mttr_hours: number | null;
+  broken_since: string | null;
+  flaky: number;
+}
+
+export interface AutomationFailingCt {
+  testcase_id: string;
+  title: string | null;
+  failed: number;
+  runs: number;
+  failure_rate: number | null;
+  repos: string[];
+}
+
+export interface AutomationReport {
+  total_runs: number;
+  passed_runs: number;
+  failed_runs: number;
+  pass_rate: number | null;
+  by_repo: AutomationRepoRow[];
+  by_env: { env: string; runs: number; failed: number; failure_rate: number | null }[];
+  envs: string[];
+  env_filter: string | null;
+  top_failing_testcases: AutomationFailingCt[];
+  flaky_testcases: { testcase_id: string; title: string | null; repos: string[] }[];
+  unparsed: number;
+  pattern: string;
+  pattern_error: string | null;
+}
+
+export interface ActivityDay {
+  date: string;
+  executions: number;
+  defects: number;
+  testcases: number;
+  requirements: number;
+  auto_runs: number;
+  total: number;
+}
+
+export interface ActivityHeatmapData {
+  from: string;
+  to: string;
+  days: ActivityDay[];
+  totals: {
+    executions: number;
+    defects: number;
+    testcases: number;
+    requirements: number;
+    auto_runs: number;
+    total: number;
+  };
+  years: number[];
+  year_filter: number | null;
 }
 
 export interface MatrixLastResult {

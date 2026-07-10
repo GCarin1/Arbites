@@ -2,10 +2,10 @@
 
 **Capability:** local-automation
 **Status:** active
-**Implementation:** verified — M3 (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
+**Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
-**Last updated:** 2026-07-04
-**Version:** 0.2.0
+**Last updated:** 2026-07-10
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -37,6 +37,23 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   interface de adapter, com testes de contrato sobre JSONs de exemplo
   versionados.
 
+- The system shall expor `GET /targets/{name}/features` (arquivos .feature e
+  tags do target) para os dropdowns do run, e aceitar `feature` opcional em
+  `POST /runs/local` (argumento posicional do behave).
+- The system shall listar e servir artefatos pós-execução do target
+  (`./logs`, `./screenshots`, `./analise`) via
+  `GET /targets/{name}/artifacts[/file]`, com guarda de path traversal.
+- The system shall expor edição visual do `.env` do target
+  (`GET/PUT /targets/{name}/env` + `GET /env/catalog`), preservando
+  comentários e linhas desconhecidas no PUT.
+- The system shall expor `PUT /targets`, substituindo `automation_targets`
+  no `arbites.yaml` por inteiro (mesmo padrão de `PUT /ai/providers`) —
+  cadastro de target não exige editar o YAML manualmente.
+- The system shall expor `GET /automation/browse-features` que escaneia
+  `local_path` em busca de arquivos `.feature` (sem exigir que o target já
+  exista/esteja salvo) e devolve caminho relativo + contagem de cenários de
+  cada um, para o usuário escolher em vez de digitar um glob às cegas.
+
 ### Event-driven
 
 - When um run é solicitado para um target já em execução, the system shall
@@ -48,6 +65,9 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   `error: "timeout"` e encerrar o subprocess.
 - When o run termina, the system shall parsear o JSON do Behave e popular
   os `results[]` com steps Gherkin e evidências.
+- When o usuário salva a configuração de targets pela UI, the system shall
+  reescanear cada target salvo (mesmo comportamento de `POST
+  /targets/{name}/scan`), populando cenários/warnings imediatamente.
 
 ### State-driven
 
@@ -79,12 +99,30 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 4. [verified] Screenshot de falha do hook aparece hasheado em
    `evidences/` — verified by `backend/tests/test_local_runs.py`.
 
+5. [verified] Features e tags do target expostos p/ seleção; run aceita
+   feature específico — verified by `backend/tests/test_automation_flow.py`.
+6. [verified] Artefatos listados e baixáveis com traversal bloqueado —
+   verified by `backend/tests/test_automation_flow.py`.
+7. [verified] `.env` editável por chave com comentários preservados e
+   catálogo com descrições — verified by `backend/tests/test_automation_flow.py`.
+
+8. [verified] Salvar um target pela UI persiste em `arbites.yaml`, aparece
+   em `GET /targets` com a contagem de cenários já escaneada, e um target
+   com `local_path` inexistente não derruba a rota — verified by
+   `backend/tests/test_automation_targets_config.py`.
+
+9. [verified] `GET /automation/browse-features` lista os `.feature`
+   encontrados (caminho relativo + nº de cenários) para um `local_path`
+   arbitrário, mesmo sem target salvo; caminho inexistente é rejeitado
+   (422) — verified by `backend/tests/test_automation_targets_config.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
 - Runs locais Behave com SSE, fila, timeout, parse JSON, evidências via
-  hooks.
+  hooks; cadastro de targets pela UI (sem editar `arbites.yaml` na mão) com
+  descoberta de `.feature` por scan do repositório.
 
 **Future (aspirational, not committed):**
 

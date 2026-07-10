@@ -297,7 +297,76 @@ textarea.raw {
   flex-direction: column;
   gap: 2px;
   padding: var(--s1);
-  border-bottom: 1px solid var(--border);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Grupos semânticos do menu (colapsáveis) */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.nav-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 24px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+button.nav-group-title:hover {
+  color: var(--text-muted);
+  background: none;
+  border: none;
+}
+.nav-chevron {
+  font-size: 10px;
+}
+
+/* Linha do item: botão de navegação + pin que aparece no hover */
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.nav-row .nav-item {
+  flex: 1;
+  min-width: 0;
+}
+.nav-pin {
+  height: 28px;
+  width: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+  background: none;
+  border: none;
+  color: var(--text-subtle);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.nav-row:hover .nav-pin,
+.nav-pin.pinned {
+  opacity: 1;
+}
+.nav-pin:hover {
+  background: var(--surface-hover);
+  border: none;
+  color: var(--text);
+}
+.nav-pin.pinned {
+  color: var(--warning);
 }
 .nav-item {
   height: var(--h-control);
@@ -345,18 +414,6 @@ textarea.raw {
   color: var(--text);
 }
 
-.sidebar .panel {
-  overflow-y: auto;
-  flex: 1;
-  padding: var(--s1);
-  min-height: 0;
-}
-.sidebar .panel-hint {
-  color: var(--text-muted);
-  font-size: var(--fs-caption);
-  padding: var(--s1);
-  line-height: 1.5;
-}
 .sidebar .actions {
   padding: var(--s1);
   border-top: 1px solid var(--border);
@@ -924,6 +981,200 @@ table.dense tbody tr:hover td {
 .kanban-card:active {
   cursor: grabbing;
 }
+.kanban-card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kanban-card-title {
+  margin-top: 4px;
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.kanban-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* barra segmentada: um pedaço por passo, cor pelo status (enche até onde foi) */
+.stepbar {
+  display: flex;
+  flex: 1;
+  gap: 1px;
+  height: 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.stepbar-seg {
+  flex: 1;
+}
+.seg-pending { background: transparent; }
+.seg-passed { background: var(--success); }
+.seg-failed { background: var(--danger); }
+.seg-blocked { background: var(--warning); }
+/* barra empilhada da execução: um segmento por status, cor da coluna */
+.exec-stack {
+  display: flex;
+  gap: 1px;
+  padding: 0;
+}
+.exec-seg:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.exec-seg:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.exec-seg.col-pending { background: var(--text-subtle); }
+.exec-seg.col-in_progress { background: var(--primary); }
+.exec-seg.col-blocked { background: var(--warning); }
+.exec-seg.col-failed { background: var(--danger); }
+.exec-seg.col-retest { background: var(--retest); }
+.exec-seg.col-passed { background: var(--success); }
+
+/* ------------------------------------------------- Activity heatmap */
+/* Preenche a largura do card: colunas flexíveis (flex:1) e células que
+   escalam por aspect-ratio — card maior = quadrados maiores. */
+.heatmap {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: stretch;
+}
+.heatmap-weekdays {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 20px; /* abaixo da linha de meses */
+  flex: 0 0 auto;
+}
+.heatmap-weekday {
+  flex: 1;
+  min-height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 26px;
+}
+.heatmap-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.heatmap-months {
+  display: flex;
+  gap: 4px;
+  height: 20px;
+}
+.heatmap-month {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+.heatmap-grid {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+.heatmap-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.heatmap-cell {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.heatmap-empty {
+  visibility: hidden;
+}
+.heat-0 { background: var(--surface); }
+.heat-1 { background: color-mix(in srgb, var(--success) 25%, var(--surface)); }
+.heat-2 { background: color-mix(in srgb, var(--success) 50%, var(--surface)); }
+.heat-3 { background: color-mix(in srgb, var(--success) 75%, var(--surface)); }
+.heat-4 { background: var(--success); }
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+/* na legenda as células têm tamanho fixo (não escalam) */
+.heatmap-legend .heatmap-cell {
+  width: 12px;
+  height: 12px;
+  aspect-ratio: auto;
+  flex: 0 0 auto;
+}
+/* tooltip flutuante no cursor — mostra as mudanças do dia */
+.heatmap-tip {
+  position: fixed;
+  transform: translate(14px, 14px);
+  z-index: 60;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  max-width: 260px;
+}
+.heatmap-tip-title {
+  font-size: var(--fs-caption);
+}
+.heatmap-tip-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+/* cabeçalho de seção com controles à direita (ex.: filtro de ambiente) */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: var(--s3) 0 var(--s2);
+}
+/* sparkline de runs recentes de automação (um quadradinho por run) */
+.run-spark {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.run-cell {
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--text-subtle);
+}
+.run-cell.run-passed { background: var(--success); }
+.run-cell.run-failed { background: var(--danger); }
+.run-cell.run-blocked { background: var(--warning); }
+.run-cell.run-partial { background: var(--primary); }
+.run-cell.run-no_results { background: var(--text-subtle); }
+.kanban-card-meta {
+  display: flex;
+  gap: var(--s2);
+  margin-top: 4px;
+}
 .dot-col-pending { --dot: var(--text-subtle); }
 .dot-col-in_progress { --dot: var(--primary); }
 .dot-col-blocked { --dot: var(--warning); }
@@ -1174,6 +1425,87 @@ a {
   color: #c9d1d9;
 }
 
+/* ------------------------------------------------- Repositório (§1.1) */
+
+.back-bar {
+  margin-bottom: var(--s2);
+}
+.repo-tree {
+  padding: var(--s1);
+  min-height: 320px;
+  max-height: calc(100vh - var(--h-header) - 160px);
+  overflow-y: auto;
+}
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 1px 8px;
+  border-radius: var(--r-control);
+}
+/* conectores de árvore (box-drawing) — monospace p/ alinhamento exato */
+.tree-prefix {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  color: var(--text-subtle);
+  white-space: pre;
+  user-select: none;
+  flex: 0 0 auto;
+  letter-spacing: 0;
+}
+.repo-row:hover {
+  background: var(--surface-hover);
+}
+.repo-row .repo-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.repo-row:hover .repo-actions {
+  opacity: 1;
+}
+.repo-folder-name {
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.repo-file-main {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* NÃO herdar center do estilo base de button */
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-weight: 400;
+  cursor: pointer;
+}
+.repo-file-main:hover:not(:disabled) {
+  background: none;
+  border: none;
+  color: var(--primary);
+}
+.repo-file-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-file.dragging {
+  opacity: 0.4;
+}
+.repo-row.drop-target,
+.repo-tree.drop-target {
+  outline: 2px dashed var(--primary);
+  outline-offset: -2px;
+  background: var(--selected);
+}
+
 /* ----------------------------------------------------------- Reuniões */
 
 .meeting-summary {
@@ -1285,6 +1617,89 @@ a {
   background: var(--surface-hover);
   border: none;
 }
+/* Cards de afazeres (doc §1.4) — bloco de anotações / sticky notes */
+.todo-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+  align-items: start;
+}
+.todo-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.todo-card.selected {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+.todo-card.note-open { border-left-color: var(--text-subtle); }
+.todo-card.note-doing { border-left-color: var(--primary); }
+.todo-card.note-blocked { border-left-color: var(--warning); }
+.todo-card.note-done { border-left-color: var(--success); opacity: 0.75; }
+.todo-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.todo-card-title {
+  /* trunca em 2 linhas com reticências — o card não cresce com o título */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.todo-card-title:hover {
+  background: none;
+  border: none;
+  color: var(--primary);
+}
+.todo-card-meta {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.todo-card-links {
+  display: flex;
+  flex-wrap: wrap;
+}
+.todo-card-body {
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+.todo-card-body .doc-body {
+  background: var(--bg);
+  border: none;
+  padding: var(--s1);
+}
+.todo-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+}
+
 .todo-desc-row td {
   background: var(--bg);
   /* `overflow-wrap: anywhere` zera a min-content-width da célula: a tabela

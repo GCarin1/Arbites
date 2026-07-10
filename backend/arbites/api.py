@@ -10,7 +10,7 @@ import asyncio
 import os
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape as _xml_escape
@@ -36,7 +36,7 @@ from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .executions import ExecutionError
-from .gherkin_scan import scan_target
+from .gherkin_scan import list_feature_files, scan_target
 from .runner import RunManager
 from .xray_import import XrayImportError
 from .indexer import connect, reindex_file, reindex_full
@@ -108,6 +108,19 @@ class RawIn(BaseModel):
     content: str
 
 
+class FolderIn(BaseModel):
+    path: str  # relativo a <área>/, ex.: "frontend/login"
+
+
+class FolderMoveIn(BaseModel):
+    path: str  # pasta de origem, relativa a <área>/
+    dest: str = ""  # pasta de destino, relativa a <área>/ (vazio = raiz)
+
+
+class MoveIn(BaseModel):
+    folder: str = ""  # destino relativo (vazio = raiz)
+
+
 class ExecutionCreate(BaseModel):
     name: str
     sprint: str | None = None
@@ -136,10 +149,16 @@ class StepStatusIn(BaseModel):
     who: str = "local"
 
 
+class DefectLinkIn(BaseModel):
+    defect_id: str
+    who: str = "local"
+
+
 class LocalRunIn(BaseModel):
     target: str
     tags: list[str] = []
     testcase_ids: list[str] = []
+    feature: str | None = None  # .feature específico (behave <arquivo> --tags=)
 
 
 class CIRunIn(BaseModel):
@@ -147,6 +166,35 @@ class CIRunIn(BaseModel):
     ref: str | None = None
     tags: list[str] = []
     testcase_ids: list[str] = []
+    feature: str | None = None
+    environment: str | None = None  # dev | cer | prd
+    browser: str | None = None  # chrome (padrão CI)
+    source_repo: str | None = None  # repositório que disparou
+
+
+class EnvIn(BaseModel):
+    values: dict[str, str] = {}
+
+
+class ProfileIn(BaseModel):
+    name: str | None = None
+    memory: str | None = None
+
+
+PROFILE_TEMPLATE = """## Preferências & Estilo
+
+<!-- Como você prefere que a IA interaja: tom, formato de resposta,
+tecnologias utilizadas, convenções do seu time. -->
+
+-
+
+## Contexto Ativo
+
+<!-- O que está em andamento: projetos, decisões recentes, informações
+relevantes. Mantenha vivo — remova o que ficou desatualizado. -->
+
+-
+"""
 
 
 class TokenIn(BaseModel):
@@ -164,6 +212,20 @@ class AIProvidersIn(BaseModel):
     default_provider: str | None = None
     providers: list[AIProviderConfig] = []
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
+
+
+class AutomationTargetIn(BaseModel):
+    name: str
+    kind: str = "behave"
+    local_path: str
+    features_glob: str = "features/**/*.feature"
+    python_path: str | None = None
+    working_dir: str | None = None
+    timeout_minutes: float | None = None
+
+
+class AutomationTargetsIn(BaseModel):
+    targets: list[AutomationTargetIn] = []
 
 
 class GenerateIn(BaseModel):
@@ -239,18 +301,55 @@ class MeetingSummarizeIn(BaseModel):
     provider: str | None = None
 
 
-DEFAULT_TC_BODY = """## Objetivo
+# Catálogo do .env do projeto de automação (doc de ajustes §1.5.1 etapa 5)
+ENV_CATALOG: list[dict[str, str]] = [
+    {"section": "Credenciais de Teste", "key": "TEST_DOCUMENTO", "description": "Documento (CPF) utilizado para login nos testes"},
+    {"section": "Credenciais de Teste", "key": "TEST_SENHA", "description": "Senha do usuário de teste"},
+    {"section": "URLs", "key": "BASE_URL", "description": "URL base da aplicação sob teste"},
+    {"section": "WebDriver Local", "key": "EDGE_DRIVER_PATH", "description": "Caminho personalizado para o msedgedriver (opcional)"},
+    {"section": "WebDriver Local", "key": "HEADLESS", "description": "Executar sem interface gráfica (true/false)"},
+    {"section": "WebDriver Manager", "key": "USE_WEBDRIVER_MANAGER", "description": "Se true, baixa o driver automaticamente via webdriver_manager"},
+    {"section": "WebDriver Manager", "key": "LOCAL_BROWSER", "description": "Navegador para execução local (edge, chrome)"},
+    {"section": "Timeouts", "key": "PAGE_LOAD_TIMEOUT", "description": "Timeout de carregamento de página (segundos)"},
+    {"section": "Timeouts", "key": "SCRIPT_TIMEOUT", "description": "Timeout de execução de scripts (segundos)"},
+    {"section": "Timeouts", "key": "ELEMENT_WAIT_TIMEOUT", "description": "Timeout de espera por elementos (segundos)"},
+    {"section": "BrowserStack — Ativação", "key": "USE_BROWSERSTACK", "description": "Ativar execução remota no BrowserStack (true/false)"},
+    {"section": "BrowserStack — Credenciais", "key": "BROWSERSTACK_USERNAME", "description": "Username da conta BrowserStack"},
+    {"section": "BrowserStack — Credenciais", "key": "BROWSERSTACK_ACCESS_KEY", "description": "Access Key da conta BrowserStack"},
+    {"section": "BrowserStack — Projeto", "key": "BROWSERSTACK_PROJECT_NAME", "description": "Nome do projeto no BrowserStack"},
+    {"section": "BrowserStack — Projeto", "key": "BROWSERSTACK_BUILD_NAME", "description": "Nome da build/execução"},
+    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_OS", "description": "Sistema operacional (Windows, OS X)"},
+    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_OS_VERSION", "description": "Versão do SO (11, 10, Ventura, etc.)"},
+    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_BROWSER", "description": "Navegador (Chrome, Firefox, Edge, Safari)"},
+    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_BROWSER_VERSION", "description": "Versão do navegador (latest, 120.0, etc.)"},
+    {"section": "BrowserStack — Local Testing", "key": "BROWSERSTACK_LOCAL", "description": "Testar URLs internas/localhost (true/false)"},
+    {"section": "Ambiente", "key": "ENVIRONMENT", "description": "Ambiente de execução (dev, staging, prod)"},
+    {"section": "Ambiente", "key": "DEBUG", "description": "Habilitar logs de debug (true/false)"},
+    {"section": "Logger", "key": "LOG_ENABLED", "description": "Habilitar/desabilitar logs (true/false)"},
+    {"section": "Logger", "key": "LOG_LEVEL", "description": "Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)"},
+    {"section": "Logger", "key": "LOG_SAVE_TO_FILE", "description": "Salvar logs em arquivo (true/false)"},
+    {"section": "Logger", "key": "LOG_SHOW_CONSOLE", "description": "Exibir logs no console (true/false)"},
+    {"section": "Logger", "key": "LOG_MAX_FILE_SIZE", "description": "Tamanho máximo do arquivo de log em bytes"},
+    {"section": "Logger", "key": "LOG_BACKUP_COUNT", "description": "Quantidade de arquivos de backup de log"},
+    {"section": "Análise de Logs com IA", "key": "AI_LOG_ANALYZER_ENABLED", "description": "Habilitar análise de logs com IA (true/false)"},
+    {"section": "Análise de Logs com IA", "key": "OPENAI_API_KEY", "description": "Chave de API da OpenAI ou B3GPT"},
+    {"section": "Análise de Logs com IA", "key": "OPENAI_BASE_URL", "description": "URL base da API (vazio para OpenAI padrão)"},
+    {"section": "Análise de Logs com IA", "key": "OPENAI_API_VERSION", "description": "Versão da API (necessário para B3GPT/Azure)"},
+    {"section": "Análise de Logs com IA", "key": "OPENAI_MODEL", "description": "Modelo a ser utilizado (gpt-4o-mini, etc.)"},
+    {"section": "Análise de Logs com IA", "key": "OPENAI_MAX_TOKENS", "description": "Máximo de tokens na resposta"},
+    {"section": "Análise de Logs com IA", "key": "OPENAI_TEMPERATURE", "description": "Temperatura (0.0 = preciso, 1.0 = criativo)"},
+    {"section": "Análise de Logs com IA", "key": "AI_ANALYZE_ON_FAILURE_ONLY", "description": "Analisar apenas em falhas (true/false)"},
+    {"section": "Análise de Logs com IA", "key": "AI_SAVE_ANALYSIS_TO_FILE", "description": "Salvar análises em arquivo (true/false)"},
+    {"section": "Análise de Logs com IA", "key": "AI_MAX_LOG_LINES", "description": "Máximo de linhas do log enviadas para análise"},
+]
 
-## Pré-condições
+# Formato canônico BDD (doc de ajustes §1.1) — steps extraídos de Given/When/Then
+DEFAULT_TC_BODY = """Feature: [Nome da Feature]
 
--
-
-## Passos
-
-1.
-
-## Resultado esperado
-
+  Scenario: [Nome do Cenário]
+    Given [pré-condição]
+    When [ação executada]
+    Then [resultado esperado]
 """
 
 
@@ -475,7 +574,9 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         by_path = {
             row["path"]: dict(row)
-            for row in conn.execute("SELECT id, title, type, status, path FROM testcases")
+            for row in conn.execute(
+                "SELECT id, title, type, status, path, created FROM testcases"
+            )
         }
 
         def walk(directory: Path) -> dict:
@@ -498,6 +599,7 @@ def _register_routes(app: FastAPI) -> None:
                             "title": meta["title"] if meta else child.stem,
                             "type": meta["type"] if meta else None,
                             "status": meta["status"] if meta else None,
+                            "created": meta["created"] if meta else None,
                         }
                     )
             return node
@@ -539,6 +641,7 @@ def _register_routes(app: FastAPI) -> None:
             "status": payload.status,
             "external_key": payload.external_key,
             "tags": payload.tags,
+            "created": date.today().isoformat(),
         }
         if payload.squad:
             meta["squad"] = payload.squad
@@ -645,6 +748,68 @@ def _register_routes(app: FastAPI) -> None:
         reindex_file(ws, conn, path)
         return _tc_out(conn, ws, new_id)
 
+    # -- repositório de pastas (doc de ajustes §1.1) ------------------------
+    # ATENÇÃO: rotas estáticas ("/testcases/folders") DEVEM vir antes das
+    # dinâmicas ("/testcases/{entity_id}"), senão o FastAPI captura "folders"
+    # como entity_id e devolve 404.
+
+    def _safe_area_dir(ws: Workspace, area: str, folder: str) -> Path:
+        """Resolve <area>/<folder> com guarda de path traversal."""
+        base = ws.root / area
+        folder = (folder or "").strip("/").replace("\\", "/")
+        target = base / folder if folder else base
+        if not str(target.resolve()).startswith(str(base.resolve())):
+            raise _error(422, "invalid_folder", f"folder fora de {area}/")
+        return target
+
+    @app.post(API_PREFIX + "/testcases/folders", status_code=201)
+    async def create_tc_folder(request: Request, payload: FolderIn):
+        ws = ws_of(request)
+        target = _safe_area_dir(ws, "testcases", payload.path)
+        if target == ws.root / "testcases":
+            raise _error(422, "invalid_folder", "informe o nome da pasta")
+        target.mkdir(parents=True, exist_ok=True)
+        return {"path": ws.relpath(target)}
+
+    @app.delete(API_PREFIX + "/testcases/folders", status_code=204)
+    async def delete_tc_folder(request: Request, path: str = ""):
+        ws, conn = ws_of(request), conn_of(request)
+        target = _safe_area_dir(ws, "testcases", path)
+        if target == ws.root / "testcases" or not target.is_dir():
+            raise _error(422, "invalid_folder", "pasta inválida")
+        affected = list(target.rglob("*.md"))
+        ws.trash(target)  # move a pasta inteira p/ a lixeira
+        for md in affected:
+            reindex_file(ws, conn, md)  # não existe mais → remove do índice
+        return None
+
+    @app.post(API_PREFIX + "/testcases/folders/move")
+    async def move_tc_folder(request: Request, payload: FolderMoveIn):
+        # rota estática ("/testcases/folders/move") ANTES de "/testcases/{entity_id}"
+        # (mesma armadilha de roteamento das demais rotas de pasta acima).
+        ws, conn = ws_of(request), conn_of(request)
+        src = _safe_area_dir(ws, "testcases", payload.path)
+        if src == ws.root / "testcases" or not src.is_dir():
+            raise _error(422, "invalid_folder", "pasta de origem inválida")
+        dest_parent = _safe_area_dir(ws, "testcases", payload.dest)
+        dest = dest_parent / src.name
+        if dest.resolve() == src.resolve():
+            return {"path": ws.relpath(src)}  # já está lá — no-op
+        if str(dest.resolve()).startswith(str(src.resolve()) + os.sep):
+            raise _error(
+                422, "invalid_folder", "não é possível mover uma pasta para dentro dela mesma"
+            )
+        if dest.exists():
+            raise _error(409, "conflict", f"{src.name} já existe no destino")
+        affected = list(src.rglob("*.md"))  # caminhos antigos, antes do rename
+        dest_parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dest)
+        for old_md in affected:
+            reindex_file(ws, conn, old_md)  # caminho antigo não existe mais → remove
+        for new_md in dest.rglob("*.md"):
+            reindex_file(ws, conn, new_md)  # indexa no caminho novo
+        return {"path": ws.relpath(dest)}
+
     @app.get(API_PREFIX + "/testcases/{entity_id}")
     async def get_testcase(request: Request, entity_id: str):
         return _tc_out(conn_of(request), ws_of(request), entity_id)
@@ -688,6 +853,22 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "testcases", entity_id)
         (ws.root / rel).write_text(payload.content, encoding="utf-8")
         reindex_file(ws, conn, ws.root / rel)
+        return _tc_out(conn, ws, entity_id)
+
+    @app.post(API_PREFIX + "/testcases/{entity_id}/move")
+    async def move_testcase(request: Request, entity_id: str, payload: MoveIn):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "testcases", entity_id)
+        src = ws.root / rel
+        dest_dir = _safe_area_dir(ws, "testcases", payload.folder)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / src.name
+        if dest.resolve() != src.resolve():
+            if dest.exists():
+                raise _error(409, "conflict", f"{dest.name} já existe no destino")
+            src.rename(dest)
+            reindex_file(ws, conn, src)   # remove o caminho antigo do índice
+            reindex_file(ws, conn, dest)  # indexa o novo
         return _tc_out(conn, ws, entity_id)
 
     # -- executions (M1) ---------------------------------------------------
@@ -818,6 +999,25 @@ def _register_routes(app: FastAPI) -> None:
         _save_and_index(ws, conn, execution)
         return execution
 
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/defects")
+    async def post_link_defect(
+        request: Request, exec_id: str, ct_id: str, payload: DefectLinkIn
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        _find_path(conn, "defects", payload.defect_id)  # 404 se o defeito não existe
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.link_defect(execution, ct_id, payload.defect_id, payload.who)
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.delete(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/defects/{defect_id}")
+    async def delete_link_defect(request: Request, exec_id: str, ct_id: str, defect_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.unlink_defect(execution, ct_id, defect_id, "local")
+        _save_and_index(ws, conn, execution)
+        return execution
+
     @app.post(API_PREFIX + "/executions/{exec_id}/close")
     async def close_execution(request: Request, exec_id: str):
         ws, conn = ws_of(request), conn_of(request)
@@ -861,6 +1061,18 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/metrics/defects")
     async def metrics_defects(request: Request, squad: str = ""):
         return metrics_ops.defects_report(conn_of(request), squad or None)
+
+    @app.get(API_PREFIX + "/metrics/activity")
+    async def metrics_activity(request: Request, days: int = 371, year: int = 0):
+        return metrics_ops.activity_heatmap(conn_of(request), days, year or None)
+
+    @app.get(API_PREFIX + "/metrics/automation")
+    async def metrics_automation(request: Request, days: int = 0, env: str = ""):
+        ws = ws_of(request)
+        pattern = (ws.config().get("ci_monitoring") or {}).get("name_pattern")
+        return metrics_ops.automation_report(
+            conn_of(request), pattern, days or None, env or None
+        )
 
     @app.get(API_PREFIX + "/metrics/traceability")
     async def metrics_traceability(
@@ -937,10 +1149,7 @@ def _register_routes(app: FastAPI) -> None:
                 return target
         raise _error(404, "not_found", f"target '{name}' não configurado")
 
-    @app.get(API_PREFIX + "/targets")
-    async def list_targets(request: Request):
-        ws, conn = ws_of(request), conn_of(request)
-        runner: RunManager = request.app.state.runner
+    def _targets_out(ws: Workspace, conn, runner: RunManager) -> list[dict]:
         out = []
         for target in ws.config().get("automation_targets") or []:
             name = target.get("name")
@@ -953,16 +1162,170 @@ def _register_routes(app: FastAPI) -> None:
                     "kind": target.get("kind", "behave"),
                     "local_path": target.get("local_path"),
                     "features_glob": target.get("features_glob"),
+                    "python_path": target.get("python_path"),
+                    "working_dir": target.get("working_dir"),
+                    "timeout_minutes": target.get("timeout_minutes"),
                     "scenarios": scenarios,
                     "queue_length": runner.queue_length(str(name)),
                 }
             )
         return out
 
+    @app.get(API_PREFIX + "/targets")
+    async def list_targets(request: Request):
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        return _targets_out(ws, conn, runner)
+
+    @app.put(API_PREFIX + "/targets")
+    async def put_targets(request: Request, payload: AutomationTargetsIn):
+        """Substitui `automation_targets` no arbites.yaml (mesmo padrão do
+        PUT /ai/providers) — sem precisar abrir o YAML na mão."""
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        import yaml as _yaml
+
+        config = ws.config()
+        config["automation_targets"] = [
+            t.model_dump(exclude_none=True) for t in payload.targets
+        ]
+        ws.config_path.write_text(
+            _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        for target in config["automation_targets"]:
+            scan_target(ws, conn, target)  # já popula cenários/warnings
+        return _targets_out(ws, conn, runner)
+
+    @app.get(API_PREFIX + "/automation/browse-features")
+    async def browse_feature_files(
+        request: Request,
+        local_path: str,
+        features_glob: str = "features/**/*.feature",
+    ):
+        """Lista os .feature encontrados em `local_path` (scan avulso, sem
+        exigir que o target já exista) — para o form de target mostrar a
+        lista real em vez do usuário digitar um glob às cegas."""
+        path = Path(local_path)
+        if not path.is_dir():
+            raise _error(422, "invalid_path", f"pasta não encontrada: {local_path}")
+        try:
+            features = list_feature_files(path, features_glob)
+        except Exception as exc:
+            raise _error(422, "scan_error", f"falha ao escanear: {exc}") from exc
+        return {"local_path": local_path, "features": features}
+
     @app.post(API_PREFIX + "/targets/{name}/scan")
     async def scan_target_route(request: Request, name: str):
         ws, conn = ws_of(request), conn_of(request)
         return scan_target(ws, conn, _find_target(ws, name))
+
+    @app.get(API_PREFIX + "/targets/{name}/features")
+    async def target_features(request: Request, name: str):
+        """Arquivos .feature e tags do target (para os dropdowns do run)."""
+        conn = conn_of(request)
+        rows = conn.execute(
+            "SELECT feature_path, tag, scenario_name FROM scenarios WHERE target = ?"
+            " ORDER BY feature_path, line",
+            (name,),
+        ).fetchall()
+        features: dict[str, int] = {}
+        tags: set[str] = set()
+        for r in rows:
+            features[r["feature_path"]] = features.get(r["feature_path"], 0) + 1
+            tags.add(r["tag"])
+        return {
+            "features": [
+                {"path": p, "scenarios": n} for p, n in sorted(features.items())
+            ],
+            "tags": sorted(tags),
+        }
+
+    _ARTIFACT_KINDS = ("logs", "screenshots", "analise")
+
+    def _artifact_base(ws: Workspace, name: str, kind: str) -> Path:
+        target = _find_target(ws, name)
+        local = Path(str(target.get("local_path") or ""))
+        if kind not in _ARTIFACT_KINDS:
+            raise _error(422, "invalid_kind", f"kind deve ser um de {_ARTIFACT_KINDS}")
+        return local / kind
+
+    @app.get(API_PREFIX + "/targets/{name}/artifacts")
+    async def target_artifacts(request: Request, name: str):
+        """Artefatos pós-execução: ./logs, ./screenshots, ./analise (doc §1.5.1)."""
+        ws = ws_of(request)
+        out: dict[str, list[dict]] = {}
+        for kind in _ARTIFACT_KINDS:
+            base = _artifact_base(ws, name, kind)
+            files = []
+            if base.is_dir():
+                for f in sorted(base.rglob("*")):
+                    if f.is_file():
+                        stat = f.stat()
+                        files.append({
+                            "path": f.relative_to(base).as_posix(),
+                            "size": stat.st_size,
+                            "mtime": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+                        })
+            out[kind] = files
+        return out
+
+    @app.get(API_PREFIX + "/targets/{name}/artifacts/file")
+    async def target_artifact_file(request: Request, name: str, kind: str, path: str):
+        ws = ws_of(request)
+        base = _artifact_base(ws, name, kind)
+        file = (base / path).resolve()
+        if not str(file).startswith(str(base.resolve())) or not file.is_file():
+            raise _error(404, "not_found", "artefato não encontrado")
+        return FileResponse(str(file), filename=file.name)
+
+    # -- .env do target (doc §1.5.1 etapa 5) --------------------------------
+
+    def _env_path(ws: Workspace, name: str) -> Path:
+        target = _find_target(ws, name)
+        local = Path(str(target.get("local_path") or ""))
+        if not local.is_dir():
+            raise _error(422, "no_local_path", f"target '{name}' sem local_path válido")
+        return local / ".env"
+
+    @app.get(API_PREFIX + "/env/catalog")
+    async def env_catalog(request: Request):
+        return {"catalog": ENV_CATALOG}
+
+    @app.get(API_PREFIX + "/targets/{name}/env")
+    async def get_target_env(request: Request, name: str):
+        path = _env_path(ws_of(request), name)
+        values: dict[str, str] = {}
+        if path.exists():
+            for line in path.read_text(encoding="utf-8-sig").splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in stripped:
+                    continue
+                key, _, value = stripped.partition("=")
+                values[key.strip()] = value.strip().strip('"').strip("'")
+        return {"path": str(path), "exists": path.exists(), "values": values}
+
+    @app.put(API_PREFIX + "/targets/{name}/env")
+    async def put_target_env(request: Request, name: str, payload: EnvIn):
+        """Atualiza chaves no .env preservando comentários e linhas desconhecidas."""
+        path = _env_path(ws_of(request), name)
+        lines = (
+            path.read_text(encoding="utf-8-sig").splitlines() if path.exists() else []
+        )
+        pending = dict(payload.values)
+        out_lines: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                key = stripped.partition("=")[0].strip()
+                if key in pending:
+                    out_lines.append(f"{key}={pending.pop(key)}")
+                    continue
+            out_lines.append(line)
+        for key, value in pending.items():  # chaves novas ao final
+            out_lines.append(f"{key}={value}")
+        path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+        return {"path": str(path), "updated": len(payload.values)}
 
     @app.post(API_PREFIX + "/runs/local", status_code=201)
     async def create_local_run(request: Request, payload: LocalRunIn):
@@ -973,6 +1336,13 @@ def _register_routes(app: FastAPI) -> None:
         # resolve seleção → CTs da execution + tags do behave
         ct_ids: list[str] = list(payload.testcase_ids)
         tags: list[str] = [t if t.startswith("@") else f"@{t}" for t in payload.tags]
+        if payload.feature and not ct_ids and not tags:
+            # rodar um .feature inteiro: CTs = cenários daquele arquivo
+            rows = conn.execute(
+                "SELECT tag FROM scenarios WHERE target = ? AND feature_path = ?",
+                (payload.target, payload.feature),
+            ).fetchall()
+            ct_ids = sorted({r["tag"].lstrip("@") for r in rows})
         if tags and not ct_ids:
             rows = conn.execute(
                 "SELECT DISTINCT t.id FROM testcases t JOIN tc_tags g"
@@ -991,8 +1361,8 @@ def _register_routes(app: FastAPI) -> None:
             ct_ids = sorted(set(ct_ids))
         if not ct_ids:
             raise _error(422, "empty_selection",
-                         "informe testcase_ids ou tags que resolvam para CTs")
-        if not tags:
+                         "informe testcase_ids, tags ou feature que resolvam para CTs")
+        if not tags and not payload.feature:
             rows = conn.execute(
                 "SELECT id, scenario_tag FROM testcases WHERE id IN (%s)"
                 % ",".join("?" for _ in ct_ids),
@@ -1006,11 +1376,13 @@ def _register_routes(app: FastAPI) -> None:
                 "SELECT id, path FROM testcases WHERE id = ?", (ct_id,)
             ).fetchone()
             if not row:
-                raise _error(404, "not_found", f"{ct_id} não encontrado")
+                # cenário sem CT espelho no workspace — roda mesmo assim,
+                # sem entrada na execution
+                continue
             doc = parse_markdown(ws.root / row["path"])
             testcases.append({"id": ct_id, "steps": doc.steps})
 
-        execution = runner.submit(target, testcases, tags)
+        execution = runner.submit(target, testcases, tags, feature=payload.feature)
         return {
             "execution": execution,
             "run": runner.runs[execution["id"]].snapshot(),
@@ -1086,6 +1458,15 @@ def _register_routes(app: FastAPI) -> None:
         inputs = {"tags": ",".join(
             t if t.startswith("@") else f"@{t}" for t in payload.tags
         )} if payload.tags else {"tags": ",".join(f"@{c}" for c in ct_ids)}
+        # parâmetros do workflow corporativo (doc §1.5.2) — só os informados
+        for key, value in (
+            ("feature", payload.feature),
+            ("environment", payload.environment),
+            ("browser", payload.browser),
+            ("source_repo", payload.source_repo),
+        ):
+            if value:
+                inputs[key] = value
         return await asyncio.to_thread(
             ci.dispatch, payload.target, payload.ref, inputs, testcases
         )
@@ -1162,6 +1543,52 @@ def _register_routes(app: FastAPI) -> None:
         )
 
     # -- IA opcional (M5) -----------------------------------------------------
+
+    # -- perfil / memória de longo prazo (doc §2) ---------------------------
+
+    def _profile_path(ws: Workspace) -> Path:
+        return ws.root / "profile.md"
+
+    def _load_profile(ws: Workspace) -> tuple[str, str]:
+        path = _profile_path(ws)
+        if not path.exists():
+            _write_doc(path, {"name": ""}, PROFILE_TEMPLATE)
+        meta, body = _load_doc(ws, ws.relpath(path))
+        return str(meta.get("name") or ""), body
+
+    @app.get(API_PREFIX + "/profile")
+    async def get_profile(request: Request):
+        name, memory = _load_profile(ws_of(request))
+        return {"name": name, "memory": memory}
+
+    @app.put(API_PREFIX + "/profile")
+    async def put_profile(request: Request, payload: ProfileIn):
+        ws = ws_of(request)
+        name, memory = _load_profile(ws)
+        if payload.name is not None:
+            name = payload.name
+        if payload.memory is not None:
+            memory = payload.memory
+        _write_doc(_profile_path(ws), {"name": name or None}, memory)
+        return {"name": name, "memory": memory}
+
+    def _with_memory(ws: Workspace, user_text: str) -> str:
+        """Prefixa o conteúdo do usuário com a memória de longo prazo (doc §2).
+
+        Injetado em TODA chamada de IA, independente do provider. Memória
+        vazia/template intocado → sem bloco (prompt limpo).
+        """
+        try:
+            _, memory = _load_profile(ws)
+        except OSError:
+            return user_text
+        stripped = memory.strip()
+        if not stripped or stripped == PROFILE_TEMPLATE.strip():
+            return user_text
+        return (
+            "Contexto persistente do usuário (memória de longo prazo):\n"
+            f"{stripped}\n\n---\n\n{user_text}"
+        )
 
     def _ai_config(ws: Workspace) -> dict:
         return ws.config().get("ai") or {"default_provider": None, "providers": []}
@@ -1243,7 +1670,7 @@ def _register_routes(app: FastAPI) -> None:
             rel = _find_path(conn, "requirements", source.upper())
             source = (ws.root / rel).read_text(encoding="utf-8-sig")
         generated = await asyncio.to_thread(
-            ai_ops.generate_testcases, provider, source
+            ai_ops.generate_testcases, provider, _with_memory(ws, source)
         )
         return _preview_out(generated)
 
@@ -1263,7 +1690,7 @@ def _register_routes(app: FastAPI) -> None:
         ]
         similar = ai_ops.find_similar(conn, row["title"], tags, exclude_id=ct_id)
         result = await asyncio.to_thread(
-            ai_ops.review_testcase, provider, ct_md, similar
+            ai_ops.review_testcase, provider, _with_memory(ws, ct_md), similar
         )
         return {"preview": True, "similar_considered": similar,
                 **result.model_dump()}
@@ -1274,8 +1701,61 @@ def _register_routes(app: FastAPI) -> None:
         provider = _ai_provider(request, payload.provider)
         rel = _find_path(conn, "testcases", ct_id)
         ct_md = (ws.root / rel).read_text(encoding="utf-8-sig")
-        generated = await asyncio.to_thread(ai_ops.negative_cases, provider, ct_md)
+        generated = await asyncio.to_thread(
+            ai_ops.negative_cases, provider, _with_memory(ws, ct_md)
+        )
         return _preview_out(generated)
+
+    @app.post(API_PREFIX + "/import/ai")
+    async def import_ai_preview(
+        request: Request, file: UploadFile = File(...), provider: str = Form(default="")
+    ):
+        """Importação inteligente (doc §1.1): txt/md/xml livre → CTs BDD em preview."""
+        ws = ws_of(request)
+        name = file.filename or "arquivo.txt"
+        ext = Path(name).suffix.lower()
+        if ext not in (".txt", ".md", ".xml"):
+            raise _error(422, "invalid_file", "envie um arquivo .txt, .md ou .xml")
+        text = (await file.read()).decode("utf-8", errors="replace")
+        if not text.strip():
+            raise _error(422, "empty_file", "arquivo vazio")
+
+        # Arquivo já em Gherkin/BDD → preservar VERBATIM (sem IA, sem parafrasear,
+        # sem exigir provider). Cada Scenario vira um CT com o corpo intacto.
+        if ai_ops.looks_like_gherkin(text):
+            scenarios = ai_ops.parse_gherkin(text)
+            if scenarios:
+                return {
+                    "preview": True,
+                    "folder": ai_ops.gherkin_folder(scenarios),
+                    "testcases": [
+                        {
+                            "title": sc["title"],
+                            "type": "manual",
+                            "priority": "medium",
+                            "tags": [],
+                            "objetivo": "",
+                            "pre_condicoes": [],
+                            "passos": [],
+                            "resultado_esperado": "",
+                            "body": ai_ops.gherkin_body(sc),
+                        }
+                        for sc in scenarios
+                    ],
+                }
+
+        prov = _ai_provider(request, provider or None)
+        conversion = await asyncio.to_thread(
+            ai_ops.convert_import, prov, name, _with_memory(ws, text)
+        )
+        return {
+            "preview": True,  # nada gravado; aceite = POST /testcases por item
+            "folder": conversion.folder,
+            "testcases": [
+                {**item.model_dump(), "body": ai_ops.testcase_body_bdd(item)}
+                for item in conversion.testcases
+            ],
+        }
 
     # -- defects (M1, mínimo) ---------------------------------------------
 
@@ -1320,6 +1800,10 @@ def _register_routes(app: FastAPI) -> None:
             _save_and_index(ws, conn, execution)
         return _defect_out(conn, ws, defect_id)
 
+    @app.get(API_PREFIX + "/defects/{defect_id}")
+    async def get_defect(request: Request, defect_id: str):
+        return _defect_out(conn_of(request), ws_of(request), defect_id)
+
     @app.put(API_PREFIX + "/defects/{defect_id}")
     async def update_defect(request: Request, defect_id: str, payload: DefectUpdate):
         ws, conn = ws_of(request), conn_of(request)
@@ -1331,6 +1815,14 @@ def _register_routes(app: FastAPI) -> None:
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
         return _defect_out(conn, ws, defect_id)
+
+    @app.delete(API_PREFIX + "/defects/{defect_id}", status_code=204)
+    async def delete_defect(request: Request, defect_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "defects", defect_id)
+        path = ws.root / rel
+        ws.trash(path)
+        reindex_file(ws, conn, path)
 
     # -- busca de entidades (autocomplete de links / menções @) -----------
 
@@ -1547,7 +2039,9 @@ def _register_routes(app: FastAPI) -> None:
         provider = _ai_provider(request, payload.provider)
         ctx = daily_ops.build_context(ws, conn, _check_date(day))
         markdown = daily_ops.context_markdown(ctx)
-        digest = await asyncio.to_thread(ai_ops.generate_daily, provider, markdown)
+        digest = await asyncio.to_thread(
+            ai_ops.generate_daily, provider, _with_memory(ws, markdown)
+        )
         return {"preview": True, "date": day, **digest.model_dump(), "context_markdown": markdown}
 
     @app.get(API_PREFIX + "/dailies")
@@ -1644,7 +2138,9 @@ def _register_routes(app: FastAPI) -> None:
         _, body = _load_doc(ws, rel)
         if not body.strip():
             raise _error(422, "empty_meeting", "reunião sem descrição/transcrição para resumir")
-        result = await asyncio.to_thread(ai_ops.summarize_meeting, provider, body)
+        result = await asyncio.to_thread(
+            ai_ops.summarize_meeting, provider, _with_memory(ws, body)
+        )
         return {"preview": True, "id": meeting_id, **result.model_dump()}
 
 

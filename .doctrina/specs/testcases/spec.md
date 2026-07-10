@@ -2,10 +2,10 @@
 
 **Capability:** testcases
 **Status:** active
-**Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/parser.py, frontend/src/components/TestCaseEditor.tsx)
+**Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-04
-**Version:** 0.3.0
+**Last updated:** 2026-07-10
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -39,6 +39,20 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   para edição direta do arquivo.
 - The system shall exigir `story` no frontmatter para o CT entrar na
   matriz de cobertura.
+- The system shall aceitar corpo de CT em formato BDD (Feature/Scenario +
+  Given/When/Then, EN ou PT-BR), extraindo os steps do CT das linhas
+  Gherkin; este é o formato padrão de novos CTs (o markdown legado com
+  `## Passos` permanece aceito).
+- The system shall permitir criar e excluir pastas (aninhamento ilimitado)
+  sob `testcases/` e mover um CT entre pastas
+  (`POST /testcases/{id}/move`), preservando o ID; exclusão de pasta move
+  o conteúdo para a lixeira.
+- The system shall permitir mover uma pasta inteira (drag & drop) para dentro
+  de outra pasta sob `testcases/` via `POST /testcases/folders/move`,
+  preservando toda a subárvore e reindexando cada `.md` afetado no novo
+  caminho (IDs preservados).
+- The system shall indexar e expor a data de criação (`created`) do CT na
+  árvore e no detalhe.
 - The system shall aceitar `external_key` opcional no frontmatter do CT
   (chave no sistema externo de origem) e indexá-la para detecção de
   duplicidade na migração (spec `xray-migration`).
@@ -50,6 +64,10 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - When um CT `automated` ou `hybrid` referencia tag sem cenário
   correspondente, the system shall registrar warning "automação quebrada"
   no reindex (ver `indexing`).
+- When o usuário arrasta uma pasta que contém um ou mais casos de teste
+  (recursivamente) para dentro de outra pasta, the system shall abrir um
+  modal de confirmação informando quantos CTs serão movidos junto, e só
+  mover após confirmação explícita.
 
 ### State-driven
 
@@ -62,6 +80,13 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   quebra vínculos.
 - The system shall not escrever no repositório de automação (feature
   files são read-only para o Arbites).
+- The system shall not emitir warning de heading ausente para corpo BDD
+  válido (Scenario + steps Gherkin).
+- The system shall not aceitar caminhos de pasta fora de `testcases/`
+  (path traversal → 422).
+- The system shall not aceitar mover uma pasta para dentro dela mesma ou de
+  uma pasta descendente (422); nem sobrescrever uma pasta existente com o
+  mesmo nome no destino (409).
 
 ### Optional
 
@@ -78,12 +103,27 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
    verified by `backend/tests/test_testcases.py`.
 4. [verified] `GET /tree` espelha a árvore real de `testcases/` —
    verified by `backend/tests/test_testcases.py`.
+5. [verified] Corpo BDD tem steps extraídos de Given/When/Then (usados no
+   snapshot da execution) e não gera warning de heading — verified by
+   `backend/tests/test_tc_repository.py`.
+6. [verified] Criar pasta aninhada, mover CT (drag & drop) e excluir pasta
+   (conteúdo → lixeira, fora do índice) — verified by
+   `backend/tests/test_tc_repository.py`.
+7. [verified] `created` indexado e presente na árvore/detalhe — verified by
+   `backend/tests/test_tc_repository.py`.
+
+8. [verified] Mover uma pasta com CTs para outra pasta preserva os IDs e
+   atualiza os caminhos; mover para dentro de si mesma/descendente e para um
+   destino já ocupado são rejeitados — verified by
+   `backend/tests/test_tc_repository.py`.
 
 ## Maturity
 
 **MVP (committed):**
 
-- CRUD, árvore, editor form + aba markdown cru, filtros de listagem.
+- CRUD, repositório de pastas centralizado (criar/excluir/mover pasta ou CT,
+  drag & drop), formato BDD padrão, editor form + markdown cru, filtros,
+  `created`.
 
 **Future (aspirational, not committed):**
 

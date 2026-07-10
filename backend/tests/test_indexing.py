@@ -1,5 +1,7 @@
 """Critérios de aceite da spec indexing (SC1) — exceto Gherkin (M3)."""
 
+import sqlite3
+
 from conftest import make_md
 
 from arbites.indexer import reindex_file, reindex_full
@@ -23,6 +25,55 @@ def test_external_edit_reflects_after_incremental_reindex(client):
 
     fetched = client.get(f"/api/v1/testcases/{created['id']}").json()
     assert fetched["title"] == "Título editado fora"
+
+
+def test_reindex_file_retries_transient_database_locked(client, monkeypatch):
+    """Watcher (thread própria) e handler HTTP usam conexões separadas e podem
+    colidir numa rajada (ex.: mover pasta com vários CTs) — reindex_file deve
+    retentar em "database is locked" em vez de deixar o 500 subir.
+    """
+    created = client.post("/api/v1/testcases", json={"title": "Retry me"}).json()
+    ws = client.ws
+    path = ws.root / created["path"]
+
+    from arbites import indexer as indexer_mod
+
+    real_once = indexer_mod._reindex_file_once
+    calls = {"n": 0}
+
+    def flaky(ws_, conn_, path_):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise sqlite3.OperationalError("database is locked")
+        return real_once(ws_, conn_, path_)
+
+    monkeypatch.setattr(indexer_mod, "_reindex_file_once", flaky)
+    conn = indexer_mod.connect(ws)
+    reindex_file(ws, conn, path)  # não deve levantar — retenta e conclui
+    assert calls["n"] == 2
+
+    fetched = client.get(f"/api/v1/testcases/{created['id']}").json()
+    assert fetched["title"] == "Retry me"
+
+
+def test_reindex_file_gives_up_after_persistent_lock(client, monkeypatch):
+    ws = client.ws
+    created = client.post("/api/v1/testcases", json={"title": "X"}).json()
+    path = ws.root / created["path"]
+
+    from arbites import indexer as indexer_mod
+
+    def always_locked(ws_, conn_, path_):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(indexer_mod, "_reindex_file_once", always_locked)
+    monkeypatch.setattr(indexer_mod.time, "sleep", lambda _: None)  # teste rápido
+    conn = indexer_mod.connect(ws)
+    try:
+        reindex_file(ws, conn, path)
+        assert False, "deveria ter levantado após esgotar as tentativas"
+    except sqlite3.OperationalError:
+        pass
 
 
 def test_duplicate_id_marks_both_files_as_conflict(ws, indexed):

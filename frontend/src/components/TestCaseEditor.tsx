@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { SingleRefInput } from "./Autocomplete";
 import { ConfirmModal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import type { TestCase } from "../types";
@@ -233,12 +234,13 @@ export function TestCaseEditor({
               </select>
             </div>
             <div className="field">
-              <label>Story</label>
-              <input
-                className="mono"
-                placeholder="ST-0000"
+              <label>Story (digite id ou título)</label>
+              <SingleRefInput
+                id="tc-story"
                 value={tc.story_id ?? ""}
-                onChange={(e) => set("story_id", e.target.value || null)}
+                onChange={(v) => set("story_id", v || null)}
+                kinds="requirement"
+                placeholder="ST-0000 — digite para sugerir"
               />
             </div>
             <div className="field">

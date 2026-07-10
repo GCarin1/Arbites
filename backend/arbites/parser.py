@@ -26,6 +26,11 @@ REQUIRED_TC_HEADINGS = ["Passos", "Resultado esperado"]
 
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*?)\s*#*\s*$")
 _ORDERED_ITEM_RE = re.compile(r"^\s*\d+[.)]\s+(.*)$")
+# BDD/Gherkin: steps são as linhas Given/When/Then/And/But (EN e PT-BR)
+_GHERKIN_STEP_RE = re.compile(
+    r"^\s*(Given|When|Then|And|But|Dado|Quando|Então|Entao|E|Mas)\s+(.+)$"
+)
+_GHERKIN_SCENARIO_RE = re.compile(r"^\s*(Scenario|Cenário|Cenario)\s*:", re.IGNORECASE)
 
 
 @dataclass
@@ -35,6 +40,7 @@ class ParsedDoc:
     body: str = ""
     headings: list[str] = field(default_factory=list)
     steps: list[str] = field(default_factory=list)
+    is_bdd: bool = False  # corpo em Gherkin (Scenario/Given/When/Then)
     warnings: list[tuple[str, str]] = field(default_factory=list)  # (code, message)
 
     @property
@@ -99,9 +105,15 @@ def parse_text(path: Path, text: str) -> ParsedDoc:
 
 
 def check_testcase_headings(doc: ParsedDoc) -> None:
-    """Âncoras obrigatórias p/ manual|hybrid; ausência = warning (spec)."""
+    """Âncoras obrigatórias p/ manual|hybrid; ausência = warning (spec).
+
+    Corpo em BDD/Gherkin (Scenario + Given/When/Then) é o formato canônico
+    novo e dispensa as âncoras markdown legadas.
+    """
     tc_type = str(doc.meta.get("type", "manual"))
     if tc_type not in ("manual", "hybrid"):
+        return
+    if doc.is_bdd:
         return
     for heading in REQUIRED_TC_HEADINGS:
         if heading not in doc.headings:
@@ -109,15 +121,18 @@ def check_testcase_headings(doc: ParsedDoc) -> None:
                 (
                     "missing_heading",
                     f"{doc.path.name}: heading obrigatório '## {heading}' ausente "
-                    f"para caso {tc_type}",
+                    f"para caso {tc_type} (use o formato BDD ou as âncoras markdown)",
                 )
             )
 
 
 def _scan_body(doc: ParsedDoc) -> None:
-    """Uma passada pelas linhas: coleta headings e os itens sob '## Passos'."""
+    """Uma passada pelas linhas: coleta headings, itens sob '## Passos' e,
+    no formato BDD, os steps Given/When/Then (que viram os steps do CT)."""
     in_passos = False
     in_code = False
+    gherkin_steps: list[str] = []
+    has_scenario = False
     for line in doc.body.splitlines():
         stripped = line.strip()
         if stripped.startswith("```"):
@@ -131,7 +146,20 @@ def _scan_body(doc: ParsedDoc) -> None:
             doc.headings.append(title)
             in_passos = title == "Passos"
             continue
+        if _GHERKIN_SCENARIO_RE.match(line):
+            has_scenario = True
+            continue
+        g = _GHERKIN_STEP_RE.match(line)
+        if g:
+            gherkin_steps.append(stripped)
+            continue
         if in_passos:
             item = _ORDERED_ITEM_RE.match(line)
             if item:
                 doc.steps.append(item.group(1).strip())
+    # BDD: com Scenario + steps Gherkin e sem '## Passos', os steps do CT
+    # são as linhas Given/When/Then (na ordem)
+    if has_scenario and gherkin_steps:
+        doc.is_bdd = True
+        if not doc.steps:
+            doc.steps = gherkin_steps

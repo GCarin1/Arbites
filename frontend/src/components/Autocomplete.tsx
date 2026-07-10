@@ -3,7 +3,7 @@ import { api } from "../api";
 import type { SearchResult } from "../types";
 
 /** Busca debounced de entidades (CT/requisito/execução/defeito/todo). */
-function useSuggestions(query: string | null): SearchResult[] {
+function useSuggestions(query: string | null, kinds = ""): SearchResult[] {
   const [results, setResults] = useState<SearchResult[]>([]);
   // normaliza: "@CT-0001" ou "!@" viram "CT-0001"/"" — o '@' é gatilho, não filtro
   const term = (query ?? "").replace(/^[@!\s]+/, "").trim();
@@ -15,7 +15,7 @@ function useSuggestions(query: string | null): SearchResult[] {
     let alive = true;
     const timer = setTimeout(() => {
       api
-        .search(term, 8)
+        .search(term, 8, kinds)
         .then((r) => alive && setResults(r.results))
         .catch(() => {});
     }, 120);
@@ -23,7 +23,7 @@ function useSuggestions(query: string | null): SearchResult[] {
       alive = false;
       clearTimeout(timer);
     };
-  }, [term]);
+  }, [term, kinds]);
   return results;
 }
 
@@ -134,6 +134,70 @@ export function LinksInput({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => navKey(e, results, active, setActive, accept, () => setOpen(false))}
+      />
+      {open && results.length > 0 && (
+        <SuggestionBox results={results} active={active} onPick={accept} onHover={setActive} />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------- SingleRefInput
+
+/**
+ * Campo de referência a UM item existente: o usuário digita id ou título e o
+ * autocomplete sugere; escolher grava o id. Substitui `<select>`/campo de id
+ * cru em qualquer lugar onde se referencia um card (story, defeito, etc.).
+ */
+export function SingleRefInput({
+  value,
+  onChange,
+  kinds = "",
+  id,
+  placeholder,
+  onEnterNoMatch,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  kinds?: string;
+  id?: string;
+  placeholder?: string;
+  onEnterNoMatch?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const results = useSuggestions(open ? value : null, kinds);
+
+  function accept(r: SearchResult) {
+    onChange(r.id);
+    setOpen(false);
+    setActive(0);
+  }
+
+  return (
+    <div className="ac-wrap">
+      <input
+        id={id}
+        className="mono"
+        value={value}
+        autoComplete="off"
+        placeholder={placeholder ?? "digite id ou título…"}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+          setActive(0);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          const handled = navKey(e, results, active, setActive, accept, () =>
+            setOpen(false),
+          );
+          if (!handled && e.key === "Enter" && onEnterNoMatch) {
+            e.preventDefault();
+            onEnterNoMatch();
+          }
+        }}
       />
       {open && results.length > 0 && (
         <SuggestionBox results={results} active={active} onPick={accept} onHover={setActive} />

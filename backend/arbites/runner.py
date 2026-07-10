@@ -28,10 +28,12 @@ DEFAULT_TIMEOUT_MINUTES = 30.0
 
 
 class RunInfo:
-    def __init__(self, exec_id: str, target: dict[str, Any], tags: list[str]):
+    def __init__(self, exec_id: str, target: dict[str, Any], tags: list[str],
+                 feature: str | None = None):
         self.exec_id = exec_id
         self.target = target
         self.tags = tags
+        self.feature = feature  # caminho relativo do .feature (opcional)
         self.status = "queued"  # queued | running | done | failed | timeout | cancelled
         self.log: list[str] = []
         self.subscribers: list[asyncio.Queue] = []
@@ -83,6 +85,7 @@ class RunManager:
         testcases: list[dict[str, Any]],
         tags: list[str],
         owner: str = "behave",
+        feature: str | None = None,
     ) -> dict[str, Any]:
         """Cria a execution (origin local_run) e enfileira o run (FIFO)."""
         execution = exec_ops.create(
@@ -97,7 +100,7 @@ class RunManager:
         path = exec_ops.save(self.ws, execution)
         reindex_file(self.ws, self.conn, path)
 
-        run = RunInfo(execution["id"], target, tags)
+        run = RunInfo(execution["id"], target, tags, feature=feature)
         self.runs[execution["id"]] = run
         name = str(target.get("name"))
         if name not in self._queues:
@@ -154,14 +157,18 @@ class RunManager:
         evidence_dir.mkdir()
 
         python = str(target.get("python_path") or sys.executable)
-        # sem path posicional: cwd=local_path e o behave resolve ./features
-        # (path explícito faria o behave tratar o repo como dir de features)
+        # sem path posicional o behave resolve ./features via cwd=local_path;
+        # com run.feature, o arquivo .feature específico entra como posicional
+        # (behave <arquivo>.feature --tags=<tag>) — doc de ajustes §1.5.1
         cmd = [
             python, "-m", "behave",
             "-f", "json", "-o", str(result_json),
             "-f", "plain", "--no-capture",
-            f"--tags={','.join(run.tags)}",
         ]
+        if run.tags:
+            cmd.append(f"--tags={','.join(run.tags)}")
+        if run.feature:
+            cmd.append(run.feature)
         run.emit(f"[arbites] $ {' '.join(cmd)}")
 
         import os

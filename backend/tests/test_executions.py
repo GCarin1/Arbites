@@ -131,6 +131,58 @@ def test_same_ct_different_results_in_two_executions(client):
     assert client.get(f"/api/v1/testcases/{ct['id']}").json()["status"] == "draft"
 
 
+def test_link_and_unlink_existing_defect(client):
+    ct = make_ct(client, "Login")
+    execution = make_exec(client, ct_ids=[ct["id"]])
+    defect = client.post(
+        "/api/v1/defects", json={"title": "Bug pré-existente", "severity": "medium"}
+    ).json()
+
+    linked = client.post(
+        f"/api/v1/executions/{execution['id']}/results/{ct['id']}/defects",
+        json={"defect_id": defect["id"]},
+    ).json()
+    assert linked["results"][0]["defects"] == [defect["id"]]
+    events = [e for e in linked["history"] if e["event"] == "defect"]
+    assert events and events[-1]["defect_id"] == defect["id"]
+
+    # idempotente: vincular de novo não duplica
+    linked_again = client.post(
+        f"/api/v1/executions/{execution['id']}/results/{ct['id']}/defects",
+        json={"defect_id": defect["id"]},
+    ).json()
+    assert linked_again["results"][0]["defects"] == [defect["id"]]
+
+    unlinked = client.delete(
+        f"/api/v1/executions/{execution['id']}/results/{ct['id']}/defects/{defect['id']}"
+    ).json()
+    assert unlinked["results"][0]["defects"] == []
+
+
+def test_link_nonexistent_defect_rejected(client):
+    ct = make_ct(client, "Login")
+    execution = make_exec(client, ct_ids=[ct["id"]])
+    resp = client.post(
+        f"/api/v1/executions/{execution['id']}/results/{ct['id']}/defects",
+        json={"defect_id": "DEF-9999"},
+    )
+    assert resp.status_code == 404
+
+
+def test_link_defect_rejected_on_closed_execution(client):
+    ct = make_ct(client, "Login")
+    execution = make_exec(client, ct_ids=[ct["id"]])
+    defect = client.post(
+        "/api/v1/defects", json={"title": "Bug", "severity": "medium"}
+    ).json()
+    client.post(f"/api/v1/executions/{execution['id']}/close")
+    resp = client.post(
+        f"/api/v1/executions/{execution['id']}/results/{ct['id']}/defects",
+        json={"defect_id": defect["id"]},
+    )
+    assert resp.status_code == 409
+
+
 def test_execution_survives_index_rebuild(client):
     ct = make_ct(client, "Login")
     execution = make_exec(client, ct_ids=[ct["id"]])

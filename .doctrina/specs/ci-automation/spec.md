@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M4 (backend/arbites/ci.py, frontend/src/components/Automation.tsx, docs/examples/tests.yml); orquestração provada com fake client — validação contra a API real pendente do primeiro uso com o repo da B3
 **Realizes:** SC6
-**Last updated:** 2026-07-04
-**Version:** 0.2.0
+**Last updated:** 2026-07-09
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -36,6 +36,10 @@ workflow/jobs/steps do workflow.
 - The system shall documentar um `tests.yml` de exemplo: o workflow deve
   aceitar `workflow_dispatch` com input de tags e publicar JSON +
   screenshots como artifact.
+
+- The system shall aceitar em `POST /runs/ci` os parâmetros opcionais
+  `feature`, `environment (dev|cer|prd)`, `browser` e `source_repo`,
+  repassando-os como inputs do workflow_dispatch quando informados.
 
 ### Event-driven
 
@@ -74,6 +78,9 @@ workflow/jobs/steps do workflow.
 3. [verified] Token gravado via API está no keyring e nunca aparece em
    respostas, logs ou arquivos do workspace — verified by
    `backend/tests/test_ci_token.py`.
+
+4. [verified] Inputs opcionais do dispatch (feature/environment/browser/
+   source_repo) chegam ao workflow — verified by `backend/tests/test_ci_runs.py`.
 
 ## Maturity
 

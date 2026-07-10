@@ -58,3 +58,13 @@ def test_update_and_delete_requirement(client):
     assert updated["title"] == "Renomeado"
     assert client.delete(f"/api/v1/requirements/{epic['id']}").status_code == 204
     assert client.get(f"/api/v1/requirements/{epic['id']}").status_code == 404
+
+
+def test_requirement_created_stamped_and_indexed(client):
+    """Doc §1.2: data de criação registrada e exposta na listagem."""
+    epic = client.post(
+        "/api/v1/requirements", json={"kind": "epic", "title": "Com data"}
+    ).json()
+    assert epic["created"]  # AAAA-MM-DD
+    listed = client.get("/api/v1/requirements").json()
+    assert any(r["id"] == epic["id"] and r["created"] for r in listed)

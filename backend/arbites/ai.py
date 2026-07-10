@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import typing
+import unicodedata
 from typing import Any
 
 import httpx
@@ -92,6 +94,106 @@ class MeetingSummary(BaseModel):
     action_items: list[str] = []  # próximos passos
 
 
+class ImportConversion(BaseModel):
+    folder: str = "importados"  # pasta sugerida pelo contexto do arquivo
+    testcases: list[GeneratedTestcase]
+
+
+def testcase_body_bdd(item: GeneratedTestcase, feature: str = "") -> str:
+    """Renderiza o item gerado no formato BDD canônico (doc §1.1)."""
+    lines = [f"Feature: {feature or item.title}", ""]
+    lines.append(f"  Scenario: {item.title}")
+    pre = item.pre_condicoes or ["que o sistema está disponível"]
+    lines.append(f"    Given {pre[0]}")
+    lines += [f"    And {p}" for p in pre[1:]]
+    passos = item.passos or ["executar a ação principal"]
+    lines.append(f"    When {passos[0]}")
+    lines += [f"    And {p}" for p in passos[1:]]
+    lines.append(f"    Then {item.resultado_esperado}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Import determinístico de Gherkin — quando o arquivo JÁ é BDD, preservar
+# verbatim (a IA parafraseia/normaliza; o usuário não quer isso). Sem LLM.
+
+_GHERKIN_FEATURE = re.compile(r"^(Feature|Funcionalidade)\s*:\s*(.*)$", re.IGNORECASE)
+_GHERKIN_SCENARIO = re.compile(
+    r"^(Scenario Outline|Scenario|Esquema do Cen[aá]rio|Cen[aá]rio)\s*:\s*(.*)$",
+    re.IGNORECASE,
+)
+_GHERKIN_STEP = re.compile(
+    r"^(Given|When|Then|And|But|Dado|Quando|Ent[aã]o|E|Mas)\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_gherkin(text: str) -> bool:
+    """Heurística: o arquivo já está em Gherkin/BDD (tem Scenario + passos)."""
+    has_scenario = has_step = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if _GHERKIN_SCENARIO.match(line):
+            has_scenario = True
+        elif _GHERKIN_STEP.match(line):
+            has_step = True
+        if has_scenario and has_step:
+            return True
+    return False
+
+
+def parse_gherkin(text: str) -> list[dict[str, Any]]:
+    """Separa Feature/Scenario/passos preservando o texto EXATAMENTE como escrito.
+
+    Só normaliza indentação; nunca reescreve palavras, remove 'que', junta
+    passos And nem troca o Feature pelo título do cenário (o que a IA fazia).
+    """
+    feature = ""
+    scenarios: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        mf = _GHERKIN_FEATURE.match(line)
+        if mf:
+            feature = mf.group(2).strip()
+            continue
+        ms = _GHERKIN_SCENARIO.match(line)
+        if ms:
+            current = {"feature": feature, "title": ms.group(2).strip(), "steps": []}
+            scenarios.append(current)
+            continue
+        if current is None:
+            continue
+        if _GHERKIN_STEP.match(line):
+            current["steps"].append(line)
+        elif line.startswith("|") and line.endswith("|") and current["steps"]:
+            # linha de tabela de dados (`| a | b |`) do passo anterior.
+            current["steps"].append(line)
+        # qualquer outra linha (cabeçalho markdown "### CTxx", comentário,
+        # numeração, prosa entre cenários) é ignorada — nunca vira passo.
+    return [s for s in scenarios if s["steps"]]
+
+
+def gherkin_body(scenario: dict[str, Any]) -> str:
+    """Reconstrói o corpo BDD verbatim de um cenário (só ajusta indentação)."""
+    feature = scenario["feature"] or scenario["title"]
+    lines = [f"Feature: {feature}", "", f"  Scenario: {scenario['title']}"]
+    lines += [f"    {step}" for step in scenario["steps"]]
+    lines.append("")
+    return "\n".join(lines)
+
+
+def gherkin_folder(scenarios: list[dict[str, Any]]) -> str:
+    """Pasta sugerida = slug da primeira Feature (o usuário pode editar)."""
+    feature = next((s["feature"] for s in scenarios if s["feature"]), "")
+    slug = unicodedata.normalize("NFKD", feature).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", slug).strip("-").lower()
+    return slug[:40] or "importados"
+
+
 def testcase_body(item: GeneratedTestcase) -> str:
     """Converte o item gerado no corpo .md canônico (âncoras do parser)."""
     lines = ["## Objetivo", "", item.objetivo or "-", "", "## Pré-condições", ""]
@@ -106,29 +208,154 @@ def testcase_body(item: GeneratedTestcase) -> str:
 # Providers
 
 
+_REASONING_TAGS = ("think", "thinking", "thought", "reasoning", "scratchpad")
+
+
+def _strip_reasoning(text: str) -> str:
+    """Remove blocos de raciocínio (<think>…</think>) que modelos locais vazam."""
+    for tag in _REASONING_TAGS:
+        text = re.sub(rf"<{tag}>.*?</{tag}>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    return text
+
+
+def _balanced_objects(text: str) -> list[Any]:
+    """Todos os objetos JSON `{…}` de nível superior que fazem parse (string-aware)."""
+    out: list[Any] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "{":
+            i += 1
+            continue
+        depth = 0
+        in_str = esc = False
+        j = i
+        while j < n:
+            c = text[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        out.append(json.loads(text[i : j + 1]))
+                    except ValueError:
+                        pass
+                    break
+            j += 1
+        i = j + 1
+    return out
+
+
+def _all_objects(text: str) -> list[Any]:
+    """Todo objeto `{…}` que faz parse, EM QUALQUER nível (inclusive aninhados).
+
+    Diferente de `_balanced_objects`, não pula o conteúdo de um objeto: assim,
+    quando o objeto externo vem truncado (geração cortada por timeout), ainda
+    recupera os objetos internos completos — ex.: os CTs que já saíram inteiros.
+    """
+    out: list[Any] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "{":
+            i += 1
+            continue
+        depth = 0
+        in_str = esc = False
+        j = i
+        while j < n:
+            c = text[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        out.append(json.loads(text[i : j + 1]))
+                    except ValueError:
+                        pass
+                    break
+            j += 1
+        i += 1  # avança 1 (não pula o objeto) p/ também achar os aninhados
+    return out
+
+
+def _json_candidates(text: str) -> list[Any]:
+    """Objetos JSON candidatos, priorizando blocos cercados e a resposta final.
+
+    Modelos pequenos costumam raciocinar/reconstruir o schema antes de emitir
+    os dados; o objeto útil tende a estar no fim ou dentro de uma cerca ```json.
+    """
+    text = _strip_reasoning(text)
+    fenced: list[Any] = []
+    for m in re.finditer(r"```(?:json)?\s*(.*?)```", text, re.DOTALL):
+        fenced.extend(_balanced_objects(m.group(1)))
+    whole = _balanced_objects(text)
+    # cercados primeiro (sinal forte de "resposta"); depois o texto do fim p/ o início.
+    return fenced + list(reversed(whole))
+
+
 def _extract_json(text: str) -> Any:
-    """Extrai o primeiro bloco JSON da resposta (modelos põem texto ao redor)."""
-    text = text.strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence:
-        text = fence.group(1).strip()
-    start = text.find("{")
-    if start == -1:
+    """Compat: primeiro objeto JSON legível da resposta."""
+    cands = _json_candidates(text)
+    if not cands:
         raise AIProviderError("invalid_output", "resposta sem JSON", 422)
-    depth = 0
-    for i, ch in enumerate(text[start:], start):
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(text[start : i + 1])
-                except ValueError as exc:
-                    raise AIProviderError(
-                        "invalid_output", f"JSON ilegível na resposta: {exc}", 422
-                    ) from exc
-    raise AIProviderError("invalid_output", "JSON truncado na resposta", 422)
+    return cands[0]
+
+
+def _example_for(annotation: Any, field: Any) -> Any:
+    """Valor-exemplo concreto para uma anotação de tipo (prompt guiado por exemplo)."""
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+    if origin in (list, tuple, set):
+        inner = args[0] if args else str
+        return [_example_for(inner, None)]
+    if origin is typing.Union:  # Optional[X] / X | None
+        non_none = [a for a in args if a is not type(None)]
+        return _example_for(non_none[0], None) if non_none else None
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return _example_from_model(annotation)
+    if annotation is bool:
+        return True
+    if annotation is int:
+        return 0
+    if annotation is float:
+        return 0.0
+    # str e afins: usa o default textual (ex.: "manual", "importados") quando houver.
+    if field is not None:
+        default = getattr(field, "default", None)
+        if isinstance(default, str) and default:
+            return default
+    return "texto"
+
+
+def _example_from_model(model_cls: type[BaseModel]) -> dict[str, Any]:
+    """Exemplo compacto e concreto do JSON esperado — substitui o dump do JSON Schema.
+
+    Modelos ≤ 9B entram em loop ao receber JSON Schema ($defs/properties/required);
+    um exemplo preenchível é seguido de forma muito mais confiável.
+    """
+    return {
+        name: _example_for(field.annotation, field)
+        for name, field in model_cls.model_fields.items()
+    }
 
 
 class _BaseProvider:
@@ -140,7 +367,9 @@ class _BaseProvider:
         self.transport = transport
 
     def _client(self) -> httpx.Client:
-        return httpx.Client(timeout=120, transport=self.transport)
+        # modelos locais de raciocínio (glm/qwen) podem levar minutos p/ um
+        # documento longo — timeout curto derruba a geração no meio.
+        return httpx.Client(timeout=300, transport=self.transport)
 
     def _post(self, url: str, headers: dict, payload: dict) -> dict:
         with self._client() as client:
@@ -152,29 +381,50 @@ class _BaseProvider:
             )
         return resp.json()
 
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         raise NotImplementedError
 
-    def complete(self, system: str, user: str,
-                 schema: type[BaseModel] | None = None) -> str | BaseModel:
+    def complete(
+        self,
+        system: str,
+        user: str,
+        schema: type[BaseModel] | None = None,
+        *,
+        salvage: "typing.Callable[[str], BaseModel | None] | None" = None,
+    ) -> str | BaseModel:
         if schema is not None:
+            example = json.dumps(_example_from_model(schema), ensure_ascii=False)
             system = (
-                f"{system}\n\nResponda APENAS com um objeto JSON válido no schema:"
-                f"\n{json.dumps(schema.model_json_schema(), ensure_ascii=False)}"
-                "\nSem texto fora do JSON."
+                f"{system}\n\nResponda SOMENTE com um objeto JSON exatamente neste"
+                f" formato, preenchido com os dados reais (um objeto por item, sem"
+                f" abreviar com 'repita'/'...'):\n{example}\n"
+                "Não escreva schema, comentários, explicações nem raciocínio — só o JSON."
             )
-        text = self._raw_complete(system, user)
+        text = self._raw_complete(system, user, json_mode=schema is not None)
         if schema is None:
             return text
-        data = _extract_json(text)
-        try:
-            return schema.model_validate(data)
-        except ValidationError as exc:
-            raise AIProviderError(
-                "schema_mismatch",
-                f"saída do modelo fora do schema {schema.__name__}: {exc.errors()[:3]}",
-                422,
-            ) from exc
+        # Escolhe, dentre os objetos JSON candidatos, o primeiro que valida no
+        # schema — descarta raciocínio/reconstruções de schema que o modelo vaze.
+        last_err: ValidationError | None = None
+        for cand in _json_candidates(text):
+            try:
+                return schema.model_validate(cand)
+            except ValidationError as exc:
+                last_err = exc
+        # Nenhum objeto completo validou. Se houver salvamento parcial (ex.: a
+        # geração foi cortada no meio), tenta recuperar o que já saiu inteiro.
+        if salvage is not None:
+            recovered = salvage(text)
+            if recovered is not None:
+                return recovered
+        if last_err is None:
+            raise AIProviderError("invalid_output", "resposta sem JSON", 422)
+        raise AIProviderError(
+            "schema_mismatch",
+            f"saída do modelo fora do schema {schema.__name__}: {last_err.errors()[:3]}",
+            422,
+        ) from last_err
 
 
 class OpenAICompatible(_BaseProvider):
@@ -186,33 +436,50 @@ class OpenAICompatible(_BaseProvider):
         super().__init__(name, model, keys, transport)
         self.base_url = base_url.rstrip("/")
 
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         headers = {}
         key = self.keys.get(self.name)
         if key:  # endpoints locais (LM Studio) dispensam chave
             headers["Authorization"] = f"Bearer {key}"
-        data = self._post(
-            f"{self.base_url}/chat/completions",
-            headers,
-            {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "temperature": 0.2,
-            },
-        )
+        url = f"{self.base_url}/chat/completions"
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": 0.2,
+        }
+        if json_mode:
+            # força saída 100% JSON — corta loops de raciocínio de modelos locais.
+            payload["response_format"] = {"type": "json_object"}
         try:
-            return data["choices"][0]["message"]["content"]
+            data = self._post(url, headers, payload)
+        except AIProviderError:
+            if not json_mode:
+                raise
+            # servidor não suporta response_format → tenta sem (prompt já guia o JSON).
+            payload.pop("response_format", None)
+            data = self._post(url, headers, payload)
+        try:
+            message = data["choices"][0]["message"]
         except (KeyError, IndexError) as exc:
             raise AIProviderError(
                 "provider_error", f"{self.name}: resposta sem choices"
             ) from exc
+        content = message.get("content") or ""
+        # modelos de raciocínio (glm-4.7-flash) devolvem o pensamento em
+        # `reasoning_content` e às vezes deixam `content` vazio — o JSON útil,
+        # quando existe, pode estar lá; usa como fallback.
+        if not content.strip():
+            content = message.get("reasoning_content") or ""
+        return content
 
 
 class AnthropicProvider(_BaseProvider):
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         key = self.keys.get(self.name)
         if not key:
             raise AIProviderError("no_key", f"chave do provider '{self.name}'"
@@ -236,19 +503,23 @@ class AnthropicProvider(_BaseProvider):
 
 
 class GeminiProvider(_BaseProvider):
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         key = self.keys.get(self.name)
         if not key:
             raise AIProviderError("no_key", f"chave do provider '{self.name}'"
                                   " não configurada", 409)
+        payload: dict[str, Any] = {
+            "system_instruction": {"parts": [{"text": system}]},
+            "contents": [{"parts": [{"text": user}]}],
+        }
+        if json_mode:
+            payload["generationConfig"] = {"responseMimeType": "application/json"}
         data = self._post(
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self.model}:generateContent",
             {"x-goog-api-key": key},
-            {
-                "system_instruction": {"parts": [{"text": system}]},
-                "contents": [{"parts": [{"text": user}]}],
-            },
+            payload,
         )
         try:
             return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -361,6 +632,66 @@ _MEETING_SYSTEM = (
 def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
     result = provider.complete(_MEETING_SYSTEM, body, MeetingSummary)
     assert isinstance(result, MeetingSummary)
+    return result
+
+
+# Prompt curto de propósito: a importação precisa rodar bem em modelos de
+# até 9B (doc §1.1 — baixo consumo de tokens, sem exemplos longos).
+_IMPORT_SYSTEM = (
+    "Extraia os casos de teste do texto. Cada Scenario/cenário é um caso. "
+    "Regra simples, sem analisar idioma: linha Given/Dado → pre_condicoes; "
+    "linha When/Quando/And/E → passos; linha Then/Então → resultado_esperado. "
+    "Copie o texto da linha SEM a palavra-chave, como está. Gere TODOS os casos, "
+    "um objeto por caso, sem abreviar. 'folder' = nome curto kebab-case pelo "
+    "assunto do arquivo. Não invente casos. PT-BR. Responda só o JSON."
+)
+
+
+def _salvage_import(text: str) -> ImportConversion | None:
+    """Recupera os CTs completos de uma resposta cuja saída foi cortada no meio.
+
+    Quando a geração é truncada (timeout do modelo local), o objeto externo
+    fica sem fechar e não valida — mas os CTs que já saíram inteiros estão lá.
+    Percorre TODO objeto `{…}` (inclusive aninhado), fica com os que têm cara
+    de test case e monta um `ImportConversion` parcial em vez de perder tudo.
+    """
+    clean = _strip_reasoning(text)
+    folder = "importados"
+    testcases: list[GeneratedTestcase] = []
+    for obj in _all_objects(clean):
+        if not isinstance(obj, dict):
+            continue
+        val = obj.get("folder")
+        if isinstance(val, str) and val and "testcases" in obj:
+            folder = val  # objeto externo íntegro traz a pasta
+        if "title" in obj and ("passos" in obj or "resultado_esperado" in obj):
+            try:
+                testcases.append(GeneratedTestcase.model_validate(obj))
+            except ValidationError:
+                continue
+    if not testcases:
+        return None
+    if folder == "importados":
+        # objeto externo truncado (não fechou): recupera a pasta do cabeçalho.
+        head = re.search(r'"folder"\s*:\s*"([^"\\]+)"', clean)
+        if head:
+            folder = head.group(1)
+    return ImportConversion(folder=folder, testcases=testcases)
+
+
+def convert_import(provider: _BaseProvider, filename: str, text: str,
+                   max_chars: int = 24000) -> ImportConversion:
+    """Converte um arquivo livre (txt/md/xml) em CTs BDD — preview apenas.
+
+    Tolerante a truncamento: se a resposta completa não validar, aproveita os
+    casos que saíram inteiros (`_salvage_import`) em vez de falhar por completo.
+    """
+    clipped = text[:max_chars]
+    user = f"Arquivo: {filename}\n\n{clipped}"
+    result = provider.complete(
+        _IMPORT_SYSTEM, user, ImportConversion, salvage=_salvage_import
+    )
+    assert isinstance(result, ImportConversion)
     return result
 
 

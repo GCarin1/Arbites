@@ -8,6 +8,7 @@ o denominador. Nenhum estado é materializado — o índice é descartável
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -15,6 +16,13 @@ from typing import Any
 FINAL_STATUSES = ("passed", "failed", "blocked", "retest")
 # pior primeiro — agregação do "último resultado" de uma story
 _WORST_ORDER = ["failed", "blocked", "retest", "in_progress", "pending", "passed"]
+
+# Padrão GENÉRICO (sem referência a empresa/projeto) que separa o nome de uma
+# execução de automação em `<nome> <sep> <repo>.<ambiente>`. Ex.:
+# "Regression . acme/web-core.cer" → name=Regression repo=acme/web-core env=cer.
+# O usuário sobrescreve em arbites.yaml (`ci_monitoring.name_pattern`) para o
+# seu próprio padrão de nomes; grupo `repo` é obrigatório, `env` é opcional.
+DEFAULT_CI_NAME_PATTERN = r"^(?P<name>.+?)\s*[.\-]\s*(?P<repo>\S+)\.(?P<env>[^.\s]+)\s*$"
 
 
 def _cutoff(days: int | None) -> str | None:
@@ -448,6 +456,333 @@ def defects_report(conn: sqlite3.Connection, squad: str | None = None) -> dict:
         "by_squad": dict(sorted(by_squad.items())),
         "aging_buckets": buckets,
         "items": items,
+    }
+
+
+def _run_outcome(passed: int, failed: int, blocked: int, total: int) -> str:
+    """Desfecho de UMA execução de automação a partir dos seus resultados."""
+    if total == 0:
+        return "no_results"  # run sem resultados (workflow errou / artifact vazio)
+    if failed:
+        return "failed"
+    if blocked:
+        return "blocked"
+    if passed == total:
+        return "passed"
+    return "partial"  # parte passou, resto pendente/in_progress
+
+
+def _mttr_and_broken(runs: list[dict]) -> tuple[float | None, str | None]:
+    """MTTR (horas) e desde-quando-quebrado de uma sequência de runs (asc).
+
+    "Verde" = `passed`; qualquer outro desfecho mantém o repo vermelho. Um
+    incidente começa no 1º run não-verde após um verde (ou no início) e fecha
+    no próximo verde; MTTR = média das durações fechadas. Se a série termina
+    vermelha, `broken_since` = início do incidente aberto.
+    """
+    durations: list[float] = []
+    fail_start: str | None = None
+    for run in runs:
+        green = run["outcome"] == "passed"
+        if not green and fail_start is None:
+            fail_start = run["at"]
+        elif green and fail_start is not None:
+            try:
+                delta = datetime.fromisoformat(run["at"]) - datetime.fromisoformat(fail_start)
+                durations.append(delta.total_seconds())
+            except (ValueError, TypeError):
+                pass
+            fail_start = None
+    mttr_hours = round(sum(durations) / len(durations) / 3600, 2) if durations else None
+    return mttr_hours, fail_start
+
+
+def automation_report(
+    conn: sqlite3.Connection,
+    name_pattern: str | None = None,
+    days: int | None = None,
+    env: str | None = None,
+) -> dict:
+    """Monitoramento das execuções de automação agrupado por REPOSITÓRIO.
+
+    Cada execução não-manual (github_actions/local_run) é um run; o repo/env
+    saem do `name` pelo `name_pattern` (regex com grupos nomeados). Agrega por
+    repo com pior-primeiro (mais falhas), com sparkline dos runs recentes,
+    MTTR (tempo até voltar ao verde) e nº de CTs flaky por repo; e no topo
+    lista os CTs que mais falham e os flaky. `env` (opcional) filtra por
+    ambiente. Runs cujo nome não casa o padrão contam em `unparsed`.
+    """
+    raw_pattern = name_pattern or DEFAULT_CI_NAME_PATTERN
+    pattern_error = None
+    try:
+        pattern = re.compile(raw_pattern)
+    except re.error as exc:
+        pattern_error = str(exc)
+        pattern = re.compile(DEFAULT_CI_NAME_PATTERN)
+
+    def parse(name: str | None) -> tuple[str, str | None] | None:
+        m = pattern.match(name or "")
+        if not m or "repo" not in m.groupdict() or not m.group("repo"):
+            return None
+        return m.group("repo"), m.groupdict().get("env")
+
+    cutoff = _cutoff(days)
+    where = " WHERE e.origin != 'manual'"
+    params: list[Any] = []
+    if cutoff:
+        where += " AND e.created_at >= ?"
+        params.append(cutoff)
+
+    # --- Query A: por RUN (desfecho, ranking por repo, sparkline, MTTR) ------
+    run_sql = (
+        "SELECT e.id, e.name, e.created_at,"
+        " SUM(CASE WHEN r.status='passed' THEN 1 ELSE 0 END) passed,"
+        " SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) failed,"
+        " SUM(CASE WHEN r.status='blocked' THEN 1 ELSE 0 END) blocked,"
+        " COUNT(r.testcase_id) total"
+        " FROM executions e LEFT JOIN results r ON r.execution_id = e.id"
+        + where + " GROUP BY e.id ORDER BY e.created_at ASC"  # asc → último = last
+    )
+    repos: dict[str, dict] = {}
+    env_agg: dict[str, dict] = {}
+    all_envs: set[str] = set()
+    total_runs = passed_runs = failed_runs = unparsed = 0
+    for row in conn.execute(run_sql, params):
+        parsed = parse(row["name"])
+        if parsed is None:
+            unparsed += 1
+            continue
+        repo, run_env = parsed
+        if run_env:
+            all_envs.add(run_env)
+        if env and run_env != env:  # filtro de ambiente
+            continue
+        outcome = _run_outcome(
+            row["passed"] or 0, row["failed"] or 0, row["blocked"] or 0, row["total"] or 0
+        )
+        total_runs += 1
+        passed_runs += outcome == "passed"
+        failed_runs += outcome == "failed"
+
+        agg = repos.setdefault(
+            repo,
+            {"repo": repo, "runs": 0, "passed": 0, "failed": 0, "other": 0,
+             "envs": set(), "series": []},
+        )
+        agg["runs"] += 1
+        agg["passed"] += outcome == "passed"
+        agg["failed"] += outcome == "failed"
+        agg["other"] += outcome not in ("passed", "failed")
+        if run_env:
+            agg["envs"].add(run_env)
+        agg["series"].append({"at": row["created_at"], "outcome": outcome})
+
+        if run_env:
+            ea = env_agg.setdefault(run_env, {"env": run_env, "runs": 0, "failed": 0})
+            ea["runs"] += 1
+            ea["failed"] += outcome == "failed"
+
+    # --- Query B: por RESULTADO (CTs que mais falham + flaky por repo) -------
+    res_sql = (
+        "SELECT e.name, r.testcase_id, r.status, t.title"
+        " FROM results r JOIN executions e ON e.id = r.execution_id"
+        " LEFT JOIN testcases t ON t.id = r.testcase_id" + where
+    )
+    ct_stats: dict[str, dict] = {}
+    repo_ct_status: dict[str, dict[str, set]] = {}  # repo -> ct -> {statuses}
+    for row in conn.execute(res_sql, params):
+        parsed = parse(row["name"])
+        if parsed is None:
+            continue
+        repo, run_env = parsed
+        if env and run_env != env:
+            continue
+        ct = row["testcase_id"]
+        status = row["status"]
+        cs = ct_stats.setdefault(
+            ct, {"testcase_id": ct, "title": row["title"], "failed": 0, "final": 0, "repos": set()}
+        )
+        cs["repos"].add(repo)
+        if status in ("passed", "failed"):
+            cs["final"] += 1
+            cs["failed"] += status == "failed"
+        repo_ct_status.setdefault(repo, {}).setdefault(ct, set()).add(status)
+
+    # flaky por repo = CTs que passaram E falharam dentro dos runs daquele repo
+    repo_flaky: dict[str, int] = {}
+    flaky_ct: dict[str, set] = {}  # ct -> repos onde é flaky
+    for repo, cts in repo_ct_status.items():
+        for ct, statuses in cts.items():
+            if "passed" in statuses and "failed" in statuses:
+                repo_flaky[repo] = repo_flaky.get(repo, 0) + 1
+                flaky_ct.setdefault(ct, set()).add(repo)
+
+    by_repo = []
+    for a in repos.values():
+        mttr, broken_since = _mttr_and_broken(a["series"])
+        by_repo.append(
+            {
+                "repo": a["repo"],
+                "runs": a["runs"],
+                "passed": a["passed"],
+                "failed": a["failed"],
+                "other": a["other"],
+                "pass_rate": _ratio(a["passed"], a["passed"] + a["failed"]),
+                "failure_rate": _ratio(a["failed"], a["runs"]),
+                "envs": sorted(a["envs"]),
+                "last_run_at": a["series"][-1]["at"] if a["series"] else None,
+                "last_outcome": a["series"][-1]["outcome"] if a["series"] else None,
+                "recent": a["series"][-12:],  # sparkline dos últimos runs
+                "mttr_hours": mttr,
+                "broken_since": broken_since,
+                "flaky": repo_flaky.get(a["repo"], 0),
+            }
+        )
+    by_repo.sort(key=lambda x: (x["failed"], x["failure_rate"] or 0, x["runs"]), reverse=True)
+
+    top_failing = sorted(
+        (
+            {
+                "testcase_id": c["testcase_id"],
+                "title": c["title"],
+                "failed": c["failed"],
+                "runs": c["final"],
+                "failure_rate": _ratio(c["failed"], c["final"]),
+                "repos": sorted(c["repos"]),
+            }
+            for c in ct_stats.values()
+            if c["failed"] > 0
+        ),
+        key=lambda x: (x["failed"], x["failure_rate"] or 0),
+        reverse=True,
+    )[:10]
+
+    flaky_testcases = sorted(
+        (
+            {
+                "testcase_id": ct,
+                "title": ct_stats.get(ct, {}).get("title"),
+                "repos": sorted(reps),
+            }
+            for ct, reps in flaky_ct.items()
+        ),
+        key=lambda x: x["testcase_id"],
+    )
+
+    by_env = sorted(
+        (
+            {"env": e["env"], "runs": e["runs"], "failed": e["failed"],
+             "failure_rate": _ratio(e["failed"], e["runs"])}
+            for e in env_agg.values()
+        ),
+        key=lambda x: (x["failed"], x["failure_rate"] or 0),
+        reverse=True,
+    )
+    return {
+        "total_runs": total_runs,
+        "passed_runs": passed_runs,
+        "failed_runs": failed_runs,
+        "pass_rate": _ratio(passed_runs, passed_runs + failed_runs),
+        "by_repo": by_repo,
+        "by_env": by_env,
+        "envs": sorted(all_envs),
+        "env_filter": env,
+        "top_failing_testcases": top_failing,
+        "flaky_testcases": flaky_testcases,
+        "unparsed": unparsed,
+        "pattern": raw_pattern,
+        "pattern_error": pattern_error,
+    }
+
+
+_ACTIVITY_DATE_EXPRS = (
+    "substr(at,1,10)",  # result_events
+    "opened_at",  # defects
+    "created",  # testcases
+    "created",  # requirements
+    "substr(created_at,1,10)",  # executions (auto)
+)
+_ACTIVITY_YEAR_SQL = (
+    "SELECT substr(at,1,4) y FROM result_events WHERE at IS NOT NULL"
+    " UNION SELECT substr(opened_at,1,4) FROM defects WHERE opened_at IS NOT NULL"
+    " UNION SELECT substr(created,1,4) FROM testcases WHERE created IS NOT NULL"
+    " UNION SELECT substr(created,1,4) FROM requirements WHERE created IS NOT NULL"
+    " UNION SELECT substr(created_at,1,4) FROM executions WHERE created_at IS NOT NULL"
+)
+
+
+def _activity_years(conn: sqlite3.Connection) -> list[int]:
+    years = set()
+    for row in conn.execute(_ACTIVITY_YEAR_SQL):
+        if row["y"] and row["y"].isdigit():
+            years.add(int(row["y"]))
+    return sorted(years)
+
+
+def activity_heatmap(
+    conn: sqlite3.Connection, days: int = 371, year: int | None = None
+) -> dict:
+    """Heatmap estilo GitHub da atividade de QA por dia.
+
+    Cada dia agrega vários sinais datados do índice: casos executados
+    (transições de resultado), bugs abertos, CTs/requisitos criados e runs de
+    automação. Janela: `year` (ano civil) ou os últimos `days` dias; sempre
+    começa alinhada à SEGUNDA (grade Seg→Dom × semanas). Devolve só os dias COM
+    atividade (o frontend preenche os zeros) + os anos que têm atividade (p/ o
+    seletor de ano).
+    """
+    today = date.today()
+    if year:
+        start = date(year, 1, 1)
+        end = min(date(year, 12, 31), today)
+    else:
+        end = today
+        start = end - timedelta(days=max(days, 1) - 1)
+    start = start - timedelta(days=start.weekday())  # alinha à segunda-feira
+    from_str, to_str = start.isoformat(), end.isoformat()
+
+    per_day: dict[str, dict[str, int]] = {}
+
+    def bump(day: str | None, key: str, n: int) -> None:
+        if not day or not (from_str <= day <= to_str):
+            return
+        slot = per_day.setdefault(
+            day,
+            {"executions": 0, "defects": 0, "testcases": 0,
+             "requirements": 0, "auto_runs": 0},
+        )
+        slot[key] += n
+
+    sources = [
+        # (chave, SQL que devolve (dia 'YYYY-MM-DD', n))
+        ("executions", "SELECT substr(at,1,10) d, COUNT(*) n FROM result_events GROUP BY d"),
+        ("defects", "SELECT opened_at d, COUNT(*) n FROM defects WHERE opened_at IS NOT NULL GROUP BY d"),
+        ("testcases", "SELECT created d, COUNT(*) n FROM testcases WHERE created IS NOT NULL GROUP BY d"),
+        ("requirements", "SELECT created d, COUNT(*) n FROM requirements WHERE created IS NOT NULL GROUP BY d"),
+        ("auto_runs", "SELECT substr(created_at,1,10) d, COUNT(*) n"
+                      " FROM executions WHERE origin != 'manual' GROUP BY d"),
+    ]
+    for key, sql in sources:
+        for row in conn.execute(sql):
+            bump(row["d"], key, row["n"])
+
+    days_list = []
+    totals = {"executions": 0, "defects": 0, "testcases": 0,
+              "requirements": 0, "auto_runs": 0, "total": 0}
+    for day, counts in sorted(per_day.items()):
+        total = sum(counts.values())
+        days_list.append({"date": day, **counts, "total": total})
+        for k, v in counts.items():
+            totals[k] += v
+        totals["total"] += total
+
+    return {
+        "from": from_str,
+        "to": to_str,
+        "days": days_list,
+        "totals": totals,
+        "years": _activity_years(conn),  # anos com atividade (p/ o seletor)
+        "year_filter": year,
     }
 
 
