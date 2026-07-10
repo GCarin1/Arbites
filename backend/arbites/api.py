@@ -1593,6 +1593,31 @@ def _register_routes(app: FastAPI) -> None:
         text = (await file.read()).decode("utf-8", errors="replace")
         if not text.strip():
             raise _error(422, "empty_file", "arquivo vazio")
+
+        # Arquivo já em Gherkin/BDD → preservar VERBATIM (sem IA, sem parafrasear,
+        # sem exigir provider). Cada Scenario vira um CT com o corpo intacto.
+        if ai_ops.looks_like_gherkin(text):
+            scenarios = ai_ops.parse_gherkin(text)
+            if scenarios:
+                return {
+                    "preview": True,
+                    "folder": ai_ops.gherkin_folder(scenarios),
+                    "testcases": [
+                        {
+                            "title": sc["title"],
+                            "type": "manual",
+                            "priority": "medium",
+                            "tags": [],
+                            "objetivo": "",
+                            "pre_condicoes": [],
+                            "passos": [],
+                            "resultado_esperado": "",
+                            "body": ai_ops.gherkin_body(sc),
+                        }
+                        for sc in scenarios
+                    ],
+                }
+
         prov = _ai_provider(request, provider or None)
         conversion = await asyncio.to_thread(
             ai_ops.convert_import, prov, name, _with_memory(ws, text)

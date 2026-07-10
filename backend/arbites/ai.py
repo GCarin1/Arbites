@@ -15,6 +15,7 @@ import json
 import re
 import sqlite3
 import typing
+import unicodedata
 from typing import Any
 
 import httpx
@@ -111,6 +112,86 @@ def testcase_body_bdd(item: GeneratedTestcase, feature: str = "") -> str:
     lines.append(f"    Then {item.resultado_esperado}")
     lines.append("")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Import determinístico de Gherkin — quando o arquivo JÁ é BDD, preservar
+# verbatim (a IA parafraseia/normaliza; o usuário não quer isso). Sem LLM.
+
+_GHERKIN_FEATURE = re.compile(r"^(Feature|Funcionalidade)\s*:\s*(.*)$", re.IGNORECASE)
+_GHERKIN_SCENARIO = re.compile(
+    r"^(Scenario Outline|Scenario|Esquema do Cen[aá]rio|Cen[aá]rio)\s*:\s*(.*)$",
+    re.IGNORECASE,
+)
+_GHERKIN_STEP = re.compile(
+    r"^(Given|When|Then|And|But|Dado|Quando|Ent[aã]o|E|Mas)\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_gherkin(text: str) -> bool:
+    """Heurística: o arquivo já está em Gherkin/BDD (tem Scenario + passos)."""
+    has_scenario = has_step = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if _GHERKIN_SCENARIO.match(line):
+            has_scenario = True
+        elif _GHERKIN_STEP.match(line):
+            has_step = True
+        if has_scenario and has_step:
+            return True
+    return False
+
+
+def parse_gherkin(text: str) -> list[dict[str, Any]]:
+    """Separa Feature/Scenario/passos preservando o texto EXATAMENTE como escrito.
+
+    Só normaliza indentação; nunca reescreve palavras, remove 'que', junta
+    passos And nem troca o Feature pelo título do cenário (o que a IA fazia).
+    """
+    feature = ""
+    scenarios: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        mf = _GHERKIN_FEATURE.match(line)
+        if mf:
+            feature = mf.group(2).strip()
+            continue
+        ms = _GHERKIN_SCENARIO.match(line)
+        if ms:
+            current = {"feature": feature, "title": ms.group(2).strip(), "steps": []}
+            scenarios.append(current)
+            continue
+        if current is None:
+            continue
+        if _GHERKIN_STEP.match(line):
+            current["steps"].append(line)
+        elif line.startswith("|") and line.endswith("|") and current["steps"]:
+            # linha de tabela de dados (`| a | b |`) do passo anterior.
+            current["steps"].append(line)
+        # qualquer outra linha (cabeçalho markdown "### CTxx", comentário,
+        # numeração, prosa entre cenários) é ignorada — nunca vira passo.
+    return [s for s in scenarios if s["steps"]]
+
+
+def gherkin_body(scenario: dict[str, Any]) -> str:
+    """Reconstrói o corpo BDD verbatim de um cenário (só ajusta indentação)."""
+    feature = scenario["feature"] or scenario["title"]
+    lines = [f"Feature: {feature}", "", f"  Scenario: {scenario['title']}"]
+    lines += [f"    {step}" for step in scenario["steps"]]
+    lines.append("")
+    return "\n".join(lines)
+
+
+def gherkin_folder(scenarios: list[dict[str, Any]]) -> str:
+    """Pasta sugerida = slug da primeira Feature (o usuário pode editar)."""
+    feature = next((s["feature"] for s in scenarios if s["feature"]), "")
+    slug = unicodedata.normalize("NFKD", feature).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", slug).strip("-").lower()
+    return slug[:40] or "importados"
 
 
 def testcase_body(item: GeneratedTestcase) -> str:

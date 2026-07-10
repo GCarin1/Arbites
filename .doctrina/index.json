@@ -15,7 +15,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.6.0",
+        "version": "0.8.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -709,6 +709,32 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0036-import-quando-o-arquivo-ja-esta-em-gherkin-bdd-p",
+        "title": "import: quando o arquivo ja esta em Gherkin/BDD, preservar verbatim (parser deterministico, sem IA e sem exigir provider) em vez de parafrasear via LLM que troca a Feature, remove que, adiciona pontuacao e funde passos And",
+        "path": ".doctrina/changes/archive/2026-07-10-0036-import-quando-o-arquivo-ja-esta-em-gherkin-bdd-p",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0037-parse-gherkin-nao-tratar-linhas-comecando-com-ou",
+        "title": "parse_gherkin: nao tratar linhas comecando com # ou aspas como continuacao de passo — isso colava cabecalhos markdown (### CTxx) e comentarios do documento de origem dentro do ultimo passo do cenario anterior; agora linhas nao reconhecidas sao ignoradas, so tabelas Gherkin de verdade (| a | b |) continuam sendo anexadas",
+        "path": ".doctrina/changes/archive/2026-07-10-0037-parse-gherkin-nao-tratar-linhas-comecando-com-ou",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -755,6 +781,12 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "nao-passar-dados-ja-estruturados-pela-llm",
+        "path": ".doctrina/skills/nao-passar-dados-ja-estruturados-pela-llm.md",
+        "description": "Se a entrada JÁ está num formato estruturado (Gherkin/BDD, CSV, JSON, Markdown com âncoras), NÃO a mande para a LLM — parseie deterministicamente e preserve verbatim. LLM extrai-em-campos-e-re-renderiza, o que parafraseia, funde itens e troca campos.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "rota-estatica-antes-da-dinamica",
         "path": ".doctrina/skills/rota-estatica-antes-da-dinamica.md",
         "description": "No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.",
@@ -773,15 +805,21 @@
         "last_updated": "2026-07-07"
       },
       {
+        "id": "salvar-json-truncado-de-llm",
+        "path": ".doctrina/skills/salvar-json-truncado-de-llm.md",
+        "description": "Quando a geração de um LLM local é cortada (timeout) no meio de um JSON grande, o objeto externo não fecha e o parse falha — perdendo TUDO. Recupere os objetos internos que já saíram inteiros em vez de retornar erro sem preview.",
+        "last_updated": "2026-07-10"
+      },
+      {
         "id": "truncar-titulo-em-card",
         "path": ".doctrina/skills/truncar-titulo-em-card.md",
         "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
         "last_updated": "2026-07-10"
       },
       {
-        "id": "salvar-json-truncado-de-llm",
-        "path": ".doctrina/skills/salvar-json-truncado-de-llm.md",
-        "description": "Quando a geração de um LLM local é cortada (timeout) no meio de um JSON grande, o objeto externo não fecha e o parse falha — perdendo TUDO. Recupere os objetos internos que já saíram inteiros em vez de retornar erro sem preview.",
+        "id": "heuristica-de-continuacao-sem-teste-vira-bug",
+        "path": ".doctrina/skills/heuristica-de-continuacao-sem-teste-vira-bug.md",
+        "description": "Ao escrever um parser de linhas (Gherkin, logs, markdown), não adivinhe regras de \"continuação\"/\"comentário\" (ex.:# ou aspas) sem um caso real que as exija — símbolos genéricos colidem com formatação legítima do usuário (cabeçalhos markdown, numeração) e colam texto onde não devia.",
         "last_updated": "2026-07-10"
       }
     ],
