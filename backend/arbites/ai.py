@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import typing
 from typing import Any
 
 import httpx
@@ -126,29 +127,112 @@ def testcase_body(item: GeneratedTestcase) -> str:
 # Providers
 
 
+_REASONING_TAGS = ("think", "thinking", "thought", "reasoning", "scratchpad")
+
+
+def _strip_reasoning(text: str) -> str:
+    """Remove blocos de raciocínio (<think>…</think>) que modelos locais vazam."""
+    for tag in _REASONING_TAGS:
+        text = re.sub(rf"<{tag}>.*?</{tag}>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    return text
+
+
+def _balanced_objects(text: str) -> list[Any]:
+    """Todos os objetos JSON `{…}` de nível superior que fazem parse (string-aware)."""
+    out: list[Any] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "{":
+            i += 1
+            continue
+        depth = 0
+        in_str = esc = False
+        j = i
+        while j < n:
+            c = text[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        out.append(json.loads(text[i : j + 1]))
+                    except ValueError:
+                        pass
+                    break
+            j += 1
+        i = j + 1
+    return out
+
+
+def _json_candidates(text: str) -> list[Any]:
+    """Objetos JSON candidatos, priorizando blocos cercados e a resposta final.
+
+    Modelos pequenos costumam raciocinar/reconstruir o schema antes de emitir
+    os dados; o objeto útil tende a estar no fim ou dentro de uma cerca ```json.
+    """
+    text = _strip_reasoning(text)
+    fenced: list[Any] = []
+    for m in re.finditer(r"```(?:json)?\s*(.*?)```", text, re.DOTALL):
+        fenced.extend(_balanced_objects(m.group(1)))
+    whole = _balanced_objects(text)
+    # cercados primeiro (sinal forte de "resposta"); depois o texto do fim p/ o início.
+    return fenced + list(reversed(whole))
+
+
 def _extract_json(text: str) -> Any:
-    """Extrai o primeiro bloco JSON da resposta (modelos põem texto ao redor)."""
-    text = text.strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence:
-        text = fence.group(1).strip()
-    start = text.find("{")
-    if start == -1:
+    """Compat: primeiro objeto JSON legível da resposta."""
+    cands = _json_candidates(text)
+    if not cands:
         raise AIProviderError("invalid_output", "resposta sem JSON", 422)
-    depth = 0
-    for i, ch in enumerate(text[start:], start):
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(text[start : i + 1])
-                except ValueError as exc:
-                    raise AIProviderError(
-                        "invalid_output", f"JSON ilegível na resposta: {exc}", 422
-                    ) from exc
-    raise AIProviderError("invalid_output", "JSON truncado na resposta", 422)
+    return cands[0]
+
+
+def _example_for(annotation: Any, field: Any) -> Any:
+    """Valor-exemplo concreto para uma anotação de tipo (prompt guiado por exemplo)."""
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+    if origin in (list, tuple, set):
+        inner = args[0] if args else str
+        return [_example_for(inner, None)]
+    if origin is typing.Union:  # Optional[X] / X | None
+        non_none = [a for a in args if a is not type(None)]
+        return _example_for(non_none[0], None) if non_none else None
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return _example_from_model(annotation)
+    if annotation is bool:
+        return True
+    if annotation is int:
+        return 0
+    if annotation is float:
+        return 0.0
+    # str e afins: usa o default textual (ex.: "manual", "importados") quando houver.
+    if field is not None:
+        default = getattr(field, "default", None)
+        if isinstance(default, str) and default:
+            return default
+    return "texto"
+
+
+def _example_from_model(model_cls: type[BaseModel]) -> dict[str, Any]:
+    """Exemplo compacto e concreto do JSON esperado — substitui o dump do JSON Schema.
+
+    Modelos ≤ 9B entram em loop ao receber JSON Schema ($defs/properties/required);
+    um exemplo preenchível é seguido de forma muito mais confiável.
+    """
+    return {
+        name: _example_for(field.annotation, field)
+        for name, field in model_cls.model_fields.items()
+    }
 
 
 class _BaseProvider:
@@ -172,29 +256,38 @@ class _BaseProvider:
             )
         return resp.json()
 
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         raise NotImplementedError
 
     def complete(self, system: str, user: str,
                  schema: type[BaseModel] | None = None) -> str | BaseModel:
         if schema is not None:
+            example = json.dumps(_example_from_model(schema), ensure_ascii=False)
             system = (
-                f"{system}\n\nResponda APENAS com um objeto JSON válido no schema:"
-                f"\n{json.dumps(schema.model_json_schema(), ensure_ascii=False)}"
-                "\nSem texto fora do JSON."
+                f"{system}\n\nResponda SOMENTE com um objeto JSON exatamente neste"
+                f" formato, preenchido com os dados reais (um objeto por item, sem"
+                f" abreviar com 'repita'/'...'):\n{example}\n"
+                "Não escreva schema, comentários, explicações nem raciocínio — só o JSON."
             )
-        text = self._raw_complete(system, user)
+        text = self._raw_complete(system, user, json_mode=schema is not None)
         if schema is None:
             return text
-        data = _extract_json(text)
-        try:
-            return schema.model_validate(data)
-        except ValidationError as exc:
-            raise AIProviderError(
-                "schema_mismatch",
-                f"saída do modelo fora do schema {schema.__name__}: {exc.errors()[:3]}",
-                422,
-            ) from exc
+        # Escolhe, dentre os objetos JSON candidatos, o primeiro que valida no
+        # schema — descarta raciocínio/reconstruções de schema que o modelo vaze.
+        last_err: ValidationError | None = None
+        for cand in _json_candidates(text):
+            try:
+                return schema.model_validate(cand)
+            except ValidationError as exc:
+                last_err = exc
+        if last_err is None:
+            raise AIProviderError("invalid_output", "resposta sem JSON", 422)
+        raise AIProviderError(
+            "schema_mismatch",
+            f"saída do modelo fora do schema {schema.__name__}: {last_err.errors()[:3]}",
+            422,
+        ) from last_err
 
 
 class OpenAICompatible(_BaseProvider):
@@ -206,23 +299,32 @@ class OpenAICompatible(_BaseProvider):
         super().__init__(name, model, keys, transport)
         self.base_url = base_url.rstrip("/")
 
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         headers = {}
         key = self.keys.get(self.name)
         if key:  # endpoints locais (LM Studio) dispensam chave
             headers["Authorization"] = f"Bearer {key}"
-        data = self._post(
-            f"{self.base_url}/chat/completions",
-            headers,
-            {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "temperature": 0.2,
-            },
-        )
+        url = f"{self.base_url}/chat/completions"
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": 0.2,
+        }
+        if json_mode:
+            # força saída 100% JSON — corta loops de raciocínio de modelos locais.
+            payload["response_format"] = {"type": "json_object"}
+        try:
+            data = self._post(url, headers, payload)
+        except AIProviderError:
+            if not json_mode:
+                raise
+            # servidor não suporta response_format → tenta sem (prompt já guia o JSON).
+            payload.pop("response_format", None)
+            data = self._post(url, headers, payload)
         try:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as exc:
@@ -232,7 +334,8 @@ class OpenAICompatible(_BaseProvider):
 
 
 class AnthropicProvider(_BaseProvider):
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         key = self.keys.get(self.name)
         if not key:
             raise AIProviderError("no_key", f"chave do provider '{self.name}'"
@@ -256,19 +359,23 @@ class AnthropicProvider(_BaseProvider):
 
 
 class GeminiProvider(_BaseProvider):
-    def _raw_complete(self, system: str, user: str) -> str:
+    def _raw_complete(self, system: str, user: str,
+                      json_mode: bool = False) -> str:
         key = self.keys.get(self.name)
         if not key:
             raise AIProviderError("no_key", f"chave do provider '{self.name}'"
                                   " não configurada", 409)
+        payload: dict[str, Any] = {
+            "system_instruction": {"parts": [{"text": system}]},
+            "contents": [{"parts": [{"text": user}]}],
+        }
+        if json_mode:
+            payload["generationConfig"] = {"responseMimeType": "application/json"}
         data = self._post(
             "https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self.model}:generateContent",
             {"x-goog-api-key": key},
-            {
-                "system_instruction": {"parts": [{"text": system}]},
-                "contents": [{"parts": [{"text": user}]}],
-            },
+            payload,
         )
         try:
             return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -387,10 +494,11 @@ def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
 # Prompt curto de propósito: a importação precisa rodar bem em modelos de
 # até 9B (doc §1.1 — baixo consumo de tokens, sem exemplos longos).
 _IMPORT_SYSTEM = (
-    "Extraia os casos de teste do texto (formato livre). Para cada caso: "
-    "title, passos (lista de ações) e resultado_esperado; infira "
-    "pre_condicoes quando houver. Sugira 'folder' (kebab-case) pelo contexto "
-    "do arquivo. Não invente casos que não estão no texto. PT-BR."
+    "Extraia TODOS os casos de teste do texto (formato livre ou BDD/Gherkin). "
+    "Mapeamento BDD: Given/Dado → pre_condicoes; When/And/Quando → passos; "
+    "Then/Então → resultado_esperado. Um objeto por caso — gere todos (CT01..CTnn), "
+    "nunca abrevie com 'repita para os demais' ou '...'. Sugira 'folder' "
+    "(kebab-case) pelo contexto do arquivo. Não invente casos fora do texto. PT-BR."
 )
 
 

@@ -94,86 +94,95 @@ export function TcRepository({
     return node.files.length + node.dirs.reduce((acc, d) => acc + countAll(d), 0);
   }
 
-  function renderDir(node: TreeNode, depth: number, isRoot = false) {
-    const isCollapsed = collapsed.has(node.path);
-    const isDrop = dropTarget === node.path;
-    return (
-      <div key={node.path} className="repo-dir">
-        {!isRoot && (
-          <div
-            className={`repo-row repo-folder ${isDrop ? "drop-target" : ""}`}
-            style={{ paddingLeft: depth * 20 }}
-            onDragOver={(e) => {
-              if (dragId) {
-                e.preventDefault();
-                setDropTarget(node.path);
-              }
-            }}
-            onDragLeave={() => setDropTarget((t) => (t === node.path ? null : t))}
-            onDrop={() => void moveTo(node.path)}
-          >
-            <button className="expand-btn" onClick={() => toggle(node.path)}>
-              {isCollapsed ? "▸" : "▾"}
-            </button>
-            <span className="repo-folder-name" onClick={() => toggle(node.path)}>
-              📁 {node.name}/
-            </span>
-            <span className="caption muted">{countAll(node)}</span>
-            <span className="spacer" style={{ flex: 1 }} />
-            <span className="repo-actions">
-              <button className="btn-sm" onClick={() => setCreatingFolder(node.path)}>
-                + pasta
-              </button>
-              <button className="btn-sm danger" onClick={() => setDeletingFolder(node)}>
-                Excluir
-              </button>
-            </span>
-          </div>
-        )}
-        {(!isCollapsed || isRoot) && (
-          <>
-            {node.dirs.map((d) => renderDir(d, depth + 1))}
-            {node.files.map((f) => (
+  // Renderiza os filhos de um nó (dirs, depois files) com conectores box-drawing.
+  // `prefix` = string dos ancestrais ("│   "/"    "); cada filho recebe ├──/└──.
+  function renderChildren(node: TreeNode, prefix: string): React.ReactNode[] {
+    const kids: { key: string; render: (branch: string, childPrefix: string) => React.ReactNode }[] = [
+      ...node.dirs.map((d) => ({
+        key: d.path,
+        render: (branch: string, childPrefix: string) => {
+          const isCollapsed = collapsed.has(d.path);
+          return (
+            <div key={d.path} className="repo-dir">
               <div
-                key={f.path}
-                className={`repo-row repo-file ${dragId === f.id ? "dragging" : ""}`}
-                style={{ paddingLeft: (depth + 1) * 20 }}
-                draggable={!!f.id}
-                onDragStart={() => f.id && setDragId(f.id)}
-                onDragEnd={() => {
-                  setDragId(null);
-                  setDropTarget(null);
+                className={`repo-row repo-folder ${dropTarget === d.path ? "drop-target" : ""}`}
+                onDragOver={(e) => {
+                  if (dragId) {
+                    e.preventDefault();
+                    setDropTarget(d.path);
+                  }
                 }}
+                onDragLeave={() => setDropTarget((t) => (t === d.path ? null : t))}
+                onDrop={() => void moveTo(d.path)}
               >
-                <button
-                  className="repo-file-main"
-                  onClick={() => f.id && onOpen(f.id)}
-                  disabled={!f.id}
-                  title={f.path}
-                >
-                  <span className="mono muted">{f.id ?? "?"}</span>
-                  <span className="repo-file-title">{f.title}</span>
+                <span className="tree-prefix">{prefix + branch}</span>
+                <button className="expand-btn" onClick={() => toggle(d.path)}>
+                  {isCollapsed ? "▸" : "▾"}
                 </button>
-                {f.status && (
-                  <span className={`status-dot dot-${f.status} caption`}>{f.status}</span>
-                )}
-                <span className="caption mono muted">{f.created ?? ""}</span>
+                <span className="repo-folder-name" onClick={() => toggle(d.path)}>
+                  📁 {d.name}/
+                </span>
+                <span className="caption muted">{countAll(d)}</span>
+                <span className="spacer" style={{ flex: 1 }} />
                 <span className="repo-actions">
-                  {f.id && (
-                    <button
-                      className="btn-sm danger"
-                      onClick={() => setDeletingCt({ id: f.id!, title: f.title })}
-                    >
-                      Excluir
-                    </button>
-                  )}
+                  <button className="btn-sm" onClick={() => setCreatingFolder(d.path)}>
+                    + pasta
+                  </button>
+                  <button className="btn-sm danger" onClick={() => setDeletingFolder(d)}>
+                    Excluir
+                  </button>
                 </span>
               </div>
-            ))}
-          </>
-        )}
-      </div>
-    );
+              {!isCollapsed && renderChildren(d, childPrefix)}
+            </div>
+          );
+        },
+      })),
+      ...node.files.map((f) => ({
+        key: f.path,
+        render: (branch: string) => (
+          <div
+            key={f.path}
+            className={`repo-row repo-file ${dragId === f.id ? "dragging" : ""}`}
+            draggable={!!f.id}
+            onDragStart={() => f.id && setDragId(f.id)}
+            onDragEnd={() => {
+              setDragId(null);
+              setDropTarget(null);
+            }}
+          >
+            <span className="tree-prefix">{prefix + branch}</span>
+            <button
+              className="repo-file-main"
+              onClick={() => f.id && onOpen(f.id)}
+              disabled={!f.id}
+              title={f.path}
+            >
+              <span className="mono muted">{f.id ?? "?"}</span>
+              <span className="repo-file-title">{f.title}</span>
+            </button>
+            {f.status && (
+              <span className={`status-dot dot-${f.status} caption`}>{f.status}</span>
+            )}
+            <span className="caption mono muted">{f.created ?? ""}</span>
+            <span className="repo-actions">
+              {f.id && (
+                <button
+                  className="btn-sm danger"
+                  onClick={() => setDeletingCt({ id: f.id!, title: f.title })}
+                >
+                  Excluir
+                </button>
+              )}
+            </span>
+          </div>
+        ),
+      })),
+    ];
+    return kids.map((kid, i) => {
+      const isLast = i === kids.length - 1;
+      return kid.render(isLast ? "└── " : "├── ", prefix + (isLast ? "    " : "│   "));
+    });
   }
 
   const empty = root.dirs.length === 0 && root.files.length === 0;
@@ -215,7 +224,7 @@ export function TcRepository({
             </div>
           </div>
         ) : (
-          renderDir(root, 0, true)
+          renderChildren(root, "")
         )}
       </div>
 

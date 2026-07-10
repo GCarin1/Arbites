@@ -164,11 +164,10 @@ export function ReqRepository({
   const stories = items.filter((r) => r.kind === "story");
   const orphans = stories.filter((s) => !epics.some((e) => e.id === s.epic_id));
 
-  const storyRow = (story: Requirement) => (
+  const storyRow = (story: Requirement, prefix: string, isLast: boolean) => (
     <div
       key={story.id}
       className={`repo-row repo-file ${dragStory === story.id ? "dragging" : ""}`}
-      style={{ paddingLeft: 28 }}
       draggable
       onDragStart={() => setDragStory(story.id)}
       onDragEnd={() => {
@@ -176,6 +175,7 @@ export function ReqRepository({
         setDropEpic(null);
       }}
     >
+      <span className="tree-prefix">{prefix + (isLast ? "└── " : "├── ")}</span>
       <button className="repo-file-main" onClick={() => onOpen(story.id)}>
         <span className="mono muted">{story.id}</span>
         <span className="repo-file-title">{story.title}</span>
@@ -189,6 +189,9 @@ export function ReqRepository({
       </span>
     </div>
   );
+
+  // topo da árvore = epics + (pseudo-pasta "sem epic" se houver órfãs)
+  const topLevel = epics.length + (orphans.length > 0 ? 1 : 0);
 
   return (
     <div className="repo">
@@ -214,9 +217,11 @@ export function ReqRepository({
           </div>
         ) : (
           <>
-            {epics.map((epic) => {
+            {epics.map((epic, ei) => {
               const isCollapsed = collapsed.has(epic.id);
               const children = stories.filter((s) => s.epic_id === epic.id);
+              const epicLast = ei === topLevel - 1;
+              const childPrefix = epicLast ? "    " : "│   ";
               return (
                 <div key={epic.id} className="repo-dir">
                   <div
@@ -230,6 +235,7 @@ export function ReqRepository({
                     onDragLeave={() => setDropEpic((t) => (t === epic.id ? null : t))}
                     onDrop={() => void moveStory(epic.id)}
                   >
+                    <span className="tree-prefix">{epicLast ? "└── " : "├── "}</span>
                     <button className="expand-btn" onClick={() => toggle(epic.id)}>
                       {isCollapsed ? "▸" : "▾"}
                     </button>
@@ -245,26 +251,34 @@ export function ReqRepository({
                       </button>
                     </span>
                   </div>
-                  {!isCollapsed && children.map(storyRow)}
+                  {!isCollapsed &&
+                    children.map((s, si) =>
+                      storyRow(s, childPrefix, si === children.length - 1),
+                    )}
                 </div>
               );
             })}
             {orphans.length > 0 && (
-              <div
-                className={`repo-row repo-folder ${dropEpic === "__none__" ? "drop-target" : ""}`}
-                onDragOver={(e) => {
-                  if (dragStory) {
-                    e.preventDefault();
-                    setDropEpic("__none__");
-                  }
-                }}
-                onDragLeave={() => setDropEpic((t) => (t === "__none__" ? null : t))}
-                onDrop={() => void moveStory(null)}
-              >
-                <span className="repo-folder-name muted">sem epic/</span>
-              </div>
+              <>
+                <div
+                  className={`repo-row repo-folder ${dropEpic === "__none__" ? "drop-target" : ""}`}
+                  onDragOver={(e) => {
+                    if (dragStory) {
+                      e.preventDefault();
+                      setDropEpic("__none__");
+                    }
+                  }}
+                  onDragLeave={() => setDropEpic((t) => (t === "__none__" ? null : t))}
+                  onDrop={() => void moveStory(null)}
+                >
+                  <span className="tree-prefix">└── </span>
+                  <span className="repo-folder-name muted">sem epic/</span>
+                </div>
+                {orphans.map((s, si) =>
+                  storyRow(s, "    ", si === orphans.length - 1),
+                )}
+              </>
             )}
-            {orphans.map(storyRow)}
           </>
         )}
       </div>

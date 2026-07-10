@@ -1,7 +1,7 @@
 ---
 name: rota-estatica-antes-da-dinamica
 description: No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.
-when: Ao adicionar uma rota com segmento fixo sob um prefixo que já tem rota com path param (ex.: /testcases/{id} existente e nova /testcases/folders), ou ao depurar um 404 em rota que "existe".
+when: Ao adicionar uma rota com segmento fixo sob um prefixo que já tem rota com path param (ex /testcases/{id} existente e nova /testcases/folders), ou ao depurar um 404 em rota que "existe".
 ---
 
 # Skill — rota-estatica-antes-da-dinamica

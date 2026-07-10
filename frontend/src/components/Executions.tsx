@@ -129,12 +129,15 @@ export function ExecutionsRepo({
             </div>
           </div>
         ) : (
-          years.map((year) => {
+          years.map((year, yi) => {
             const isCollapsed = collapsed.has(year);
             const list = byYear.get(year) ?? [];
+            const yearLast = yi === years.length - 1;
+            const childPrefix = yearLast ? "    " : "│   ";
             return (
               <div key={year} className="repo-dir">
                 <div className="repo-row repo-folder">
+                  <span className="tree-prefix">{yearLast ? "└── " : "├── "}</span>
                   <button className="expand-btn" onClick={() => toggle(year)}>
                     {isCollapsed ? "▸" : "▾"}
                   </button>
@@ -144,14 +147,17 @@ export function ExecutionsRepo({
                   <span className="caption muted">{list.length}</span>
                 </div>
                 {!isCollapsed &&
-                  list.map((item) => {
+                  list.map((item, ii) => {
                     const total = Object.values(item.result_counts).reduce(
                       (a, b) => a + b,
                       0,
                     );
                     const passed = item.result_counts["passed"] ?? 0;
                     return (
-                      <div key={item.id} className="repo-row repo-file" style={{ paddingLeft: 28 }}>
+                      <div key={item.id} className="repo-row repo-file">
+                        <span className="tree-prefix">
+                          {childPrefix + (ii === list.length - 1 ? "└── " : "├── ")}
+                        </span>
                         <button className="repo-file-main" onClick={() => onOpen(item.id)}>
                           <span className="mono muted">{item.id}</span>
                           <span className="repo-file-title">{item.name}</span>

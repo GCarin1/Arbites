@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-09",
+  "last_updated": "2026-07-10",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,8 +15,8 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.3.0",
-        "last_updated": "2026-07-09",
+        "version": "0.4.0",
+        "last_updated": "2026-07-10",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
@@ -654,9 +654,44 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0031-afazeres-titulo-de-card-muito-grande-estoura-o-c",
+        "title": "afazeres: titulo de card muito grande estoura o card (overflow-wrap:anywhere cresce verticalmente) — truncar com line-clamp e reticencias sem aumentar o card; tooltip com o titulo completo",
+        "path": ".doctrina/changes/archive/2026-07-10-0031-afazeres-titulo-de-card-muito-grande-estoura-o-c",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0032-repositorios-test-cases-requisitos-execucoes-nom",
+        "title": "repositorios (test cases/requisitos/execucoes): nomes aparecem centralizados na linha (botao herda justify-content:center do estilo base) — alinhar a esquerda; e nova visualizacao com box-drawing tree connectors (branches ├── └── e linhas │) para hierarquia intuitiva",
+        "path": ".doctrina/changes/archive/2026-07-10-0032-repositorios-test-cases-requisitos-execucoes-nom",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": []
+      },
+      {
+        "id": "0033-importacao-bdd-via-llm-parar-loops-de-raciocinio",
+        "title": "importacao BDD via LLM: parar loops de raciocinio/reconstrucao de schema em modelos locais pequenos; enviar exemplo compacto em vez de JSON Schema; usar response_format json_object; extrair JSON ignorando raciocinio e escolhendo o objeto que valida no schema",
+        "path": ".doctrina/changes/archive/2026-07-10-0033-importacao-bdd-via-llm-parar-loops-de-raciocinio",
+        "status": "applied",
+        "applied": "2026-07-10",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
+      {
+        "id": "botao-como-item-de-lista-heranca-justify",
+        "path": ".doctrina/skills/botao-como-item-de-lista-heranca-justify.md",
+        "description": "Um <button> reestilizado como item de lista/linha herda justify-content:center do estilo base de button — o conteúdo aparece centralizado; sobrescreva para flex-start.",
+        "last_updated": "2026-07-10"
+      },
       {
         "id": "conteudo-longo-em-tabela-overflow",
         "path": ".doctrina/skills/conteudo-longo-em-tabela-overflow.md",
@@ -666,8 +701,8 @@
       {
         "id": "default-por-tipo-de-provider",
         "path": ".doctrina/skills/default-por-tipo-de-provider.md",
-        "description": "Fallback único (ex.: base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
-        "last_updated": "2026-07-07"
+        "description": "Fallback único (ex. base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
+        "last_updated": "2026-07-10"
       },
       {
         "id": "efeito-de-foco-so-no-mount",
@@ -698,6 +733,18 @@
         "path": ".doctrina/skills/salvar-inclui-formulario-pendente.md",
         "description": "Formulário com \"Adicionar à lista\" + \"Salvar\" separados perde dados — o Salvar deve incluir o item pendente do formulário, senão o usuário preenche e nada persiste.",
         "last_updated": "2026-07-07"
+      },
+      {
+        "id": "truncar-titulo-em-card",
+        "path": ".doctrina/skills/truncar-titulo-em-card.md",
+        "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "saida-estruturada-llm-modelo-pequeno",
+        "path": ".doctrina/skills/saida-estruturada-llm-modelo-pequeno.md",
+        "description": "Para saída JSON confiável em modelos locais ≤ 9B, envie um EXEMPLO compacto (não o JSON Schema), ligue response_format json_object com fallback, e extraia o objeto que valida no schema ignorando raciocínio vazado.",
+        "last_updated": "2026-07-10"
       }
     ],
     "contracts": [

@@ -291,7 +291,7 @@ function TodoTable({ rows, ...p }: { rows: Todo[] } & RowProps) {
               </select>
             </div>
 
-            <button className="todo-card-title" onClick={() => p.onExpand(t)}>
+            <button className="todo-card-title" onClick={() => p.onExpand(t)} title={t.title}>
               <span className={`status-dot ${STATUS_DOT[t.status]}`} /> {t.title}
             </button>
 

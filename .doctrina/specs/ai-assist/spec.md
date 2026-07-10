@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-09
-**Version:** 0.3.0
+**Last updated:** 2026-07-10
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -31,6 +31,18 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   `POST /ai/negative-cases/{testcase_id}`.
 - The system shall validar a saída de geração de CTs contra schema
   Pydantic antes de apresentar o preview.
+- The system shall, ao pedir saída estruturada, guiar o modelo com um
+  **exemplo compacto preenchível** do JSON esperado — nunca com o dump do
+  JSON Schema (`$defs`/`properties`/`required`), que induz loops de
+  reconstrução de schema em modelos ≤ 9B.
+- The system shall solicitar `response_format: json_object` nos providers
+  OpenAI-compatíveis quando espera JSON (Gemini: `responseMimeType`), com
+  **fallback** transparente (repetir sem o campo) quando o endpoint não o
+  suporta.
+- The system shall, ao interpretar a saída, **descartar raciocínio vazado**
+  (`<think>…</think>` e afins) e escolher, dentre os objetos JSON
+  candidatos, o primeiro que **valida no schema** — ignorando planos/
+  reconstruções de schema emitidos antes dos dados.
 
 - The system shall expor `POST /import/ai` (upload .txt/.md/.xml) que usa a
   IA para identificar casos de teste em texto livre, sugerir uma pasta e
@@ -59,6 +71,9 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 - The system shall not gravar qualquer saída de IA no disco sem
   confirmação explícita do usuário na UI.
 - The system shall not armazenar chaves de API fora do keyring.
+- The system shall not incluir JSON Schema no prompt de saída estruturada,
+  nem falhar a conversão por raciocínio vazado ou por um objeto JSON extra
+  (schema reconstruído) preceder os dados válidos.
 
 ### Optional
 
@@ -78,6 +93,12 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 4. [verified] Arquivo livre vira preview BDD (pasta sugerida + Given/When/
    Then), nada gravado sem aceite; extensão inválida/arquivo vazio → 422 —
    verified by `backend/tests/test_ai_import.py`.
+
+5. [verified] Resposta com `<think>`, "Final Plan" e um objeto de schema
+   reconstruído antes dos dados ainda produz o `ImportConversion` correto; o
+   prompt leva exemplo compacto (não JSON Schema); `response_format:
+   json_object` é enviado, com fallback quando o servidor o rejeita (400) —
+   verified by `backend/tests/test_ai_import_robustness.py`.
 
 ## Maturity
 

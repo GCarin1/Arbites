@@ -1,6 +1,6 @@
 ---
 name: default-por-tipo-de-provider
-description: Fallback único (ex.: base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.
+description: Fallback único (ex. base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.
 when: Ao dar valor default a um campo opcional (base_url, host, porta, região) que varia por tipo/kind de integração — especialmente providers de LLM locais (LM Studio/Ollama/vLLM).
 ---
 
