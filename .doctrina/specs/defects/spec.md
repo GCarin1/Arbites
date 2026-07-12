@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)
 **Realizes:** SC2
-**Last updated:** 2026-07-10
-**Version:** 0.6.0
+**Last updated:** 2026-07-11
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -21,6 +21,11 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 - The system shall representar defeito como `.md` em `defects/` com
   frontmatter `id`, `title`, `status (open|fixed|closed)`, `severity`,
   `testcase`, `execution`, `external_key`, `opened` (data de abertura).
+- The system shall permitir registrar, por defeito, uma **lição aprendida**
+  opcional em três campos de frontmatter: `root_cause` (causa raiz), `fix`
+  (correção aplicada) e `prevention` (como prevenir a recorrência).
+- The system shall expor `GET /defects?has_lesson=true` filtrando apenas
+  defeitos com ao menos um dos três campos de lição preenchido.
 - The system shall expor `GET /defects`, `GET /defects/{id}` (com corpo),
   `POST /defects`, `PUT /defects/{id}`, `DELETE /defects/{id}` (lixeira).
 - The system shall expor uma página dedicada de gerenciamento de defeitos
@@ -41,6 +46,10 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
   shall preencher automaticamente `testcase` e `execution` no frontmatter.
 - When o usuário navega por uma menção/link `@DF-XXXX`, the system shall
   abrir a aba Defeitos com o editor daquele defeito já aberto.
+- When o usuário abre o formulário de defeito, the system shall exibir uma
+  seção "Lição aprendida" (causa raiz/correção/prevenção) editável junto dos
+  demais campos, e sinalizar na listagem quais defeitos já têm lição
+  registrada.
 
 ### State-driven
 
@@ -78,12 +87,18 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
    /defects/{id}` move para a lixeira e o defeito some da listagem e do
    individual (404) — verified by `backend/tests/test_defects.py`.
 
+6. [verified] Criar/editar um defeito com causa raiz/correção/prevenção
+   persiste os três campos, aparecem no `GET` individual, e
+   `GET /defects?has_lesson=true` retorna só os defeitos com lição — verified
+   by `backend/tests/test_lessons_learned.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
 - CRUD mínimo, vínculo com resultado/execution, listagem na UI, página
-  dedicada de gerenciamento (criar/editar/excluir avulso).
+  dedicada de gerenciamento (criar/editar/excluir avulso), lição aprendida
+  (causa/correção/prevenção) filtrável e reusada pela IA (ver `ai-assist`).
 
 **Future (aspirational, not committed):**
 

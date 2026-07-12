@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { SingleRefInput } from "./Autocomplete";
 import { DocBody } from "./ReadView";
 import type {
   AiProvider,
@@ -53,6 +54,8 @@ export function AiAssist({
       </div>
 
       <ProvidersCard info={info} onSaved={load} onError={onError} />
+
+      <ContextPackCard />
 
       {!enabled && (
         <div className="empty-state" style={{ marginBottom: 24 }}>
@@ -351,6 +354,7 @@ function GenerateCard({
   const [provider, setProvider] = useState(defaultProvider ?? "");
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<GeneratedTestcase[] | null>(null);
+  const [lessonsUsed, setLessonsUsed] = useState<{ id: string; title: string }[]>([]);
 
   async function generate() {
     if (!source.trim()) return;
@@ -358,6 +362,7 @@ function GenerateCard({
     try {
       const data = await api.aiGenerate({ source: source.trim(), provider });
       setItems(data.testcases);
+      setLessonsUsed(data.lessons_used ?? []);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -389,6 +394,14 @@ function GenerateCard({
           {busy ? "Gerando…" : "Gerar preview"}
         </button>
       </div>
+
+      {lessonsUsed.length > 0 && (
+        <p className="caption muted" style={{ marginTop: 12 }}>
+          Considerou {lessonsUsed.length} lição{lessonsUsed.length === 1 ? "" : "ões"} aprendida
+          {lessonsUsed.length === 1 ? "" : "s"} de defeitos anteriores:{" "}
+          {lessonsUsed.map((l) => l.id).join(", ")}
+        </p>
+      )}
 
       {items && (
         <PreviewList
@@ -620,6 +633,76 @@ function ReviewCard({
           onError={onError}
         />
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------ context pack
+
+/**
+ * Context Pack — bundle Markdown único (requisitos + CTs + defeitos +
+ * decisões de um escopo) pronto para colar num agente de IA externo
+ * (Cursor, Claude Code, Codex, Roo Code, Aider, etc.). Não depende de um
+ * provider de IA configurado no Arbites — é um export, não uma chamada.
+ */
+function ContextPackCard() {
+  const [epic, setEpic] = useState("");
+  const [story, setStory] = useState("");
+  const [squad, setSquad] = useState("");
+
+  const params: Record<string, string> = {};
+  if (epic.trim()) params.epic = epic.trim();
+  if (story.trim()) params.story = story.trim();
+  if (squad.trim()) params.squad = squad.trim();
+  const canExport = Object.keys(params).length > 0;
+
+  return (
+    <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card-head">
+        <h3>Context Pack</h3>
+        <span className="spacer" />
+        <span className="caption">bundle para agentes de IA externos (Cursor, Claude Code, etc.)</span>
+      </div>
+      <p className="muted caption">
+        Exporta requisitos, casos de teste, defeitos (com causa raiz/correção,
+        quando registrados) e decisões arquiteturais de um escopo — epic,
+        story ou squad — num único Markdown.
+      </p>
+      <div className="field-grid">
+        <div className="field col-4">
+          <label>Epic (opcional)</label>
+          <SingleRefInput
+            value={epic}
+            onChange={setEpic}
+            kinds="requirement"
+            placeholder="EP-0001"
+          />
+        </div>
+        <div className="field col-4">
+          <label>Story (opcional)</label>
+          <SingleRefInput
+            value={story}
+            onChange={setStory}
+            kinds="requirement"
+            placeholder="ST-0001"
+          />
+        </div>
+        <div className="field col-4">
+          <label>Squad (opcional)</label>
+          <input value={squad} onChange={(e) => setSquad(e.target.value)} placeholder="pagamentos" />
+        </div>
+      </div>
+      <div className="step-row">
+        {canExport ? (
+          <a className="button-link" href={api.contextPackUrl(params)} download>
+            Baixar Context Pack
+          </a>
+        ) : (
+          <button disabled title="Informe ao menos epic, story ou squad">
+            Baixar Context Pack
+          </button>
+        )}
+      </div>
     </div>
   );
 }

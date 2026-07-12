@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-10
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -73,6 +73,13 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall aceitar o filtro opcional `year` em `GET /metrics/activity`
   (janela do ano civil, alinhada à segunda-feira), e devolver `years` — os
   anos que têm atividade — para o seletor de ano do heatmap.
+- The system shall expor `GET /metrics/health` com uma nota única 0-100
+  (Health Score) composta de 4 componentes — cobertura (média
+  requisito+execução), defeitos (penalidade por severidade), automação (pass
+  rate dos runs de CI/local) e dívida de testes (bloqueio+retrabalho+flaky) —
+  cada um com valor, peso e fórmula explícitos na resposta; os pesos são
+  configuráveis em `arbites.yaml` (`health_score.weights`, default
+  30/25/25/20) e sempre renormalizados para somar 1.0.
 
 ### Event-driven
 
@@ -105,6 +112,10 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall not referenciar nenhuma empresa/organização/projeto
   específico no padrão default nem na spec (o padrão é genérico e
   sobrescrevível).
+- The system shall not tratar um componente do Health Score sem dado
+  suficiente como zero; o componente fica `value: null` e é excluído do
+  cálculo, com os pesos restantes renormalizados. Em workspace sem nenhuma
+  atividade de QA, o `score` geral é `null`.
 
 ### Optional
 
@@ -151,6 +162,12 @@ export PDF e Markdown (para colar no Confluence).
     segunda) e a resposta lista os anos com atividade; sem filtro segue os
     últimos ~12 meses — verified by `backend/tests/test_activity_heatmap.py`.
 
+12. [verified] `GET /metrics/health` devolve `score` 0-100 e os 4 componentes
+    (cobertura/defeitos/automação/dívida) com valor, peso e fórmula; pesos
+    customizados em `arbites.yaml` são renormalizados; componente sem dado
+    fica `null` e não vira zero; workspace vazio devolve `score: null` —
+    verified by `backend/tests/test_health_score.py`.
+
 ## Maturity
 
 **MVP (committed):**
@@ -159,7 +176,9 @@ export PDF e Markdown (para colar no Confluence).
   por métrica (semáforo), painel de defeitos abertos (aging/severidade/squad),
   monitoramento de automação por repositório (pior-primeiro, padrão de nome
   configurável, sparkline/MTTR/flaky por repo, CTs que mais falham, filtro de
-  ambiente), heatmap de atividade de QA no perfil (estilo GitHub).
+  ambiente), heatmap de atividade de QA no perfil (estilo GitHub), Health
+  Score (nota única 0-100 composta de cobertura/defeitos/automação/dívida,
+  pesos configuráveis) em destaque no Dashboard.
 
 **Future (aspirational, not committed):**
 

@@ -217,6 +217,22 @@ export interface Defect {
   external_key: string | null;
   path: string;
   opened_at: string | null;
+  root_cause: string | null;
+  fix: string | null;
+  prevention: string | null;
+  body?: string;
+}
+
+export interface Decision {
+  id: string;
+  title: string;
+  status: "proposed" | "accepted" | "superseded";
+  squad: string | null;
+  tags: string[];
+  supersedes: string | null;
+  path: string;
+  created: string | null;
+  mtime: number;
   body?: string;
 }
 
@@ -311,6 +327,76 @@ export interface AutomationReport {
   unparsed: number;
   pattern: string;
   pattern_error: string | null;
+}
+
+export interface AuditFinding {
+  category: "indexing" | "coverage" | "defects" | "automation" | string;
+  code: string;
+  severity: "bad" | "warn" | "info";
+  message: string;
+  ref: string | null;
+}
+
+export interface AuditReport {
+  id: string;
+  ran_at: string;
+  trigger: "manual" | "auto";
+  total: number;
+  by_severity: Record<string, number>;
+  by_category: Record<string, number>;
+  findings: AuditFinding[];
+}
+
+export interface AuditHistoryEntry {
+  id: string;
+  ran_at: string;
+  trigger: "manual" | "auto";
+  total: number;
+  by_severity: Record<string, number>;
+  by_category: Record<string, number>;
+}
+
+export interface TimelineEntry {
+  at: string;
+  kind: "requirement" | "defect" | "lesson" | "decision" | "agent";
+  id: string;
+  title: string;
+  summary: string;
+}
+
+export interface HealthComponent {
+  value: number | null;
+  weight: number;
+  formula: string;
+}
+
+export interface HealthScore {
+  score: number | null;
+  components: {
+    coverage: HealthComponent;
+    defects: HealthComponent;
+    automation: HealthComponent;
+    debt: HealthComponent;
+  };
+}
+
+export interface RiskMapFile {
+  path: string;
+  churn: number;
+  defect_commits: number;
+}
+
+export interface RiskMapRepo {
+  repo: string;
+  error: string | null;
+  total_commits: number;
+  files: RiskMapFile[];
+  automation_pass_rate: number | null;
+}
+
+export interface RiskMap {
+  since_days: number;
+  repos: RiskMapRepo[];
 }
 
 export interface ActivityDay {
@@ -408,6 +494,7 @@ export interface GeneratedTestcase {
 export interface GeneratePreview {
   preview: boolean;
   testcases: GeneratedTestcase[];
+  lessons_used?: { id: string; title: string }[];
 }
 
 export interface ReviewIssue {

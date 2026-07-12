@@ -7,10 +7,11 @@ Toda resposta de escrita retorna a entidade atualizada (contrato http-api).
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape as _xml_escape
@@ -28,7 +29,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import __version__
+from . import audit as audit_ops
+from . import context_pack as context_pack_ops
 from . import executions as exec_ops
+from . import project_memory as memory_ops
+from . import risk_map as risk_map_ops
 from . import metrics as metrics_ops
 from . import ai as ai_ops
 from . import daily as daily_ops
@@ -245,6 +250,11 @@ class DefectIn(BaseModel):
     execution: str | None = None
     external_key: str | None = None
     body: str = ""
+    # Banco de Lições Aprendidas (doc de ideias): causa raiz + correção +
+    # prevenção — a IA cruza isto ao gerar CTs pra não repetir o mesmo bug.
+    root_cause: str | None = None
+    fix: str | None = None
+    prevention: str | None = None
 
 
 class DefectUpdate(BaseModel):
@@ -255,6 +265,9 @@ class DefectUpdate(BaseModel):
     execution: str | None = None
     external_key: str | None = None
     body: str | None = None
+    root_cause: str | None = None
+    fix: str | None = None
+    prevention: str | None = None
 
 
 class TodoIn(BaseModel):
@@ -294,6 +307,24 @@ class MeetingUpdate(BaseModel):
     title: str | None = None
     date: str | None = None
     summary: str | None = None
+    body: str | None = None
+
+
+class DecisionIn(BaseModel):
+    title: str
+    status: str = Field(default="proposed", pattern="^(proposed|accepted|superseded)$")
+    squad: str | None = None
+    tags: list[str] = []
+    supersedes: str | None = None
+    body: str | None = None
+
+
+class DecisionUpdate(BaseModel):
+    title: str | None = None
+    status: str | None = None
+    squad: str | None = None
+    tags: list[str] | None = None
+    supersedes: str | None = None
     body: str | None = None
 
 
@@ -350,6 +381,21 @@ DEFAULT_TC_BODY = """Feature: [Nome da Feature]
     Given [pré-condição]
     When [ação executada]
     Then [resultado esperado]
+"""
+
+# Template leve (não é o ADR do Doctrina — é uma decisão do TIME DE QA sobre o
+# projeto sob teste; "ponteiro + metadados", mesmo espírito de defects).
+DEFAULT_DECISION_BODY = """## Contexto
+
+[Por que esta decisão precisou ser tomada?]
+
+## Decisão
+
+[O que foi decidido?]
+
+## Consequências
+
+[O que isso implica pra frente — positivo e negativo?]
 """
 
 
@@ -1066,6 +1112,16 @@ def _register_routes(app: FastAPI) -> None:
     async def metrics_activity(request: Request, days: int = 371, year: int = 0):
         return metrics_ops.activity_heatmap(conn_of(request), days, year or None)
 
+    @app.get(API_PREFIX + "/metrics/health")
+    async def metrics_health(
+        request: Request, sprint: str = "", days: int = 0, squad: str = ""
+    ):
+        ws = ws_of(request)
+        weights = (ws.config().get("health_score") or {}).get("weights")
+        return metrics_ops.health_score(
+            conn_of(request), weights, sprint or None, days or None, squad or None
+        )
+
     @app.get(API_PREFIX + "/metrics/automation")
     async def metrics_automation(request: Request, days: int = 0, env: str = ""):
         ws = ws_of(request)
@@ -1121,6 +1177,32 @@ def _register_routes(app: FastAPI) -> None:
                 headers={"Content-Disposition": 'attachment; filename="matriz.pdf"'},
             )
         raise _error(422, "invalid_format", "format deve ser md ou pdf")
+
+    @app.get(API_PREFIX + "/context-pack")
+    async def get_context_pack(
+        request: Request, epic: str = "", story: str = "", squad: str = ""
+    ):
+        if not (epic or story or squad):
+            raise _error(
+                422, "scope_required",
+                "informe epic, story ou squad — o context pack não exporta o"
+                " workspace inteiro sem escopo",
+            )
+        ws, conn = ws_of(request), conn_of(request)
+        body = context_pack_ops.build(
+            conn, ws.root, epic or None, story or None, squad or None
+        )
+        return PlainTextResponse(
+            body,
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="context-pack.md"'},
+        )
+
+    @app.get(API_PREFIX + "/risk-map")
+    async def get_risk_map(request: Request, days: int = 90):
+        ws, conn = ws_of(request), conn_of(request)
+        repos = ws.config().get("risk_repos") or []
+        return risk_map_ops.build(conn, repos, days)
 
     @app.get(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/evidences/{index}/file")
     async def download_evidence(request: Request, exec_id: str, ct_id: str, index: int):
@@ -1590,6 +1672,33 @@ def _register_routes(app: FastAPI) -> None:
             f"{stripped}\n\n---\n\n{user_text}"
         )
 
+    def _with_project_recap(conn: sqlite3.Connection, ws: Workspace, user_text: str) -> str:
+        """Empilha o recap de decisões/lições recentes (Memória Histórica do
+        Projeto) sobre a memória de longo prazo do usuário — a IA "lembra"
+        do que já aconteceu no projeto, não só do que o usuário escreveu no
+        perfil."""
+        recap = memory_ops.recent_recap(conn)
+        text = f"{recap}\n\n---\n\n{user_text}" if recap else user_text
+        return _with_memory(ws, text)
+
+    def _log_agent_event(
+        ws: Workspace, conn: sqlite3.Connection, action: str,
+        target_id: str | None, target_title: str | None, summary: str,
+    ) -> None:
+        """Registra uma interação de IA que gera/altera conteúdo — alimenta
+        a linha do tempo da Memória Histórica do Projeto (`agent_log/`)."""
+        event_id = ws.next_id("agent_event")
+        meta = {
+            "id": event_id,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "action": action,
+            "target_id": target_id,
+            "target_title": target_title,
+        }
+        path = ws.root / "agent_log" / f"{event_id}.md"
+        _write_doc(path, meta, summary)
+        reindex_file(ws, conn, path)
+
     def _ai_config(ws: Workspace) -> dict:
         return ws.config().get("ai") or {"default_provider": None, "providers": []}
 
@@ -1652,13 +1761,14 @@ def _register_routes(app: FastAPI) -> None:
             keys.set(name, secret)  # keyring — nunca no YAML
         return _providers_out(request)
 
-    def _preview_out(generated: ai_ops.GeneratedTestcases) -> dict:
+    def _preview_out(generated: ai_ops.GeneratedTestcases, extra: dict | None = None) -> dict:
         return {
             "preview": True,  # nada foi gravado; aceite = POST /testcases
             "testcases": [
                 {**item.model_dump(), "body": ai_ops.testcase_body(item)}
                 for item in generated.testcases
             ],
+            **(extra or {}),
         }
 
     @app.post(API_PREFIX + "/ai/generate-testcases")
@@ -1666,13 +1776,26 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         provider = _ai_provider(request, payload.provider)
         source = payload.source.strip()
+        source_id, source_title = None, None
         if source.upper().startswith(("ST-", "EP-")) and len(source) < 32:
-            rel = _find_path(conn, "requirements", source.upper())
+            source_id = source.upper()
+            rel = _find_path(conn, "requirements", source_id)
+            row = conn.execute(
+                "SELECT title FROM requirements WHERE id = ?", (source_id,)
+            ).fetchone()
+            source_title = row["title"] if row else None
             source = (ws.root / rel).read_text(encoding="utf-8-sig")
+        lessons = ai_ops.find_relevant_lessons(conn, source)
         generated = await asyncio.to_thread(
-            ai_ops.generate_testcases, provider, _with_memory(ws, source)
+            ai_ops.generate_testcases, provider, _with_project_recap(conn, ws, source), lessons
         )
-        return _preview_out(generated)
+        lessons_used = [{"id": l["id"], "title": l["title"]} for l in lessons]
+        _log_agent_event(
+            ws, conn, "generate_testcases", source_id, source_title,
+            f"Gerou {len(generated.testcases)} caso(s) de teste"
+            + (f" para {source_id}" if source_id else ""),
+        )
+        return _preview_out(generated, {"lessons_used": lessons_used})
 
     @app.post(API_PREFIX + "/ai/review/{ct_id}")
     async def ai_review(request: Request, ct_id: str, payload: AIByCtIn):
@@ -1690,7 +1813,11 @@ def _register_routes(app: FastAPI) -> None:
         ]
         similar = ai_ops.find_similar(conn, row["title"], tags, exclude_id=ct_id)
         result = await asyncio.to_thread(
-            ai_ops.review_testcase, provider, _with_memory(ws, ct_md), similar
+            ai_ops.review_testcase, provider, _with_project_recap(conn, ws, ct_md), similar
+        )
+        _log_agent_event(
+            ws, conn, "review_testcase", ct_id, row["title"] if row else None,
+            f"Revisou {ct_id}: {len(result.issues)} issue(s) encontrado(s)",
         )
         return {"preview": True, "similar_considered": similar,
                 **result.model_dump()}
@@ -1701,8 +1828,15 @@ def _register_routes(app: FastAPI) -> None:
         provider = _ai_provider(request, payload.provider)
         rel = _find_path(conn, "testcases", ct_id)
         ct_md = (ws.root / rel).read_text(encoding="utf-8-sig")
+        row = conn.execute(
+            "SELECT title FROM testcases WHERE id = ?", (ct_id,)
+        ).fetchone()
         generated = await asyncio.to_thread(
             ai_ops.negative_cases, provider, _with_memory(ws, ct_md)
+        )
+        _log_agent_event(
+            ws, conn, "negative_cases", ct_id, row["title"] if row else None,
+            f"Gerou {len(generated.testcases)} caso(s) negativo(s) para {ct_id}",
         )
         return _preview_out(generated)
 
@@ -1768,11 +1902,13 @@ def _register_routes(app: FastAPI) -> None:
         return out
 
     @app.get(API_PREFIX + "/defects")
-    async def list_defects(request: Request, status: str = ""):
+    async def list_defects(request: Request, status: str = "", has_lesson: bool = False):
         sql, params = "SELECT * FROM defects WHERE 1=1", []
         if status:
             sql += " AND status = ?"
             params.append(status)
+        if has_lesson:
+            sql += " AND (root_cause IS NOT NULL OR fix IS NOT NULL OR prevention IS NOT NULL)"
         return [
             dict(r) for r in conn_of(request).execute(sql + " ORDER BY id", params)
         ]
@@ -1790,6 +1926,9 @@ def _register_routes(app: FastAPI) -> None:
             "execution": payload.execution,
             "external_key": payload.external_key,
             "opened": date.today().isoformat(),
+            "root_cause": payload.root_cause,
+            "fix": payload.fix,
+            "prevention": payload.prevention,
         }
         path = ws.root / "defects" / f"{defect_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body)
@@ -1840,6 +1979,7 @@ def _register_routes(app: FastAPI) -> None:
             ("defect", "SELECT id, title FROM defects"),
             ("todo", "SELECT id, title FROM todos"),
             ("meeting", "SELECT id, title FROM meetings"),
+            ("decision", "SELECT id, title FROM decisions"),
         ]
         out = []
         for kind, base in sources:
@@ -1863,6 +2003,7 @@ def _register_routes(app: FastAPI) -> None:
             ("requirements", "requirement", "title"),
             ("executions", "execution", "name"),
             ("defects", "defect", "title"),
+            ("decisions", "decision", "title"),
         ):
             row = conn.execute(
                 f"SELECT {col} v FROM {table} WHERE id = ?", (link_id,)
@@ -2142,6 +2283,187 @@ def _register_routes(app: FastAPI) -> None:
             ai_ops.summarize_meeting, provider, _with_memory(ws, body)
         )
         return {"preview": True, "id": meeting_id, **result.model_dump()}
+
+    # -- decisions / decisões arquiteturais (Memória Histórica) -------------
+    # Ponteiro + metadados do TIME DE QA sobre o projeto sob teste — não é
+    # o sistema de ADR do próprio Doctrina (.doctrina/decisions/), que é meta
+    # do framework e nunca é tocado por estas rotas.
+
+    def _decision_out(conn, ws: Workspace, decision_id: str) -> dict:
+        row = conn.execute(
+            "SELECT * FROM decisions WHERE id = ?", (decision_id,)
+        ).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{decision_id} não encontrada")
+        out = dict(row)
+        out["tags"] = [t for t in (row["tags"] or "").split(",") if t]
+        _, out["body"] = _load_doc(ws, row["path"])
+        return out
+
+    @app.get(API_PREFIX + "/decisions")
+    async def list_decisions(request: Request, status: str = "", squad: str = ""):
+        conn = conn_of(request)
+        sql, params = "SELECT * FROM decisions WHERE 1=1", []
+        if status:
+            sql += " AND status = ?"
+            params.append(status)
+        if squad:
+            sql += " AND squad = ?"
+            params.append(squad)
+        rows = conn.execute(sql + " ORDER BY created DESC, id DESC", params)
+        return [
+            {**dict(r), "tags": [t for t in (r["tags"] or "").split(",") if t]}
+            for r in rows
+        ]
+
+    @app.post(API_PREFIX + "/decisions", status_code=201)
+    async def create_decision(request: Request, payload: DecisionIn):
+        ws, conn = ws_of(request), conn_of(request)
+        decision_id = ws.next_id("decision")
+        meta = {
+            "id": decision_id,
+            "title": payload.title,
+            "status": payload.status,
+            "squad": payload.squad,
+            "tags": payload.tags or None,
+            "supersedes": payload.supersedes,
+            "created": date.today().isoformat(),
+        }
+        path = ws.root / "decisions" / f"{decision_id}-{slugify(payload.title)}.md"
+        _write_doc(path, meta, payload.body if payload.body is not None else DEFAULT_DECISION_BODY)
+        reindex_file(ws, conn, path)
+        return _decision_out(conn, ws, decision_id)
+
+    @app.get(API_PREFIX + "/decisions/{decision_id}")
+    async def get_decision(request: Request, decision_id: str):
+        return _decision_out(conn_of(request), ws_of(request), decision_id)
+
+    @app.put(API_PREFIX + "/decisions/{decision_id}")
+    async def update_decision(request: Request, decision_id: str, payload: DecisionUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "decisions", decision_id)
+        meta, body = _load_doc(ws, rel)
+        changes = payload.model_dump(exclude_unset=True)
+        body = changes.pop("body", body)
+        if "tags" in changes and not changes["tags"]:
+            meta.pop("tags", None)
+            changes.pop("tags")
+        meta.update(changes)
+        _write_doc(ws.root / rel, meta, body)
+        reindex_file(ws, conn, ws.root / rel)
+        return _decision_out(conn, ws, decision_id)
+
+    @app.delete(API_PREFIX + "/decisions/{decision_id}", status_code=204)
+    async def delete_decision(request: Request, decision_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "decisions", decision_id)
+        path = ws.root / rel
+        ws.trash(path)
+        reindex_file(ws, conn, path)
+
+    # -- audit / Agente Auditor ----------------------------------------
+    # Consolida sinais que já existem no índice (warnings de indexação,
+    # stories sem CT, defeitos abertos há muito tempo, automação quebrada)
+    # num snapshot datado. Sem daemon: roda sob demanda (POST /audit/run) ou
+    # "lazy" — GET /audit/latest dispara uma rodada nova quando a última
+    # passou de `audit.auto_interval_hours` (default 24h) no arbites.yaml.
+
+    def _audit_out(conn: sqlite3.Connection, ws: Workspace, audit_id: str) -> dict:
+        row = conn.execute("SELECT * FROM audits WHERE id = ?", (audit_id,)).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{audit_id} não encontrada")
+        meta, _ = _load_doc(ws, row["path"])
+        return {
+            "id": row["id"],
+            "ran_at": row["ran_at"],
+            "trigger": row["trigger"],
+            "total": row["total"],
+            "by_severity": json.loads(row["by_severity"] or "{}"),
+            "by_category": json.loads(row["by_category"] or "{}"),
+            "findings": meta.get("findings") or [],
+        }
+
+    def _run_audit(request: Request, trigger: str) -> dict:
+        ws, conn = ws_of(request), conn_of(request)
+        cfg = ws.config().get("audit") or {}
+        findings = audit_ops.collect_findings(
+            conn, cfg.get("defect_aging_days"), cfg.get("broken_automation_days")
+        )
+        summary = audit_ops.summarize(findings)
+        audit_id = ws.next_id("audit")
+        meta = {
+            "id": audit_id,
+            "ran_at": datetime.now(timezone.utc).isoformat(),
+            "trigger": trigger,
+            "total": summary["total"],
+            "by_severity": summary["by_severity"],
+            "by_category": summary["by_category"],
+            "findings": findings,
+        }
+        path = ws.root / "audits" / f"{audit_id}.md"
+        _write_doc(path, meta, audit_ops.audit_markdown(findings, summary))
+        reindex_file(ws, conn, path)
+        return _audit_out(conn, ws, audit_id)
+
+    @app.post(API_PREFIX + "/audit/run", status_code=201)
+    async def run_audit_now(request: Request):
+        return _run_audit(request, "manual")
+
+    @app.get(API_PREFIX + "/audit/latest")
+    async def audit_latest(request: Request):
+        ws, conn = ws_of(request), conn_of(request)
+        cfg = ws.config().get("audit") or {}
+        interval_hours = cfg.get("auto_interval_hours", 24)
+        row = conn.execute(
+            "SELECT id, ran_at FROM audits ORDER BY ran_at DESC LIMIT 1"
+        ).fetchone()
+        stale = True
+        if row and row["ran_at"]:
+            try:
+                last = datetime.fromisoformat(row["ran_at"])
+                stale = (
+                    datetime.now(timezone.utc) - last
+                ).total_seconds() > interval_hours * 3600
+            except ValueError:
+                stale = True
+        if stale:
+            return _run_audit(request, "auto")
+        return _audit_out(conn, ws, row["id"])
+
+    @app.get(API_PREFIX + "/audit/history")
+    async def audit_history(request: Request, limit: int = 20):
+        conn = conn_of(request)
+        rows = conn.execute(
+            "SELECT id, ran_at, trigger, total, by_severity, by_category"
+            " FROM audits ORDER BY ran_at DESC LIMIT ?",
+            (max(1, min(limit, 200)),),
+        ).fetchall()
+        return [
+            {
+                "id": r["id"],
+                "ran_at": r["ran_at"],
+                "trigger": r["trigger"],
+                "total": r["total"],
+                "by_severity": json.loads(r["by_severity"] or "{}"),
+                "by_category": json.loads(r["by_category"] or "{}"),
+            }
+            for r in rows
+        ]
+
+    @app.get(API_PREFIX + "/audit/{audit_id}")
+    async def get_audit(request: Request, audit_id: str):
+        return _audit_out(conn_of(request), ws_of(request), audit_id)
+
+    # -- memory / Memória Histórica do Projeto --------------------------
+    # Linha do tempo cronológica (estilo git log) cruzando requisitos,
+    # defeitos, lições aprendidas, decisões arquiteturais e interações de
+    # agentes de IA — nada persistido além de `agent_events` (ver
+    # `_log_agent_event`); o resto é derivado do que já está no índice.
+
+    @app.get(API_PREFIX + "/memory/timeline")
+    async def get_memory_timeline(request: Request, kinds: str = "", limit: int = 50):
+        wanted = [k for k in kinds.split(",") if k] or None
+        return memory_ops.timeline(conn_of(request), wanted, max(1, min(limit, 200)))
 
 
 def _mount_frontend(app: FastAPI) -> None:

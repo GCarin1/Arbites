@@ -695,27 +695,47 @@ def automation_report(
     }
 
 
-_ACTIVITY_DATE_EXPRS = (
-    "substr(at,1,10)",  # result_events
-    "opened_at",  # defects
-    "created",  # testcases
-    "created",  # requirements
-    "substr(created_at,1,10)",  # executions (auto)
-)
-_ACTIVITY_YEAR_SQL = (
-    "SELECT substr(at,1,4) y FROM result_events WHERE at IS NOT NULL"
-    " UNION SELECT substr(opened_at,1,4) FROM defects WHERE opened_at IS NOT NULL"
-    " UNION SELECT substr(created,1,4) FROM testcases WHERE created IS NOT NULL"
-    " UNION SELECT substr(created,1,4) FROM requirements WHERE created IS NOT NULL"
-    " UNION SELECT substr(created_at,1,4) FROM executions WHERE created_at IS NOT NULL"
-)
+def _local_date(iso_str: str | None) -> str | None:
+    """Data LOCAL (`YYYY-MM-DD`) de um timestamp ISO possivelmente UTC.
+
+    `result_events.at`/`executions.created_at` são carimbados em UTC
+    (`_now()` de executions.py); campos já-locais (`date.today().isoformat()`,
+    sem hora nem fuso) passam por aqui inalterados, já que
+    `datetime.fromisoformat` num valor sem `T`/fuso não tem `tzinfo` para
+    converter.
+    """
+    if not iso_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_str)
+    except ValueError:
+        return iso_str[:10] or None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone()  # fuso local do processo
+    return dt.date().isoformat()
 
 
 def _activity_years(conn: sqlite3.Connection) -> list[int]:
-    years = set()
-    for row in conn.execute(_ACTIVITY_YEAR_SQL):
-        if row["y"] and row["y"].isdigit():
-            years.add(int(row["y"]))
+    """Anos com atividade — os dois campos UTC (`at`/`created_at`) passam por
+    `_local_date` antes de extrair o ano (mesmo motivo do `activity_heatmap`:
+    virada de ano UTC não coincide com virada de ano local)."""
+    years: set[int] = set()
+
+    def add(iso_str: str | None) -> None:
+        local = _local_date(iso_str)
+        if local:
+            years.add(int(local[:4]))
+
+    for row in conn.execute("SELECT at FROM result_events WHERE at IS NOT NULL"):
+        add(row["at"])
+    for row in conn.execute("SELECT created_at FROM executions WHERE created_at IS NOT NULL"):
+        add(row["created_at"])
+    for row in conn.execute("SELECT opened_at FROM defects WHERE opened_at IS NOT NULL"):
+        add(row["opened_at"])
+    for row in conn.execute("SELECT created FROM testcases WHERE created IS NOT NULL"):
+        add(row["created"])
+    for row in conn.execute("SELECT created FROM requirements WHERE created IS NOT NULL"):
+        add(row["created"])
     return sorted(years)
 
 
@@ -753,18 +773,30 @@ def activity_heatmap(
         )
         slot[key] += n
 
-    sources = [
-        # (chave, SQL que devolve (dia 'YYYY-MM-DD', n))
-        ("executions", "SELECT substr(at,1,10) d, COUNT(*) n FROM result_events GROUP BY d"),
-        ("defects", "SELECT opened_at d, COUNT(*) n FROM defects WHERE opened_at IS NOT NULL GROUP BY d"),
-        ("testcases", "SELECT created d, COUNT(*) n FROM testcases WHERE created IS NOT NULL GROUP BY d"),
-        ("requirements", "SELECT created d, COUNT(*) n FROM requirements WHERE created IS NOT NULL GROUP BY d"),
-        ("auto_runs", "SELECT substr(created_at,1,10) d, COUNT(*) n"
-                      " FROM executions WHERE origin != 'manual' GROUP BY d"),
-    ]
-    for key, sql in sources:
-        for row in conn.execute(sql):
-            bump(row["d"], key, row["n"])
+    # `result_events.at` e `executions.created_at` são carimbados em UTC
+    # (_now() de executions.py); `defects.opened_at` e `testcases/
+    # requirements.created` são carimbados com `date.today()` LOCAL. Bucketar
+    # os dois sem converter faz atividade de fim de tarde (fusos atrás de UTC,
+    # ex. Brasil) cair no dia UTC seguinte — que costuma ficar FORA da janela
+    # "até hoje local" e some do heatmap. Por isso as duas fontes UTC passam
+    # por `_local_date` linha a linha antes de bucketar; as três já-locais
+    # seguem agregadas direto no SQL (não têm componente de hora/fuso).
+    for row in conn.execute("SELECT at FROM result_events"):
+        bump(_local_date(row["at"]), "executions", 1)
+    for row in conn.execute("SELECT created_at FROM executions WHERE origin != 'manual'"):
+        bump(_local_date(row["created_at"]), "auto_runs", 1)
+    for row in conn.execute(
+        "SELECT opened_at d, COUNT(*) n FROM defects WHERE opened_at IS NOT NULL GROUP BY d"
+    ):
+        bump(row["d"], "defects", row["n"])
+    for row in conn.execute(
+        "SELECT created d, COUNT(*) n FROM testcases WHERE created IS NOT NULL GROUP BY d"
+    ):
+        bump(row["d"], "testcases", row["n"])
+    for row in conn.execute(
+        "SELECT created d, COUNT(*) n FROM requirements WHERE created IS NOT NULL GROUP BY d"
+    ):
+        bump(row["d"], "requirements", row["n"])
 
     days_list = []
     totals = {"executions": 0, "defects": 0, "testcases": 0,
@@ -784,6 +816,99 @@ def activity_heatmap(
         "years": _activity_years(conn),  # anos com atividade (p/ o seletor)
         "year_filter": year,
     }
+
+
+_HEALTH_DEFAULT_WEIGHTS = {
+    "coverage": 0.30,
+    "defects": 0.25,
+    "automation": 0.25,
+    "debt": 0.20,
+}
+_DEFECT_SEVERITY_PENALTY = {"critical": 25, "high": 12, "medium": 5, "low": 2, "unspecified": 5}
+
+
+def health_score(
+    conn: sqlite3.Connection,
+    weights: dict[str, float] | None = None,
+    sprint: str | None = None,
+    days: int | None = None,
+    squad: str | None = None,
+) -> dict:
+    """Nota única 0-100 sobre a saúde de QA — defensável em reunião: cada
+
+    componente cita sua fórmula e contribuição, nada fica escondido atrás do
+    número. Pesos configuráveis em `arbites.yaml` (`health_score.weights`);
+    os 4 abaixo são o default e são renormalizados para somar 1.0 mesmo que
+    o usuário informe pesos que não somem exatamente 1. Um componente sem
+    dado disponível (`value: None`) não participa do score — o peso dos
+    demais é renormalizado, em vez de tratar "sem dado" como "zero".
+    """
+    w = dict(_HEALTH_DEFAULT_WEIGHTS)
+    if weights:
+        w.update({k: float(v) for k, v in weights.items() if k in w})
+    total_w = sum(w.values()) or 1.0
+    w = {k: v / total_w for k, v in w.items()}
+
+    req_cov = requirement_coverage(conn, None, squad)
+    exec_cov = execution_coverage(conn, sprint, days, squad)
+    cov_values = [v["value"] for v in (req_cov, exec_cov) if v["value"] is not None]
+    coverage_pct = round(sum(cov_values) / len(cov_values) * 100) if cov_values else None
+
+    drep = defects_report(conn, squad)
+    penalty = sum(
+        _DEFECT_SEVERITY_PENALTY.get(sev, 5) * n for sev, n in drep["by_severity"].items()
+    )
+    # 0 defeitos com "0 penalidade" é indistinguível de "nada foi criado ainda"
+    # — só pontua "defects" se já existe algum CT ou defeito no workspace,
+    # senão um workspace vazio ganharia 100/100 (falso positivo de saúde).
+    has_qa_activity = conn.execute(
+        "SELECT EXISTS(SELECT 1 FROM testcases) OR EXISTS(SELECT 1 FROM defects)"
+    ).fetchone()[0]
+    defects_pct = max(0, 100 - penalty) if has_qa_activity else None
+
+    arep = automation_report(conn, None, days)
+    automation_pct = round(arep["pass_rate"] * 100) if arep["pass_rate"] is not None else None
+
+    br = blocked_rate(conn, sprint, days, squad)
+    rr = rework_rate(conn, sprint, days, squad)
+    fl = flaky(conn, 5, squad)
+    ct_sql, ct_params = "SELECT COUNT(*) c FROM testcases WHERE 1=1", []
+    if squad:
+        ct_sql += " AND squad_effective = ?"
+        ct_params.append(squad)
+    total_ct = conn.execute(ct_sql, ct_params).fetchone()["c"]
+    flaky_ratio = _ratio(len(fl["testcases"]), total_ct) if total_ct else None
+    debt_inputs = [v for v in (br["value"], rr["value"], flaky_ratio) if v is not None]
+    debt_pct = round(100 - (sum(debt_inputs) / len(debt_inputs) * 100)) if debt_inputs else None
+
+    components = {
+        "coverage": {
+            "value": coverage_pct, "weight": round(w["coverage"], 4),
+            "formula": "média(cobertura de requisito, cobertura de execução)",
+        },
+        "defects": {
+            "value": defects_pct, "weight": round(w["defects"], 4),
+            "formula": "100 - penalidade por severidade dos defeitos abertos"
+                       " (critical=25, high=12, medium=5, low=2)",
+        },
+        "automation": {
+            "value": automation_pct, "weight": round(w["automation"], 4),
+            "formula": "pass rate dos runs de automação (github_actions/local_run)",
+        },
+        "debt": {
+            "value": debt_pct, "weight": round(w["debt"], 4),
+            "formula": "100 - média(taxa de bloqueio, retrabalho, proporção de CTs flaky)",
+        },
+    }
+
+    available = {k: c for k, c in components.items() if c["value"] is not None}
+    if not available:
+        score = None
+    else:
+        aw = sum(c["weight"] for c in available.values()) or 1.0
+        score = round(sum(c["value"] * (c["weight"] / aw) for c in available.values()))
+
+    return {"score": score, "components": components}
 
 
 def matrix_markdown(matrix: dict) -> str:

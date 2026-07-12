@@ -15,9 +15,12 @@ import type {
   DefectsReport,
   Execution,
   FlakyReport,
+  HealthScore,
   MatrixStory,
   MetricValue,
   MetricsSummary,
+  RiskMap,
+  RiskMapFile,
   TraceabilityMatrix,
   TrendPoint,
 } from "../types";
@@ -34,6 +37,8 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
   const [defects, setDefects] = useState<DefectsReport | null>(null);
   const [automation, setAutomation] = useState<AutomationReport | null>(null);
   const [autoEnv, setAutoEnv] = useState("");
+  const [health, setHealth] = useState<HealthScore | null>(null);
+  const [riskMap, setRiskMap] = useState<RiskMap | null>(null);
 
   useEffect(() => {
     api
@@ -44,18 +49,20 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
 
   const load = useCallback(async () => {
     try {
-      const [s, t, f, m, d] = await Promise.all([
+      const [s, t, f, m, d, h] = await Promise.all([
         api.metricsSummary(sprint, days, squad),
         api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, squad),
         api.metricsFlaky(5),
         api.traceability("", sprint, squad),
         api.metricsDefects(squad),
+        api.metricsHealth(sprint, days, squad),
       ]);
       setSummary(s);
       setTrend(t);
       setFlaky(f);
       setMatrix(m);
       setDefects(d);
+      setHealth(h);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
@@ -72,6 +79,15 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
       .then(setAutomation)
       .catch((e) => onError(e instanceof Error ? e.message : String(e)));
   }, [days, autoEnv, onError]);
+
+  // Mapa de Risco tem janela própria (git churn, não o filtro de dias da QA)
+  // e depende de subprocess — evita atrelar ao load() geral.
+  useEffect(() => {
+    api
+      .riskMap()
+      .then(setRiskMap)
+      .catch((e) => onError(e instanceof Error ? e.message : String(e)));
+  }, [onError]);
 
   return (
     <div>
@@ -111,6 +127,8 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
           </a>
         </div>
       </div>
+
+      <HealthScoreCard health={health} />
 
       {summary && (
         <div className="metric-cards">
@@ -166,6 +184,9 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
       </div>
       <AutomationPanel report={automation} />
 
+      <h3 className="section-title">Mapa de Risco ({riskMap?.since_days ?? 90} dias)</h3>
+      <RiskMapPanel data={riskMap} />
+
       <h3 className="section-title">Defeitos abertos</h3>
       <DefectsPanel report={defects} />
 
@@ -205,6 +226,55 @@ export function Dashboard({ onError }: { onError: (message: string) => void }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const HEALTH_COMPONENT_LABEL: Record<string, string> = {
+  coverage: "Cobertura",
+  defects: "Defeitos",
+  automation: "Automação",
+  debt: "Dívida de testes",
+};
+
+function healthLevel(score: number | null): string {
+  if (score === null) return "none";
+  if (score >= 80) return "ok";
+  if (score >= 60) return "warn";
+  return "bad";
+}
+
+/**
+ * Nota única 0-100 (doc de ideias, item 9) — cada componente cita a própria
+ * fórmula (tooltip), nada fica escondido atrás do número só. Pesos vêm de
+ * `arbites.yaml` (`health_score.weights`), configuráveis por quem usa.
+ */
+function HealthScoreCard({ health }: { health: HealthScore | null }) {
+  if (!health) return null;
+  const level = healthLevel(health.score);
+  return (
+    <div className={`chart-card health-score-card health-${level}`} style={{ marginBottom: 16 }}>
+      <div className="health-score-main">
+        <div className="health-score-value">{health.score === null ? "—" : health.score}</div>
+        <div>
+          <div className="health-score-title">Health Score</div>
+          <div className="caption muted">
+            {health.score === null
+              ? "sem dado suficiente ainda"
+              : "nota composta — veja o detalhamento por componente"}
+          </div>
+        </div>
+      </div>
+      <div className="health-score-components">
+        {Object.entries(health.components).map(([key, c]) => (
+          <div key={key} className="health-component" title={c.formula}>
+            <div className="caption muted">
+              {HEALTH_COMPONENT_LABEL[key] ?? key} · peso {Math.round(c.weight * 100)}%
+            </div>
+            <div className="health-component-value">{c.value === null ? "—" : `${c.value}%`}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -439,6 +509,82 @@ function AutomationPanel({ report }: { report: AutomationReport | null }) {
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Nível de risco 0–4 pelo churn do arquivo vs. o máximo do repo (estilo GitHub). */
+function riskLevel(churn: number, max: number): number {
+  if (churn <= 0 || max <= 0) return 0;
+  const q = churn / max;
+  if (q > 0.75) return 4;
+  if (q > 0.5) return 3;
+  if (q > 0.25) return 2;
+  return 1;
+}
+
+function RiskMapPanel({ data }: { data: RiskMap | null }) {
+  if (!data) return null;
+  if (data.repos.length === 0) {
+    return (
+      <div className="empty-state" style={{ marginBottom: 24 }}>
+        <div className="empty-title">Nenhum repositório configurado</div>
+        <div className="empty-body">
+          Configure <span className="mono">risk_repos</span> (nome + caminho
+          local) em <span className="mono">arbites.yaml</span> para ver onde
+          o código muda mais, quebra mais e é menos testado.
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="chart-card">
+      {data.repos.map((repo) => {
+        const maxChurn = Math.max(0, ...repo.files.map((f: RiskMapFile) => f.churn));
+        return (
+          <div key={repo.repo} className="risk-map-repo">
+            <div className="defects-summary">
+              <span className="mono">{repo.repo}</span>
+              {repo.error ? (
+                <span className="status-dot dot-col-failed caption">{repo.error}</span>
+              ) : (
+                <>
+                  <span className="caption muted">{repo.total_commits} commits</span>
+                  <span className="caption muted">
+                    pass rate: {pct(repo.automation_pass_rate)}
+                  </span>
+                </>
+              )}
+            </div>
+            {repo.files.length > 0 && (
+              <div className="risk-map-grid">
+                {repo.files.map((f) => (
+                  <span
+                    key={f.path}
+                    className={`risk-map-cell risk-heat-${riskLevel(f.churn, maxChurn)} ${
+                      f.defect_commits > 0 ? "has-defect" : ""
+                    }`}
+                    title={`${f.path} — ${f.churn} mudança${f.churn === 1 ? "" : "s"}${
+                      f.defect_commits > 0
+                        ? `, ${f.defect_commits} ligada${f.defect_commits === 1 ? "" : "s"} a defeito`
+                        : ""
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div className="heatmap-legend caption muted">
+        <span>menos mudanças</span>
+        {[0, 1, 2, 3, 4].map((l) => (
+          <span key={l} className={`risk-map-cell risk-heat-${l}`} />
+        ))}
+        <span>mais mudanças</span>
+        <span style={{ marginLeft: 12 }} className="risk-map-cell has-defect risk-heat-0" />
+        <span>commit ligado a defeito</span>
+      </div>
     </div>
   );
 }

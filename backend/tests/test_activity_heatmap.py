@@ -1,10 +1,33 @@
 """Heatmap de atividade estilo GitHub (perfil) — agregação diária de sinais."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from arbites import executions as exec_ops
+from arbites.metrics import _local_date
 
 TC_BODY = "## Passos\n\n1. x\n\n## Resultado esperado\n\nok\n"
+
+
+def test_local_date_converts_utc_iso_consistently_with_python():
+    """Bug real: result_events.at/executions.created_at são UTC; defects.opened_at
+    e testcases/requirements.created são data LOCAL sem hora. Bucketar os dois
+    juntos sem converter faz atividade de fim de tarde (fusos atrás de UTC, ex.
+    Brasil UTC-3) cair no dia UTC seguinte — que cai fora da janela "até hoje
+    local" e some do heatmap. `_local_date` deve casar com
+    `datetime.fromisoformat(iso).astimezone().date()` para qualquer timestamp
+    UTC-aware, e ser identidade para uma data local pura (sem hora/fuso)."""
+    samples = [
+        "2026-07-12T01:18:36.440248+00:00",
+        "2026-01-01T00:00:00+00:00",
+        "2026-12-31T23:59:59+00:00",
+    ]
+    for iso in samples:
+        expected = datetime.fromisoformat(iso).astimezone().date().isoformat()
+        assert _local_date(iso) == expected
+
+    # data local pura (como stampada por date.today().isoformat()): identidade
+    assert _local_date("2026-07-11") == "2026-07-11"
+    assert _local_date(None) is None
 
 
 def test_activity_heatmap_aggregates_daily_signals(client):
