@@ -47,12 +47,18 @@ CREATE TABLE IF NOT EXISTS evidences(
 CREATE TABLE IF NOT EXISTS defects(
   id TEXT PRIMARY KEY, title TEXT, status TEXT, severity TEXT,
   testcase_id TEXT, execution_id TEXT, external_key TEXT, path TEXT,
-  opened_at TEXT);
+  opened_at TEXT, root_cause TEXT, fix TEXT, prevention TEXT);
 CREATE TABLE IF NOT EXISTS todos(
   id TEXT PRIMARY KEY, title TEXT, status TEXT, due TEXT, squad TEXT,
   links TEXT, created TEXT, path TEXT, mtime REAL);
 CREATE TABLE IF NOT EXISTS meetings(
   id TEXT PRIMARY KEY, title TEXT, date TEXT, summary TEXT, path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS decisions(
+  id TEXT PRIMARY KEY, title TEXT, status TEXT, squad TEXT, tags TEXT,
+  supersedes TEXT, path TEXT, created TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS audits(
+  id TEXT PRIMARY KEY, ran_at TEXT, trigger TEXT, total INTEGER,
+  by_severity TEXT, by_category TEXT, path TEXT, mtime REAL);
 CREATE TABLE IF NOT EXISTS warnings(
   source_path TEXT, code TEXT, message TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS index_meta(key TEXT PRIMARY KEY, value TEXT);
@@ -76,6 +82,9 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
         "ALTER TABLE testcases ADD COLUMN created TEXT",
         "ALTER TABLE requirements ADD COLUMN created TEXT",
+        "ALTER TABLE defects ADD COLUMN root_cause TEXT",
+        "ALTER TABLE defects ADD COLUMN fix TEXT",
+        "ALTER TABLE defects ADD COLUMN prevention TEXT",
     ):
         try:
             conn.execute(ddl)
@@ -115,6 +124,8 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM evidences")
     conn.execute("DELETE FROM todos")
     conn.execute("DELETE FROM meetings")
+    conn.execute("DELETE FROM decisions")
+    conn.execute("DELETE FROM audits")
     conn.execute("DELETE FROM warnings")
 
     seen_ids: dict[str, str] = {}  # id -> relpath (detecção de duplicidade)
@@ -197,6 +208,20 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
         if doc.id and track_id(doc, rel):
             _insert_meeting(conn, doc, rel)
 
+    for path, text, error in read_all(ws.root / "decisions"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_decision(conn, doc, rel)
+
+    for path, text, error in read_all(ws.root / "audits"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_audit(conn, doc, rel)
+
     exec_base = ws.root / "executions"
     if exec_base.exists():
         for path in sorted(exec_base.glob("*/*/execution.json")):
@@ -267,7 +292,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
         conn.commit()
         return
     conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
-    for table in ("requirements", "testcases", "defects", "todos", "meetings"):
+    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits"):
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
             if table == "testcases":
                 conn.execute("DELETE FROM tc_tags WHERE testcase_id = ?", (row["id"],))
@@ -297,6 +322,10 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
                 _insert_todo(conn, doc, rel)
             elif top == "meetings":
                 _insert_meeting(conn, doc, rel)
+            elif top == "decisions":
+                _insert_decision(conn, doc, rel)
+            elif top == "audits":
+                _insert_audit(conn, doc, rel)
             m = _ID_RE.match(doc.id)
             if m:
                 ws.bump_counter_to(m.group(1), int(m.group(2)))
@@ -306,7 +335,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
 
 
 def _find_id(conn: sqlite3.Connection, entity_id: str) -> str | None:
-    for table in ("requirements", "testcases", "defects", "todos", "meetings"):
+    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits"):
         row = conn.execute(f"SELECT path FROM {table} WHERE id = ?", (entity_id,)).fetchone()
         if row:
             return row["path"]
@@ -399,8 +428,8 @@ def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO defects"
         "(id, title, status, severity, testcase_id, execution_id, external_key, path,"
-        " opened_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?)",
+        " opened_at, root_cause, fix, prevention)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -411,6 +440,9 @@ def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             doc.meta.get("external_key"),
             rel,
             str(doc.meta.get("opened")) if doc.meta.get("opened") else None,
+            doc.meta.get("root_cause"),
+            doc.meta.get("fix"),
+            doc.meta.get("prevention"),
         ),
     )
 
@@ -447,6 +479,47 @@ def _insert_meeting(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             str(doc.meta.get("title", "")),
             str(doc.meta.get("date")) if doc.meta.get("date") else None,
             str(doc.meta.get("summary")) if doc.meta.get("summary") else None,
+            rel,
+            doc.path.stat().st_mtime,
+        ),
+    )
+
+
+def _insert_decision(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    raw_tags = doc.meta.get("tags") or []
+    if isinstance(raw_tags, str):
+        raw_tags = [raw_tags]
+    tags = ",".join(str(t) for t in raw_tags)
+    conn.execute(
+        "INSERT OR REPLACE INTO decisions"
+        "(id, title, status, squad, tags, supersedes, path, created, mtime)"
+        " VALUES (?,?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("title", "")),
+            str(doc.meta.get("status", "proposed")),
+            (str(doc.meta.get("squad")).strip() or None) if doc.meta.get("squad") else None,
+            tags,
+            doc.meta.get("supersedes"),
+            rel,
+            str(doc.meta.get("created")) if doc.meta.get("created") else None,
+            doc.path.stat().st_mtime,
+        ),
+    )
+
+
+def _insert_audit(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO audits"
+        "(id, ran_at, trigger, total, by_severity, by_category, path, mtime)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("ran_at", "")),
+            str(doc.meta.get("trigger", "manual")),
+            int(doc.meta.get("total") or 0),
+            json.dumps(doc.meta.get("by_severity") or {}),
+            json.dumps(doc.meta.get("by_category") or {}),
             rel,
             doc.path.stat().st_mtime,
         ),

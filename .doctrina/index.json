@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.11.0",
-  "last_updated": "2026-07-10",
+  "last_updated": "2026-07-12",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,12 +15,20 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.8.0",
-        "last_updated": "2026-07-10",
+        "version": "0.9.0",
+        "last_updated": "2026-07-11",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
         ]
+      },
+      {
+        "id": "audit",
+        "path": ".doctrina/specs/audit/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-12",
+        "implementation": "verified"
       },
       {
         "id": "businessmap",
@@ -45,6 +53,14 @@
         ]
       },
       {
+        "id": "context-pack",
+        "path": ".doctrina/specs/context-pack/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-12",
+        "implementation": "verified"
+      },
+      {
         "id": "daily",
         "path": ".doctrina/specs/daily/spec.md",
         "status": "active",
@@ -56,11 +72,19 @@
         ]
       },
       {
+        "id": "decisions",
+        "path": ".doctrina/specs/decisions/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-11",
+        "implementation": "verified — M14 (backend/arbites/indexer.py, backend/arbites/api.py, frontend/src/components/Decisions.tsx)"
+      },
+      {
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.6.0",
-        "last_updated": "2026-07-10",
+        "version": "0.7.0",
+        "last_updated": "2026-07-11",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -126,7 +150,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.9.0",
+        "version": "0.10.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -143,6 +167,14 @@
         "realizes": [
           "SC1"
         ]
+      },
+      {
+        "id": "risk-map",
+        "path": ".doctrina/specs/risk-map/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-12",
+        "implementation": "verified"
       },
       {
         "id": "segmentation",
@@ -880,6 +912,104 @@
         "status": "applied",
         "applied": "2026-07-10",
         "specs_affected": []
+      },
+      {
+        "id": "0050-remover-a-div-panel-hint-da-sidebar-app-tsx-os-1",
+        "title": "remover a div panel-hint da sidebar (App.tsx): os 12 textos de dica por aba nao agregavam valor e so ocupavam espaco; deixar a sidebar so com o menu de navegacao (nav). CSS orfa (.sidebar .panel/.panel-hint) removida; .sidebar .nav ganha flex:1 pra preencher o espaco que sobrou",
+        "path": ".doctrina/changes/archive/2026-07-12-0050-remover-a-div-panel-hint-da-sidebar-app-tsx-os-1",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": []
+      },
+      {
+        "id": "0051-fix-heatmap-de-atividade-metrics-activity-heatma",
+        "title": "fix: heatmap de atividade (metrics.activity_heatmap) misturava timestamps UTC (result_events.at, executions.created_at) com datas LOCAIS (defects.opened_at, testcases/requirements.created) no mesmo bucket por dia. Em fusos atras de UTC (ex: Brasil, UTC-3), atividade de execucao/automacao de fim de tarde cai no dia UTC seguinte, que fica fora da janela 'ate hoje local' e some do heatmap silenciosamente. Fix: _local_date() converte os dois campos UTC pra data local antes de bucketar; _activity_years tinha o mesmo problema na virada de ano e foi corrigido igual",
+        "path": ".doctrina/changes/archive/2026-07-12-0051-fix-heatmap-de-atividade-metrics-activity-heatma",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": []
+      },
+      {
+        "id": "0052-banco-de-licoes-aprendidas-defeitos-ganham-3-cam",
+        "title": "Banco de Licoes Aprendidas: defeitos ganham 3 campos opcionais (root_cause, fix, prevention). GET /defects?has_lesson=true filtra os que tem licao preenchida; GET /defects/{id} ja retorna. UI: badge 'licao' na lista, filtro checkbox, secao dedicada no modal de editar/criar defeito. Cruzamento com IA: find_relevant_lessons faz keyword-match (sem embeddings) entre o texto da story e causa/prevencao de defeitos com licao preenchida; generate_testcases injeta as licoes relevantes no prompt (nao repetir o mesmo bug) e a resposta expoe lessons_used para o usuario ver o que foi considerado",
+        "path": ".doctrina/changes/archive/2026-07-12-0052-banco-de-licoes-aprendidas-defeitos-ganham-3-cam",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0053-memoria-historica-do-projeto-nova-capability-dec",
+        "title": "Memoria Historica do Projeto: nova capability decisions. Decisoes arquiteturais do TIME DE QA sobre o projeto sob teste (nao o sistema de ADR do proprio Doctrina) — ponteiro + metadados como defects: titulo, status (proposed/accepted/superseded), squad, tags, supersedes, corpo com template Contexto/Decisao/Consequencias. CRUD completo GET/POST/PUT/DELETE, filtro por status/squad, pesquisavel via /search (kind=decision) e mencionavel @DEC-XXXX em qualquer texto (Todos, comentarios de execucao, etc). Nova aba Decisoes na navegacao com navegacao por mencao",
+        "path": ".doctrina/changes/archive/2026-07-12-0053-memoria-historica-do-projeto-nova-capability-dec",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": [
+          {
+            "capability": "decisions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0054-health-score-nota-unica-0-100-no-dashboard-compo",
+        "title": "Health Score: nota unica 0-100 no Dashboard, composta de cobertura (media requisito+execucao), defeitos (penalidade por severidade), automacao (pass rate dos runs de CI/local) e divida de testes (bloqueio+retrabalho+flaky). GET /metrics/health devolve score + componentes com formula e peso explicitos (nada escondido atras do numero). Pesos configuraveis em arbites.yaml (health_score.weights), com default 30/25/25/20 renormalizado; componente sem dado nao participa (nao vira zero, workspace vazio nao pontua). Card em destaque no topo do Dashboard",
+        "path": ".doctrina/changes/archive/2026-07-12-0054-health-score-nota-unica-0-100-no-dashboard-compo",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0055-agente-auditor-consolida-sinais-que-ja-existem-n",
+        "title": "Agente Auditor: consolida sinais que ja existem no indice (warnings de indexacao, stories sem CT, defeitos abertos ha muito tempo sem causa raiz, automacoes quebradas ha varios dias) num snapshot datado, persistido como Markdown em audits/ (AUD-NNNN). Sem daemon: POST /audit/run roda sob demanda; GET /audit/latest reaproveita a ultima rodada se ainda estiver fresca (menos de audit.auto_interval_hours, default 24h) ou dispara uma nova (trigger=auto) se estiver velha/inexistente. GET /audit/history lista rodadas passadas; GET /audit/{id} devolve o detalhe. Cada achado tem categoria/codigo/severidade(bad|warn|info)/mensagem/ref, ordenados pior-primeiro. Limiares (defect_aging_days default 14, broken_automation_days default 3) configuraveis em arbites.yaml (audit.*).",
+        "path": ".doctrina/changes/archive/2026-07-12-0055-agente-auditor-consolida-sinais-que-ja-existem-n",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0056-context-pack-get-context-pack-exporta-um-bundle",
+        "title": "Context Pack: GET /context-pack exporta um bundle Markdown unico (RAG-ready) com requisitos, casos de teste, defeitos (causa raiz/correcao quando registrados) e decisoes arquiteturais relevantes a um escopo (epic, story ou squad), para uso por agentes de IA externos (Cursor, Claude Code, Codex, Roo Code, Aider). Reaproveita a matriz de rastreabilidade como esqueleto e enriquece cada no com o corpo Markdown lido do disco. Exige ao menos um filtro de escopo (422 sem epic/story/squad) para nao despejar o workspace inteiro sem querer. Botao 'Baixar Context Pack' na aba de IA (nao depende de provider de IA configurado, e um export puro).",
+        "path": ".doctrina/changes/archive/2026-07-12-0056-context-pack-get-context-pack-exporta-um-bundle",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": [
+          {
+            "capability": "context-pack",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0057-mapa-de-risco-get-risk-map-cruza-churn-de-git-su",
+        "title": "Mapa de Risco: GET /risk-map cruza churn de git (subprocess, git log --name-only por arquivo, janela configuravel em dias) com defeitos (commits cuja mensagem referencia um DF-ID real do indice) e pass rate de automacao do repo (reaproveita metrics.automation_report), por repositorio configurado em arbites.yaml (risk_repos: name + local_path, mesma forma de automation_targets, lista separada pois o repo sob teste automatizado pode nao ser o mesmo do codigo fonte). Path invalido vira erro no payload (nunca derruba a rota). Visualizacao GitHub-heatmap-style no Dashboard: grade de quadrados por arquivo, intensidade de cor = churn, marcador vermelho = commit ligado a defeito.",
+        "path": ".doctrina/changes/archive/2026-07-12-0057-mapa-de-risco-get-risk-map-cruza-churn-de-git-su",
+        "status": "applied",
+        "applied": "2026-07-12",
+        "specs_affected": [
+          {
+            "capability": "risk-map",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -890,10 +1020,22 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "bucket-diario-nao-mistura-timestamp-utc-com-data-local",
+        "path": ".doctrina/skills/bucket-diario-nao-mistura-timestamp-utc-com-data-local.md",
+        "description": "Agregações \"por dia\" que juntam campos carimbados em UTC (datetime.now(timezone.utc)) com campos carimbados em data local (date.today()) perdem/deslocam dados silenciosamente para fusos horário atrás de UTC — sem erro, sem log, só o número errado. Normalize tudo pra data LOCAL antes de bucketar.",
+        "last_updated": "2026-07-12"
+      },
+      {
         "id": "campos-de-referencia-com-autocomplete",
         "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
         "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "composite-score-sem-dado-nao-e-zero",
+        "path": ".doctrina/skills/composite-score-sem-dado-nao-e-zero.md",
+        "description": "Ao compor uma nota única (0-100) a partir de vários componentes com pesos, um componente sem dado suficiente deve virar `null` e ser excluído do cálculo (pesos restantes renormalizados) — nunca contar como 0.",
+        "last_updated": "2026-07-12"
       },
       {
         "id": "conteudo-longo-em-tabela-overflow",
@@ -932,6 +1074,12 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "git-log-subprocess-null-separado-read-only",
+        "path": ".doctrina/skills/git-log-subprocess-null-separado-read-only.md",
+        "description": "Como chamar `git log` via subprocess de forma segura para extrair commits + arquivos tocados, sem ambiguidade de parsing e sem risco de travar ou escrever no repositório do usuário.",
+        "last_updated": "2026-07-12"
+      },
+      {
         "id": "grade-de-quadrados-responsiva-e-tooltip-no-cursor",
         "path": ".doctrina/skills/grade-de-quadrados-responsiva-e-tooltip-no-cursor.md",
         "description": "Para uma grade de quadrados (heatmap/calendário) preencher um container e escalar com ele, use colunas flex:1 + células aspect-ratio:1 (não px fixos). E um tooltip que segue o cursor precisa de position:fixed com clientX/clientY — dentro de um ancestral position:relative, coordenadas de viewport ficam deslocadas.",
@@ -942,6 +1090,12 @@
         "path": ".doctrina/skills/heuristica-de-continuacao-sem-teste-vira-bug.md",
         "description": "Ao escrever um parser de linhas (Gherkin, logs, markdown), não adivinhe regras de \"continuação\"/\"comentário\" (ex.:# ou aspas) sem um caso real que as exija — símbolos genéricos colidem com formatação legítima do usuário (cabeçalhos markdown, numeração) e colam texto onde não devia.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "keyword-match-descarta-frontmatter-antes-de-tokenizar",
+        "path": ".doctrina/skills/keyword-match-descarta-frontmatter-antes-de-tokenizar.md",
+        "description": "Uma função de casamento por palavra-chave (keyword match) que recebe o arquivo INTEIRO de um documento (frontmatter YAML + corpo) e limita quantas palavras extrai (ex.: [:8]) pode ter esse orçamento inteiro consumido por metadados (id/title/kind/status) antes de alcançar o conteúdo real — resultado: nunca casa nada, sem erro, sem log.",
+        "last_updated": "2026-07-12"
       },
       {
         "id": "leitura-agrupada-em-card",
@@ -1016,6 +1170,18 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "tela-preta-crash-de-render-sem-error-boundary",
+        "path": ".doctrina/skills/tela-preta-crash-de-render-sem-error-boundary.md",
+        "description": "Uma aba/tela que fica \"preta\" (em branco) SEM erro nos logs de servidor é quase sempre um crash de render do React — o erro está no console do browser, e sem ErrorBoundary o React 18 desmonta o app inteiro. Gatilho comum front novo lê um campo que o backend não-reiniciado ainda não devolve (ex. [...data.campo] com campo undefined).",
+        "last_updated": "2026-07-10"
+      },
+      {
+        "id": "template-fallback-precisa-de-none-nao-string-vazia",
+        "path": ".doctrina/skills/template-fallback-precisa-de-none-nao-string-vazia.md",
+        "description": "Um campo Pydantic opcional com default de string vazia (str = \"\") nunca cai no fallback de template (payload.campo if payload.campo is not None else TEMPLATE), porque \"\" is not None é sempre True. O default precisa ser None (str | None = None) para o guard funcionar.",
+        "last_updated": "2026-07-12"
+      },
+      {
         "id": "truncar-titulo-em-card",
         "path": ".doctrina/skills/truncar-titulo-em-card.md",
         "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
@@ -1025,12 +1191,6 @@
         "id": "watcher-vs-handler-mesma-rajada-database-locked",
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
-        "last_updated": "2026-07-10"
-      },
-      {
-        "id": "tela-preta-crash-de-render-sem-error-boundary",
-        "path": ".doctrina/skills/tela-preta-crash-de-render-sem-error-boundary.md",
-        "description": "Uma aba/tela que fica \"preta\" (em branco) SEM erro nos logs de servidor é quase sempre um crash de render do React — o erro está no console do browser, e sem ErrorBoundary o React 18 desmonta o app inteiro. Gatilho comum: front novo lê um campo que o backend não-reiniciado ainda não devolve (ex.: [...data.campo] com campo undefined).",
         "last_updated": "2026-07-10"
       }
     ],

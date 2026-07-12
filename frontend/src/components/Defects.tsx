@@ -40,16 +40,20 @@ export function Defects({
   const [items, setItems] = useState<Defect[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
+  const [lessonOnly, setLessonOnly] = useState(false);
   const [editing, setEditing] = useState<Defect | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Defect | null>(null);
 
   const load = useCallback(() => {
-    const q = statusFilter ? `?status=${statusFilter}` : "";
+    const params = new URLSearchParams();
+    if (statusFilter) params.set("status", statusFilter);
+    if (lessonOnly) params.set("has_lesson", "true");
+    const q = params.toString() ? `?${params}` : "";
     api
       .defects(q)
       .then(setItems)
       .catch((e) => onError(e.message));
-  }, [statusFilter, onError]);
+  }, [statusFilter, lessonOnly, onError]);
 
   useEffect(() => {
     load();
@@ -115,6 +119,14 @@ export function Defects({
               </option>
             ))}
           </select>
+          <label className="caption" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="checkbox"
+              checked={lessonOnly}
+              onChange={(e) => setLessonOnly(e.target.checked)}
+            />
+            Só com lição aprendida
+          </label>
           <button className="primary" onClick={() => setEditing("new")}>
             Novo defeito
           </button>
@@ -151,7 +163,18 @@ export function Defects({
                 return (
                   <tr key={d.id}>
                     <td className="mono">{d.id}</td>
-                    <td>{d.title}</td>
+                    <td>
+                      {d.title}
+                      {(d.root_cause || d.fix || d.prevention) && (
+                        <span
+                          className="status-dot dot-col-in_progress caption"
+                          title="Tem lição aprendida (causa/correção/prevenção)"
+                          style={{ marginLeft: 6 }}
+                        >
+                          lição
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <span
                         className={`status-dot ${SEV_DOT[d.severity ?? ""] ?? "dot-col-pending"} caption`}
@@ -265,6 +288,9 @@ function DefectModal({
   const [execution, setExecution] = useState(defect?.execution_id ?? "");
   const [externalKey, setExternalKey] = useState(defect?.external_key ?? "");
   const [body, setBody] = useState(defect?.body ?? "");
+  const [rootCause, setRootCause] = useState(defect?.root_cause ?? "");
+  const [fix, setFix] = useState(defect?.fix ?? "");
+  const [prevention, setPrevention] = useState(defect?.prevention ?? "");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -288,6 +314,9 @@ function DefectModal({
       execution: execution.trim() || null,
       external_key: externalKey.trim() || null,
       body,
+      root_cause: rootCause.trim() || null,
+      fix: fix.trim() || null,
+      prevention: prevention.trim() || null,
     };
     try {
       if (defect) await api.updateDefect(defect.id, payload);
@@ -380,6 +409,39 @@ function DefectModal({
           value={body}
           onChange={setBody}
           placeholder="Passos para reproduzir, evidência, contexto…"
+        />
+      </div>
+
+      <h4 className="section-title">Lição aprendida (opcional)</h4>
+      <p className="caption muted" style={{ marginTop: -4, marginBottom: 8 }}>
+        Preenchido, a IA passa a considerar isto ao gerar casos de teste para
+        áreas relacionadas — evita repetir o mesmo bug.
+      </p>
+      <div className="modal-field">
+        <label htmlFor="defect-root-cause">Causa raiz</label>
+        <input
+          id="defect-root-cause"
+          value={rootCause}
+          onChange={(e) => setRootCause(e.target.value)}
+          placeholder="Ex.: falta validação de CPF"
+        />
+      </div>
+      <div className="modal-field">
+        <label htmlFor="defect-fix">Correção</label>
+        <input
+          id="defect-fix"
+          value={fix}
+          onChange={(e) => setFix(e.target.value)}
+          placeholder="Ex.: campo obrigatório"
+        />
+      </div>
+      <div className="modal-field">
+        <label htmlFor="defect-prevention">Prevenção</label>
+        <input
+          id="defect-prevention"
+          value={prevention}
+          onChange={(e) => setPrevention(e.target.value)}
+          placeholder="Ex.: sempre testar CPF vazio"
         />
       </div>
     </Modal>

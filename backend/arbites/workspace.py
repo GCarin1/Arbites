@@ -27,15 +27,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "defect": "DF",
             "todo": "TD",
             "meeting": "MTG",
+            "decision": "DEC",
+            "audit": "AUD",
         },
     },
     "automation_targets": [],
+    "risk_repos": [],
     "ai": {"default_provider": None, "providers": []},
 }
 
 SUBDIRS = [
     "requirements", "testcases", "executions", "defects", "todos",
-    "dailies", "metrics", "meetings", ".arbites",
+    "dailies", "metrics", "meetings", "decisions", "audits", ".arbites",
 ]
 
 

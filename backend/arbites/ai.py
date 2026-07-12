@@ -569,8 +569,24 @@ _GENERATE_SYSTEM = (
 )
 
 
-def generate_testcases(provider: _BaseProvider, story_md: str) -> GeneratedTestcases:
-    result = provider.complete(_GENERATE_SYSTEM, story_md, GeneratedTestcases)
+def _lessons_block(lessons: list[dict]) -> str:
+    lines = [
+        f"- {lesson['title']}: causa={lesson.get('root_cause') or '?'};"
+        f" prevenção={lesson.get('prevention') or '?'}"
+        for lesson in lessons
+    ]
+    return (
+        "\n\nLições aprendidas de bugs já encontrados em áreas relacionadas —"
+        " gere casos que cubram estes cenários, não repita a mesma causa:\n"
+        + "\n".join(lines)
+    )
+
+
+def generate_testcases(
+    provider: _BaseProvider, story_md: str, lessons: list[dict] | None = None
+) -> GeneratedTestcases:
+    system = _GENERATE_SYSTEM + (_lessons_block(lessons) if lessons else "")
+    result = provider.complete(system, story_md, GeneratedTestcases)
     assert isinstance(result, GeneratedTestcases)
     return result
 
@@ -716,3 +732,34 @@ def find_similar(conn: sqlite3.Connection, title: str, tags: list[str],
     if exclude_id:
         candidates.pop(exclude_id, None)
     return list(candidates.values())[:limit]
+
+
+def find_relevant_lessons(conn: sqlite3.Connection, text: str, limit: int = 3) -> list[dict]:
+    """Banco de Lições Aprendidas: defeitos com causa/correção/prevenção
+
+    preenchidas cujo título ou conteúdo da lição compartilha palavra-chave
+    com `text` — insumo para o gerador de CTs não repetir um bug conhecido.
+    Casamento por palavra-chave (não semântico): funciona sem embeddings,
+    determinístico, e a plataforma continua 100% funcional sem IA (a lição
+    em si já é útil buscável na UI; isto só a injeta no prompt).
+    """
+    # `text` costuma ser o ARQUIVO INTEIRO da story (frontmatter + corpo) — sem
+    # descartar o frontmatter, as poucas palavras-chave viram "title"/"kind"/
+    # "status"/"draft" em vez do conteúdo real, e a lição nunca casa.
+    body = re.sub(r"^---\n.*?\n---\n", "", text, count=1, flags=re.DOTALL)
+    words = list(dict.fromkeys(re.findall(r"\w{4,}", body.lower())))[:40]
+    if not words:
+        return []
+    found: dict[str, dict] = {}
+    for word in words:
+        like = f"%{word}%"
+        for row in conn.execute(
+            "SELECT id, title, root_cause, fix, prevention FROM defects"
+            " WHERE (root_cause IS NOT NULL OR fix IS NOT NULL OR prevention IS NOT NULL)"
+            " AND (LOWER(title) LIKE ? OR LOWER(COALESCE(root_cause,'')) LIKE ?"
+            " OR LOWER(COALESCE(prevention,'')) LIKE ?)"
+            " LIMIT 5",
+            (like, like, like),
+        ):
+            found[row["id"]] = dict(row)
+    return list(found.values())[:limit]

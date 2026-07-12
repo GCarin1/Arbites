@@ -46,6 +46,12 @@ const Todos = lazy(() =>
 const Defects = lazy(() =>
   import("./components/Defects").then((m) => ({ default: m.Defects }))
 );
+const Decisions = lazy(() =>
+  import("./components/Decisions").then((m) => ({ default: m.Decisions }))
+);
+const Audit = lazy(() =>
+  import("./components/Audit").then((m) => ({ default: m.Audit }))
+);
 const Daily = lazy(() =>
   import("./components/Daily").then((m) => ({ default: m.Daily }))
 );
@@ -61,6 +67,8 @@ type Tab =
   | "requirements"
   | "executions"
   | "defects"
+  | "decisions"
+  | "audit"
   | "todos"
   | "daily"
   | "meetings"
@@ -76,6 +84,8 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "requirements", label: "Requisitos" },
   { key: "executions", label: "Execuções" },
   { key: "defects", label: "Defeitos" },
+  { key: "decisions", label: "Decisões" },
+  { key: "audit", label: "Auditoria" },
   { key: "todos", label: "Afazeres" },
   { key: "daily", label: "Daily" },
   { key: "meetings", label: "Reuniões" },
@@ -90,7 +100,7 @@ const NAV: { key: Tab; label: string }[] = [
 // Agrupamento semântico do menu (doc de ajustes §3)
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["defects", "todos", "dashboard", "daily", "meetings"] },
+  { title: "Acompanhamento", keys: ["defects", "decisions", "audit", "todos", "dashboard", "daily", "meetings"] },
   { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
   { title: "Suporte", keys: ["problems", "profile"] },
 ];
@@ -157,6 +167,7 @@ export default function App() {
   const [selectedReq, setSelectedReq] = useState<string | null>(null);
   const [selectedExec, setSelectedExec] = useState<string | null>(null);
   const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -237,6 +248,9 @@ export default function App() {
     } else if (prefix === "DF") {
       setSelectedDefect(id);
       setTab("defects");
+    } else if (prefix === "DEC") {
+      setSelectedDecision(id);
+      setTab("decisions");
     }
   }, []);
 
@@ -347,6 +361,19 @@ export default function App() {
                 openId={selectedDefect}
                 onOpened={() => setSelectedDefect(null)}
               />
+            </Suspense>
+          ) : tab === "decisions" ? (
+            <Suspense fallback={<p className="empty">Carregando decisões…</p>}>
+              <Decisions
+                onError={setError}
+                onNavigate={navigateTo}
+                openId={selectedDecision}
+                onOpened={() => setSelectedDecision(null)}
+              />
+            </Suspense>
+          ) : tab === "audit" ? (
+            <Suspense fallback={<p className="empty">Carregando auditoria…</p>}>
+              <Audit onError={setError} />
             </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>

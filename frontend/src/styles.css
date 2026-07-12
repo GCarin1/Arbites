@@ -1108,6 +1108,36 @@ table.dense tbody tr:hover td {
 .heat-2 { background: color-mix(in srgb, var(--success) 50%, var(--surface)); }
 .heat-3 { background: color-mix(in srgb, var(--success) 75%, var(--surface)); }
 .heat-4 { background: var(--success); }
+.risk-heat-0 { background: var(--surface); }
+.risk-heat-1 { background: color-mix(in srgb, var(--warning) 25%, var(--surface)); }
+.risk-heat-2 { background: color-mix(in srgb, var(--warning) 55%, var(--surface)); }
+.risk-heat-3 { background: color-mix(in srgb, var(--danger) 70%, var(--surface)); }
+.risk-heat-4 { background: var(--danger); }
+.risk-map-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.risk-map-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  position: relative;
+}
+.risk-map-cell.has-defect::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 1px solid var(--surface);
+}
+.risk-map-repo { margin-bottom: var(--s3); }
 .heatmap-legend {
   display: flex;
   align-items: center;
@@ -1331,6 +1361,92 @@ table.dense tbody tr:hover td {
   padding: var(--s2);
   margin-bottom: var(--s3);
 }
+
+/* -------------------------------------------------------- Health Score */
+.health-score-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--text-subtle);
+}
+.health-score-card.health-ok { border-left-color: var(--success); }
+.health-score-card.health-warn { border-left-color: var(--warning); }
+.health-score-card.health-bad { border-left-color: var(--danger); }
+.health-score-main {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex: 0 0 auto;
+}
+.health-score-value {
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  min-width: 64px;
+  text-align: center;
+}
+.health-ok .health-score-value { color: var(--success); }
+.health-warn .health-score-value { color: var(--warning); }
+.health-bad .health-score-value { color: var(--danger); }
+.health-score-title {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+}
+.health-score-components {
+  display: flex;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  flex: 1;
+  border-left: 1px solid var(--border);
+  padding-left: var(--s3);
+}
+.health-component {
+  min-width: 96px;
+}
+.health-component-value {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------- Agente Auditor */
+.audit-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--s2);
+  margin-bottom: var(--s3);
+}
+.audit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-caption);
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.audit-badge-bad { border-color: var(--danger); }
+.audit-badge-warn { border-color: var(--warning); }
+.audit-badge-info { border-color: var(--border); color: var(--text-subtle); }
+.audit-category { margin-bottom: var(--s3); }
+.audit-category-title {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  margin-bottom: var(--s1);
+}
+.audit-history { margin-top: var(--s4); }
+.row-clickable { cursor: pointer; }
+.row-clickable:hover { background: var(--surface-hover, var(--surface)); }
+.row-active { font-weight: 600; }
 
 .defects-summary {
   display: flex;

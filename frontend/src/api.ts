@@ -1,19 +1,24 @@
 import type {
   ActivityHeatmapData,
   AiProvidersInfo,
+  AuditHistoryEntry,
+  AuditReport,
   AutomationReport,
   DailyContext,
   DailyDigestResult,
+  Decision,
   Defect,
   DefectsReport,
   EvidenceEntry,
   Meeting,
   MeetingSummaryResult,
+  RiskMap,
   SavedDaily,
   Execution,
   ExecutionSummary,
   FlakyReport,
   GeneratePreview,
+  HealthScore,
   MetricsSummary,
   Requirement,
   ReviewResponse,
@@ -167,6 +172,25 @@ export const api = {
     request<Defect>(`/defects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteDefect: (id: string) => request<void>(`/defects/${id}`, { method: "DELETE" }),
 
+  decisions: (query = "") => request<Decision[]>(`/decisions${query}`),
+  decision: (id: string) => request<Decision>(`/decisions/${id}`),
+  createDecision: (body: object) =>
+    request<Decision>("/decisions", { method: "POST", body: JSON.stringify(body) }),
+  updateDecision: (id: string, body: object) =>
+    request<Decision>(`/decisions/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteDecision: (id: string) => request<void>(`/decisions/${id}`, { method: "DELETE" }),
+
+  runAudit: () => request<AuditReport>("/audit/run", { method: "POST" }),
+  auditLatest: () => request<AuditReport>("/audit/latest"),
+  auditHistory: (limit = 20) =>
+    request<AuditHistoryEntry[]>(`/audit/history?limit=${limit}`),
+  audit: (id: string) => request<AuditReport>(`/audit/${id}`),
+
+  contextPackUrl: (params: Record<string, string>) => {
+    const qs = new URLSearchParams(params);
+    return `${BASE}/context-pack?${qs.toString()}`;
+  },
+
   todos: (query = "") => request<Todo[]>(`/todos${query}`),
   todo: (id: string) => request<Todo>(`/todos/${id}`),
   createTodo: (body: object) =>
@@ -229,6 +253,12 @@ export const api = {
     ),
   metricsActivity: (days = 371, year = 0) =>
     request<ActivityHeatmapData>(`/metrics/activity?days=${days}&year=${year}`),
+  metricsHealth: (sprint = "", days = 0, squad = "") =>
+    request<HealthScore>(
+      `/metrics/health?sprint=${encodeURIComponent(sprint)}&days=${days}` +
+        `&squad=${encodeURIComponent(squad)}`,
+    ),
+  riskMap: (days = 90) => request<RiskMap>(`/risk-map?days=${days}`),
   traceability: (epic: string, sprint: string, squad = "") =>
     request<TraceabilityMatrix>(
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +
