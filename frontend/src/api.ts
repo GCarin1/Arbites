@@ -14,6 +14,7 @@ import type {
   MeetingSummaryResult,
   RiskMap,
   SavedDaily,
+  TimelineEntry,
   Execution,
   ExecutionSummary,
   FlakyReport,
@@ -185,6 +186,11 @@ export const api = {
   auditHistory: (limit = 20) =>
     request<AuditHistoryEntry[]>(`/audit/history?limit=${limit}`),
   audit: (id: string) => request<AuditReport>(`/audit/${id}`),
+
+  memoryTimeline: (kinds = "", limit = 50) =>
+    request<TimelineEntry[]>(
+      `/memory/timeline?kinds=${encodeURIComponent(kinds)}&limit=${limit}`,
+    ),
 
   contextPackUrl: (params: Record<string, string>) => {
     const qs = new URLSearchParams(params);

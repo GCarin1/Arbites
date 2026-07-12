@@ -32,6 +32,7 @@ from . import __version__
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
+from . import project_memory as memory_ops
 from . import risk_map as risk_map_ops
 from . import metrics as metrics_ops
 from . import ai as ai_ops
@@ -1671,6 +1672,33 @@ def _register_routes(app: FastAPI) -> None:
             f"{stripped}\n\n---\n\n{user_text}"
         )
 
+    def _with_project_recap(conn: sqlite3.Connection, ws: Workspace, user_text: str) -> str:
+        """Empilha o recap de decisões/lições recentes (Memória Histórica do
+        Projeto) sobre a memória de longo prazo do usuário — a IA "lembra"
+        do que já aconteceu no projeto, não só do que o usuário escreveu no
+        perfil."""
+        recap = memory_ops.recent_recap(conn)
+        text = f"{recap}\n\n---\n\n{user_text}" if recap else user_text
+        return _with_memory(ws, text)
+
+    def _log_agent_event(
+        ws: Workspace, conn: sqlite3.Connection, action: str,
+        target_id: str | None, target_title: str | None, summary: str,
+    ) -> None:
+        """Registra uma interação de IA que gera/altera conteúdo — alimenta
+        a linha do tempo da Memória Histórica do Projeto (`agent_log/`)."""
+        event_id = ws.next_id("agent_event")
+        meta = {
+            "id": event_id,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "action": action,
+            "target_id": target_id,
+            "target_title": target_title,
+        }
+        path = ws.root / "agent_log" / f"{event_id}.md"
+        _write_doc(path, meta, summary)
+        reindex_file(ws, conn, path)
+
     def _ai_config(ws: Workspace) -> dict:
         return ws.config().get("ai") or {"default_provider": None, "providers": []}
 
@@ -1748,14 +1776,25 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         provider = _ai_provider(request, payload.provider)
         source = payload.source.strip()
+        source_id, source_title = None, None
         if source.upper().startswith(("ST-", "EP-")) and len(source) < 32:
-            rel = _find_path(conn, "requirements", source.upper())
+            source_id = source.upper()
+            rel = _find_path(conn, "requirements", source_id)
+            row = conn.execute(
+                "SELECT title FROM requirements WHERE id = ?", (source_id,)
+            ).fetchone()
+            source_title = row["title"] if row else None
             source = (ws.root / rel).read_text(encoding="utf-8-sig")
         lessons = ai_ops.find_relevant_lessons(conn, source)
         generated = await asyncio.to_thread(
-            ai_ops.generate_testcases, provider, _with_memory(ws, source), lessons
+            ai_ops.generate_testcases, provider, _with_project_recap(conn, ws, source), lessons
         )
         lessons_used = [{"id": l["id"], "title": l["title"]} for l in lessons]
+        _log_agent_event(
+            ws, conn, "generate_testcases", source_id, source_title,
+            f"Gerou {len(generated.testcases)} caso(s) de teste"
+            + (f" para {source_id}" if source_id else ""),
+        )
         return _preview_out(generated, {"lessons_used": lessons_used})
 
     @app.post(API_PREFIX + "/ai/review/{ct_id}")
@@ -1774,7 +1813,11 @@ def _register_routes(app: FastAPI) -> None:
         ]
         similar = ai_ops.find_similar(conn, row["title"], tags, exclude_id=ct_id)
         result = await asyncio.to_thread(
-            ai_ops.review_testcase, provider, _with_memory(ws, ct_md), similar
+            ai_ops.review_testcase, provider, _with_project_recap(conn, ws, ct_md), similar
+        )
+        _log_agent_event(
+            ws, conn, "review_testcase", ct_id, row["title"] if row else None,
+            f"Revisou {ct_id}: {len(result.issues)} issue(s) encontrado(s)",
         )
         return {"preview": True, "similar_considered": similar,
                 **result.model_dump()}
@@ -1785,8 +1828,15 @@ def _register_routes(app: FastAPI) -> None:
         provider = _ai_provider(request, payload.provider)
         rel = _find_path(conn, "testcases", ct_id)
         ct_md = (ws.root / rel).read_text(encoding="utf-8-sig")
+        row = conn.execute(
+            "SELECT title FROM testcases WHERE id = ?", (ct_id,)
+        ).fetchone()
         generated = await asyncio.to_thread(
             ai_ops.negative_cases, provider, _with_memory(ws, ct_md)
+        )
+        _log_agent_event(
+            ws, conn, "negative_cases", ct_id, row["title"] if row else None,
+            f"Gerou {len(generated.testcases)} caso(s) negativo(s) para {ct_id}",
         )
         return _preview_out(generated)
 
@@ -2403,6 +2453,17 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/audit/{audit_id}")
     async def get_audit(request: Request, audit_id: str):
         return _audit_out(conn_of(request), ws_of(request), audit_id)
+
+    # -- memory / Memória Histórica do Projeto --------------------------
+    # Linha do tempo cronológica (estilo git log) cruzando requisitos,
+    # defeitos, lições aprendidas, decisões arquiteturais e interações de
+    # agentes de IA — nada persistido além de `agent_events` (ver
+    # `_log_agent_event`); o resto é derivado do que já está no índice.
+
+    @app.get(API_PREFIX + "/memory/timeline")
+    async def get_memory_timeline(request: Request, kinds: str = "", limit: int = 50):
+        wanted = [k for k in kinds.split(",") if k] or None
+        return memory_ops.timeline(conn_of(request), wanted, max(1, min(limit, 200)))
 
 
 def _mount_frontend(app: FastAPI) -> None:

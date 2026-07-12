@@ -356,6 +356,14 @@ export interface AuditHistoryEntry {
   by_category: Record<string, number>;
 }
 
+export interface TimelineEntry {
+  at: string;
+  kind: "requirement" | "defect" | "lesson" | "decision" | "agent";
+  id: string;
+  title: string;
+  summary: string;
+}
+
 export interface HealthComponent {
   value: number | null;
   weight: number;

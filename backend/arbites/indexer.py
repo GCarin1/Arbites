@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS decisions(
 CREATE TABLE IF NOT EXISTS audits(
   id TEXT PRIMARY KEY, ran_at TEXT, trigger TEXT, total INTEGER,
   by_severity TEXT, by_category TEXT, path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS agent_events(
+  id TEXT PRIMARY KEY, at TEXT, action TEXT, target_id TEXT,
+  target_title TEXT, summary TEXT, path TEXT, mtime REAL);
 CREATE TABLE IF NOT EXISTS warnings(
   source_path TEXT, code TEXT, message TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS index_meta(key TEXT PRIMARY KEY, value TEXT);
@@ -126,6 +129,7 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM meetings")
     conn.execute("DELETE FROM decisions")
     conn.execute("DELETE FROM audits")
+    conn.execute("DELETE FROM agent_events")
     conn.execute("DELETE FROM warnings")
 
     seen_ids: dict[str, str] = {}  # id -> relpath (detecção de duplicidade)
@@ -222,6 +226,13 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
         if doc.id and track_id(doc, rel):
             _insert_audit(conn, doc, rel)
 
+    for path, text, error in read_all(ws.root / "agent_log"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_agent_event(conn, doc, rel)
+
     exec_base = ws.root / "executions"
     if exec_base.exists():
         for path in sorted(exec_base.glob("*/*/execution.json")):
@@ -292,7 +303,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
         conn.commit()
         return
     conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
-    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits"):
+    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
             if table == "testcases":
                 conn.execute("DELETE FROM tc_tags WHERE testcase_id = ?", (row["id"],))
@@ -326,6 +337,8 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
                 _insert_decision(conn, doc, rel)
             elif top == "audits":
                 _insert_audit(conn, doc, rel)
+            elif top == "agent_log":
+                _insert_agent_event(conn, doc, rel)
             m = _ID_RE.match(doc.id)
             if m:
                 ws.bump_counter_to(m.group(1), int(m.group(2)))
@@ -335,7 +348,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
 
 
 def _find_id(conn: sqlite3.Connection, entity_id: str) -> str | None:
-    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits"):
+    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
         row = conn.execute(f"SELECT path FROM {table} WHERE id = ?", (entity_id,)).fetchone()
         if row:
             return row["path"]
@@ -520,6 +533,24 @@ def _insert_audit(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             int(doc.meta.get("total") or 0),
             json.dumps(doc.meta.get("by_severity") or {}),
             json.dumps(doc.meta.get("by_category") or {}),
+            rel,
+            doc.path.stat().st_mtime,
+        ),
+    )
+
+
+def _insert_agent_event(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO agent_events"
+        "(id, at, action, target_id, target_title, summary, path, mtime)"
+        " VALUES (?,?,?,?,?,?,?,?)",
+        (
+            doc.id,
+            str(doc.meta.get("at", "")),
+            str(doc.meta.get("action", "")),
+            doc.meta.get("target_id"),
+            doc.meta.get("target_title"),
+            doc.body.strip() if doc.body else "",
             rel,
             doc.path.stat().st_mtime,
         ),

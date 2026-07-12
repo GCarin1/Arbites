@@ -1138,6 +1138,48 @@ table.dense tbody tr:hover td {
   border: 1px solid var(--surface);
 }
 .risk-map-repo { margin-bottom: var(--s3); }
+
+/* --------------------------------------------------- Memória do Projeto */
+.memory-kind-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: var(--s2);
+}
+.memory-timeline {
+  position: relative;
+  padding-left: 20px;
+  border-left: 2px solid var(--border);
+}
+.memory-entry {
+  position: relative;
+  padding-bottom: var(--s3);
+}
+.memory-dot {
+  position: absolute;
+  left: -25px;
+  top: 4px;
+}
+.memory-entry-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--s2);
+}
+.memory-entry-head {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.memory-entry-title {
+  font-weight: 600;
+}
+.memory-entry-summary {
+  color: var(--text-subtle);
+  margin-top: 2px;
+}
 .heatmap-legend {
   display: flex;
   align-items: center;

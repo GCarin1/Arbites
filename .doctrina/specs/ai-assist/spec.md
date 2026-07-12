@@ -5,7 +5,7 @@
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
 **Last updated:** 2026-07-11
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -60,6 +60,13 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   prompt do provider (para não repetir a mesma causa), e expor na resposta
   `lessons_used` (quais lições foram consideradas) para o usuário ver o que
   influenciou a geração.
+- When o usuário solicita geração de CTs ou revisão de um CT, the system
+  shall injetar, além da memória de longo prazo do Perfil, um recap das
+  últimas decisões aceitas e lições recentes do projeto (capability
+  `project-memory`) no prompt enviado ao provider — complementa a injeção
+  de lições por similaridade (que exige palavra-chave em comum) com o que
+  aconteceu de mais recente, independente de relação textual. Sem nenhuma
+  decisão aceita ou lição, nenhum bloco de recap é adicionado.
 - When o usuário solicita revisão de um CT, the system shall apontar
   passos ambíguos, duplicidade contra o índice (busca por título/tags
   similares) e resultado esperado vago.
@@ -154,13 +161,19 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     devolve `lessons_used`; sem palavra em comum, `lessons_used` vem vazio e
     nada é injetado — verified by `backend/tests/test_lessons_learned.py`.
 
+11. [verified] Gerar CTs e revisar um CT injetam, no prompt enviado ao
+    provider, um recap com decisões aceitas e lições recentes do projeto
+    quando existem no workspace; sem nenhuma, o prompt fica limpo (sem
+    bloco de recap) — verified by `backend/tests/test_project_memory.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
 - 4 classes de provider, 3 funções (gerar/revisar/negativos), preview
   obrigatório, config UI, cruzamento com lições aprendidas (ver `defects`) na
-  geração de CTs.
+  geração de CTs, recap de decisões+lições recentes do projeto injetado em
+  geração e revisão (ver `project-memory`).
 
 **Future (aspirational, not committed):**
 

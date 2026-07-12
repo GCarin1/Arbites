@@ -52,6 +52,9 @@ const Decisions = lazy(() =>
 const Audit = lazy(() =>
   import("./components/Audit").then((m) => ({ default: m.Audit }))
 );
+const Memory = lazy(() =>
+  import("./components/Memory").then((m) => ({ default: m.Memory }))
+);
 const Daily = lazy(() =>
   import("./components/Daily").then((m) => ({ default: m.Daily }))
 );
@@ -69,6 +72,7 @@ type Tab =
   | "defects"
   | "decisions"
   | "audit"
+  | "memory"
   | "todos"
   | "daily"
   | "meetings"
@@ -86,6 +90,7 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "defects", label: "Defeitos" },
   { key: "decisions", label: "Decisões" },
   { key: "audit", label: "Auditoria" },
+  { key: "memory", label: "Memória do Projeto" },
   { key: "todos", label: "Afazeres" },
   { key: "daily", label: "Daily" },
   { key: "meetings", label: "Reuniões" },
@@ -100,7 +105,7 @@ const NAV: { key: Tab; label: string }[] = [
 // Agrupamento semântico do menu (doc de ajustes §3)
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["defects", "decisions", "audit", "todos", "dashboard", "daily", "meetings"] },
+  { title: "Acompanhamento", keys: ["defects", "decisions", "audit", "memory", "todos", "dashboard", "daily", "meetings"] },
   { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
   { title: "Suporte", keys: ["problems", "profile"] },
 ];
@@ -374,6 +379,10 @@ export default function App() {
           ) : tab === "audit" ? (
             <Suspense fallback={<p className="empty">Carregando auditoria…</p>}>
               <Audit onError={setError} />
+            </Suspense>
+          ) : tab === "memory" ? (
+            <Suspense fallback={<p className="empty">Carregando memória do projeto…</p>}>
+              <Memory onError={setError} onNavigate={navigateTo} />
             </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
