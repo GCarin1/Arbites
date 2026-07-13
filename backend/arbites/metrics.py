@@ -833,6 +833,7 @@ def health_score(
     sprint: str | None = None,
     days: int | None = None,
     squad: str | None = None,
+    name_pattern: str | None = None,
 ) -> dict:
     """Nota única 0-100 sobre a saúde de QA — defensável em reunião: cada
 
@@ -866,7 +867,10 @@ def health_score(
     ).fetchone()[0]
     defects_pct = max(0, 100 - penalty) if has_qa_activity else None
 
-    arep = automation_report(conn, None, days)
+    # mesmo padrão de nome do endpoint /metrics/automation — sem repassá-lo,
+    # um padrão customizado deixaria todos os runs "unparsed" e o componente
+    # de automação viraria None silenciosamente
+    arep = automation_report(conn, name_pattern, days)
     automation_pct = round(arep["pass_rate"] * 100) if arep["pass_rate"] is not None else None
 
     br = blocked_rate(conn, sprint, days, squad)

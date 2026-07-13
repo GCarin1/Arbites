@@ -17,7 +17,6 @@ from typing import Any
 
 from .metrics import automation_report
 
-_DF_RE = re.compile(r"\bDF-\d+\b")
 _GIT_TIMEOUT_SECONDS = 15
 _DEFAULT_SINCE_DAYS = 90
 _DEFAULT_TOP_N = 30
@@ -48,12 +47,21 @@ def _git_log(local_path: Path, since_days: int) -> list[tuple[str, list[str]]]:
     return commits
 
 
+def _defect_re(defect_prefix: str) -> re.Pattern[str]:
+    """Regex de menção a defeito com o prefixo CONFIGURADO do workspace
+    (`id_prefixes.defect`) — hardcodar `DF-` quebraria a correlação
+    commit↔defeito em workspaces com prefixo customizado."""
+    return re.compile(rf"\b{re.escape(defect_prefix)}-\d+\b")
+
+
 def scan_repo(
     conn: sqlite3.Connection,
     name: str,
     local_path: str,
     since_days: int = _DEFAULT_SINCE_DAYS,
     top_n: int = _DEFAULT_TOP_N,
+    defect_prefix: str = "DF",
+    pass_rate_by_repo: dict[str, float | None] | None = None,
 ) -> dict[str, Any]:
     """Escaneia UM repo configurado; nunca levanta — path inválido vira `error`."""
     path = Path(local_path)
@@ -68,11 +76,12 @@ def scan_repo(
 
     commits = _git_log(path, since_days)
     known_defects = {r["id"] for r in conn.execute("SELECT id FROM defects")}
+    df_re = _defect_re(defect_prefix)
 
     churn: dict[str, int] = {}
     defect_commits: dict[str, int] = {}
     for message, files in commits:
-        mentions_known_defect = any(m in known_defects for m in _DF_RE.findall(message))
+        mentions_known_defect = any(m in known_defects for m in df_re.findall(message))
         for f in files:
             churn[f] = churn.get(f, 0) + 1
             if mentions_known_defect:
@@ -84,15 +93,12 @@ def scan_repo(
     ]
     files_out.sort(key=lambda r: (r["churn"], r["defect_commits"]), reverse=True)
 
-    arep = automation_report(conn)
-    repo_row = next((r for r in arep["by_repo"] if r["repo"] == name), None)
-
     return {
         "repo": name,
         "error": None,
         "total_commits": len(commits),
         "files": files_out[:top_n],
-        "automation_pass_rate": repo_row["pass_rate"] if repo_row else None,
+        "automation_pass_rate": (pass_rate_by_repo or {}).get(name),
     }
 
 
@@ -100,11 +106,22 @@ def build(
     conn: sqlite3.Connection,
     repos: list[dict[str, Any]],
     since_days: int = _DEFAULT_SINCE_DAYS,
+    defect_prefix: str = "DF",
+    name_pattern: str | None = None,
 ) -> dict[str, Any]:
+    # o report de automação é um só para o workspace inteiro — computar uma
+    # vez aqui (com o name_pattern configurado, mesmo padrão do endpoint
+    # /metrics/automation) em vez de uma vez por repo dentro do scan
+    arep = automation_report(conn, name_pattern)
+    pass_rate_by_repo = {r["repo"]: r["pass_rate"] for r in arep["by_repo"]}
     return {
         "since_days": since_days,
         "repos": [
-            scan_repo(conn, str(r.get("name", "")), str(r.get("local_path", "")), since_days)
+            scan_repo(
+                conn, str(r.get("name", "")), str(r.get("local_path", "")),
+                since_days, defect_prefix=defect_prefix,
+                pass_rate_by_repo=pass_rate_by_repo,
+            )
             for r in repos
         ],
     }

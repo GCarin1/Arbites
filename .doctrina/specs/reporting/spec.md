@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-10
-**Version:** 0.10.0
+**Version:** 0.10.1
 
 ## Purpose
 
@@ -79,7 +79,10 @@ export PDF e Markdown (para colar no Confluence).
   rate dos runs de CI/local) e dívida de testes (bloqueio+retrabalho+flaky) —
   cada um com valor, peso e fórmula explícitos na resposta; os pesos são
   configuráveis em `arbites.yaml` (`health_score.weights`, default
-  30/25/25/20) e sempre renormalizados para somar 1.0.
+  30/25/25/20) e sempre renormalizados para somar 1.0. O componente de
+  automação usa o mesmo `ci_monitoring.name_pattern` configurado que o
+  relatório de automação — um padrão customizado não pode zerar o componente
+  silenciosamente.
 
 ### Event-driven
 
@@ -165,8 +168,9 @@ export PDF e Markdown (para colar no Confluence).
 12. [verified] `GET /metrics/health` devolve `score` 0-100 e os 4 componentes
     (cobertura/defeitos/automação/dívida) com valor, peso e fórmula; pesos
     customizados em `arbites.yaml` são renormalizados; componente sem dado
-    fica `null` e não vira zero; workspace vazio devolve `score: null` —
-    verified by `backend/tests/test_health_score.py`.
+    fica `null` e não vira zero; workspace vazio devolve `score: null`; o
+    componente de automação respeita um `ci_monitoring.name_pattern`
+    customizado — verified by `backend/tests/test_health_score.py`.
 
 ## Maturity
 

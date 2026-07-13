@@ -26,6 +26,7 @@ def collect_findings(
     conn: sqlite3.Connection,
     defect_aging_days: int | None = None,
     broken_automation_days: int | None = None,
+    name_pattern: str | None = None,
 ) -> list[dict[str, Any]]:
     """Roda todos os checks e devolve os achados, piores-primeiro."""
     aging = defect_aging_days or _DEFAULT_DEFECT_AGING_DAYS
@@ -35,7 +36,7 @@ def collect_findings(
     findings += _indexing_warnings(conn)
     findings += _uncovered_stories(conn)
     findings += _forgotten_defects(conn, aging)
-    findings += _broken_automations(conn, broken)
+    findings += _broken_automations(conn, broken, name_pattern)
 
     order = {s: i for i, s in enumerate(_SEVERITY_ORDER)}
     findings.sort(key=lambda f: order.get(f["severity"], 99))
@@ -105,8 +106,13 @@ def _forgotten_defects(conn: sqlite3.Connection, aging_days: int) -> list[dict[s
     return out
 
 
-def _broken_automations(conn: sqlite3.Connection, broken_days: int) -> list[dict[str, Any]]:
-    report = automation_report(conn)
+def _broken_automations(
+    conn: sqlite3.Connection, broken_days: int, name_pattern: str | None = None,
+) -> list[dict[str, Any]]:
+    # mesmo padrão de nome do endpoint /metrics/automation — sem repassá-lo,
+    # um padrão customizado deixaria os runs "unparsed" e o check nunca acharia
+    # automação quebrada
+    report = automation_report(conn, name_pattern)
     now = datetime.now(timezone.utc)
     out = []
     for repo in report["by_repo"]:
@@ -116,7 +122,9 @@ def _broken_automations(conn: sqlite3.Connection, broken_days: int) -> list[dict
         try:
             since_dt = datetime.fromisoformat(since)
             days = (now - since_dt).days
-        except ValueError:
+        except (ValueError, TypeError):
+            # created_at editado à mão sem fuso (workspace é editável
+            # externamente, ADR 0001) subtrai naive de aware → TypeError
             days = None
         if days is not None and days < broken_days:
             continue

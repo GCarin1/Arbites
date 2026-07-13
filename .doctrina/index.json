@@ -1,8 +1,8 @@
 {
   "$schema_version": "0.1.0",
   "project": "Arbites",
-  "framework_version": "0.11.0",
-  "last_updated": "2026-07-12",
+  "framework_version": "0.12.0",
+  "last_updated": "2026-07-13",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -26,7 +26,7 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "last_updated": "2026-07-12",
         "implementation": "verified"
       },
@@ -150,7 +150,7 @@
         "id": "project-memory",
         "path": ".doctrina/specs/project-memory/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "last_updated": "2026-07-12",
         "implementation": "verified"
       },
@@ -158,7 +158,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.10.0",
+        "version": "0.10.1",
         "last_updated": "2026-07-10",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -180,7 +180,7 @@
         "id": "risk-map",
         "path": ".doctrina/specs/risk-map/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "last_updated": "2026-07-12",
         "implementation": "verified"
       },
@@ -322,7 +322,15 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0059-fix-varredura-de-inconsistencias-entre",
+        "title": "fix: varredura de inconsistencias entre capabilities novas e infra existente. (1) health_score, audit e risk_map chamavam automation_report sem o ci_monitoring.name_pattern configurado - com padrao customizado o componente de automacao do Health Score vira null, o auditor nunca acha automacao quebrada e o risk map perde o pass rate, tudo silencioso; (2) Memoria do Projeto: desmarcar todos os filtros de tipo mostrava TUDO em vez de nada (lista vazia virava param vazio = sem filtro); (3) prefixo de defeito DF- hardcoded no risk_map apesar de id_prefixes.defect ser configuravel; (4) falha ao gravar o log de agente derrubava a resposta da IA ja gerada; (5) TypeError nao capturado no audit com created_at naive editado externamente; (6) automation_report recomputado por repo no risk_map.build",
+        "path": ".doctrina/changes/0059-fix-varredura-de-inconsistencias-entre",
+        "status": "proposed",
+        "opened": "2026-07-12"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
