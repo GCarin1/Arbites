@@ -54,6 +54,13 @@ export function Memory({
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
+    // nenhum tipo marcado = nada a mostrar; não chamar a API, porque
+    // `kinds=""` no backend significa "sem filtro" (todos), não "nenhum"
+    if (kinds.length === 0) {
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     api
       .memoryTimeline(kinds.length === ALL_KINDS.length ? "" : kinds.join(","), 100)

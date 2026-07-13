@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import sqlite3
 from contextlib import asynccontextmanager
@@ -50,6 +51,7 @@ from .watcher import start_watcher
 from .workspace import Workspace, slugify
 
 API_PREFIX = "/api/v1"
+log = logging.getLogger("arbites")
 
 
 # ---------------------------------------------------------------------------
@@ -1117,9 +1119,12 @@ def _register_routes(app: FastAPI) -> None:
         request: Request, sprint: str = "", days: int = 0, squad: str = ""
     ):
         ws = ws_of(request)
-        weights = (ws.config().get("health_score") or {}).get("weights")
+        cfg = ws.config()
+        weights = (cfg.get("health_score") or {}).get("weights")
+        pattern = (cfg.get("ci_monitoring") or {}).get("name_pattern")
         return metrics_ops.health_score(
-            conn_of(request), weights, sprint or None, days or None, squad or None
+            conn_of(request), weights, sprint or None, days or None, squad or None,
+            pattern,
         )
 
     @app.get(API_PREFIX + "/metrics/automation")
@@ -1201,8 +1206,13 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/risk-map")
     async def get_risk_map(request: Request, days: int = 90):
         ws, conn = ws_of(request), conn_of(request)
-        repos = ws.config().get("risk_repos") or []
-        return risk_map_ops.build(conn, repos, days)
+        cfg = ws.config()
+        repos = cfg.get("risk_repos") or []
+        pattern = (cfg.get("ci_monitoring") or {}).get("name_pattern")
+        return risk_map_ops.build(
+            conn, repos, days,
+            defect_prefix=ws.id_prefixes()["defect"], name_pattern=pattern,
+        )
 
     @app.get(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/evidences/{index}/file")
     async def download_evidence(request: Request, exec_id: str, ct_id: str, index: int):
@@ -1686,18 +1696,26 @@ def _register_routes(app: FastAPI) -> None:
         target_id: str | None, target_title: str | None, summary: str,
     ) -> None:
         """Registra uma interação de IA que gera/altera conteúdo — alimenta
-        a linha do tempo da Memória Histórica do Projeto (`agent_log/`)."""
-        event_id = ws.next_id("agent_event")
-        meta = {
-            "id": event_id,
-            "at": datetime.now(timezone.utc).isoformat(),
-            "action": action,
-            "target_id": target_id,
-            "target_title": target_title,
-        }
-        path = ws.root / "agent_log" / f"{event_id}.md"
-        _write_doc(path, meta, summary)
-        reindex_file(ws, conn, path)
+        a linha do tempo da Memória Histórica do Projeto (`agent_log/`).
+
+        Nunca levanta: neste ponto o LLM já respondeu, e uma falha ao gravar
+        o log (disco, lock do índice) não pode custar ao usuário o conteúdo
+        gerado — o log é acessório, a resposta é o produto.
+        """
+        try:
+            event_id = ws.next_id("agent_event")
+            meta = {
+                "id": event_id,
+                "at": datetime.now(timezone.utc).isoformat(),
+                "action": action,
+                "target_id": target_id,
+                "target_title": target_title,
+            }
+            path = ws.root / "agent_log" / f"{event_id}.md"
+            _write_doc(path, meta, summary)
+            reindex_file(ws, conn, path)
+        except (OSError, sqlite3.Error) as exc:
+            log.warning("agent_log falhou (resposta preservada): %s", exc)
 
     def _ai_config(ws: Workspace) -> dict:
         return ws.config().get("ai") or {"default_provider": None, "providers": []}
@@ -2385,9 +2403,12 @@ def _register_routes(app: FastAPI) -> None:
 
     def _run_audit(request: Request, trigger: str) -> dict:
         ws, conn = ws_of(request), conn_of(request)
-        cfg = ws.config().get("audit") or {}
+        full_cfg = ws.config()
+        cfg = full_cfg.get("audit") or {}
+        pattern = (full_cfg.get("ci_monitoring") or {}).get("name_pattern")
         findings = audit_ops.collect_findings(
-            conn, cfg.get("defect_aging_days"), cfg.get("broken_automation_days")
+            conn, cfg.get("defect_aging_days"), cfg.get("broken_automation_days"),
+            pattern,
         )
         summary = audit_ops.summarize(findings)
         audit_id = ws.next_id("audit")

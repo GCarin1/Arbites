@@ -5,7 +5,7 @@
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Agente Auditor), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-12
-**Version:** 0.1.0
+**Version:** 0.1.1
 
 ## Purpose
 
@@ -31,7 +31,9 @@ atenção.
   nenhum caso de teste vinculado), `defects` (defeitos abertos há mais de
   `audit.defect_aging_days` dias, default 14) e `automation` (repositórios de
   automação quebrados há mais de `audit.broken_automation_days` dias,
-  default 3).
+  default 3). O check de automação usa o mesmo `ci_monitoring.name_pattern`
+  configurado que o relatório de automação — um padrão customizado não pode
+  cegar o auditor silenciosamente.
 - The system shall atribuir a cada achado uma severidade (`bad`, `warn` ou
   `info`), uma categoria, um código, uma mensagem legível e uma referência
   (`ref`) ao ID do artefato relacionado quando existir, e devolver os
@@ -74,6 +76,10 @@ atenção.
   pelo check de aging (sem dado, sem achado, nunca um falso positivo).
 - The system shall not referenciar nenhuma empresa/organização/projeto
   específico nos códigos, mensagens ou defaults desta capability.
+- The system shall not derrubar a auditoria por dado sujo editado
+  externamente (workspace é editável fora do Arbites, ADR 0001) — um
+  `created_at` sem fuso horário no check de automação vira "tempo
+  desconhecido" no achado, nunca um erro 500.
 
 ### Optional
 
@@ -103,6 +109,10 @@ atenção.
 5. [verified] Os limiares de aging de defeito e de automação quebrada, e o
    intervalo de auto-execução, são configuráveis em `arbites.yaml`
    (`audit.*`) — verified by `backend/tests/test_audit.py`.
+6. [verified] O check de automação quebrada respeita um
+   `ci_monitoring.name_pattern` customizado, e um `created_at` sem fuso
+   (editado externamente) não derruba a rodada — vira "tempo desconhecido"
+   no achado — verified by `backend/tests/test_audit.py`.
 
 ## Maturity
 

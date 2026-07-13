@@ -5,7 +5,7 @@
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Memória Histórica do Projeto e para a IA), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-12
-**Version:** 0.1.0
+**Version:** 0.1.1
 
 ## Purpose
 
@@ -57,6 +57,12 @@ conforme o projeto cresce, não presa a um contexto fixo.
   índice SQLite — como todo o resto do Arbites (ADR 0001), o filesystem
   (`agent_log/`) é a fonte de verdade e o índice é reconstruível via
   reindex.
+- The system shall not perder a resposta da IA quando a gravação do evento
+  de agente falha (disco, lock do índice) — nesse ponto o LLM já respondeu;
+  o log é acessório e a falha vira warning, nunca erro na resposta.
+- The system shall not tratar "nenhum tipo selecionado" no filtro da UI
+  como "sem filtro" — desmarcar todos os tipos mostra uma lista vazia, não
+  a timeline inteira.
 - The system shall not referenciar nenhuma empresa/organização/projeto
   específico nesta capability.
 
@@ -87,6 +93,9 @@ conforme o projeto cresce, não presa a um contexto fixo.
 6. [verified] Eventos de agente sobrevivem a `reindex` (persistidos como
    Markdown em `agent_log/`, não só no índice) — verified by
    `backend/tests/test_project_memory.py`.
+7. [verified] Falha ao gravar o log de agente não perde a resposta que a IA
+   já gerou (a rota devolve 200 com o conteúdo; a falha vira warning) —
+   verified by `backend/tests/test_project_memory.py`.
 
 ## Maturity
 

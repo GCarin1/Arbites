@@ -122,3 +122,52 @@ def test_risk_map_automation_pass_rate_is_none_without_matching_runs(client, git
     _configure_repo(client, "acme/api", git_repo)
     r = client.get("/api/v1/risk-map").json()
     assert r["repos"][0]["automation_pass_rate"] is None
+
+
+def test_risk_map_respects_custom_ci_name_pattern(client, git_repo):
+    """Bug real: o risk map chamava automation_report SEM o
+    ci_monitoring.name_pattern configurado — com padrão customizado o pass
+    rate do repo ficava None mesmo com runs verdes."""
+    cfg = client.ws.config()
+    cfg["risk_repos"] = [{"name": "acme/api", "local_path": str(git_repo)}]
+    cfg["ci_monitoring"] = {"name_pattern": r"^(?P<repo>\S+) run$"}
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+    ex = exec_ops.create(
+        client.ws, "acme/api run", "ci", None, None, [{"id": "CT-1", "steps": []}],
+        origin="github_actions",
+    )
+    exec_ops.set_result_status(ex, "CT-1", "passed", "ci")
+    exec_ops.save(client.ws, ex)
+    client.post("/api/v1/workspace/reindex")
+
+    r = client.get("/api/v1/risk-map").json()
+    assert r["repos"][0]["automation_pass_rate"] == 1.0
+
+
+def test_risk_map_respects_custom_defect_prefix(client, tmp_path):
+    """Bug real: a regex de menção a defeito era DF- hardcoded, apesar de
+    id_prefixes.defect ser configurável — workspace com prefixo customizado
+    nunca correlacionava commit↔defeito."""
+    cfg = client.ws.config()
+    cfg.setdefault("workspace", {}).setdefault("id_prefixes", {})["defect"] = "BUG"
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+    repo = tmp_path / "custom-prefix-repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "qa@example.com")
+    _git(repo, "config", "user.name", "QA")
+    (repo / "a.py").write_text("print(1)\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "fix BUG-0001: rounding")
+
+    d = client.post("/api/v1/defects", json={"title": "Rounding"}).json()
+    assert d["id"] == "BUG-0001"
+    cfg = client.ws.config()
+    cfg["risk_repos"] = [{"name": "acme/api", "local_path": str(repo)}]
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+    r = client.get("/api/v1/risk-map").json()
+    files_by_path = {f["path"]: f for f in r["repos"][0]["files"]}
+    assert files_by_path["a.py"]["defect_commits"] == 1

@@ -232,6 +232,27 @@ def test_recap_empty_string_when_no_decisions_or_lessons(memory_client):
     assert "Histórico recente do projeto" not in user_msg
 
 
+def test_agent_log_failure_does_not_lose_ai_response(memory_client):
+    """Bug real: se gravar o log de agente falhasse (disco/lock), a exceção
+    subia e o usuário perdia o conteúdo que o LLM JÁ tinha gerado — o log é
+    acessório, a resposta é o produto."""
+    import shutil
+
+    story = memory_client.post(
+        "/api/v1/requirements", json={"kind": "story", "title": "Checkout"}
+    ).json()
+    # sabota o diretório: agent_log vira um ARQUIVO, mkdir/write vai falhar
+    agent_dir = memory_client.ws.root / "agent_log"
+    shutil.rmtree(agent_dir)
+    agent_dir.write_text("não sou um diretório", encoding="utf-8")
+
+    resp = memory_client.post(
+        "/api/v1/ai/generate-testcases", json={"source": story["id"]}
+    )
+    assert resp.status_code == 200  # resposta preservada
+    assert resp.json()["testcases"]  # conteúdo gerado chegou inteiro
+
+
 def test_agent_event_survives_reindex(memory_client):
     story = memory_client.post(
         "/api/v1/requirements", json={"kind": "story", "title": "Checkout"}

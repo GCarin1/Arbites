@@ -5,7 +5,7 @@
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Mapa de Risco), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-12
-**Version:** 0.1.0
+**Version:** 0.1.1
 
 ## Purpose
 
@@ -30,12 +30,14 @@ defeitos e o painel de automação.
 - The system shall calcular, por arquivo tocado nos commits da janela
   (`days`, default 90): `churn` (nº de commits que tocaram o arquivo) e
   `defect_commits` (nº de commits, dentre esses, cuja mensagem referencia
-  um ID de defeito — `DF-\d+` — que existe de fato no índice do Arbites).
+  um ID de defeito que existe de fato no índice do Arbites — a regex usa o
+  prefixo CONFIGURADO em `id_prefixes.defect`, não `DF-` fixo).
 - The system shall devolver, por repositório configurado, o pass rate de
-  automação (reaproveitando `metrics.automation_report`, casado pelo nome
-  do repo) como sinal de "testado menos", junto com o total de commits e a
-  lista de arquivos (ordenada por churn, pior-primeiro, limitada a um topo
-  N).
+  automação (reaproveitando `metrics.automation_report`, computado uma
+  única vez por requisição e com o mesmo `ci_monitoring.name_pattern`
+  configurado do relatório de automação, casado pelo nome do repo) como
+  sinal de "testado menos", junto com o total de commits e a lista de
+  arquivos (ordenada por churn, pior-primeiro, limitada a um topo N).
 
 ### Event-driven
 
@@ -77,15 +79,20 @@ defeitos e o painel de automação.
    verified by `backend/tests/test_risk_map.py`.
 5. [verified] Sem nenhum `risk_repos` configurado, a rota devolve uma lista
    vazia de repositórios — verified by `backend/tests/test_risk_map.py`.
+6. [verified] Com `ci_monitoring.name_pattern` customizado o pass rate do
+   repo continua sendo calculado, e com `id_prefixes.defect` customizado a
+   correlação commit↔defeito usa o prefixo configurado — verified by
+   `backend/tests/test_risk_map.py`.
 
 ## Maturity
 
 **MVP (committed):**
 
 - Churn por arquivo via `git log` local, cruzamento com defeitos reais via
-  menção `DF-\d+` na mensagem do commit, pass rate de automação por repo,
-  tolerância a repositório inválido/ausente, heatmap no Dashboard (grade de
-  quadrados coloridos por churn, marcador para commits ligados a defeito).
+  menção ao ID (prefixo configurável) na mensagem do commit, pass rate de
+  automação por repo (padrão de nome configurável), tolerância a
+  repositório inválido/ausente, heatmap no Dashboard (grade de quadrados
+  coloridos por churn, marcador para commits ligados a defeito).
 
 **Future (aspirational, not committed):**
 

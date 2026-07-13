@@ -46,6 +46,27 @@ def test_health_score_custom_weights_from_config(client):
     assert r["score"] == 88  # 100 - 12 (high), único componente com peso > 0 e dado
 
 
+def test_health_score_respects_custom_ci_name_pattern(client):
+    """Bug real: health_score chamava automation_report SEM o
+    ci_monitoring.name_pattern do arbites.yaml (o endpoint /metrics/automation
+    passa) — com padrão customizado, todos os runs viravam unparsed e o
+    componente de automação ficava None silenciosamente."""
+    cfg = client.ws.config()
+    cfg["ci_monitoring"] = {"name_pattern": r"^(?P<repo>\S+) run$"}
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+    ex = exec_ops.create(
+        client.ws, "acme/web run", "ci", None, None, [{"id": "CT-1", "steps": []}],
+        origin="github_actions",
+    )
+    exec_ops.set_result_status(ex, "CT-1", "passed", "ci")
+    exec_ops.save(client.ws, ex)
+    client.post("/api/v1/workspace/reindex")
+
+    r = client.get("/api/v1/metrics/health").json()
+    assert r["components"]["automation"]["value"] == 100  # não None
+
+
 def test_health_score_automation_component_from_ci_runs(client):
     ex = exec_ops.create(
         client.ws, "Reg . acme/api.cer", "ci", None, None, [{"id": "CT-1", "steps": []}],

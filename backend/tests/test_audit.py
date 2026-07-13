@@ -91,6 +91,57 @@ def test_audit_finds_broken_automation(client):
     assert automation_findings[0]["ref"] == "acme/api"
 
 
+def test_audit_broken_automation_respects_custom_ci_name_pattern(client):
+    """Bug real: o check de automação quebrada chamava automation_report SEM o
+    ci_monitoring.name_pattern configurado — com padrão customizado os runs
+    viravam unparsed e o auditor nunca achava automação quebrada."""
+    cfg = client.ws.config()
+    cfg["ci_monitoring"] = {"name_pattern": r"^(?P<repo>\S+) run$"}
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+    old_iso = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+    ex = exec_ops.create(
+        client.ws, "acme/web run", "ci", None, None, [{"id": "CT-1", "steps": []}],
+        origin="github_actions",
+    )
+    ex["created_at"] = old_iso
+    exec_ops.set_result_status(ex, "CT-1", "failed", "ci")
+    exec_ops.save(client.ws, ex)
+    client.post("/api/v1/workspace/reindex")
+
+    r = client.post("/api/v1/audit/run").json()
+    automation_findings = [f for f in r["findings"] if f["category"] == "automation"]
+    assert len(automation_findings) == 1
+    assert automation_findings[0]["ref"] == "acme/web"
+
+
+def test_audit_naive_created_at_does_not_crash(client):
+    """Bug real: execution.json editado externamente com created_at SEM fuso
+    (naive) fazia `now_aware - naive` levantar TypeError não capturado e a
+    auditoria inteira virava 500 — o workspace é editável fora do Arbites
+    (ADR 0001), então dado sujo não pode derrubar a rota."""
+    naive_old = (datetime.now() - timedelta(days=10)).replace(
+        tzinfo=None
+    ).isoformat()
+    ex = exec_ops.create(
+        client.ws, "Reg . acme/api.cer", "ci", None, None, [{"id": "CT-1", "steps": []}],
+        origin="github_actions",
+    )
+    ex["created_at"] = naive_old
+    exec_ops.set_result_status(ex, "CT-1", "failed", "ci")
+    exec_ops.save(client.ws, ex)
+    client.post("/api/v1/workspace/reindex")
+
+    resp = client.post("/api/v1/audit/run")
+    assert resp.status_code == 201  # não 500
+    automation_findings = [
+        f for f in resp.json()["findings"] if f["category"] == "automation"
+    ]
+    # idade indeterminável → reporta como "tempo desconhecido", não some
+    assert len(automation_findings) == 1
+    assert "tempo desconhecido" in automation_findings[0]["message"]
+
+
 def test_audit_thresholds_configurable_in_arbites_yaml(client):
     cfg = client.ws.config()
     cfg["audit"] = {"defect_aging_days": 5}
