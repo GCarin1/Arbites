@@ -42,7 +42,7 @@ from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .executions import ExecutionError
-from .gherkin_scan import list_feature_files, scan_target
+from .gherkin_scan import DEFAULT_FEATURES_GLOB, list_feature_files, scan_target
 from .runner import RunManager
 from .xray_import import XrayImportError
 from .indexer import connect, reindex_file, reindex_full
@@ -225,7 +225,7 @@ class AutomationTargetIn(BaseModel):
     name: str
     kind: str = "behave"
     local_path: str
-    features_glob: str = "features/**/*.feature"
+    features_glob: str = DEFAULT_FEATURES_GLOB
     python_path: str | None = None
     working_dir: str | None = None
     timeout_minutes: float | None = None
@@ -1293,7 +1293,7 @@ def _register_routes(app: FastAPI) -> None:
     async def browse_feature_files(
         request: Request,
         local_path: str,
-        features_glob: str = "features/**/*.feature",
+        features_glob: str = DEFAULT_FEATURES_GLOB,
     ):
         """Lista os .feature encontrados em `local_path` (scan avulso, sem
         exigir que o target já exista) — para o form de target mostrar a
@@ -1314,21 +1314,48 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/targets/{name}/features")
     async def target_features(request: Request, name: str):
-        """Arquivos .feature e tags do target (para os dropdowns do run)."""
-        conn = conn_of(request)
+        """Arquivos .feature e tags do target (para os dropdowns do run).
+
+        Lista do DISCO (mesma fonte do preview `/automation/browse-features`,
+        via `list_feature_files`) em vez de só da tabela `scenarios` — um
+        repositório sem nenhum cenário tagueado `@CT-` ainda mostra seus
+        arquivos aqui (mudança 0067: antes o dropdown ficava vazio e o run
+        recusava com 422). `mapped` anota quantos cenários de cada arquivo
+        já têm tag reconhecida, para a UI explicar quando é zero.
+        """
+        ws, conn = ws_of(request), conn_of(request)
+        target = _find_target(ws, name)
+        local_path = Path(str(target.get("local_path") or ""))
+        glob = str(target.get("features_glob") or DEFAULT_FEATURES_GLOB)
+
+        disk_features: list[dict[str, Any]] = []
+        if local_path.is_dir():
+            try:
+                disk_features = list_feature_files(local_path, glob)
+            except OSError:
+                disk_features = []
+
         rows = conn.execute(
             "SELECT feature_path, tag, scenario_name FROM scenarios WHERE target = ?"
             " ORDER BY feature_path, line",
             (name,),
         ).fetchall()
-        features: dict[str, int] = {}
+        mapped_by_feature: dict[str, int] = {}
         tags: set[str] = set()
         for r in rows:
-            features[r["feature_path"]] = features.get(r["feature_path"], 0) + 1
+            mapped_by_feature[r["feature_path"]] = (
+                mapped_by_feature.get(r["feature_path"], 0) + 1
+            )
             tags.add(r["tag"])
+
         return {
             "features": [
-                {"path": p, "scenarios": n} for p, n in sorted(features.items())
+                {
+                    "path": f["path"],
+                    "scenarios": f["scenarios"],
+                    "mapped": mapped_by_feature.get(f["path"], 0),
+                }
+                for f in disk_features
             ],
             "tags": sorted(tags),
         }
@@ -1451,9 +1478,13 @@ def _register_routes(app: FastAPI) -> None:
                 r["tag"].lstrip("@") for r in by_scenario
             ]
             ct_ids = sorted(set(ct_ids))
-        if not ct_ids:
+        if not ct_ids and not payload.feature:
             raise _error(422, "empty_selection",
                          "informe testcase_ids, tags ou feature que resolvam para CTs")
+        # payload.feature sem nenhum cenário mapeado a CT ainda roda: o
+        # arquivo inteiro vai pro behave (ct_ids fica vazio, a execution
+        # nasce sem CTs vinculados) — vínculo por tag é o caminho para
+        # rastreabilidade, não um pré-requisito para executar (mudança 0067)
         if not tags and not payload.feature:
             rows = conn.execute(
                 "SELECT id, scenario_tag FROM testcases WHERE id IN (%s)"

@@ -18,18 +18,28 @@ from typing import Any
 
 from gherkin.parser import Parser
 
-_CT_TAG_RE = re.compile(r"^@(CT-\d+)$")
+from .workspace import Workspace
+
+DEFAULT_FEATURES_GLOB = "features/**/*.feature"
 _SCAN_WARNING_CODES = ("orphan_scenario", "broken_automation",
                        "duplicate_scenario_tag", "unparseable_feature")
 
 
+def _ct_tag_re(prefix: str) -> re.Pattern[str]:
+    """Regex de tag de cenário com o prefixo CONFIGURADO do workspace
+    (`id_prefixes.testcase`) — hardcodar `CT-` quebraria o vínculo
+    cenário↔CT em workspaces com prefixo customizado."""
+    return re.compile(rf"^@({re.escape(prefix)}-\d+)$")
+
+
 def scan_target(
-    ws_root_unused: Any, conn: sqlite3.Connection, target: dict[str, Any]
+    ws: Workspace, conn: sqlite3.Connection, target: dict[str, Any]
 ) -> dict[str, Any]:
     """Re-escaneia um target; substitui as linhas dele em `scenarios`."""
     name = str(target.get("name"))
     local_path = Path(str(target.get("local_path", "")))
-    glob = str(target.get("features_glob", "features/**/*.feature"))
+    glob = str(target.get("features_glob") or DEFAULT_FEATURES_GLOB)
+    ct_tag_re = _ct_tag_re(ws.id_prefixes()["testcase"])
 
     conn.execute("DELETE FROM scenarios WHERE target = ?", (name,))
     placeholders = ",".join("?" for _ in _SCAN_WARNING_CODES)
@@ -77,7 +87,7 @@ def scan_target(
             scenario_count += 1
             for tag in scenario.get("tags", []):
                 tag_name = tag.get("name", "")
-                if not _CT_TAG_RE.match(tag_name):
+                if not ct_tag_re.match(tag_name):
                     continue
                 where = f"{rel}:{scenario['location']['line']}"
                 if tag_name in seen_tags:
@@ -121,7 +131,7 @@ def scan_target(
 
 
 def list_feature_files(
-    local_path: Path, glob: str = "features/**/*.feature"
+    local_path: Path, glob: str = DEFAULT_FEATURES_GLOB
 ) -> list[dict[str, Any]]:
     """Lista .feature sob `local_path` sem tocar no índice (scan avulso).
 

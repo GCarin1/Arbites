@@ -20,6 +20,12 @@ interface FoundFeature {
   parseable: boolean;
 }
 
+interface TargetFeature {
+  path: string;
+  scenarios: number; // total de cenários no arquivo (do disco)
+  mapped: number; // quantos têm tag reconhecida (vinculados a um CT)
+}
+
 interface RunSnapshot {
   exec_id: string;
   target: string;
@@ -51,7 +57,7 @@ export function Automation({
   const [selection, setSelection] = useState("");
   const [tags, setTags] = useState("");
   const [feature, setFeature] = useState("");
-  const [features, setFeatures] = useState<{ path: string; scenarios: number }[]>([]);
+  const [features, setFeatures] = useState<TargetFeature[]>([]);
   const [knownTags, setKnownTags] = useState<string[]>([]);
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [log, setLog] = useState<string[]>([]);
@@ -74,7 +80,7 @@ export function Automation({
   // features + tags do target selecionado (dropdowns do comando behave)
   useEffect(() => {
     if (!selection) return;
-    json<{ features: { path: string; scenarios: number }[]; tags: string[] }>(
+    json<{ features: TargetFeature[]; tags: string[] }>(
       `${BASE}/targets/${selection}/features`,
     )
       .then((data) => {
@@ -145,6 +151,8 @@ export function Automation({
     }
   }
 
+  const selectedFeature = feature ? features.find((f) => f.path === feature) : undefined;
+
   return (
     <div>
       <div className="page-head">
@@ -178,10 +186,18 @@ export function Automation({
               <option value="">(todos os features)</option>
               {features.map((f) => (
                 <option key={f.path} value={f.path}>
-                  {f.path} ({f.scenarios})
+                  {f.path} ({f.mapped < f.scenarios ? `${f.mapped}/${f.scenarios} mapeados` : f.scenarios})
                 </option>
               ))}
             </select>
+            {selectedFeature && selectedFeature.mapped === 0 && (
+              <p className="caption muted" style={{ marginTop: 4 }}>
+                Nenhum cenário deste arquivo está vinculado a um caso de
+                teste (tag de CT no cenário). O Behave roda o arquivo
+                inteiro normalmente, mas os resultados não aparecerão
+                vinculados a um CT — tague os cenários para rastreabilidade.
+              </p>
+            )}
           </div>
           <div className="field col-3">
             <label>Tag (autocomplete)</label>
