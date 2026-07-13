@@ -224,7 +224,9 @@ class RunManager:
             return
         if result_json.exists():
             try:
-                results = parse_behave_json(result_json.read_bytes())
+                results = parse_behave_json(
+                    result_json.read_bytes(), self.ws.id_prefixes()["testcase"]
+                )
             except BehaveJsonError as exc:
                 run.emit(f"[arbites] {exc}")
                 results = {}

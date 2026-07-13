@@ -51,6 +51,26 @@ run devolve `422 empty_selection`.
    `id_prefixes.testcase` ser configurável — derivar a regex do prefixo
    configurado (mesma família da change 0059/risk-map; skill
    `novo-consumidor-repassa-config-do-helper`).
+5. **Achado durante a implementação** (3ª ocorrência do mesmo bug irmão):
+   `behave_json.parse_behave_json` também hardcodava `CT-\d+` para casar a
+   tag do cenário no JSON do Behave contra o resultado — usado tanto pelo
+   run local (`runner.py`) quanto pela coleta de artifact do CI (`ci.py`).
+   Com prefixo customizado, mesmo um cenário corretamente tagueado teria
+   seu resultado descartado silenciosamente ao voltar do Behave. Parametrizado
+   (`ct_prefix`, lido de `id_prefixes.testcase` nos dois call sites).
+
+## Implementado
+
+Todas as 5 correções acima landaram: `gherkin_scan.py` (`DEFAULT_FEATURES_GLOB`,
+`_ct_tag_re(prefix)`, `scan_target` recebe `Workspace` de verdade),
+`behave_json.py` (`parse_behave_json(content, ct_prefix=...)`), `runner.py`/
+`ci.py` (repassam `ws.id_prefixes()["testcase"]`), `api.py`
+(`GET /targets/{name}/features` lê do disco + anota `mapped`;
+`create_local_run` só exige `ct_ids` não-vazio quando NÃO há `feature`),
+`Automation.tsx` (dropdown mostra `mapped/scenarios`, aviso quando
+`mapped === 0`). 9 testes novos (backend), suíte completa 225/225, build
+limpo, smoke test contra servidor real reproduzindo o cenário relatado
+(browse → salvar → dropdown → run) ponta a ponta.
 
 ## Scope boundaries
 
@@ -72,8 +92,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

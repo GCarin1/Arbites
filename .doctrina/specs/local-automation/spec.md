@@ -5,7 +5,7 @@
 **Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
 **Last updated:** 2026-07-10
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -39,7 +39,15 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 
 - The system shall expor `GET /targets/{name}/features` (arquivos .feature e
   tags do target) para os dropdowns do run, e aceitar `feature` opcional em
-  `POST /runs/local` (argumento posicional do behave).
+  `POST /runs/local` (argumento posicional do behave). A lista vem do
+  DISCO — mesma fonte do preview `GET /automation/browse-features` — e não
+  só dos cenários já tagueados no índice, anotando por arquivo quantos
+  cenários estão de fato mapeados a um CT (`mapped`) do total (`scenarios`).
+- The system shall derivar do prefixo de CT CONFIGURADO
+  (`id_prefixes.testcase`) tanto a regex de tag de cenário do scan
+  (`gherkin_scan`) quanto o parser de resultado do Behave
+  (`behave_json.parse_behave_json`, usado no run local e na coleta de CI) —
+  nenhum dos dois hardcoda `CT-`.
 - The system shall listar e servir artefatos pós-execução do target
   (`./logs`, `./screenshots`, `./analise`) via
   `GET /targets/{name}/artifacts[/file]`, com guarda de path traversal.
@@ -68,6 +76,11 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - When o usuário salva a configuração de targets pela UI, the system shall
   reescanear cada target salvo (mesmo comportamento de `POST
   /targets/{name}/scan`), populando cenários/warnings imediatamente.
+- When o usuário roda um `.feature` inteiro cujos cenários não têm tag de
+  CT, the system shall executar o arquivo mesmo assim (execution criada sem
+  CTs vinculados), em vez de recusar com `422 empty_selection` — o vínculo
+  por tag é o caminho para rastreabilidade, não um pré-requisito para
+  executar.
 
 ### State-driven
 
@@ -81,6 +94,9 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   (virtualenv é responsabilidade do usuário).
 - The system shall not quebrar o repo de automação standalone: sem
   `ARBITES_EVIDENCE_DIR`, os hooks não fazem nada.
+- The system shall not usar fontes divergentes para o preview de features e
+  para a operação (dropdown/run) da mesma lista — o que o browse mostra é
+  o que o dropdown oferece.
 
 ### Optional
 
@@ -116,13 +132,25 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
    arbitrário, mesmo sem target salvo; caminho inexistente é rejeitado
    (422) — verified by `backend/tests/test_automation_targets_config.py`.
 
+10. [verified] Target salvo apontando para um repositório de features SEM
+    tags de CT: o dropdown lista o arquivo (com `mapped: 0`) e rodar o
+    arquivo inteiro cria a execution (201, sem CTs vinculados) e dispara o
+    behave de verdade — verified by
+    `backend/tests/test_gherkin.py` e `backend/tests/test_local_runs.py`.
+
+11. [verified] Com `id_prefixes.testcase` customizado, cenários tagueados
+    com o prefixo configurado são mapeados pelo scan E pelo parser de
+    resultado do Behave (run local e coleta de CI) — verified by
+    `backend/tests/test_gherkin.py` e `backend/tests/test_behave_json.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
 - Runs locais Behave com SSE, fila, timeout, parse JSON, evidências via
   hooks; cadastro de targets pela UI (sem editar `arbites.yaml` na mão) com
-  descoberta de `.feature` por scan do repositório.
+  descoberta de `.feature` por scan do repositório; rodar um `.feature`
+  inteiro funciona mesmo sem nenhum cenário tagueado a um CT.
 
 **Future (aspirational, not committed):**
 

@@ -12,7 +12,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-_CT_RE = re.compile(r"^@?(CT-\d+)$")
+_DEFAULT_CT_PREFIX = "CT"
 
 _STATUS_MAP = {
     "passed": "passed",
@@ -37,8 +37,16 @@ class BehaveJsonError(Exception):
     pass
 
 
-def parse_behave_json(content: bytes | str) -> dict[str, ScenarioResult]:
-    """Retorna {CT-XXXX: ScenarioResult} para cenários com tag @CT."""
+def parse_behave_json(
+    content: bytes | str, ct_prefix: str = _DEFAULT_CT_PREFIX
+) -> dict[str, ScenarioResult]:
+    """Retorna {<PREFIXO>-XXXX: ScenarioResult} para cenários com tag do CT.
+
+    `ct_prefix` vem de `id_prefixes.testcase` do workspace (default "CT" só
+    para chamadas sem workspace, ex. testes unitários deste módulo) — um
+    prefixo customizado não pode fazer os resultados do Behave sumirem
+    silenciosamente na hora de casar com a execution.
+    """
     try:
         data = json.loads(content)
     except ValueError as exc:
@@ -46,6 +54,7 @@ def parse_behave_json(content: bytes | str) -> dict[str, ScenarioResult]:
     if not isinstance(data, list):
         raise BehaveJsonError("Cucumber JSON inválido: raiz não é lista")
 
+    ct_re = re.compile(rf"^@?({re.escape(ct_prefix)}-\d+)$")
     results: dict[str, ScenarioResult] = {}
     for feature in data:
         for element in feature.get("elements") or []:
@@ -53,7 +62,7 @@ def parse_behave_json(content: bytes | str) -> dict[str, ScenarioResult]:
                 continue
             ct_id = None
             for tag in element.get("tags") or []:
-                m = _CT_RE.match(str(tag))
+                m = ct_re.match(str(tag))
                 if m:
                     ct_id = m.group(1)
                     break

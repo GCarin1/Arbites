@@ -112,3 +112,54 @@ def test_scan_detects_duplicate_tag(auto_client):
     auto_client.post("/api/v1/targets/frontend-web/scan")
     warnings = auto_client.get("/api/v1/warnings").json()
     assert any(w["code"] == "duplicate_scenario_tag" for w in warnings)
+
+
+def test_target_features_lists_disk_files_even_without_any_tagged_scenario(
+    auto_client,
+):
+    """Bug real (mudança 0067): repositório com um .feature SEM nenhum
+    cenário tagueado @CT- (comum no primeiro uso, antes do time adotar a
+    convenção) fazia o dropdown de features ficar vazio — a rota lia só da
+    tabela `scenarios`, que o scan só popula com cenários tagueados. Agora
+    lista do disco (mesma fonte do preview de browse) e anota quantos
+    cenários de cada arquivo estão de fato mapeados."""
+    repo = auto_client.repo
+    (repo / "features" / "sem_tag.feature").write_text(
+        "# language: pt\nFuncionalidade: Sem tag\n\n"
+        "  Cenário: sem vínculo a CT\n    Dado x\n    Quando y\n    Então z\n",
+        encoding="utf-8",
+    )
+    auto_client.post("/api/v1/targets/frontend-web/scan")
+
+    data = auto_client.get("/api/v1/targets/frontend-web/features").json()
+    by_path = {f["path"]: f for f in data["features"]}
+    assert "features/sem_tag.feature" in by_path  # aparece mesmo sem tag
+    assert by_path["features/sem_tag.feature"]["scenarios"] == 1
+    assert by_path["features/sem_tag.feature"]["mapped"] == 0
+    # login.feature continua com seus cenários mapeados normalmente
+    assert by_path["features/login.feature"]["mapped"] > 0
+
+
+def test_scan_recognizes_scenario_tag_with_custom_testcase_prefix(client, tmp_path):
+    """Bug irmão (mudança 0067): a regex de tag de cenário usava `CT-`
+    hardcoded apesar de `id_prefixes.testcase` ser configurável — workspace
+    com prefixo customizado nunca vinculava cenário a CT."""
+    import yaml
+
+    repo = tmp_path / "custom-prefix-repo"
+    (repo / "features").mkdir(parents=True)
+    (repo / "features" / "login.feature").write_text(
+        "Feature: Login\n\n  @TC-0001\n  Scenario: ok\n    Given x\n",
+        encoding="utf-8",
+    )
+    cfg = client.ws.config()
+    cfg.setdefault("workspace", {}).setdefault("id_prefixes", {})["testcase"] = "TC"
+    cfg["automation_targets"] = [
+        {"name": "web", "kind": "behave", "local_path": str(repo),
+         "features_glob": "features/**/*.feature"}
+    ]
+    client.ws.config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+
+    client.post("/api/v1/targets/web/scan")
+    data = client.get("/api/v1/targets/web/features").json()
+    assert "@TC-0001" in data["tags"]

@@ -149,3 +149,33 @@ def test_selection_by_tags_resolves_cts(auto_client):
     execution = resp.json()["execution"]
     assert [r["testcase_id"] for r in execution["results"]] == ["CT-9001"]
     _wait_run(auto_client, execution["id"])
+
+
+def test_run_whole_feature_without_any_ct_tag_does_not_422(tmp_path):
+    """Bug real (mudança 0067): repositório sem nenhuma tag @CT- (comum no
+    primeiro uso, antes do time adotar a convenção) fazia o dropdown de
+    features ficar vazio e o run devolver 422 empty_selection mesmo com um
+    .feature válido selecionado. Rodar o arquivo inteiro deve funcionar
+    mesmo sem nenhum cenário mapeado a um CT — o vínculo por tag é o
+    caminho para rastreabilidade, não um pré-requisito para executar."""
+    ws = _make_ws(tmp_path)
+    repo = Path(ws.config()["automation_targets"][0]["local_path"])
+    (repo / "features" / "sem_tag.feature").write_text(
+        "# language: pt\nFuncionalidade: Sem tag\n\n"
+        "  Cenário: sem vínculo a CT\n    Dado que o usuário está na tela de login\n",
+        encoding="utf-8",
+    )
+    app = create_app(ws.root, watch=False)
+    with TestClient(app) as client:
+        client.ws = ws
+        resp = client.post(
+            "/api/v1/runs/local",
+            json={"target": "frontend-web", "feature": "features/sem_tag.feature"},
+        )
+        assert resp.status_code == 201  # não 422 empty_selection
+        execution = resp.json()["execution"]
+        assert execution["results"] == []  # nenhum CT vinculado, e tudo bem
+
+        _wait_run(client, execution["id"])
+        stream = client.get(f"/api/v1/runs/{execution['id']}/stream")
+        assert "sem_tag.feature" in stream.text  # o behave rodou o arquivo

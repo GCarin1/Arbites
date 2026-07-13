@@ -270,7 +270,11 @@ class CIManager:
             merged: dict = {}
             for name in json_names:
                 try:
-                    merged.update(parse_behave_json(zf.read(name)))
+                    merged.update(
+                        parse_behave_json(
+                            zf.read(name), self.ws.id_prefixes()["testcase"]
+                        )
+                    )
                 except BehaveJsonError:
                     continue
             if not merged:
