@@ -64,6 +64,9 @@ const Meetings = lazy(() =>
 const Profile = lazy(() =>
   import("./components/Profile").then((m) => ({ default: m.Profile }))
 );
+const CommandPalette = lazy(() =>
+  import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette }))
+);
 
 type Tab =
   | "testcases"
@@ -174,6 +177,7 @@ export default function App() {
   const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
+  const [cmdkOpen, setCmdkOpen] = useState(false);
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reindexing, setReindexing] = useState(false);
@@ -221,6 +225,18 @@ export default function App() {
     const timer = setInterval(refresh, 5000); // reflete edições externas (watcher)
     return () => clearInterval(timer);
   }, [refresh]);
+
+  // Busca global: Ctrl/Cmd+K abre a paleta de comandos de qualquer tela.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdkOpen((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   async function reindex() {
     setReindexing(true);
@@ -272,6 +288,34 @@ export default function App() {
 
   const problemCount = warnings.length;
 
+  const quickActions = [
+    {
+      id: "new-ct",
+      label: "Novo caso de teste",
+      hint: "criar",
+      run: () => {
+        setTab("testcases");
+        setCreatingCt(true);
+      },
+    },
+    {
+      id: "new-exec",
+      label: "Nova execução",
+      hint: "criar",
+      run: () => {
+        setSelectedExec(null);
+        setExecCreating(true);
+        setTab("executions");
+      },
+    },
+    {
+      id: "reindex",
+      label: "Reindexar workspace",
+      hint: "ação",
+      run: () => void reindex(),
+    },
+  ];
+
   return (
     <>
       <header className="app-header">
@@ -282,11 +326,24 @@ export default function App() {
           requisitos
         </span>
         <span className="spacer" />
+        <button className="cmdk-trigger" onClick={() => setCmdkOpen(true)}>
+          <span>Buscar…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
         <span className="meta mono">{workspace?.root}</span>
         <button onClick={() => void reindex()} disabled={reindexing}>
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
       </header>
+      {cmdkOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            onClose={() => setCmdkOpen(false)}
+            onNavigate={navigateTo}
+            actions={quickActions}
+          />
+        </Suspense>
+      )}
       <div className="app-body">
         <aside className="sidebar">
           <nav className="nav">
@@ -348,7 +405,7 @@ export default function App() {
             </Suspense>
           ) : tab === "dashboard" ? (
             <Suspense fallback={<p className="empty">Carregando dashboard…</p>}>
-              <Dashboard onError={setError} />
+              <Dashboard onError={setError} onNavigate={navigateTo} />
             </Suspense>
           ) : tab === "automation" ? (
             <Suspense fallback={<p className="empty">Carregando automação…</p>}>
@@ -409,6 +466,11 @@ export default function App() {
               <Suspense fallback={<p className="empty">Carregando criação…</p>}>
                 <div className="back-bar">
                   <button onClick={() => setExecCreating(false)}>← Voltar</button>
+                  <span className="crumbs caption">
+                    <span className="muted">Execuções</span>
+                    <span className="crumb-sep">/</span>
+                    <span>nova</span>
+                  </span>
                 </div>
                 <ExecutionCreate
                   onCreated={(id) => {
@@ -423,6 +485,11 @@ export default function App() {
               <Suspense fallback={<p className="empty">Carregando execução…</p>}>
                 <div className="back-bar">
                   <button onClick={() => setSelectedExec(null)}>← Voltar</button>
+                  <span className="crumbs caption">
+                    <span className="muted">Execuções</span>
+                    <span className="crumb-sep">/</span>
+                    <span className="mono">{selectedExec}</span>
+                  </span>
                 </div>
                 <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
               </Suspense>
@@ -447,6 +514,11 @@ export default function App() {
               <Suspense fallback={<p className="empty">Carregando requisito…</p>}>
                 <div className="back-bar">
                   <button onClick={() => setSelectedReq(null)}>← Voltar</button>
+                  <span className="crumbs caption">
+                    <span className="muted">Requisitos</span>
+                    <span className="crumb-sep">/</span>
+                    <span className="mono">{selectedReq}</span>
+                  </span>
                 </div>
                 <RequirementEditor
                   id={selectedReq}
@@ -471,6 +543,11 @@ export default function App() {
             <Suspense fallback={<p className="empty">Carregando test case…</p>}>
               <div className="back-bar">
                 <button onClick={() => setSelectedCt(null)}>← Voltar</button>
+                <span className="crumbs caption">
+                  <span className="muted">Test cases</span>
+                  <span className="crumb-sep">/</span>
+                  <span className="mono">{selectedCt}</span>
+                </span>
               </div>
               <TestCaseEditor
                 id={selectedCt}

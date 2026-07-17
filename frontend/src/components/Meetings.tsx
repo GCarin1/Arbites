@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
+import { useToast } from "./Toast";
 import type { Meeting } from "../types";
 
 export function Meetings({ onError }: { onError: (message: string) => void }) {
@@ -188,7 +189,9 @@ function MeetingModal({
   const [summary, setSummary] = useState(meeting?.summary ?? "");
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (meeting) {
@@ -211,6 +214,7 @@ function MeetingModal({
     setSaving(true);
     try {
       await save();
+      toast("Reunião salva");
       onSaved();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -249,6 +253,7 @@ function MeetingModal({
     <Modal
       title={meeting ? `Editar ${meeting.id}` : "Nova reunião"}
       onClose={onClose}
+      dirty={dirty && !saving}
       initialFocus={titleRef}
       footer={
         <>
@@ -261,6 +266,7 @@ function MeetingModal({
         </>
       }
     >
+      <div className="modal-form" onInput={() => setDirty(true)}>
       <div className="field-grid">
         <div className="field col-8">
           <label htmlFor="meet-title">Tema</label>
@@ -304,6 +310,7 @@ function MeetingModal({
           placeholder="Gerado pela IA (ou escreva à mão)."
           spellCheck={false}
         />
+      </div>
       </div>
     </Modal>
   );

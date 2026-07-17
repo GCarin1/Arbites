@@ -81,16 +81,23 @@ _SQUAD_STORY = (
 
 
 def _results_where(
-    sprint: str | None, days: int | None, squad: str | None = None
+    sprint: str | None, days: int | None, squad: str | None = None,
+    since: str | None = None, until: str | None = None,
 ) -> tuple[str, list[Any]]:
+    """`since`/`until` (ISO) delimitam uma janela fechada [since, until) —
+    usado pela comparação período-a-período. Sem eles, `days` mantém o
+    comportamento antigo (>= agora-days, aberto até agora)."""
     sql, params = "", []
     if sprint:
         sql += " AND e.sprint = ?"
         params.append(sprint)
-    cutoff = _cutoff(days)
-    if cutoff:
+    lower = since or _cutoff(days)
+    if lower:
         sql += " AND r.executed_at >= ?"
-        params.append(cutoff)
+        params.append(lower)
+    if until:
+        sql += " AND r.executed_at < ?"
+        params.append(until)
     if squad:
         sql += _SQUAD_CT.format(col="r.testcase_id")
         params.append(squad)
@@ -815,6 +822,65 @@ def activity_heatmap(
         "totals": totals,
         "years": _activity_years(conn),  # anos com atividade (p/ o seletor)
         "year_filter": year,
+    }
+
+
+def period_pass_rate(
+    conn: sqlite3.Connection, days: int = 30, sprint: str | None = None,
+    squad: str | None = None,
+) -> dict:
+    """Pass rate da janela atual vs a janela anterior de mesmo tamanho —
+    responde "melhorou ou piorou?" (Dashboard executivo). `delta` = atual −
+    anterior (None se faltar dado num dos lados)."""
+    now = datetime.now(timezone.utc)
+    start = (now - timedelta(days=days)).isoformat()
+    prev_start = (now - timedelta(days=2 * days)).isoformat()
+
+    def rate(since: str, until: str | None) -> float | None:
+        where, params = _results_where(sprint, None, squad, since=since, until=until)
+        row = conn.execute(
+            "SELECT SUM(CASE WHEN r.status='passed' THEN 1 ELSE 0 END) p,"
+            " SUM(CASE WHEN r.status IN ('passed','failed') THEN 1 ELSE 0 END) f"
+            " FROM results r JOIN executions e ON e.id = r.execution_id WHERE 1=1" + where,
+            params,
+        ).fetchone()
+        return _ratio(row["p"] or 0, row["f"] or 0)
+
+    current = rate(start, None)
+    previous = rate(prev_start, start)
+    delta = round(current - previous, 4) if current is not None and previous is not None else None
+    return {"days": days, "current": current, "previous": previous, "delta": delta}
+
+
+def top_problems(
+    conn: sqlite3.Connection, name_pattern: str | None = None, days: int | None = None,
+    limit: int = 5,
+) -> dict:
+    """Consolida num só lugar os piores sinais que os reports já produzem:
+    repositórios de automação piores, CTs que mais falham e defeitos abertos
+    mais antigos. Nada de coleta nova — só agrega o que existe."""
+    arep = automation_report(conn, name_pattern, days)
+    worst_repos = [
+        {"repo": r["repo"], "failed": r["failed"], "runs": r["runs"],
+         "failure_rate": r["failure_rate"], "broken_since": r["broken_since"]}
+        for r in arep["by_repo"] if r["failed"] > 0
+    ][:limit]
+    top_failing = arep["top_failing_testcases"][:limit]
+
+    drep = defects_report(conn)
+    oldest = sorted(
+        (d for d in drep["items"] if d.get("age_days") is not None),
+        key=lambda d: d["age_days"], reverse=True,
+    )[:limit]
+    oldest_defects = [
+        {"id": d["id"], "title": d["title"], "severity": d["severity"],
+         "age_days": d["age_days"]}
+        for d in oldest
+    ]
+    return {
+        "worst_repos": worst_repos,
+        "top_failing_testcases": top_failing,
+        "oldest_defects": oldest_defects,
     }
 
 

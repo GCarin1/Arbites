@@ -3,6 +3,7 @@ import { api } from "../api";
 import { SingleRefInput } from "./Autocomplete";
 import { ConfirmModal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
+import { useToast } from "./Toast";
 import type { TestCase } from "../types";
 
 export function TestCaseEditor({
@@ -21,6 +22,7 @@ export function TestCaseEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { toast } = useToast();
 
   const load = useCallback(() => {
     setError(null);
@@ -74,6 +76,7 @@ export function TestCaseEditor({
         setTc(updated);
       }
       setEditing(false); // após salvar, volta ao modo leitura
+      toast("Caso de teste salvo");
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

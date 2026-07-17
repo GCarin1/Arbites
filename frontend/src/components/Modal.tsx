@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Pilha de modais abertos (ex.: "Criar defeito" dentro do modal de resultado).
 // Cada instância tem listener de Esc próprio no document; sem essa pilha, Esc
@@ -17,6 +17,7 @@ export function Modal({
   children,
   footer,
   initialFocus,
+  dirty = false,
 }: {
   title: string;
   onClose: () => void;
@@ -24,14 +25,25 @@ export function Modal({
   // Opcional: sem footer, o único fechar é o X do header (evita botão duplicado).
   footer?: ReactNode;
   initialFocus?: React.RefObject<HTMLElement>;
+  // Quando true, fechar sem salvar (Esc/backdrop/X) pede confirmação —
+  // evita perder o que foi digitado em silêncio (design-system 0061).
+  dirty?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const modalId = useRef(++modalIdSeq).current;
-  // onClose lido por ref: não pode entrar nas deps do efeito de foco, senão
-  // uma nova identidade de onClose (ex.: re-render do pai) re-dispara o foco
-  // e rouba o cursor do campo em que o usuário está digitando.
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  const [confirmingClose, setConfirmingClose] = useState(false);
+
+  // Toda tentativa de fechar passa por aqui: se há alteração pendente, pede
+  // confirmação em vez de descartar direto.
+  const requestClose = () => {
+    if (dirtyRef.current) setConfirmingClose(true);
+    else onClose();
+  };
+  // lido por ref pelos listeners (Esc) que montam uma vez só
+  const requestCloseRef = useRef(requestClose);
+  requestCloseRef.current = requestClose;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
 
   useEffect(() => {
     openModalIds.push(modalId);
@@ -61,12 +73,12 @@ export function Modal({
   }, []);
 
   // Esc fecha só o modal do topo da pilha — usa a ref para sempre ver o
-  // onClose atual sem re-focar.
+  // requestClose atual sem re-focar.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape" && openModalIds[openModalIds.length - 1] === modalId) {
         e.stopPropagation();
-        onCloseRef.current();
+        requestCloseRef.current();
       }
     }
     document.addEventListener("keydown", onKey);
@@ -77,7 +89,7 @@ export function Modal({
     <div
       className="modal-overlay"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
       <div
@@ -90,13 +102,26 @@ export function Modal({
       >
         <div className="modal-header">
           <h3>{title}</h3>
-          <button className="modal-close" onClick={onClose} aria-label="Fechar">
+          <button className="modal-close" onClick={requestClose} aria-label="Fechar">
             ×
           </button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
+      {confirmingClose && (
+        <ConfirmModal
+          title="Descartar alterações?"
+          message="Há alterações não salvas neste formulário. Fechar mesmo assim?"
+          confirmLabel="Descartar"
+          danger
+          onConfirm={() => {
+            setConfirmingClose(false);
+            onClose();
+          }}
+          onCancel={() => setConfirmingClose(false)}
+        />
+      )}
     </div>
   );
 }

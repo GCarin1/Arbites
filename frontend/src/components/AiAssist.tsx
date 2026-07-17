@@ -42,6 +42,10 @@ export function AiAssist({
   }, [load]);
 
   const enabled = !!info?.default_provider;
+  // Workspace de assistente (0066): a tela abre no TRABALHO (gerar/revisar/
+  // context pack), com o contexto ativo e o histórico visíveis; a config de
+  // providers vira seção colapsada no fim.
+  const [showConfig, setShowConfig] = useState(false);
 
   return (
     <div>
@@ -51,22 +55,23 @@ export function AiAssist({
         <span className={`status-dot ${enabled ? "dot-active" : "dot-draft"}`}>
           {enabled ? `ativo · ${info?.default_provider}` : "desabilitada"}
         </span>
+        <button onClick={() => setShowConfig((v) => !v)}>
+          {showConfig ? "Ocultar configuração" : "Configuração"}
+        </button>
       </div>
 
-      <ProvidersCard info={info} onSaved={load} onError={onError} />
-
-      <ContextPackCard />
-
       {!enabled && (
-        <div className="empty-state" style={{ marginBottom: 24 }}>
+        <div className="empty-state block">
           <div className="empty-title">IA desabilitada</div>
           <div className="empty-body">
             A plataforma é 100% funcional sem IA. Configure ao menos um provider
-            e defina o padrão acima para habilitar geração, revisão e casos
-            negativos.
+            (botão "Configuração" acima) para habilitar geração, revisão e
+            casos negativos. O Context Pack abaixo funciona sem provider.
           </div>
         </div>
       )}
+
+      {enabled && <AssistContextCard />}
 
       {enabled && info && (
         <>
@@ -84,6 +89,125 @@ export function AiAssist({
           />
         </>
       )}
+
+      <ContextPackCard />
+
+      {enabled && <AssistHistoryCard />}
+
+      {showConfig && <ProvidersCard info={info} onSaved={load} onError={onError} />}
+    </div>
+  );
+}
+
+// -------------------------------------------------- contexto ativo (0066)
+
+/** Remove comentários HTML, headings e itens vazios — sobra texto real? */
+function memoryFilled(memory: string): boolean {
+  return (
+    memory
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/^#+ .*$/gm, "")
+      .replace(/^\s*-\s*$/gm, "")
+      .trim().length > 0
+  );
+}
+
+/**
+ * O que a IA vai receber junto do próximo pedido (0066): memória do perfil,
+ * recap de decisões aceitas + lições recentes (capability project-memory) e
+ * lições por similaridade quando o pedido casa. O usuário vê POR QUE a IA
+ * responde melhor conforme o projeto cresce.
+ */
+function AssistContextCard() {
+  const [profileOn, setProfileOn] = useState<boolean | null>(null);
+  const [decisionCount, setDecisionCount] = useState<number | null>(null);
+  const [lessonCount, setLessonCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.profile().then((p) => alive && setProfileOn(memoryFilled(p.memory))).catch(() => {});
+    api
+      .decisions("?status=accepted")
+      .then((d) => alive && setDecisionCount(d.length))
+      .catch(() => {});
+    api
+      .defects("?has_lesson=true")
+      .then((d) => alive && setLessonCount(d.length))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const dot = (on: boolean | null) =>
+    on === null ? "dot-col-pending" : on ? "dot-col-passed" : "dot-col-pending";
+
+  return (
+    <div className="card block">
+      <div className="card-head">
+        <h3>Contexto ativo</h3>
+        <span className="spacer" />
+        <span className="caption muted">o que acompanha cada pedido à IA</span>
+      </div>
+      <div className="assist-context">
+        <span className={`status-dot ${dot(profileOn)}`}>
+          memória do perfil {profileOn ? "preenchida" : "vazia (aba Perfil)"}
+        </span>
+        <span className={`status-dot ${dot((decisionCount ?? 0) > 0)}`}>
+          {decisionCount ?? "…"} decisão{decisionCount === 1 ? "" : "ões"} aceita
+          {decisionCount === 1 ? "" : "s"} no recap
+        </span>
+        <span className={`status-dot ${dot((lessonCount ?? 0) > 0)}`}>
+          {lessonCount ?? "…"} lição{lessonCount === 1 ? "" : "ões"} aprendida
+          {lessonCount === 1 ? "" : "s"} (injetadas por similaridade)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Histórico de interações de IA — reutiliza os agent_events da capability
+ * project-memory (`GET /memory/timeline?kinds=agent`), sem endpoint novo. */
+function AssistHistoryCard() {
+  const [events, setEvents] = useState<
+    { at: string; id: string; title: string; summary: string }[]
+  >([]);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .memoryTimeline("agent", 10)
+      .then((rows) => alive && setEvents(rows))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (events.length === 0) return null;
+
+  return (
+    <div className="card block">
+      <div className="card-head">
+        <h3>Histórico de interações</h3>
+        <span className="spacer" />
+        <span className="caption muted">o que a IA gerou/revisou (Memória do Projeto)</span>
+      </div>
+      {events.map((e, i) => (
+        <div key={`${e.id}-${i}`} className="exec-item">
+          <span className="caption mono muted">
+            {(() => {
+              try {
+                return new Date(e.at).toLocaleString();
+              } catch {
+                return e.at;
+              }
+            })()}
+          </span>
+          <span className="exec-item-msg">{e.summary}</span>
+          {e.title && <span className="caption muted">{e.title}</span>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -187,7 +311,7 @@ function ProvidersCard({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Providers</h3>
         <span className="spacer" />
@@ -371,7 +495,7 @@ function GenerateCard({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Gerar test cases</h3>
         <span className="spacer" />
@@ -387,6 +511,26 @@ function GenerateCard({
           style={{ minHeight: 120 }}
           spellCheck={false}
         />
+        {!source.trim() && (
+          <p className="caption muted" style={{ marginTop: 4 }}>
+            Ex.: digite o ID de uma story (o corpo dela vira o insumo) —{" "}
+            <button
+              type="button"
+              className="link-chip link-chip-btn"
+              onClick={() =>
+                setSource(
+                  "Como usuário quero recuperar minha senha por e-mail.\n\n" +
+                    "Critérios de aceite:\n" +
+                    "- Informar e-mail cadastrado envia link de redefinição\n" +
+                    "- Link expira em 30 minutos\n" +
+                    "- E-mail não cadastrado mostra mensagem genérica",
+                )
+              }
+            >
+              usar exemplo
+            </button>
+          </p>
+        )}
       </div>
       <div className="step-row">
         <ProviderSelect providers={providers} value={provider} onChange={setProvider} />
@@ -463,8 +607,8 @@ function PreviewList({
   return (
     <>
       <div className="step-row" style={{ marginTop: 16 }}>
-        <span className="caption">
-          {items.length} item(ns) em preview — nada foi gravado ainda
+        <span className="status-dot dot-col-in_progress caption">
+          {items.length} item(ns) em PREVIEW — nada foi gravado; aceite item a item
         </span>
         <span className="spacer" />
         <label className="caption">Pasta de destino</label>
@@ -556,7 +700,7 @@ function ReviewCard({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Revisar / casos negativos</h3>
         <span className="spacer" />
@@ -657,7 +801,7 @@ function ContextPackCard() {
   const canExport = Object.keys(params).length > 0;
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Context Pack</h3>
         <span className="spacer" />

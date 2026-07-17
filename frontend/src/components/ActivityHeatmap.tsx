@@ -105,7 +105,7 @@ export function ActivityHeatmap({ onError }: { onError: (message: string) => voi
   const years = data.years ?? []; // resiliente a resposta antiga/parcial do backend
 
   return (
-    <div className="card" style={{ marginBottom: 24, position: "relative" }}>
+    <div className="card block" style={{ position: "relative" }}>
       <div className="card-head">
         <h3>Atividade</h3>
         <span className="spacer" style={{ flex: 1 }} />

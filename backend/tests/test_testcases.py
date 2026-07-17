@@ -79,3 +79,41 @@ def test_raw_roundtrip_and_filters(client):
     assert [t["id"] for t in by_tag] == [created["id"]]
     by_q = client.get("/api/v1/testcases", params={"q": "Filtráv"}).json()
     assert [t["id"] for t in by_q] == [created["id"]]
+
+
+def test_priority_filter_and_combined_filters(client):
+    """0064: filtro `priority` novo, combinável com os demais (rastreabilidade
+    do repositório de CTs — a árvore filtra pelo MESMO endpoint)."""
+    high = client.post(
+        "/api/v1/testcases",
+        json={"title": "Crítico de login", "priority": "high", "status": "ready"},
+    ).json()
+    client.post(
+        "/api/v1/testcases",
+        json={"title": "Baixa prioridade", "priority": "low", "status": "ready"},
+    )
+
+    by_priority = client.get("/api/v1/testcases", params={"priority": "high"}).json()
+    assert [t["id"] for t in by_priority] == [high["id"]]
+
+    combined = client.get(
+        "/api/v1/testcases", params={"priority": "high", "status": "ready", "q": "login"}
+    ).json()
+    assert [t["id"] for t in combined] == [high["id"]]
+
+    none = client.get(
+        "/api/v1/testcases", params={"priority": "high", "status": "draft"}
+    ).json()
+    assert none == []
+
+
+def test_defects_filter_by_testcase(client):
+    """0064: o painel lateral do CT lista os defeitos vinculados a ele."""
+    ct = client.post("/api/v1/testcases", json={"title": "CT com bug"}).json()
+    linked = client.post(
+        "/api/v1/defects", json={"title": "Vinculado", "testcase": ct["id"]}
+    ).json()
+    client.post("/api/v1/defects", json={"title": "Solto"})
+
+    by_ct = client.get("/api/v1/defects", params={"testcase": ct["id"]}).json()
+    assert [d["id"] for d in by_ct] == [linked["id"]]

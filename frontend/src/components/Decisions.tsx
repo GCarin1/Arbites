@@ -3,6 +3,7 @@ import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
+import { useToast } from "./Toast";
 import type { Decision } from "../types";
 
 const STATUSES: Decision["status"][] = ["proposed", "accepted", "superseded"];
@@ -252,7 +253,9 @@ function DecisionModal({
   const [supersedes, setSupersedes] = useState(decision?.supersedes ?? "");
   const [body, setBody] = useState(decision?.body ?? "");
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (decision && decision.body === undefined) {
@@ -280,6 +283,7 @@ function DecisionModal({
     try {
       if (decision) await api.updateDecision(decision.id, payload);
       else await api.createDecision(payload);
+      toast("Decisão salva");
       onSaved();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -291,6 +295,7 @@ function DecisionModal({
     <Modal
       title={decision ? `Editar ${decision.id}` : "Nova decisão"}
       onClose={onClose}
+      dirty={dirty && !saving}
       initialFocus={titleRef}
       footer={
         <>
@@ -303,6 +308,7 @@ function DecisionModal({
         </>
       }
     >
+      <div className="modal-form" onInput={() => setDirty(true)}>
       <div className="modal-field">
         <label htmlFor="decision-title">Título</label>
         <input
@@ -349,6 +355,7 @@ function DecisionModal({
           onChange={setBody}
           placeholder="## Contexto&#10;&#10;...&#10;&#10;## Decisão&#10;&#10;...&#10;&#10;## Consequências&#10;&#10;..."
         />
+      </div>
       </div>
     </Modal>
   );

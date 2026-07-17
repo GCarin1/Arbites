@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-07-10
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -32,9 +32,19 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall interpretar a lista ordenada sob `## Passos` como os
   steps marcáveis da execução manual.
 - The system shall expor CRUD via `GET/POST /testcases`,
-  `GET/PUT/DELETE /testcases/{id}` com filtros
-  `story, status, tag, type, folder, q`, além de `GET /tree` para a árvore
-  de pastas.
+  `GET/PUT/DELETE /testcases/{id}` com filtros combináveis
+  `story, status, tag, type, priority, folder, squad, q`, além de
+  `GET /tree` para a árvore de pastas.
+- The system shall oferecer no repositório de CTs uma busca fixa no topo e
+  filtros combinados (status/prioridade/tipo/tag) que usam o MESMO endpoint
+  `GET /testcases` do servidor — a árvore exibe apenas os itens que
+  casaram, com a contagem por pasta mostrando `casaram/total` e pastas sem
+  match ocultas.
+- The system shall abrir um painel lateral de detalhes ao selecionar um CT
+  na árvore (status, tipo, prioridade, story, squad, tags e defeitos
+  vinculados — via `GET /defects?testcase=`), com ações rápidas (mudar
+  status, copiar ID, abrir o editor completo) sem sair da árvore; o editor
+  completo abre por duplo clique ou pelo botão do painel.
 - The system shall expor o markdown cru via `GET/PUT /testcases/{id}/raw`
   para edição direta do arquivo.
 - The system shall exigir `story` no frontmatter para o CT entrar na
@@ -117,13 +127,19 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
    destino já ocupado são rejeitados — verified by
    `backend/tests/test_tc_repository.py`.
 
+9. [verified] O filtro `priority` combina com os demais
+   (`status`/`q`/`tag`/`type`) em `GET /testcases`, e
+   `GET /defects?testcase=` lista os defeitos vinculados a um CT (fonte do
+   painel lateral) — verified by `backend/tests/test_testcases.py`.
+
 ## Maturity
 
 **MVP (committed):**
 
 - CRUD, repositório de pastas centralizado (criar/excluir/mover pasta ou CT,
-  drag & drop), formato BDD padrão, editor form + markdown cru, filtros,
-  `created`.
+  drag & drop), formato BDD padrão, editor form + markdown cru, filtros
+  combinados com busca fixa e contagem por pasta, painel lateral de detalhes
+  com ações rápidas, `created`.
 
 **Future (aspirational, not committed):**
 

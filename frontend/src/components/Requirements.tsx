@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
+import { useToast } from "./Toast";
 import type { Requirement } from "../types";
 
 export function RequirementsList({
@@ -409,6 +410,7 @@ export function RequirementEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { toast } = useToast();
 
   const load = useCallback(() => {
     setError(null);
@@ -447,6 +449,7 @@ export function RequirementEditor({
       });
       setReq(updated);
       setEditing(false); // após salvar, volta ao modo leitura
+      toast("Requisito salvo");
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

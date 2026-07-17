@@ -5,7 +5,7 @@
 **Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
 **Last updated:** 2026-07-10
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -86,12 +86,21 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 
 - While um run está ativo em um target, the system shall manter lock por
   target (uma execução local por vez por target).
+- While uma aba está sem dados (sem target configurado, sem run
+  disparado), the system shall exibir um empty state com a instrução do
+  próximo passo e um atalho para a aba correspondente.
 
 ### Unwanted-behavior (must-not)
 
 - The system shall not escrever no repositório de automação.
 - The system shall not gerenciar dependências do repo de automação
   (virtualenv é responsabilidade do usuário).
+- The system shall not misturar controles de setup (targets/.env/token) com
+  controles de operação (disparo/terminal) no mesmo bloco visual — a tela
+  de Automação separa Configurar (setup), Executar (operação) e Histórico
+  (observabilidade: runs recentes com status + resumo por repositório com
+  runs/falhas/MTTR/última execução, reutilizando `GET /executions?origin=`
+  e `GET /metrics/automation`).
 - The system shall not quebrar o repo de automação standalone: sem
   `ARBITES_EVIDENCE_DIR`, os hooks não fazem nada.
 - The system shall not usar fontes divergentes para o preview de features e
@@ -143,6 +152,15 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
     resultado do Behave (run local e coleta de CI) — verified by
     `backend/tests/test_gherkin.py` e `backend/tests/test_behave_json.py`.
 
+12. [verified] A tela de Automação separa Configurar/Executar/Histórico; o
+    Histórico lista runs recentes (local + CI, via `origin=`) com status e
+    o resumo por repositório (runs/falhas/MTTR/última execução) vem de
+    `GET /metrics/automation`; abas sem dados mostram instrução do próximo
+    passo — verified by build + smoke dos endpoints consumidos
+    (`GET /executions?origin=`, `GET /metrics/automation`) + revisão visual
+    (endpoints já cobertos por `backend/tests/test_executions.py` e
+    `backend/tests/test_automation_report.py`).
+
 ## Maturity
 
 **MVP (committed):**
@@ -150,7 +168,9 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - Runs locais Behave com SSE, fila, timeout, parse JSON, evidências via
   hooks; cadastro de targets pela UI (sem editar `arbites.yaml` na mão) com
   descoberta de `.feature` por scan do repositório; rodar um `.feature`
-  inteiro funciona mesmo sem nenhum cenário tagueado a um CT.
+  inteiro funciona mesmo sem nenhum cenário tagueado a um CT; tela em 3
+  abas (Configurar/Executar/Histórico) com resumo operacional e empty
+  states instrutivos.
 
 **Future (aspirational, not committed):**
 

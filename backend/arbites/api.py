@@ -737,6 +737,7 @@ def _register_routes(app: FastAPI) -> None:
         status: str = "",
         tag: str = "",
         type: str = "",
+        priority: str = "",
         folder: str = "",
         squad: str = "",
         q: str = "",
@@ -750,6 +751,7 @@ def _register_routes(app: FastAPI) -> None:
             ("story_id", story),
             ("status", status),
             ("type", type),
+            ("priority", priority),
             ("squad_effective", squad),
         ):
             if value:
@@ -1126,6 +1128,66 @@ def _register_routes(app: FastAPI) -> None:
             conn_of(request), weights, sprint or None, days or None, squad or None,
             pattern,
         )
+
+    # -- Dashboard executivo (painel de decisão, capability reporting) ------
+    # Consolida sinais que já existem: variação vs período anterior, alertas
+    # de risco (achados `bad` do Auditor + Health Score baixo), top problemas
+    # (automação/defeitos) e ações recomendadas (achados reformulados como
+    # "faça X"). Nada de coleta nova — orquestra os reports existentes.
+
+    _ACTION_VERB = {
+        "uncovered_story": "Criar cobertura para",
+        "forgotten_defect": "Registrar causa raiz e tratar",
+        "aging_defect": "Revisar/fechar",
+        "broken_automation": "Investigar automação quebrada:",
+    }
+
+    @app.get(API_PREFIX + "/metrics/dashboard")
+    async def metrics_dashboard(
+        request: Request, sprint: str = "", days: int = 30, squad: str = ""
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        cfg = ws.config()
+        pattern = (cfg.get("ci_monitoring") or {}).get("name_pattern")
+        audit_cfg = cfg.get("audit") or {}
+        s, sq = sprint or None, squad or None
+
+        findings = audit_ops.collect_findings(
+            conn, audit_cfg.get("defect_aging_days"),
+            audit_cfg.get("broken_automation_days"), pattern,
+        )
+        weights = (cfg.get("health_score") or {}).get("weights")
+        health = metrics_ops.health_score(conn, weights, s, days or None, sq, pattern)
+
+        # alertas de risco = achados `bad` + Health Score baixo
+        alerts = [
+            {"severity": f["severity"], "category": f["category"],
+             "message": f["message"], "ref": f["ref"]}
+            for f in findings if f["severity"] == "bad"
+        ]
+        if health["score"] is not None and health["score"] < 50:
+            alerts.insert(0, {
+                "severity": "bad", "category": "health",
+                "message": f"Health Score baixo: {health['score']}/100", "ref": None,
+            })
+
+        # ações recomendadas = achados (bad+warn) reformulados como "faça X"
+        recommended_actions = [
+            {"message": f"{_ACTION_VERB.get(f['code'], 'Tratar')} {f['ref'] or f['message']}",
+             "ref": f["ref"], "category": f["category"]}
+            for f in findings if f["severity"] in ("bad", "warn")
+        ][:8]
+
+        reindex_row = conn.execute(
+            "SELECT value FROM index_meta WHERE key = 'last_reindex'"
+        ).fetchone()
+        return {
+            "last_reindex": reindex_row["value"] if reindex_row else None,
+            "pass_rate_trend": metrics_ops.period_pass_rate(conn, days, s, sq),
+            "alerts": alerts,
+            "top_problems": metrics_ops.top_problems(conn, pattern, days or None),
+            "recommended_actions": recommended_actions,
+        }
 
     @app.get(API_PREFIX + "/metrics/automation")
     async def metrics_automation(request: Request, days: int = 0, env: str = ""):
@@ -1951,11 +2013,16 @@ def _register_routes(app: FastAPI) -> None:
         return out
 
     @app.get(API_PREFIX + "/defects")
-    async def list_defects(request: Request, status: str = "", has_lesson: bool = False):
+    async def list_defects(
+        request: Request, status: str = "", testcase: str = "", has_lesson: bool = False
+    ):
         sql, params = "SELECT * FROM defects WHERE 1=1", []
         if status:
             sql += " AND status = ?"
             params.append(status)
+        if testcase:
+            sql += " AND testcase_id = ?"
+            params.append(testcase)
         if has_lesson:
             sql += " AND (root_cause IS NOT NULL OR fix IS NOT NULL OR prevention IS NOT NULL)"
         return [

@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-10
-**Version:** 0.10.1
+**Version:** 0.11.0
 
 ## Purpose
 
@@ -83,6 +83,14 @@ export PDF e Markdown (para colar no Confluence).
   automação usa o mesmo `ci_monitoring.name_pattern` configurado que o
   relatório de automação — um padrão customizado não pode zerar o componente
   silenciosamente.
+- The system shall expor `GET /metrics/dashboard` (painel executivo) que
+  consolida, a partir dos reports já existentes: a variação do pass rate vs
+  o período anterior de mesmo tamanho (`pass_rate_trend`), alertas de risco
+  (achados `bad` do Agente Auditor + Health Score < 50), top problemas
+  (piores repositórios, CTs que mais falham, defeitos mais antigos), ações
+  recomendadas (achados do auditor reformulados como "faça X") e a última
+  atualização dos dados (`last_reindex`). Não coleta nada novo — orquestra
+  `audit`, `automation_report`, `defects_report` e `health_score`.
 
 ### Event-driven
 
@@ -172,6 +180,13 @@ export PDF e Markdown (para colar no Confluence).
     componente de automação respeita um `ci_monitoring.name_pattern`
     customizado — verified by `backend/tests/test_health_score.py`.
 
+13. [verified] `GET /metrics/dashboard` devolve `pass_rate_trend`
+    (atual/anterior/delta comparando janelas consecutivas), alertas de risco
+    (achados `bad` do auditor + Health Score baixo), ações recomendadas
+    (achados reformulados), top problemas (defeitos mais antigos ordenados,
+    piores repos, CTs que mais falham) e `last_reindex` — verified by
+    `backend/tests/test_dashboard_executive.py`.
+
 ## Maturity
 
 **MVP (committed):**
@@ -182,7 +197,9 @@ export PDF e Markdown (para colar no Confluence).
   configurável, sparkline/MTTR/flaky por repo, CTs que mais falham, filtro de
   ambiente), heatmap de atividade de QA no perfil (estilo GitHub), Health
   Score (nota única 0-100 composta de cobertura/defeitos/automação/dívida,
-  pesos configuráveis) em destaque no Dashboard.
+  pesos configuráveis) em destaque no Dashboard, painel executivo (variação
+  vs período anterior, alertas de risco, top problemas, ações recomendadas,
+  última atualização).
 
 **Future (aspirational, not committed):**
 

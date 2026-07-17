@@ -364,6 +364,41 @@ export interface TimelineEntry {
   summary: string;
 }
 
+export interface DashboardAlert {
+  severity: "bad" | "warn" | "info";
+  category: string;
+  message: string;
+  ref: string | null;
+}
+
+export interface DashboardOverview {
+  last_reindex: string | null;
+  pass_rate_trend: {
+    days: number;
+    current: number | null;
+    previous: number | null;
+    delta: number | null;
+  };
+  alerts: DashboardAlert[];
+  top_problems: {
+    worst_repos: {
+      repo: string;
+      failed: number;
+      runs: number;
+      failure_rate: number | null;
+      broken_since: string | null;
+    }[];
+    top_failing_testcases: AutomationFailingCt[];
+    oldest_defects: {
+      id: string;
+      title: string;
+      severity: string | null;
+      age_days: number;
+    }[];
+  };
+  recommended_actions: { message: string; ref: string | null; category: string }[];
+}
+
 export interface HealthComponent {
   value: number | null;
   weight: number;

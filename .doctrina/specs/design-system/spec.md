@@ -1,11 +1,11 @@
 # Spec — design-system
 
 **Capability:** design-system
-**Status:** draft
-**Implementation:** planned — north-star escrito; detalhe e prova chegam pelas changes 0060 (fundação), 0061 (estados & feedback) e 0062 (orientação & navegação). Draft até a fundação (0060) landar.
+**Status:** active
+**Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
-**Last updated:** 2026-07-13
-**Version:** 0.1.0
+**Last updated:** 2026-07-16
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -36,17 +36,32 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 ### Ubiquitous
 
 - The system shall expor um conjunto fixo de componentes canônicos — botão
-  primário, botão secundário, input, card e badge de status — cada um com
-  uma única aparência (cor, altura, raio, padding, borda) reutilizada em
-  todas as telas.
-- The system shall estabelecer uma hierarquia visual explícita: títulos
-  fortes, subtítulos leves, cards principais maiores que os secundários,
-  espaço entre blocos e menos bordas repetidas.
-- The system shall sinalizar de forma consistente os estados de interação —
-  salvo, carregando, falhou, vazio e alterado-não-salvo (dirty).
-- The system shall oferecer navegação assistida além do menu lateral (busca
-  global / comandos rápidos) e orientação espacial (contexto da rota atual)
-  nas áreas mais profundas.
+  primário (`button.primary`), botão secundário (`button` base), botão
+  destrutivo (`button.danger`), input/select/textarea (seletor de elemento,
+  altura `--h-control`), card (`.card` e as variantes `.metric-card`/
+  `.chart-card`/`.todo-card` compartilhando UMA superfície) e badge de
+  status (`status-dot` + `--dot`) — cada um com uma única aparência
+  reutilizada em todas as telas.
+- The system shall manter a superfície de card (fundo, borda, raio, padding,
+  sombra) numa única definição CSS compartilhada pelas variantes, para não
+  divergir tela a tela.
+- The system shall estabelecer uma hierarquia visual explícita: título de
+  página em `--fs-h1`/peso 700, subtítulo leve (`.subtitle`), espaço entre
+  blocos por token (`.block` = `--s3`) em vez de margem mágica inline, e
+  ausência de bordas duplicadas entre contêiner e conteúdo.
+- The system shall sinalizar de forma consistente os estados de interação:
+  **salvo** (toast transitório via `useToast`, em vez de save silencioso),
+  **carregando** (`.spinner`/`.skeleton` canônicos), **falhou** (toast de
+  erro + `.field-error` junto à ação, além do banner global), **vazio**
+  (`.empty-state` com instrução) e **alterado-não-salvo/dirty** (o `Modal`
+  compartilhado pede confirmação ao fechar via Esc/backdrop/X com o form
+  sujo).
+- The system shall oferecer navegação assistida além do menu lateral: uma
+  paleta de comandos global (`CommandPalette`, Ctrl/Cmd+K de qualquer tela)
+  que busca qualquer artefato via `GET /search` e navega até ele, mais
+  ações rápidas (novo CT, nova execução, reindex); e orientação espacial
+  (breadcrumbs nos back-bars das áreas profundas, largura de leitura
+  limitada via `.content-narrow`).
 
 ### Unwanted-behavior (must-not)
 
@@ -60,15 +75,32 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 <!-- Todos [unverified] enquanto planned; cada change (0060/0061/0062) landa
 e prova a sua fatia, citando o teste/artefato. -->
 
-1. [unverified] Botão/​input/​card/​badge têm uma única definição
-   reutilizada (uma classe/componente canônico por tipo), sem variações
-   ad-hoc por tela — landa em 0060.
-2. [unverified] A hierarquia visual (título/subtítulo/card principal vs
-   secundário/espaçamento) é aplicada de forma consistente — landa em 0060.
-3. [unverified] Os estados salvo/carregando/erro/vazio/dirty têm uma
-   representação consistente e reutilizável — landa em 0061.
-4. [unverified] Áreas profundas expõem contexto da rota atual e há uma busca
-   global/comando rápido acessível de qualquer tela — landa em 0062.
+1. [verified] Botão/​input/​card/​badge têm uma única definição reutilizada
+   (uma classe/seletor canônico por tipo); a superfície de card é uma regra
+   CSS compartilhada por `.card`/`.metric-card`/`.chart-card`/`.todo-card`
+   (fim das divergências: `.chart-card` sem sombra e `.todo-card` com padding
+   one-off); nenhum card de nível superior carrega mais `style={{
+   marginBottom }}` ad-hoc — verified by `frontend/src/styles.css` (regra
+   compartilhada + `.block`), varredura das telas e `npm run build` limpo.
+2. [verified] Hierarquia aplicada: título de página em `--fs-h1`/700,
+   `.subtitle` para apoio leve, ritmo de blocos via `.block` (`--s3`); no
+   máximo um CTA `primary` por bloco nas telas (padrão já seguido, confirmado
+   na varredura) — verified by `frontend/src/styles.css` + revisão das telas.
+3. [verified] Os estados salvo/carregando/erro/vazio/dirty têm uma
+   representação consistente e reutilizável: `Toast`/`useToast` (provider
+   único no `main.tsx`), `.spinner`/`.skeleton`/`.field-error` no CSS, e a
+   guarda de dirty no `Modal` compartilhado (confirma antes de descartar);
+   toast de "salvo" ligado aos saves principais (decisões, defeitos,
+   afazeres, reuniões, CT, requisitos) — verified by
+   `frontend/src/components/Toast.tsx`, `frontend/src/components/Modal.tsx`
+   (dirty), `frontend/src/styles.css` e build limpo. Rollout do toast às
+   demais telas é incremental (skill `estados-de-feedback-nas-telas`).
+4. [verified] Há uma busca global (Ctrl/Cmd+K) acessível de qualquer tela
+   que encontra qualquer artefato via `GET /search` e navega até ele, com
+   ações rápidas; as áreas profundas expõem contexto da rota (breadcrumbs
+   nos back-bars) e a leitura tem largura limitada em telas grandes —
+   verified by `frontend/src/components/CommandPalette.tsx`,
+   `frontend/src/App.tsx` (listener Ctrl+K + breadcrumbs) e build limpo.
 
 ## Maturity
 

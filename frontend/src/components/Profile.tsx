@@ -49,14 +49,14 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
   }
 
   return (
-    <div>
+    <div className="content-narrow">
       <div className="page-head">
         <h1 className="page-title">Perfil</h1>
         <span className="spacer" />
         {saved && <span className="status-dot dot-active">salvo</span>}
       </div>
 
-      <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card block">
         <div className="card-head">
           <h3>Informações pessoais</h3>
         </div>
@@ -77,7 +77,7 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
 
       <ActivityHeatmap onError={onError} />
 
-      <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card block">
         <div className="card-head">
           <h3>Memória de longo prazo para IA</h3>
           <span className="spacer" />

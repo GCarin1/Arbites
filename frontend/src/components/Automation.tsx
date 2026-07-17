@@ -53,6 +53,14 @@ export function Automation({
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
+  // Abas (0065): Configurar = setup (targets/.env/token) · Executar =
+  // operação (disparo + terminal + artefatos) · Histórico = observabilidade
+  // (runs recentes + resumo). Setup e operação nunca no mesmo bloco.
+  const [tab, setTab] = useState<"configurar" | "executar" | "historico">("executar");
+  // primeiro load sem targets abre no setup (uma vez só) — o setter funcional
+  // abaixo usa o valor anterior como "já decidiu?", por isso o estado existe
+  // mesmo sem leitura direta no render.
+  const [, setAutoTabbed] = useState(false);
   const [targets, setTargets] = useState<Target[]>([]);
   const [selection, setSelection] = useState("");
   const [tags, setTags] = useState("");
@@ -68,6 +76,11 @@ export function Automation({
       .then((data) => {
         setTargets(data);
         setSelection((old) => old || data[0]?.name || "");
+        // primeiro uso sem target: abre direto no setup (uma vez só)
+        setAutoTabbed((done) => {
+          if (!done && data.length === 0) setTab("configurar");
+          return true;
+        });
       })
       .catch((e) => onError(e.message));
   }, [onError]);
@@ -157,11 +170,54 @@ export function Automation({
     <div>
       <div className="page-head">
         <h1 className="page-title">Automação</h1>
+        <span className="spacer" />
+        <div className="tab-bar" role="tablist">
+          {(
+            [
+              ["configurar", "Configurar"],
+              ["executar", "Executar"],
+              ["historico", "Histórico"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              className={`tab-btn ${tab === key ? "active" : ""}`}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <TargetsCard targets={targets} onScan={scan} onSaved={loadTargets} onError={onError} />
+      {tab === "configurar" && (
+        <>
+          <TargetsCard targets={targets} onScan={scan} onSaved={loadTargets} onError={onError} />
+          {selection && <EnvCard target={selection} onError={onError} />}
+          <CIPanel targets={targets} onChanged={onChanged} onError={onError} mode="setup" />
+        </>
+      )}
 
-      <div className="card" style={{ marginBottom: 24 }}>
+      {tab === "historico" && <HistoryCard onGoRun={() => setTab("executar")} />}
+
+      {tab === "executar" && targets.length === 0 && (
+        <div className="empty-state block">
+          <div className="empty-title">Nenhum target configurado</div>
+          <div className="empty-body">
+            Antes de executar, cadastre um target (nome + caminho local do
+            repositório de automação) na aba Configurar.
+          </div>
+          <button className="primary" onClick={() => setTab("configurar")}>
+            Ir para Configurar
+          </button>
+        </div>
+      )}
+
+      {tab === "executar" && targets.length > 0 && (
+      <>
+      <div className="card block">
         <div className="card-head">
           <h3>Novo run local (Behave)</h3>
           <span className="spacer" />
@@ -245,10 +301,180 @@ export function Automation({
       </div>
 
       {selection && <ArtifactsCard target={selection} refreshKey={run?.status ?? ""} />}
-      {selection && <EnvCard target={selection} onError={onError} />}
 
-      <CIPanel targets={targets} onChanged={onChanged} onError={onError} />
+      <CIPanel targets={targets} onChanged={onChanged} onError={onError} mode="run" />
+      </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Histórico (0065): runs de automação recentes (local + CI) com status e
+ * resumo por repositório (runs, falhas, MTTR, última execução) — os dados
+ * vêm de `GET /executions?origin=` e `GET /metrics/automation` (mesma fonte
+ * do Dashboard, com o name_pattern configurado aplicado no servidor).
+ */
+function HistoryCard({ onGoRun }: { onGoRun: () => void }) {
+  const [runs, setRuns] = useState<
+    { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]
+  >([]);
+  const [summary, setSummary] = useState<{
+    total_runs: number;
+    failed_runs: number;
+    pass_rate: number | null;
+    by_repo: { repo: string; runs: number; failed: number; mttr_hours: number | null; last_run_at: string | null }[];
+  } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+        `${BASE}/executions?origin=local_run`,
+      ),
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+        `${BASE}/executions?origin=github_actions`,
+      ),
+      json<{
+        total_runs: number;
+        failed_runs: number;
+        pass_rate: number | null;
+        by_repo: { repo: string; runs: number; failed: number; mttr_hours: number | null; last_run_at: string | null }[];
+      }>(`${BASE}/metrics/automation?days=30`),
+    ])
+      .then(([local, ci, report]) => {
+        if (!alive) return;
+        const merged = [...local, ...ci].sort((a, b) =>
+          b.created_at.localeCompare(a.created_at),
+        );
+        setRuns(merged.slice(0, 15));
+        setSummary(report);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function outcomeOf(counts: Record<string, number>): { label: string; dot: string } {
+    if ((counts["failed"] ?? 0) > 0) return { label: "failed", dot: "dot-col-failed" };
+    if ((counts["blocked"] ?? 0) > 0) return { label: "blocked", dot: "dot-col-blocked" };
+    if ((counts["passed"] ?? 0) > 0) return { label: "passed", dot: "dot-col-passed" };
+    return { label: "sem resultados", dot: "dot-col-pending" };
+  }
+
+  function when(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <p className="caption muted">
+        <span className="spinner" /> carregando histórico…
+      </p>
+    );
+  }
+
+  if (runs.length === 0) {
+    return (
+      <div className="empty-state block">
+        <div className="empty-title">Nenhum run de automação ainda</div>
+        <div className="empty-body">
+          Dispare o primeiro run (local ou GitHub Actions) na aba Executar —
+          cada execução aparece aqui com status e duração.
+        </div>
+        <button className="primary" onClick={onGoRun}>
+          Ir para Executar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {summary && summary.total_runs > 0 && (
+        <div className="card block">
+          <div className="card-head">
+            <h3>Resumo (30 dias)</h3>
+            <span className="spacer" />
+            <span className="caption muted">
+              {summary.total_runs} runs · {summary.failed_runs} falha
+              {summary.failed_runs === 1 ? "" : "s"} · pass rate{" "}
+              {summary.pass_rate === null ? "—" : `${Math.round(summary.pass_rate * 100)}%`}
+            </span>
+          </div>
+          {summary.by_repo.length > 0 && (
+            <div className="table-wrap">
+              <table className="dense">
+                <thead>
+                  <tr>
+                    <th>Repositório</th>
+                    <th>Runs</th>
+                    <th>Falhas</th>
+                    <th>Tempo médio p/ verde</th>
+                    <th>Última execução</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.by_repo.map((r) => (
+                    <tr key={r.repo}>
+                      <td className="mono">{r.repo}</td>
+                      <td>{r.runs}</td>
+                      <td>{r.failed}</td>
+                      <td>{r.mttr_hours === null ? "—" : `${r.mttr_hours}h`}</td>
+                      <td className="caption muted">
+                        {r.last_run_at ? when(r.last_run_at) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="card block">
+        <div className="card-head">
+          <h3>Runs recentes</h3>
+        </div>
+        <div className="table-wrap">
+          <table className="dense">
+            <thead>
+              <tr>
+                <th>Execução</th>
+                <th>Nome</th>
+                <th>Origem</th>
+                <th>Status</th>
+                <th>Quando</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r) => {
+                const o = outcomeOf(r.result_counts);
+                return (
+                  <tr key={r.id}>
+                    <td className="mono">{r.id}</td>
+                    <td>{r.name}</td>
+                    <td className="caption muted">{r.origin}</td>
+                    <td>
+                      <span className={`status-dot ${o.dot} caption`}>{o.label}</span>
+                    </td>
+                    <td className="caption muted">{when(r.created_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -414,7 +640,7 @@ function TargetsCard({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Targets</h3>
         <span className="spacer" />
@@ -604,10 +830,13 @@ function CIPanel({
   targets,
   onChanged,
   onError,
+  mode,
 }: {
   targets: Target[];
   onChanged: () => void;
   onError: (message: string) => void;
+  // setup = só o token (aba Configurar) · run = só o disparo (aba Executar)
+  mode: "setup" | "run";
 }) {
   const [tokenConfigured, setTokenConfigured] = useState<boolean | null>(null);
   const [tokenInput, setTokenInput] = useState("");
@@ -711,6 +940,36 @@ function CIPanel({
         ? "dot-col-in_progress"
         : "dot-col-pending";
 
+  if (mode === "setup") {
+    return (
+      <div className="card block">
+        <div className="card-head">
+          <h3>GitHub Actions — token</h3>
+          <span className="spacer" />
+          <span className={`status-dot ${tokenConfigured ? "dot-col-passed" : "dot-col-pending"}`}>
+            {tokenConfigured === null
+              ? "status desconhecido"
+              : tokenConfigured
+                ? "PAT configurado"
+                : "PAT não configurado"}
+          </span>
+        </div>
+        <div className="step-row">
+          <input
+            type="password"
+            placeholder="PAT fine-grained (actions: read+write no repo)"
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+          />
+          <button onClick={() => void saveToken()} disabled={!tokenInput}>
+            Salvar no keyring
+          </button>
+        </div>
+        <p className="caption muted">Guardado no keyring do sistema, nunca em arquivo.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <div className="card-head">
@@ -725,20 +984,13 @@ function CIPanel({
         </span>
       </div>
 
-      <h4 className="section-title" style={{ marginTop: 0 }}>Token (keyring do sistema)</h4>
-      <div className="step-row">
-        <input
-          type="password"
-          placeholder="PAT fine-grained (actions: read+write no repo)"
-          value={tokenInput}
-          onChange={(e) => setTokenInput(e.target.value)}
-        />
-        <button onClick={() => void saveToken()} disabled={!tokenInput}>
-          Salvar no keyring
-        </button>
-      </div>
+      {tokenConfigured === false && (
+        <p className="caption muted">
+          Configure o token do GitHub na aba Configurar antes de disparar.
+        </p>
+      )}
 
-      <h4 className="section-title">Disparar workflow</h4>
+      <h4 className="section-title" style={{ marginTop: 0 }}>Disparar workflow</h4>
       <div className="field-grid">
         <div className="field col-3">
           <label>Target</label>
@@ -870,7 +1122,7 @@ function ArtifactsCard({ target, refreshKey }: { target: string; refreshKey: str
   const total = Object.values(artifacts).reduce((a, files) => a + files.length, 0);
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Artefatos pós-execução</h3>
         <span className="spacer" />
@@ -957,7 +1209,7 @@ function EnvCard({ target, onError }: { target: string; onError: (m: string) => 
   const dirtyCount = Object.keys(dirty).length;
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Configuração local (.env)</h3>
         <span className="spacer" />
