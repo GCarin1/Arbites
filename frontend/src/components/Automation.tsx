@@ -53,14 +53,10 @@ export function Automation({
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
-  // Abas (0065): Configurar = setup (targets/.env/token) · Executar =
-  // operação (disparo + terminal + artefatos) · Histórico = observabilidade
-  // (runs recentes + resumo). Setup e operação nunca no mesmo bloco.
-  const [tab, setTab] = useState<"configurar" | "executar" | "historico">("executar");
-  // primeiro load sem targets abre no setup (uma vez só) — o setter funcional
-  // abaixo usa o valor anterior como "já decidiu?", por isso o estado existe
-  // mesmo sem leitura direta no render.
-  const [, setAutoTabbed] = useState(false);
+  // Abas (0065/0070): Histórico = observabilidade (primeira e default) ·
+  // Executar = operação · Configurar = setup (última). Sem auto-troca de
+  // aba — o empty state do Histórico orienta o primeiro uso.
+  const [tab, setTab] = useState<"configurar" | "executar" | "historico">("historico");
   const [targets, setTargets] = useState<Target[]>([]);
   const [selection, setSelection] = useState("");
   const [tags, setTags] = useState("");
@@ -76,11 +72,6 @@ export function Automation({
       .then((data) => {
         setTargets(data);
         setSelection((old) => old || data[0]?.name || "");
-        // primeiro uso sem target: abre direto no setup (uma vez só)
-        setAutoTabbed((done) => {
-          if (!done && data.length === 0) setTab("configurar");
-          return true;
-        });
       })
       .catch((e) => onError(e.message));
   }, [onError]);
@@ -174,9 +165,9 @@ export function Automation({
         <div className="tab-bar" role="tablist">
           {(
             [
-              ["configurar", "Configurar"],
-              ["executar", "Executar"],
               ["historico", "Histórico"],
+              ["executar", "Executar"],
+              ["configurar", "Configurar"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -200,7 +191,13 @@ export function Automation({
         </>
       )}
 
-      {tab === "historico" && <HistoryCard onGoRun={() => setTab("executar")} />}
+      {tab === "historico" && (
+        <HistoryCard
+          hasTargets={targets.length > 0}
+          onGoRun={() => setTab("executar")}
+          onGoSetup={() => setTab("configurar")}
+        />
+      )}
 
       {tab === "executar" && targets.length === 0 && (
         <div className="empty-state block">
@@ -315,7 +312,15 @@ export function Automation({
  * vêm de `GET /executions?origin=` e `GET /metrics/automation` (mesma fonte
  * do Dashboard, com o name_pattern configurado aplicado no servidor).
  */
-function HistoryCard({ onGoRun }: { onGoRun: () => void }) {
+function HistoryCard({
+  hasTargets,
+  onGoRun,
+  onGoSetup,
+}: {
+  hasTargets: boolean;
+  onGoRun: () => void;
+  onGoSetup: () => void;
+}) {
   const [runs, setRuns] = useState<
     { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]
   >([]);
@@ -386,11 +391,12 @@ function HistoryCard({ onGoRun }: { onGoRun: () => void }) {
       <div className="empty-state block">
         <div className="empty-title">Nenhum run de automação ainda</div>
         <div className="empty-body">
-          Dispare o primeiro run (local ou GitHub Actions) na aba Executar —
-          cada execução aparece aqui com status e duração.
+          {hasTargets
+            ? "Dispare o primeiro run (local ou GitHub Actions) na aba Executar — cada execução aparece aqui com status e duração."
+            : "Comece cadastrando um target (nome + caminho local do repositório de automação) na aba Configurar; depois dispare runs na aba Executar."}
         </div>
-        <button className="primary" onClick={onGoRun}>
-          Ir para Executar
+        <button className="primary" onClick={hasTargets ? onGoRun : onGoSetup}>
+          {hasTargets ? "Ir para Executar" : "Ir para Configurar"}
         </button>
       </div>
     );

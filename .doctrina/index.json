@@ -330,7 +330,71 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0068-cobertura-de-requisito-visivel-na-aba-requisitos",
+        "title": "Cobertura de requisito visivel na aba Requisitos: cada story mostra se esta coberta (>=1 CT vinculado) ou nao, com contagem de CTs; filtro sem-cobertura; o dado ja existe na matriz do Dashboard, falta na tela de Requisitos",
+        "path": ".doctrina/changes/0068-cobertura-de-requisito-visivel-na-aba-requisitos",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0069-deletar-test-execution-pela-ui-delete-executions",
+        "title": "Deletar test execution pela UI: DELETE /executions/{id} move a pasta para a lixeira e reindexa; botao Excluir com ConfirmModal no repositorio de execucoes; execution com run ativo nao pode ser deletada",
+        "path": ".doctrina/changes/0069-deletar-test-execution-pela-ui-delete-executions",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0070-automacao-reordenar-abas-para-historico-primeira",
+        "title": "Automacao: reordenar abas para Historico (primeira e default) depois Executar e Configurar por ultimo; primeiro uso sem target orienta para Configurar via empty state",
+        "path": ".doctrina/changes/0070-automacao-reordenar-abas-para-historico-primeira",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0071-clareza-da-aba-auditoria-subtitle-e-texto-de",
+        "title": "Clareza da aba Auditoria: subtitle e texto de proposito (o que o auditor consolida e quando roda), legenda de severidades, empty state instrutivo; seguir o design system",
+        "path": ".doctrina/changes/0071-clareza-da-aba-auditoria-subtitle-e-texto-de",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0072-clareza-da-aba-decisoes-subtitle-e-texto-curto",
+        "title": "Clareza da aba Decisoes: subtitle e texto curto de proposito (registro do porque das decisoes do projeto sob teste), empty state com exemplo; seguir o design system",
+        "path": ".doctrina/changes/0072-clareza-da-aba-decisoes-subtitle-e-texto-curto",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0073-memoria-do-projeto-timeline-passa-a-incluir",
+        "title": "Memoria do Projeto: timeline passa a incluir criacao de caso de teste (testcases.created) e mudancas de resultado dentro de executions (result_events: CT passou/falhou/bloqueado em EXEC-X) como novos tipos filtraveis; derivado do indice existente, sem persistencia nova",
+        "path": ".doctrina/changes/0073-memoria-do-projeto-timeline-passa-a-incluir",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0074-historico-de-resultados-por-ct-endpoint-que",
+        "title": "Historico de resultados por CT: endpoint que lista os resultados passados de um caso de teste (execution, status, data, duracao) derivado da tabela results; exibido no painel lateral do repositorio e no editor do CT para responder se ja passou no passado; status-dot do design system",
+        "path": ".doctrina/changes/0074-historico-de-resultados-por-ct-endpoint-que",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0075-lastreamento-feature-ct-por-nome-de-cenario",
+        "title": "Lastreamento .feature-CT por nome de cenario: modal ao buscar .feature lista features e cenarios e o usuario escolhe quais vincular ao Arbites (cria CT automated com automation.feature_path e scenario_name; repositorio de automacao segue read-only, ADR 0003 preservado); sync re-executavel detecta features novos, cenarios novos em features ja vinculados, steps modificados (diff contra o body do CT) e cenarios renomeados ou sumidos (vinculo quebrado), e o modal permite escolher o que criar, atualizar ou re-vincular",
+        "path": ".doctrina/changes/0075-lastreamento-feature-ct-por-nome-de-cenario",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      },
+      {
+        "id": "0076-execucao-rastreada-ao-vivo-rodar-1-n-feature",
+        "title": "Execucao rastreada ao vivo: rodar 1..N .feature (inclusive de features diferentes) cria automaticamente um test execution com todos os CTs lastreados (por tag ou por nome); modal pos-disparo oferece ir ao execution ver o andamento; cards e steps atualizam ao vivo por parsing best-effort do output do behave com o JSON final reconciliando; toast de sucesso ou erro ao terminar; indicador pulsante executando no item Automacao do menu lateral via endpoint leve de runs ativos",
+        "path": ".doctrina/changes/0076-execucao-rastreada-ao-vivo-rodar-1-n-feature",
+        "status": "proposed",
+        "opened": "2026-07-17"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1384,6 +1448,18 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "vinculo-por-nome-exige-sync-explicita",
+        "path": ".doctrina/skills/vinculo-por-nome-exige-sync-explicita.md",
+        "description": "Quando dois sistemas se vinculam por um identificador humano (nome de cenário, título, caminho) em vez de um ID estável, o vínculo é frágil por natureza — a mitigação obrigatória é uma sync explícita e re-executável que classifica os estados (novo/modificado/renomeado-quebrado) e deixa o usuário decidir o que fazer.",
+        "last_updated": "2026-07-17"
+      },
+      {
+        "id": "progresso-ao-vivo-fonte-oficial-reconcilia",
+        "path": ".doctrina/skills/progresso-ao-vivo-fonte-oficial-reconcilia.md",
+        "description": "Progresso em tempo real parseado de um stream de texto é sempre best-effort — pode e deve existir para UX, mas a fonte oficial estruturada (JSON/artefato final) SEMPRE reconcilia o estado no fim; o live nunca é a verdade final.",
+        "last_updated": "2026-07-17"
       }
     ],
     "contracts": [
