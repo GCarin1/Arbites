@@ -5,7 +5,7 @@
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Agente Auditor), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-12
-**Version:** 0.1.1
+**Version:** 0.1.2
 
 ## Purpose
 
@@ -51,6 +51,11 @@ atenção.
   `broken_automation_days`) e o intervalo de auto-execução
   (`auto_interval_hours`, default 24) configuráveis em `arbites.yaml`
   (`audit.*`), com defaults genéricos aplicados quando ausentes.
+
+- The system shall apresentar na aba Auditoria um subtitle de propósito, um
+  parágrafo curto do que o auditor consolida e quando roda, e a legenda das
+  severidades (bad/warn/info com status-dot) — um usuário novo entende a
+  aba sem sair dela.
 
 ### Event-driven
 
@@ -113,6 +118,10 @@ atenção.
    `ci_monitoring.name_pattern` customizado, e um `created_at` sem fuso
    (editado externamente) não derruba a rodada — vira "tempo desconhecido"
    no achado — verified by `backend/tests/test_audit.py`.
+
+7. [verified] A aba exibe subtitle, propósito, legenda de severidades e
+   empty state instrutivo — verified by build + revisão visual
+   (`frontend/src/components/Audit.tsx`).
 
 ## Maturity
 

@@ -27,11 +27,12 @@ CREATE TABLE IF NOT EXISTS testcases(
   id TEXT PRIMARY KEY, title TEXT, type TEXT, priority TEXT, status TEXT,
   story_id TEXT, path TEXT, mtime REAL,
   automation_target TEXT, scenario_tag TEXT, external_key TEXT,
-  squad TEXT, squad_effective TEXT, created TEXT);
+  squad TEXT, squad_effective TEXT, created TEXT,
+  feature_path TEXT, scenario_name TEXT);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
 CREATE TABLE IF NOT EXISTS scenarios(
   target TEXT, tag TEXT PRIMARY KEY, feature_path TEXT,
-  scenario_name TEXT, line INTEGER, language TEXT);
+  scenario_name TEXT, line INTEGER, language TEXT, ct_id TEXT);
 CREATE TABLE IF NOT EXISTS executions(
   id TEXT PRIMARY KEY, name TEXT, owner TEXT, sprint TEXT, environment TEXT,
   origin TEXT, status TEXT, created_at TEXT, closed_at TEXT, path TEXT,
@@ -88,6 +89,9 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE defects ADD COLUMN root_cause TEXT",
         "ALTER TABLE defects ADD COLUMN fix TEXT",
         "ALTER TABLE defects ADD COLUMN prevention TEXT",
+        "ALTER TABLE testcases ADD COLUMN feature_path TEXT",
+        "ALTER TABLE testcases ADD COLUMN scenario_name TEXT",
+        "ALTER TABLE scenarios ADD COLUMN ct_id TEXT",
     ):
         try:
             conn.execute(ddl)
@@ -397,8 +401,9 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
     conn.execute(
         "INSERT OR REPLACE INTO testcases"
         "(id, title, type, priority, status, story_id, path, mtime,"
-        " automation_target, scenario_tag, external_key, squad, squad_effective, created)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " automation_target, scenario_tag, external_key, squad, squad_effective, created,"
+        " feature_path, scenario_name)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -414,6 +419,8 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
             squad,
             squad,  # placeholder; a herança é resolvida por _recompute_effective_squads
             str(doc.meta.get("created")) if doc.meta.get("created") else None,
+            automation.get("feature_path") if isinstance(automation, dict) else None,
+            automation.get("scenario_name") if isinstance(automation, dict) else None,
         ),
     )
     for tag in _tags(doc):

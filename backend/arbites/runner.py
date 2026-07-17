@@ -11,6 +11,7 @@ entram no mesmo execution.json do fluxo manual, via o adapter
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import sqlite3
 import sys
@@ -26,14 +27,30 @@ from .workspace import Workspace
 
 DEFAULT_TIMEOUT_MINUTES = 30.0
 
+# Progresso ao vivo (mudança 0076) — parse best-effort do formato plain do
+# behave, EN e PT. A fonte OFICIAL é sempre o Cucumber JSON do fim do run
+# (_collect reconcilia incondicionalmente); o live só antecipa a UX.
+_LIVE_SCENARIO_RE = re.compile(r"^\s*(?:Scenario|Cenário|Cenario)(?: Outline)?:\s*(.+?)\s*$")
+_LIVE_STEP_RE = re.compile(
+    r"^\s+(?:Given|When|Then|And|But|Dado|Quando|Então|Entao|E|Mas)\s+.*?"
+    r"\s\.\.\.\s(passed|failed|undefined|skipped)\b"
+)
+
 
 class RunInfo:
     def __init__(self, exec_id: str, target: dict[str, Any], tags: list[str],
-                 feature: str | None = None):
+                 feature: str | None = None, features: list[str] | None = None,
+                 live_map: dict[str, str] | None = None):
         self.exec_id = exec_id
         self.target = target
         self.tags = tags
-        self.feature = feature  # caminho relativo do .feature (opcional)
+        # 1..N caminhos relativos de .feature (posicionais do behave)
+        self.features = list(features or ([feature] if feature else []))
+        self.feature = self.features[0] if self.features else None  # compat
+        # progresso ao vivo: nome do cenário → ct_id (best-effort, 0076)
+        self.live_map = live_map or {}
+        self._live_scenario: str | None = None
+        self._live_failed = False
         self.status = "queued"  # queued | running | done | failed | timeout | cancelled
         self.log: list[str] = []
         self.subscribers: list[asyncio.Queue] = []
@@ -86,6 +103,8 @@ class RunManager:
         tags: list[str],
         owner: str = "behave",
         feature: str | None = None,
+        features: list[str] | None = None,
+        live_map: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Cria a execution (origin local_run) e enfileira o run (FIFO)."""
         execution = exec_ops.create(
@@ -100,7 +119,8 @@ class RunManager:
         path = exec_ops.save(self.ws, execution)
         reindex_file(self.ws, self.conn, path)
 
-        run = RunInfo(execution["id"], target, tags, feature=feature)
+        run = RunInfo(execution["id"], target, tags, feature=feature,
+                      features=features, live_map=live_map)
         self.runs[execution["id"]] = run
         name = str(target.get("name"))
         if name not in self._queues:
@@ -167,14 +187,18 @@ class RunManager:
         ]
         if run.tags:
             cmd.append(f"--tags={','.join(run.tags)}")
-        if run.feature:
-            cmd.append(run.feature)
+        cmd.extend(run.features)  # 1..N .feature posicionais (0076)
         run.emit(f"[arbites] $ {' '.join(cmd)}")
 
         import os
 
         env = dict(os.environ)
         env["ARBITES_EVIDENCE_DIR"] = str(evidence_dir)
+        # o behave é Python: sem isto, no Windows o stdout sai no encoding do
+        # console (cp1252) e a decodificação UTF-8 do pump vira mojibake
+        # ("Cenário" → "Cen�rio") — quebrava o terminal ao vivo E o parse de
+        # progresso (0076)
+        env["PYTHONIOENCODING"] = "utf-8"
         timeout = float(target.get("timeout_minutes") or DEFAULT_TIMEOUT_MINUTES) * 60
 
         proc = await asyncio.create_subprocess_exec(
@@ -189,10 +213,12 @@ class RunManager:
         async def pump() -> None:
             assert proc.stdout is not None
             while True:
-                line = await proc.stdout.readline()
-                if not line:
+                raw = await proc.stdout.readline()
+                if not raw:
                     break
-                run.emit(line.decode("utf-8", errors="replace").rstrip())
+                line = raw.decode("utf-8", errors="replace").rstrip()
+                run.emit(line)
+                self._live_line(run, line)  # progresso ao vivo (best-effort)
 
         timed_out = False
         try:
@@ -216,8 +242,52 @@ class RunManager:
             run.finish("done")
         shutil.rmtree(workdir, ignore_errors=True)
 
+    def _live_line(self, run: RunInfo, line: str) -> None:
+        """Progresso ao vivo por cenário concluído (0076, best-effort).
+
+        Parse do stream plain do behave (EN/PT): ao ver um cenário NOVO,
+        conclui o anterior e persiste o resultado parcial na execution —
+        o board (refresh) mostra os cards andando. Falha de parse nunca
+        derruba o runner; o JSON final SEMPRE reconcilia (_collect)."""
+        try:
+            m = _LIVE_SCENARIO_RE.match(line)
+            if m:
+                self._live_conclude(run)
+                run._live_scenario = m.group(1)
+                run._live_failed = False
+                return
+            sm = _LIVE_STEP_RE.match(line)
+            if sm and sm.group(1) in ("failed", "undefined"):
+                run._live_failed = True
+        except Exception:
+            pass  # live é acessório — nunca crasha o worker
+
+    def _live_conclude(self, run: RunInfo) -> None:
+        """Persiste o resultado parcial do cenário corrente (se mapeado)."""
+        name = run._live_scenario
+        run._live_scenario = None
+        if not name:
+            return
+        ct_id = run.live_map.get(name)
+        if not ct_id:
+            return
+        status = "failed" if run._live_failed else "passed"
+        try:
+            execution = exec_ops.load(self.ws, run.exec_id)
+            exec_ops.set_result_status(execution, ct_id, status, "behave")
+            path = exec_ops.save(self.ws, execution)
+            reindex_file(self.ws, self.conn, path)
+            run.emit(f"[arbites] parcial: {ct_id} {status}")
+        except Exception:
+            pass  # parcial falhou → o JSON final cobre
+
     def _collect(self, run: RunInfo, result_json: Path, evidence_dir: Path) -> None:
-        """Parseia o Cucumber JSON e move evidências dos hooks p/ a execution."""
+        """Parseia o Cucumber JSON e move evidências dos hooks p/ a execution.
+
+        Fonte OFICIAL do resultado — reconcilia incondicionalmente qualquer
+        parcial do progresso ao vivo (skill
+        progresso-ao-vivo-fonte-oficial-reconcilia)."""
+        self._live_conclude(run)  # fecha o último cenário do live, se houver
         try:
             execution = exec_ops.load(self.ws, run.exec_id)
         except exec_ops.ExecutionError:
@@ -225,7 +295,8 @@ class RunManager:
         if result_json.exists():
             try:
                 results = parse_behave_json(
-                    result_json.read_bytes(), self.ws.id_prefixes()["testcase"]
+                    result_json.read_bytes(), self.ws.id_prefixes()["testcase"],
+                    name_map=run.live_map,
                 )
             except BehaveJsonError as exc:
                 run.emit(f"[arbites] {exc}")

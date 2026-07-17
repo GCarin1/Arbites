@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Modal } from "./Modal";
+import { useToast } from "./Toast";
 
 const BASE = "/api/v1";
 
@@ -49,19 +51,29 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 export function Automation({
   onChanged,
   onError,
+  onNavigate,
 }: {
   onChanged: () => void;
   onError: (message: string) => void;
+  onNavigate?: (id: string) => void;
 }) {
+  // Abas (0065/0070): Histórico = observabilidade (primeira e default) ·
+  // Executar = operação · Configurar = setup (última). Sem auto-troca de
+  // aba — o empty state do Histórico orienta o primeiro uso.
+  const [tab, setTab] = useState<"configurar" | "executar" | "historico">("historico");
   const [targets, setTargets] = useState<Target[]>([]);
   const [selection, setSelection] = useState("");
   const [tags, setTags] = useState("");
-  const [feature, setFeature] = useState("");
+  // multi-seleção de .feature (0076): 1..N arquivos, inclusive de features
+  // diferentes, numa execution só
+  const [selFeatures, setSelFeatures] = useState<Set<string>>(new Set());
   const [features, setFeatures] = useState<TargetFeature[]>([]);
   const [knownTags, setKnownTags] = useState<string[]>([]);
   const [run, setRun] = useState<RunSnapshot | null>(null);
   const [log, setLog] = useState<string[]>([]);
+  const [startedExec, setStartedExec] = useState<string | null>(null); // modal pós-disparo
   const sourceRef = useRef<EventSource | null>(null);
+  const { toast } = useToast();
 
   const loadTargets = useCallback(() => {
     json<Target[]>(`${BASE}/targets`)
@@ -116,19 +128,28 @@ export function Automation({
           body: JSON.stringify({
             target: selection,
             tags: tagList,
-            feature: feature || null,
+            features: [...selFeatures],
           }),
         },
       );
       setRun(data.run);
       setLog([]);
+      setStartedExec(data.execution.id); // modal: "ver andamento" (0076)
       onChanged();
       sourceRef.current?.close();
       const source = new EventSource(`${BASE}/runs/${data.execution.id}/stream`);
       sourceRef.current = source;
       source.onmessage = (event) => setLog((old) => [...old, event.data]);
       source.addEventListener("done", (event) => {
-        setRun((old) => (old ? { ...old, status: (event as MessageEvent).data } : old));
+        const status = (event as MessageEvent).data as string;
+        setRun((old) => (old ? { ...old, status } : old));
+        // indicador de sucesso/erro ao terminar (0076)
+        toast(
+          status === "done"
+            ? `Run ${data.execution.id} concluído`
+            : `Run ${data.execution.id}: ${status}`,
+          status === "done" ? "success" : "error",
+        );
         source.close();
         onChanged();
         loadTargets();
@@ -151,22 +172,71 @@ export function Automation({
     }
   }
 
-  const selectedFeature = feature ? features.find((f) => f.path === feature) : undefined;
-
   return (
     <div>
       <div className="page-head">
         <h1 className="page-title">Automação</h1>
+        <span className="spacer" />
+        <div className="tab-bar" role="tablist">
+          {(
+            [
+              ["historico", "Histórico"],
+              ["executar", "Executar"],
+              ["configurar", "Configurar"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              className={`tab-btn ${tab === key ? "active" : ""}`}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <TargetsCard targets={targets} onScan={scan} onSaved={loadTargets} onError={onError} />
+      {tab === "configurar" && (
+        <>
+          <TargetsCard targets={targets} onScan={scan} onSaved={loadTargets} onError={onError} />
+          {selection && <EnvCard target={selection} onError={onError} />}
+          <CIPanel targets={targets} onChanged={onChanged} onError={onError} mode="setup" />
+        </>
+      )}
 
-      <div className="card" style={{ marginBottom: 24 }}>
+      {tab === "historico" && (
+        <HistoryCard
+          hasTargets={targets.length > 0}
+          onGoRun={() => setTab("executar")}
+          onGoSetup={() => setTab("configurar")}
+        />
+      )}
+
+      {tab === "executar" && targets.length === 0 && (
+        <div className="empty-state block">
+          <div className="empty-title">Nenhum target configurado</div>
+          <div className="empty-body">
+            Antes de executar, cadastre um target (nome + caminho local do
+            repositório de automação) na aba Configurar.
+          </div>
+          <button className="primary" onClick={() => setTab("configurar")}>
+            Ir para Configurar
+          </button>
+        </div>
+      )}
+
+      {tab === "executar" && targets.length > 0 && (
+      <>
+      <div className="card block">
         <div className="card-head">
           <h3>Novo run local (Behave)</h3>
           <span className="spacer" />
           <span className="caption mono">
-            behave {feature || "./features"} {tags.trim() ? `--tags=${tags}` : ""}
+            behave{" "}
+            {selFeatures.size > 0 ? [...selFeatures].join(" ") : "./features"}{" "}
+            {tags.trim() ? `--tags=${tags}` : ""}
           </span>
         </div>
         <div className="field-grid">
@@ -181,21 +251,41 @@ export function Automation({
             </select>
           </div>
           <div className="field col-6">
-            <label>Arquivo .feature (vazio = todos)</label>
-            <select value={feature} onChange={(e) => setFeature(e.target.value)}>
-              <option value="">(todos os features)</option>
-              {features.map((f) => (
-                <option key={f.path} value={f.path}>
-                  {f.path} ({f.mapped < f.scenarios ? `${f.mapped}/${f.scenarios} mapeados` : f.scenarios})
-                </option>
-              ))}
-            </select>
-            {selectedFeature && selectedFeature.mapped === 0 && (
+            <label>Arquivos .feature (1..N, inclusive de features diferentes)</label>
+            <div className="feature-picker">
+              {features.length === 0 ? (
+                <span className="caption muted">nenhum .feature no target</span>
+              ) : (
+                features.map((f) => (
+                  <label key={f.path} className="feature-pick caption">
+                    <input
+                      type="checkbox"
+                      checked={selFeatures.has(f.path)}
+                      onChange={() =>
+                        setSelFeatures((old) => {
+                          const next = new Set(old);
+                          if (next.has(f.path)) next.delete(f.path);
+                          else next.add(f.path);
+                          return next;
+                        })
+                      }
+                    />
+                    <span className="mono">{f.path}</span>
+                    <span className="muted">
+                      ({f.mapped}/{f.scenarios} lastreados)
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+            {[...selFeatures].some(
+              (p) => features.find((f) => f.path === p)?.mapped === 0,
+            ) && (
               <p className="caption muted" style={{ marginTop: 4 }}>
-                Nenhum cenário deste arquivo está vinculado a um caso de
-                teste (tag de CT no cenário). O Behave roda o arquivo
-                inteiro normalmente, mas os resultados não aparecerão
-                vinculados a um CT — tague os cenários para rastreabilidade.
+                Arquivo(s) selecionado(s) sem cenários lastreados — o Behave
+                roda normalmente, mas os resultados não aparecerão vinculados
+                a CTs. Use "Sincronizar .feature" (aba Configurar) para
+                lastrear.
               </p>
             )}
           </div>
@@ -218,7 +308,7 @@ export function Automation({
           <button
             className="primary"
             onClick={() => void startRun()}
-            disabled={!selection || (!feature && !tags.trim())}
+            disabled={!selection || (selFeatures.size === 0 && !tags.trim())}
           >
             Rodar
           </button>
@@ -245,10 +335,222 @@ export function Automation({
       </div>
 
       {selection && <ArtifactsCard target={selection} refreshKey={run?.status ?? ""} />}
-      {selection && <EnvCard target={selection} onError={onError} />}
 
-      <CIPanel targets={targets} onChanged={onChanged} onError={onError} />
+      <CIPanel targets={targets} onChanged={onChanged} onError={onError} mode="run" />
+      </>
+      )}
+
+      {startedExec && (
+        <Modal
+          title="Execução criada"
+          onClose={() => setStartedExec(null)}
+          footer={
+            <>
+              <button onClick={() => setStartedExec(null)}>
+                Acompanhar pelo terminal
+              </button>
+              {onNavigate && (
+                <button
+                  className="primary"
+                  onClick={() => {
+                    const id = startedExec;
+                    setStartedExec(null);
+                    onNavigate(id);
+                  }}
+                >
+                  Ver andamento em {startedExec}
+                </button>
+              )}
+            </>
+          }
+        >
+          <p className="modal-text">
+            O test execution <span className="mono">{startedExec}</span> foi
+            criado com os casos de teste lastreados dos arquivos selecionados.
+            Os cards atualizam conforme os cenários são executados; o
+            resultado final é consolidado ao término do run.
+          </p>
+        </Modal>
+      )}
     </div>
+  );
+}
+
+/**
+ * Histórico (0065): runs de automação recentes (local + CI) com status e
+ * resumo por repositório (runs, falhas, MTTR, última execução) — os dados
+ * vêm de `GET /executions?origin=` e `GET /metrics/automation` (mesma fonte
+ * do Dashboard, com o name_pattern configurado aplicado no servidor).
+ */
+function HistoryCard({
+  hasTargets,
+  onGoRun,
+  onGoSetup,
+}: {
+  hasTargets: boolean;
+  onGoRun: () => void;
+  onGoSetup: () => void;
+}) {
+  const [runs, setRuns] = useState<
+    { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]
+  >([]);
+  const [summary, setSummary] = useState<{
+    total_runs: number;
+    failed_runs: number;
+    pass_rate: number | null;
+    by_repo: { repo: string; runs: number; failed: number; mttr_hours: number | null; last_run_at: string | null }[];
+  } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+        `${BASE}/executions?origin=local_run`,
+      ),
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+        `${BASE}/executions?origin=github_actions`,
+      ),
+      json<{
+        total_runs: number;
+        failed_runs: number;
+        pass_rate: number | null;
+        by_repo: { repo: string; runs: number; failed: number; mttr_hours: number | null; last_run_at: string | null }[];
+      }>(`${BASE}/metrics/automation?days=30`),
+    ])
+      .then(([local, ci, report]) => {
+        if (!alive) return;
+        const merged = [...local, ...ci].sort((a, b) =>
+          b.created_at.localeCompare(a.created_at),
+        );
+        setRuns(merged.slice(0, 15));
+        setSummary(report);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function outcomeOf(counts: Record<string, number>): { label: string; dot: string } {
+    if ((counts["failed"] ?? 0) > 0) return { label: "failed", dot: "dot-col-failed" };
+    if ((counts["blocked"] ?? 0) > 0) return { label: "blocked", dot: "dot-col-blocked" };
+    if ((counts["passed"] ?? 0) > 0) return { label: "passed", dot: "dot-col-passed" };
+    return { label: "sem resultados", dot: "dot-col-pending" };
+  }
+
+  function when(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <p className="caption muted">
+        <span className="spinner" /> carregando histórico…
+      </p>
+    );
+  }
+
+  if (runs.length === 0) {
+    return (
+      <div className="empty-state block">
+        <div className="empty-title">Nenhum run de automação ainda</div>
+        <div className="empty-body">
+          {hasTargets
+            ? "Dispare o primeiro run (local ou GitHub Actions) na aba Executar — cada execução aparece aqui com status e duração."
+            : "Comece cadastrando um target (nome + caminho local do repositório de automação) na aba Configurar; depois dispare runs na aba Executar."}
+        </div>
+        <button className="primary" onClick={hasTargets ? onGoRun : onGoSetup}>
+          {hasTargets ? "Ir para Executar" : "Ir para Configurar"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {summary && summary.total_runs > 0 && (
+        <div className="card block">
+          <div className="card-head">
+            <h3>Resumo (30 dias)</h3>
+            <span className="spacer" />
+            <span className="caption muted">
+              {summary.total_runs} runs · {summary.failed_runs} falha
+              {summary.failed_runs === 1 ? "" : "s"} · pass rate{" "}
+              {summary.pass_rate === null ? "—" : `${Math.round(summary.pass_rate * 100)}%`}
+            </span>
+          </div>
+          {summary.by_repo.length > 0 && (
+            <div className="table-wrap">
+              <table className="dense">
+                <thead>
+                  <tr>
+                    <th>Repositório</th>
+                    <th>Runs</th>
+                    <th>Falhas</th>
+                    <th>Tempo médio p/ verde</th>
+                    <th>Última execução</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.by_repo.map((r) => (
+                    <tr key={r.repo}>
+                      <td className="mono">{r.repo}</td>
+                      <td>{r.runs}</td>
+                      <td>{r.failed}</td>
+                      <td>{r.mttr_hours === null ? "—" : `${r.mttr_hours}h`}</td>
+                      <td className="caption muted">
+                        {r.last_run_at ? when(r.last_run_at) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="card block">
+        <div className="card-head">
+          <h3>Runs recentes</h3>
+        </div>
+        <div className="table-wrap">
+          <table className="dense">
+            <thead>
+              <tr>
+                <th>Execução</th>
+                <th>Nome</th>
+                <th>Origem</th>
+                <th>Status</th>
+                <th>Quando</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r) => {
+                const o = outcomeOf(r.result_counts);
+                return (
+                  <tr key={r.id}>
+                    <td className="mono">{r.id}</td>
+                    <td>{r.name}</td>
+                    <td className="caption muted">{r.origin}</td>
+                    <td>
+                      <span className={`status-dot ${o.dot} caption`}>{o.label}</span>
+                    </td>
+                    <td className="caption muted">{when(r.created_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -313,6 +615,7 @@ function TargetsCard({
   const [browsing, setBrowsing] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [found, setFound] = useState<FoundFeature[] | null>(null);
+  const [syncing, setSyncing] = useState<string | null>(null); // target da sync (0075)
 
   useEffect(() => {
     setStaged(targets);
@@ -414,7 +717,7 @@ function TargetsCard({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Targets</h3>
         <span className="spacer" />
@@ -443,6 +746,9 @@ function TargetsCard({
                   <td>{target.scenarios}</td>
                   <td>{target.queue_length}</td>
                   <td className="repo-actions">
+                    <button className="btn-sm" onClick={() => setSyncing(target.name)}>
+                      Sincronizar .feature
+                    </button>
                     <button className="btn-sm" onClick={() => void onScan(target.name)}>
                       Re-scan
                     </button>
@@ -596,7 +902,247 @@ function TargetsCard({
           {saving ? "Salvando…" : "Salvar configuração"}
         </button>
       </div>
+      {syncing && (
+        <FeatureSyncModal
+          target={syncing}
+          onClose={() => setSyncing(null)}
+          onChanged={onSaved}
+          onError={onError}
+        />
+      )}
     </div>
+  );
+}
+
+// ------------------------------------- sync .feature ↔ CT por nome (0075)
+
+interface SyncScenario {
+  name: string;
+  line: number;
+  status: "linked_tag" | "linked" | "modified" | "new";
+  ct_id: string | null;
+  steps: string[];
+}
+
+interface SyncStatus {
+  target: string;
+  features: { path: string; feature_name: string; scenarios: SyncScenario[] }[];
+  broken: { ct_id: string; feature_path: string; scenario_name: string }[];
+  error: string | null;
+}
+
+const SYNC_DOT: Record<string, string> = {
+  linked_tag: "dot-col-passed",
+  linked: "dot-col-passed",
+  modified: "dot-col-blocked",
+  new: "dot-col-in_progress",
+};
+
+const SYNC_LABEL: Record<string, string> = {
+  linked_tag: "vinculado por tag",
+  linked: "vinculado",
+  modified: "steps modificados",
+  new: "novo",
+};
+
+/**
+ * Modal de sincronização .feature ↔ CT (0075): o usuário escolhe quais
+ * cenários vincular (cria CT com steps verbatim), quais atualizar (steps
+ * divergiram) e como re-vincular os quebrados (rename) — nada é decidido
+ * automaticamente, e o repositório de automação NUNCA é escrito.
+ */
+function FeatureSyncModal({
+  target,
+  onClose,
+  onChanged,
+  onError,
+}: {
+  target: string;
+  onClose: () => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}) {
+  const [data, setData] = useState<SyncStatus | null>(null);
+  const [selCreate, setSelCreate] = useState<Set<string>>(new Set()); // "path|name"
+  const [selUpdate, setSelUpdate] = useState<Set<string>>(new Set()); // ct_id
+  const [relinkTo, setRelinkTo] = useState<Record<string, string>>({}); // ct_id → "path|name"
+  const [applying, setApplying] = useState(false);
+  const { toast } = useToast();
+
+  const load = useCallback(() => {
+    json<SyncStatus>(
+      `${BASE}/automation/features-sync?target=${encodeURIComponent(target)}`,
+    )
+      .then((d) => {
+        setData(d);
+        setSelCreate(new Set());
+        setSelUpdate(new Set());
+        setRelinkTo({});
+      })
+      .catch((e) => onError(e instanceof Error ? e.message : String(e)));
+  }, [target, onError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const key = (path: string, name: string) => `${path}|${name}`;
+
+  function toggle(set: Set<string>, v: string): Set<string> {
+    const next = new Set(set);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    return next;
+  }
+
+  const newScenarios = (data?.features ?? []).flatMap((f) =>
+    f.scenarios.filter((s) => s.status === "new").map((s) => ({ f, s })),
+  );
+
+  async function apply() {
+    if (!data) return;
+    setApplying(true);
+    try {
+      const create = [...selCreate].map((k) => {
+        const [feature_path, scenario_name] = k.split("|");
+        return { feature_path, scenario_name };
+      });
+      const relink = Object.entries(relinkTo)
+        .filter(([, v]) => v)
+        .map(([ct_id, v]) => {
+          const [feature_path, scenario_name] = v.split("|");
+          return { ct_id, feature_path, scenario_name };
+        });
+      const result = await json<{ created: string[]; updated: string[]; relinked: string[] }>(
+        `${BASE}/automation/features-sync/apply`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            target,
+            create,
+            update: [...selUpdate],
+            relink,
+          }),
+        },
+      );
+      toast(
+        `Sync aplicada: ${result.created.length} criado(s), ` +
+          `${result.updated.length} atualizado(s), ${result.relinked.length} re-vinculado(s)`,
+      );
+      onChanged();
+      load();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  const nothingSelected =
+    selCreate.size === 0 &&
+    selUpdate.size === 0 &&
+    !Object.values(relinkTo).some(Boolean);
+
+  return (
+    <Modal
+      title={`Sincronizar .feature — ${target}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} disabled={applying}>
+            Fechar
+          </button>
+          <button
+            className="primary"
+            onClick={() => void apply()}
+            disabled={applying || nothingSelected}
+          >
+            {applying ? "Aplicando…" : "Aplicar seleção"}
+          </button>
+        </>
+      }
+    >
+      {!data ? (
+        <p className="caption muted">
+          <span className="spinner" /> comparando .feature com os casos de teste…
+        </p>
+      ) : data.error ? (
+        <p className="field-error">{data.error}</p>
+      ) : (
+        <>
+          <p className="modal-text muted">
+            Cenários sem vínculo podem virar casos de teste (steps copiados
+            verbatim); steps modificados podem ser re-baseados; vínculos
+            quebrados (cenário renomeado/removido) podem ser re-apontados. O
+            repositório de automação nunca é alterado.
+          </p>
+
+          {data.broken.length > 0 && (
+            <>
+              <h4 className="section-title">Vínculos quebrados ({data.broken.length})</h4>
+              {data.broken.map((b) => (
+                <div key={b.ct_id} className="step-row">
+                  <span className="status-dot dot-col-failed caption">
+                    {b.ct_id} → "{b.scenario_name}" não existe mais
+                  </span>
+                  <select
+                    value={relinkTo[b.ct_id] ?? ""}
+                    onChange={(e) =>
+                      setRelinkTo((old) => ({ ...old, [b.ct_id]: e.target.value }))
+                    }
+                  >
+                    <option value="">(não re-vincular)</option>
+                    {newScenarios.map(({ f, s }) => (
+                      <option key={key(f.path, s.name)} value={key(f.path, s.name)}>
+                        {s.name} — {f.path}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </>
+          )}
+
+          {data.features.map((f) => (
+            <div key={f.path} style={{ marginTop: 12 }}>
+              <h4 className="section-title mono">{f.path}</h4>
+              {f.scenarios.map((s) => (
+                <div key={`${f.path}-${s.line}`} className="step-row">
+                  {s.status === "new" ? (
+                    <label className="caption" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={selCreate.has(key(f.path, s.name))}
+                        onChange={() =>
+                          setSelCreate((old) => toggle(old, key(f.path, s.name)))
+                        }
+                      />
+                      criar CT
+                    </label>
+                  ) : s.status === "modified" && s.ct_id ? (
+                    <label className="caption" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={selUpdate.has(s.ct_id)}
+                        onChange={() => setSelUpdate((old) => toggle(old, s.ct_id!))}
+                      />
+                      atualizar CT
+                    </label>
+                  ) : (
+                    <span style={{ width: 74 }} />
+                  )}
+                  <span className="exec-item-msg">{s.name}</span>
+                  {s.ct_id && <span className="mono caption muted">{s.ct_id}</span>}
+                  <span className={`status-dot ${SYNC_DOT[s.status]} caption`}>
+                    {SYNC_LABEL[s.status]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -604,10 +1150,13 @@ function CIPanel({
   targets,
   onChanged,
   onError,
+  mode,
 }: {
   targets: Target[];
   onChanged: () => void;
   onError: (message: string) => void;
+  // setup = só o token (aba Configurar) · run = só o disparo (aba Executar)
+  mode: "setup" | "run";
 }) {
   const [tokenConfigured, setTokenConfigured] = useState<boolean | null>(null);
   const [tokenInput, setTokenInput] = useState("");
@@ -711,6 +1260,36 @@ function CIPanel({
         ? "dot-col-in_progress"
         : "dot-col-pending";
 
+  if (mode === "setup") {
+    return (
+      <div className="card block">
+        <div className="card-head">
+          <h3>GitHub Actions — token</h3>
+          <span className="spacer" />
+          <span className={`status-dot ${tokenConfigured ? "dot-col-passed" : "dot-col-pending"}`}>
+            {tokenConfigured === null
+              ? "status desconhecido"
+              : tokenConfigured
+                ? "PAT configurado"
+                : "PAT não configurado"}
+          </span>
+        </div>
+        <div className="step-row">
+          <input
+            type="password"
+            placeholder="PAT fine-grained (actions: read+write no repo)"
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+          />
+          <button onClick={() => void saveToken()} disabled={!tokenInput}>
+            Salvar no keyring
+          </button>
+        </div>
+        <p className="caption muted">Guardado no keyring do sistema, nunca em arquivo.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <div className="card-head">
@@ -725,20 +1304,13 @@ function CIPanel({
         </span>
       </div>
 
-      <h4 className="section-title" style={{ marginTop: 0 }}>Token (keyring do sistema)</h4>
-      <div className="step-row">
-        <input
-          type="password"
-          placeholder="PAT fine-grained (actions: read+write no repo)"
-          value={tokenInput}
-          onChange={(e) => setTokenInput(e.target.value)}
-        />
-        <button onClick={() => void saveToken()} disabled={!tokenInput}>
-          Salvar no keyring
-        </button>
-      </div>
+      {tokenConfigured === false && (
+        <p className="caption muted">
+          Configure o token do GitHub na aba Configurar antes de disparar.
+        </p>
+      )}
 
-      <h4 className="section-title">Disparar workflow</h4>
+      <h4 className="section-title" style={{ marginTop: 0 }}>Disparar workflow</h4>
       <div className="field-grid">
         <div className="field col-3">
           <label>Target</label>
@@ -870,7 +1442,7 @@ function ArtifactsCard({ target, refreshKey }: { target: string; refreshKey: str
   const total = Object.values(artifacts).reduce((a, files) => a + files.length, 0);
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Artefatos pós-execução</h3>
         <span className="spacer" />
@@ -957,7 +1529,7 @@ function EnvCard({ target, onError }: { target: string; onError: (m: string) => 
   const dirtyCount = Object.keys(dirty).length;
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className="card block">
       <div className="card-head">
         <h3>Configuração local (.env)</h3>
         <span className="spacer" />

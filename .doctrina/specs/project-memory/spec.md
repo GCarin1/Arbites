@@ -5,7 +5,7 @@
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Memória Histórica do Projeto e para a IA), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-12
-**Version:** 0.1.1
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -40,6 +40,12 @@ conforme o projeto cresce, não presa a um contexto fixo.
   lições aprendidas do projeto — além (não em substituição) da injeção de
   lições por similaridade textual já existente
   (`ai.find_relevant_lessons`).
+
+- The system shall incluir na timeline os tipos `testcase` (criação de caso
+  de teste, de `testcases.created`) e `result` (mudança de resultado em
+  execution, de `result_events` — "CT-X passou/falhou em EXEC-Y"), ambos
+  filtráveis; `result` é verboso por natureza e fica FORA do default (sem
+  `kinds` explícito) — opt-in na UI.
 
 ### Event-driven
 
@@ -96,6 +102,10 @@ conforme o projeto cresce, não presa a um contexto fixo.
 7. [verified] Falha ao gravar o log de agente não perde a resposta que a IA
    já gerou (a rota devolve 200 com o conteúdo; a falha vira warning) —
    verified by `backend/tests/test_project_memory.py`.
+
+8. [verified] Criar um CT gera evento `testcase` (default); transições de
+   resultado só aparecem com `kinds=result` (opt-in) — verified by
+   `backend/tests/test_project_memory.py`.
 
 ## Maturity
 

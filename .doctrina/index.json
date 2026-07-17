@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.12.0",
-  "last_updated": "2026-07-13",
+  "last_updated": "2026-07-17",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,7 +15,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "last_updated": "2026-07-11",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -26,7 +26,7 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.1.1",
+        "version": "0.1.2",
         "last_updated": "2026-07-12",
         "implementation": "verified"
       },
@@ -75,7 +75,7 @@
         "id": "decisions",
         "path": ".doctrina/specs/decisions/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "last_updated": "2026-07-11",
         "implementation": "verified — M14 (backend/arbites/indexer.py, backend/arbites/api.py, frontend/src/components/Decisions.tsx)"
       },
@@ -93,16 +93,16 @@
       {
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
-        "status": "draft",
-        "version": "0.1.0",
-        "last_updated": "2026-07-13",
-        "implementation": "planned — north-star escrito; detalhe e prova chegam pelas changes 0060 (fundação), 0061 (estados & feedback) e 0062 (orientação & navegação). Draft até a fundação (0060) landar."
+        "status": "active",
+        "version": "0.4.0",
+        "last_updated": "2026-07-16",
+        "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -125,7 +125,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.4.0",
+        "version": "0.7.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
@@ -158,7 +158,7 @@
         "id": "project-memory",
         "path": ".doctrina/specs/project-memory/spec.md",
         "status": "active",
-        "version": "0.1.1",
+        "version": "0.2.0",
         "last_updated": "2026-07-12",
         "implementation": "verified"
       },
@@ -166,7 +166,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.10.1",
+        "version": "0.11.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -177,7 +177,7 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-09",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
@@ -207,7 +207,7 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.5.0",
+        "version": "0.7.0",
         "last_updated": "2026-07-10",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
@@ -330,64 +330,7 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [
-      {
-        "id": "0060-design-system-fundacao-gramatica-visual-unica",
-        "title": "Design system - fundacao: gramatica visual unica. Botao primario (cor/altura/raio fixos) e secundario padronizados; input com altura e comportamento unicos; card com padding e borda unicos; badge com linguagem de status unica. Hierarquia visual: titulos mais fortes, subtitulos mais leves, cards principais maiores e secundarios menores, mais espaco entre blocos, menos bordas repetidas. Uma unica acao de destaque (CTA dominante) por bloco; acoes secundarias discretas.",
-        "path": ".doctrina/changes/0060-design-system-fundacao-gramatica-visual-unica",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0061-design-system-estados-e-feedback-tornar-visiveis",
-        "title": "Design system - estados e feedback: tornar visiveis e consistentes os estados salvo/carregando/falhou/vazio/alterado-nao-salvo (dirty) em toda a app. Empty states com instrucao util. Reduzir textos longos: ajuda curta e contextual (uma linha de apoio, link ver-exemplo, tooltip no ponto certo) onde a interface ja e autoexplicativa.",
-        "path": ".doctrina/changes/0061-design-system-estados-e-feedback-tornar-visiveis",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0062-design-system-orientacao-e-navegacao-assistida",
-        "title": "Design system - orientacao e navegacao assistida: breadcrumbs em areas profundas, header de contexto fixo com rota atual destacada, area de detalhes fixa para item selecionado. Busca global e comandos rapidos (palette), links de acao dentro dos cards. Em telas grandes: limitar largura util, paineis laterais colapsaveis, controlar ritmo vertical.",
-        "path": ".doctrina/changes/0062-design-system-orientacao-e-navegacao-assistida",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0063-dashboard-executivo-transformar-a-dashboard-de",
-        "title": "Dashboard executivo: transformar a dashboard de vitrine de metrica em painel de decisao. Tendencia com variacao vs periodo anterior; alertas de risco; bloco ultima-atualizacao-dos-dados; secao top-problemas; secao acoes-recomendadas. Responder: estamos entregando bem? onde esta o risco? o que piorou? qual area esta mais instavel? o que mudou nos ultimos 7/30 dias?",
-        "path": ".doctrina/changes/0063-dashboard-executivo-transformar-a-dashboard-de",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0064-test-cases-como-produto-de-rastreabilidade-nao",
-        "title": "Test cases como produto de rastreabilidade (nao explorer de arquivos): busca fixa no topo; filtros por status, tag, prioridade, automacao e requisito; contagem visivel por pasta; badges de status mais claros; painel lateral de detalhes ao clicar num CT; acoes rapidas sem abrir a tela inteira.",
-        "path": ".doctrina/changes/0064-test-cases-como-produto-de-rastreabilidade-nao",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0065-tela-de-automacao-como-centro-operacional-nao",
-        "title": "Tela de Automacao como centro operacional (nao formulario de config): separar em abas Configurar/Executar/Historico. Mostrar ultimos runs com status, tempo medio, falhas e ultima execucao. Deixar claro o que e setup e o que e operacao. Empty state melhor com instrucao util.",
-        "path": ".doctrina/changes/0065-tela-de-automacao-como-centro-operacional-nao",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0066-area-de-ia-como-workspace-de-assistente-nao",
-        "title": "Area de IA como workspace de assistente (nao cadastro de provider): visao Assistente com exemplos de uso, historico de interacoes, contexto atual ativo, geracao de test cases e revisao do que a IA propos antes de salvar. O usuario deve sentir uma IA que trabalha, nao um formulario de configuracao.",
-        "path": ".doctrina/changes/0066-area-de-ia-como-workspace-de-assistente-nao",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      },
-      {
-        "id": "0067-fix-automacao-target-salvo-com-feature",
-        "title": "fix automacao: target salvo com .feature encontrados no browse, mas o dropdown de features fica vazio e o run devolve 422 empty_selection quando os cenarios do repositorio NAO tem tags @CT-XXXX. Causa: o preview (browse-features) lista do disco via glob, mas o dropdown pos-save (GET /targets/name/features) e a resolucao do run leem da tabela scenarios, que o scan_target so popula com cenarios tagueados @CT-\\d+ — duas fontes divergentes para a mesma lista. Corrigir: dropdown deve listar as features reais do glob mesmo sem tags; rodar um .feature inteiro deve funcionar sem CTs mapeados (execution sem vinculo ou com resultado nao-mapeado explicito); quando nao ha cenarios tagueados, a UI explica o porque em vez de mostrar vazio. Bug irmao: prefixo CT hardcoded na regex _CT_TAG_RE apesar de id_prefixes.testcase ser configuravel.",
-        "path": ".doctrina/changes/0067-fix-automacao-target-salvo-com-feature",
-        "status": "proposed",
-        "opened": "2026-07-13"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1125,6 +1068,235 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0060-design-system-fundacao-gramatica-visual-unica",
+        "title": "Design system - fundacao: gramatica visual unica. Botao primario (cor/altura/raio fixos) e secundario padronizados; input com altura e comportamento unicos; card com padding e borda unicos; badge com linguagem de status unica. Hierarquia visual: titulos mais fortes, subtitulos mais leves, cards principais maiores e secundarios menores, mais espaco entre blocos, menos bordas repetidas. Uma unica acao de destaque (CTA dominante) por bloco; acoes secundarias discretas.",
+        "path": ".doctrina/changes/archive/2026-07-16-0060-design-system-fundacao-gramatica-visual-unica",
+        "status": "applied",
+        "applied": "2026-07-16",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0061-design-system-estados-e-feedback-tornar-visiveis",
+        "title": "Design system - estados e feedback: tornar visiveis e consistentes os estados salvo/carregando/falhou/vazio/alterado-nao-salvo (dirty) em toda a app. Empty states com instrucao util. Reduzir textos longos: ajuda curta e contextual (uma linha de apoio, link ver-exemplo, tooltip no ponto certo) onde a interface ja e autoexplicativa.",
+        "path": ".doctrina/changes/archive/2026-07-16-0061-design-system-estados-e-feedback-tornar-visiveis",
+        "status": "applied",
+        "applied": "2026-07-16",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0062-design-system-orientacao-e-navegacao-assistida",
+        "title": "Design system - orientacao e navegacao assistida: breadcrumbs em areas profundas, header de contexto fixo com rota atual destacada, area de detalhes fixa para item selecionado. Busca global e comandos rapidos (palette), links de acao dentro dos cards. Em telas grandes: limitar largura util, paineis laterais colapsaveis, controlar ritmo vertical.",
+        "path": ".doctrina/changes/archive/2026-07-16-0062-design-system-orientacao-e-navegacao-assistida",
+        "status": "applied",
+        "applied": "2026-07-16",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0067-fix-automacao-target-salvo-com-feature",
+        "title": "fix automacao: target salvo com .feature encontrados no browse, mas o dropdown de features fica vazio e o run devolve 422 empty_selection quando os cenarios do repositorio NAO tem tags @CT-XXXX. Causa: o preview (browse-features) lista do disco via glob, mas o dropdown pos-save (GET /targets/name/features) e a resolucao do run leem da tabela scenarios, que o scan_target so popula com cenarios tagueados @CT-\\d+ — duas fontes divergentes para a mesma lista. Corrigir: dropdown deve listar as features reais do glob mesmo sem tags; rodar um .feature inteiro deve funcionar sem CTs mapeados (execution sem vinculo ou com resultado nao-mapeado explicito); quando nao ha cenarios tagueados, a UI explica o porque em vez de mostrar vazio. Bug irmao: prefixo CT hardcoded na regex _CT_TAG_RE apesar de id_prefixes.testcase ser configuravel.",
+        "path": ".doctrina/changes/archive/2026-07-16-0067-fix-automacao-target-salvo-com-feature",
+        "status": "applied",
+        "applied": "2026-07-16",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0063-dashboard-executivo-transformar-a-dashboard-de",
+        "title": "Dashboard executivo: transformar a dashboard de vitrine de metrica em painel de decisao. Tendencia com variacao vs periodo anterior; alertas de risco; bloco ultima-atualizacao-dos-dados; secao top-problemas; secao acoes-recomendadas. Responder: estamos entregando bem? onde esta o risco? o que piorou? qual area esta mais instavel? o que mudou nos ultimos 7/30 dias?",
+        "path": ".doctrina/changes/archive/2026-07-17-0063-dashboard-executivo-transformar-a-dashboard-de",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0064-test-cases-como-produto-de-rastreabilidade-nao",
+        "title": "Test cases como produto de rastreabilidade (nao explorer de arquivos): busca fixa no topo; filtros por status, tag, prioridade, automacao e requisito; contagem visivel por pasta; badges de status mais claros; painel lateral de detalhes ao clicar num CT; acoes rapidas sem abrir a tela inteira.",
+        "path": ".doctrina/changes/archive/2026-07-17-0064-test-cases-como-produto-de-rastreabilidade-nao",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0065-tela-de-automacao-como-centro-operacional-nao",
+        "title": "Tela de Automacao como centro operacional (nao formulario de config): separar em abas Configurar/Executar/Historico. Mostrar ultimos runs com status, tempo medio, falhas e ultima execucao. Deixar claro o que e setup e o que e operacao. Empty state melhor com instrucao util.",
+        "path": ".doctrina/changes/archive/2026-07-17-0065-tela-de-automacao-como-centro-operacional-nao",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0066-area-de-ia-como-workspace-de-assistente-nao",
+        "title": "Area de IA como workspace de assistente (nao cadastro de provider): visao Assistente com exemplos de uso, historico de interacoes, contexto atual ativo, geracao de test cases e revisao do que a IA propos antes de salvar. O usuario deve sentir uma IA que trabalha, nao um formulario de configuracao.",
+        "path": ".doctrina/changes/archive/2026-07-17-0066-area-de-ia-como-workspace-de-assistente-nao",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0068-cobertura-de-requisito-visivel-na-aba-requisitos",
+        "title": "Cobertura de requisito visivel na aba Requisitos: cada story mostra se esta coberta (>=1 CT vinculado) ou nao, com contagem de CTs; filtro sem-cobertura; o dado ja existe na matriz do Dashboard, falta na tela de Requisitos",
+        "path": ".doctrina/changes/archive/2026-07-17-0068-cobertura-de-requisito-visivel-na-aba-requisitos",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0069-deletar-test-execution-pela-ui-delete-executions",
+        "title": "Deletar test execution pela UI: DELETE /executions/{id} move a pasta para a lixeira e reindexa; botao Excluir com ConfirmModal no repositorio de execucoes; execution com run ativo nao pode ser deletada",
+        "path": ".doctrina/changes/archive/2026-07-17-0069-deletar-test-execution-pela-ui-delete-executions",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0070-automacao-reordenar-abas-para-historico-primeira",
+        "title": "Automacao: reordenar abas para Historico (primeira e default) depois Executar e Configurar por ultimo; primeiro uso sem target orienta para Configurar via empty state",
+        "path": ".doctrina/changes/archive/2026-07-17-0070-automacao-reordenar-abas-para-historico-primeira",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0071-clareza-da-aba-auditoria-subtitle-e-texto-de",
+        "title": "Clareza da aba Auditoria: subtitle e texto de proposito (o que o auditor consolida e quando roda), legenda de severidades, empty state instrutivo; seguir o design system",
+        "path": ".doctrina/changes/archive/2026-07-17-0071-clareza-da-aba-auditoria-subtitle-e-texto-de",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0072-clareza-da-aba-decisoes-subtitle-e-texto-curto",
+        "title": "Clareza da aba Decisoes: subtitle e texto curto de proposito (registro do porque das decisoes do projeto sob teste), empty state com exemplo; seguir o design system",
+        "path": ".doctrina/changes/archive/2026-07-17-0072-clareza-da-aba-decisoes-subtitle-e-texto-curto",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "decisions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0073-memoria-do-projeto-timeline-passa-a-incluir",
+        "title": "Memoria do Projeto: timeline passa a incluir criacao de caso de teste (testcases.created) e mudancas de resultado dentro de executions (result_events: CT passou/falhou/bloqueado em EXEC-X) como novos tipos filtraveis; derivado do indice existente, sem persistencia nova",
+        "path": ".doctrina/changes/archive/2026-07-17-0073-memoria-do-projeto-timeline-passa-a-incluir",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "project-memory",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0074-historico-de-resultados-por-ct-endpoint-que",
+        "title": "Historico de resultados por CT: endpoint que lista os resultados passados de um caso de teste (execution, status, data, duracao) derivado da tabela results; exibido no painel lateral do repositorio e no editor do CT para responder se ja passou no passado; status-dot do design system",
+        "path": ".doctrina/changes/archive/2026-07-17-0074-historico-de-resultados-por-ct-endpoint-que",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0075-lastreamento-feature-ct-por-nome-de-cenario",
+        "title": "Lastreamento .feature-CT por nome de cenario: modal ao buscar .feature lista features e cenarios e o usuario escolhe quais vincular ao Arbites (cria CT automated com automation.feature_path e scenario_name; repositorio de automacao segue read-only, ADR 0003 preservado); sync re-executavel detecta features novos, cenarios novos em features ja vinculados, steps modificados (diff contra o body do CT) e cenarios renomeados ou sumidos (vinculo quebrado), e o modal permite escolher o que criar, atualizar ou re-vincular",
+        "path": ".doctrina/changes/archive/2026-07-17-0075-lastreamento-feature-ct-por-nome-de-cenario",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0076-execucao-rastreada-ao-vivo-rodar-1-n-feature",
+        "title": "Execucao rastreada ao vivo: rodar 1..N .feature (inclusive de features diferentes) cria automaticamente um test execution com todos os CTs lastreados (por tag ou por nome); modal pos-disparo oferece ir ao execution ver o andamento; cards e steps atualizam ao vivo por parsing best-effort do output do behave com o JSON final reconciliando; toast de sucesso ou erro ao terminar; indicador pulsante executando no item Automacao do menu lateral via endpoint leve de runs ativos",
+        "path": ".doctrina/changes/archive/2026-07-17-0076-execucao-rastreada-ao-vivo-rodar-1-n-feature",
+        "status": "applied",
+        "applied": "2026-07-17",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -1285,6 +1457,12 @@
         "last_updated": "2026-07-13"
       },
       {
+        "id": "progresso-ao-vivo-fonte-oficial-reconcilia",
+        "path": ".doctrina/skills/progresso-ao-vivo-fonte-oficial-reconcilia.md",
+        "description": "Progresso em tempo real parseado de um stream de texto é sempre best-effort — pode e deve existir para UX, mas a fonte oficial estruturada (JSON/artefato final) SEMPRE reconcilia o estado no fim; o live nunca é a verdade final.",
+        "last_updated": "2026-07-17"
+      },
+      {
         "id": "rota-estatica-antes-da-dinamica",
         "path": ".doctrina/skills/rota-estatica-antes-da-dinamica.md",
         "description": "No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.",
@@ -1315,6 +1493,12 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "subprocess-python-windows-forca-pythonioencoding",
+        "path": ".doctrina/skills/subprocess-python-windows-forca-pythonioencoding.md",
+        "description": "Ao consumir stdout de um subprocess PYTHON como UTF-8 no Windows, defina PYTHONIOENCODING=utf-8 no env do processo — sem isso o filho emite no encoding do console (cp1252) e acentos viram mojibake (\"Cenário\" → \"Cen�rio\"), quebrando silenciosamente qualquer parse do stream.",
+        "last_updated": "2026-07-17"
+      },
+      {
         "id": "tela-preta-crash-de-render-sem-error-boundary",
         "path": ".doctrina/skills/tela-preta-crash-de-render-sem-error-boundary.md",
         "description": "Uma aba/tela que fica \"preta\" (em branco) SEM erro nos logs de servidor é quase sempre um crash de render do React — o erro está no console do browser, e sem ErrorBoundary o React 18 desmonta o app inteiro. Gatilho comum front novo lê um campo que o backend não-reiniciado ainda não devolve (ex. [...data.campo] com campo undefined).",
@@ -1331,6 +1515,12 @@
         "path": ".doctrina/skills/truncar-titulo-em-card.md",
         "description": "Título/texto em card de altura fixa deve truncar com line-clamp e reticências, não crescer o card — overflow-wrap sozinho quebra e expande verticalmente.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "vinculo-por-nome-exige-sync-explicita",
+        "path": ".doctrina/skills/vinculo-por-nome-exige-sync-explicita.md",
+        "description": "Quando dois sistemas se vinculam por um identificador humano (nome de cenário, título, caminho) em vez de um ID estável, o vínculo é frágil por natureza — a mitigação obrigatória é uma sync explícita e re-executável que classifica os estados (novo/modificado/renomeado-quebrado) e deixa o usuário decidir o que fazer.",
+        "last_updated": "2026-07-17"
       },
       {
         "id": "watcher-vs-handler-mesma-rajada-database-locked",

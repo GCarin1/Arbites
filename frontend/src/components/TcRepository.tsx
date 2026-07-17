@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
-import type { GeneratedTestcase, TreeNode } from "../types";
+import { useToast } from "./Toast";
+import type {
+  Defect,
+  GeneratedTestcase,
+  TestCase,
+  TestCaseResult,
+  TreeNode,
+} from "../types";
 
 type DragState =
   | { kind: "ct"; id: string }
@@ -45,6 +52,44 @@ export function TcRepository({
     destPath: string;
     ctCount: number;
   } | null>(null);
+
+  // Filtros combinados (0064): busca fixa + status/prioridade/tipo/tag. O
+  // filtro roda no SERVIDOR (GET /testcases, os mesmos params da API) e a
+  // árvore só exibe os IDs que casaram — uma fonte só, sem reimplementar a
+  // lógica de filtro no cliente.
+  const [q, setQ] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [fPriority, setFPriority] = useState("");
+  const [fType, setFType] = useState("");
+  const [fTag, setFTag] = useState("");
+  const [matchIds, setMatchIds] = useState<Set<string> | null>(null); // null = sem filtro
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const filterActive = !!(q.trim() || fStatus || fPriority || fType || fTag.trim());
+  useEffect(() => {
+    if (!filterActive) {
+      setMatchIds(null);
+      return;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (q.trim()) params.set("q", q.trim());
+      if (fStatus) params.set("status", fStatus);
+      if (fPriority) params.set("priority", fPriority);
+      if (fType) params.set("type", fType);
+      if (fTag.trim()) params.set("tag", fTag.trim().replace(/^@/, ""));
+      api
+        .testcases(`?${params.toString()}`)
+        .then((rows) => alive && setMatchIds(new Set(rows.map((r) => r.id))))
+        .catch((e) => onError(e instanceof Error ? e.message : String(e)));
+    }, 150);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, fStatus, fPriority, fType, fTag, filterActive]);
 
   function toggle(path: string) {
     setCollapsed((old) => {
@@ -128,11 +173,25 @@ export function TcRepository({
     return node.files.length + node.dirs.reduce((acc, d) => acc + countAll(d), 0);
   }
 
+  // contagem visível por pasta: com filtro ativo, quantos itens casaram
+  function countMatching(node: TreeNode): number {
+    if (!matchIds) return countAll(node);
+    return (
+      node.files.filter((f) => f.id && matchIds.has(f.id)).length +
+      node.dirs.reduce((acc, d) => acc + countMatching(d), 0)
+    );
+  }
+
   // Renderiza os filhos de um nó (dirs, depois files) com conectores box-drawing.
   // `prefix` = string dos ancestrais ("│   "/"    "); cada filho recebe ├──/└──.
   function renderChildren(node: TreeNode, prefix: string): React.ReactNode[] {
+    // com filtro ativo: só pastas com match e só arquivos que casaram
+    const dirs = matchIds ? node.dirs.filter((d) => countMatching(d) > 0) : node.dirs;
+    const files = matchIds
+      ? node.files.filter((f) => f.id && matchIds.has(f.id))
+      : node.files;
     const kids: { key: string; render: (branch: string, childPrefix: string) => React.ReactNode }[] = [
-      ...node.dirs.map((d) => ({
+      ...dirs.map((d) => ({
         key: d.path,
         render: (branch: string, childPrefix: string) => {
           const isCollapsed = collapsed.has(d.path);
@@ -168,7 +227,9 @@ export function TcRepository({
                 <span className="repo-folder-name" onClick={() => toggle(d.path)}>
                   📁 {d.name}/
                 </span>
-                <span className="caption muted">{countAll(d)}</span>
+                <span className="caption muted">
+                  {matchIds ? `${countMatching(d)}/${countAll(d)}` : countAll(d)}
+                </span>
                 <span className="spacer" style={{ flex: 1 }} />
                 <span className="repo-actions">
                   <button className="btn-sm" onClick={() => setCreatingFolder(d.path)}>
@@ -184,14 +245,14 @@ export function TcRepository({
           );
         },
       })),
-      ...node.files.map((f) => ({
+      ...files.map((f) => ({
         key: f.path,
         render: (branch: string) => (
           <div
             key={f.path}
             className={`repo-row repo-file ${
               drag?.kind === "ct" && drag.id === f.id ? "dragging" : ""
-            }`}
+            } ${selectedId === f.id ? "selected" : ""}`}
             draggable={!!f.id}
             onDragStart={(e) => {
               e.stopPropagation();
@@ -205,9 +266,10 @@ export function TcRepository({
             <span className="tree-prefix">{prefix + branch}</span>
             <button
               className="repo-file-main"
-              onClick={() => f.id && onOpen(f.id)}
+              onClick={() => f.id && setSelectedId(f.id)}
+              onDoubleClick={() => f.id && onOpen(f.id)}
               disabled={!f.id}
-              title={f.path}
+              title={`${f.path} — clique: detalhes · duplo clique: editor`}
             >
               <span className="mono muted">{f.id ?? "?"}</span>
               <span className="repo-file-title">{f.title}</span>
@@ -253,6 +315,53 @@ export function TcRepository({
         </div>
       </div>
 
+      <div className="tc-filter-bar block">
+        <input
+          className="tc-filter-q"
+          placeholder="Buscar por ID ou título…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} aria-label="Status">
+          <option value="">Status</option>
+          {["draft", "ready", "deprecated"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select value={fPriority} onChange={(e) => setFPriority(e.target.value)} aria-label="Prioridade">
+          <option value="">Prioridade</option>
+          {["low", "medium", "high", "critical"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select value={fType} onChange={(e) => setFType(e.target.value)} aria-label="Tipo">
+          <option value="">Tipo</option>
+          {["manual", "automated", "hybrid"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <input
+          className="tc-filter-tag"
+          placeholder="tag"
+          value={fTag}
+          onChange={(e) => setFTag(e.target.value)}
+        />
+        {filterActive && (
+          <button
+            className="btn-sm"
+            onClick={() => {
+              setQ(""); setFStatus(""); setFPriority(""); setFType(""); setFTag("");
+            }}
+          >
+            Limpar
+          </button>
+        )}
+        {matchIds && (
+          <span className="caption muted">{matchIds.size} resultado{matchIds.size === 1 ? "" : "s"}</span>
+        )}
+      </div>
+
+      <div className="repo-layout">
       <div
         className={`repo-tree card ${dropTarget === root.path ? "drop-target" : ""}`}
         onDragOver={(e) => {
@@ -274,9 +383,26 @@ export function TcRepository({
               (Given / When / Then). Arraste CTs entre pastas.
             </div>
           </div>
+        ) : matchIds && matchIds.size === 0 ? (
+          <div className="empty-state" style={{ border: "none" }}>
+            <div className="empty-title">Nenhum caso de teste casa com o filtro</div>
+            <div className="empty-body">
+              Ajuste a busca ou limpe os filtros para ver a árvore completa.
+            </div>
+          </div>
         ) : (
           renderChildren(root, "")
         )}
+      </div>
+      {selectedId && (
+        <TcDetailPanel
+          id={selectedId}
+          onClose={() => setSelectedId(null)}
+          onOpenEditor={() => onOpen(selectedId)}
+          onChanged={onChanged}
+          onError={onError}
+        />
+      )}
       </div>
 
       {importing && (
@@ -347,6 +473,157 @@ export function TcRepository({
           }}
           onCancel={() => setPendingFolderMove(null)}
         />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Painel lateral de detalhes do CT (0064): consulta e ações rápidas sem sair
+ * da árvore — o editor completo continua a um clique ("Abrir editor").
+ */
+function TcDetailPanel({
+  id,
+  onClose,
+  onOpenEditor,
+  onChanged,
+  onError,
+}: {
+  id: string;
+  onClose: () => void;
+  onOpenEditor: () => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}) {
+  const [tc, setTc] = useState<TestCase | null>(null);
+  const [defects, setDefects] = useState<Defect[]>([]);
+  const [history, setHistory] = useState<TestCaseResult[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let alive = true;
+    setTc(null);
+    api
+      .testcase(id)
+      .then((t) => alive && setTc(t))
+      .catch((e) => onError(e instanceof Error ? e.message : String(e)));
+    api
+      .defects(`?testcase=${encodeURIComponent(id)}`)
+      .then((d) => alive && setDefects(d))
+      .catch(() => {});
+    api
+      .testcaseResults(id)
+      .then((h) => alive && setHistory(h))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id, onError]);
+
+  async function quickStatus(status: string) {
+    try {
+      const updated = await api.updateTestcase(id, { status });
+      setTc(updated);
+      toast("Status atualizado");
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div className="tc-panel card">
+      <div className="card-head">
+        <span className="mono">{id}</span>
+        <span className="spacer" />
+        <button className="btn-sm" onClick={() => {
+          void navigator.clipboard?.writeText(id);
+          toast("ID copiado", "info");
+        }}>
+          Copiar ID
+        </button>
+        <button className="modal-close" onClick={onClose} aria-label="Fechar painel">
+          ×
+        </button>
+      </div>
+      {!tc ? (
+        <p className="caption muted"><span className="spinner" /> carregando…</p>
+      ) : (
+        <>
+          <div className="tc-panel-title">{tc.title}</div>
+          <div className="tc-panel-grid">
+            <span className="caption muted">Status</span>
+            <select
+              value={tc.status}
+              onChange={(e) => void quickStatus(e.target.value)}
+              aria-label="Mudar status"
+            >
+              {["draft", "ready", "deprecated"].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <span className="caption muted">Tipo</span>
+            <span>{tc.type}{tc.automation_target ? ` · ${tc.automation_target}` : ""}</span>
+            <span className="caption muted">Prioridade</span>
+            <span>{tc.priority}</span>
+            <span className="caption muted">Story</span>
+            <span className="mono">{tc.story_id ?? "—"}</span>
+            <span className="caption muted">Squad</span>
+            <span>{tc.squad_effective ?? "—"}</span>
+            {(tc.tags ?? []).length > 0 && (
+              <>
+                <span className="caption muted">Tags</span>
+                <span>{(tc.tags ?? []).map((t) => `#${t}`).join(" ")}</span>
+              </>
+            )}
+          </div>
+          {defects.length > 0 && (
+            <div className="tc-panel-defects">
+              <span className="caption muted">Defeitos vinculados</span>
+              {defects.map((d) => (
+                <div key={d.id} className="exec-item">
+                  <span className="mono">{d.id}</span>
+                  <span className="exec-item-msg">{d.title}</span>
+                  <span className={`status-dot ${d.status === "open" ? "dot-col-failed" : "dot-col-passed"} caption`}>
+                    {d.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {history.length > 0 && (
+            <div className="tc-panel-defects">
+              <span className="caption muted">
+                Histórico de resultados ({history.length})
+              </span>
+              <div className="tc-history-dots" title="mais recente à esquerda">
+                {history.slice(0, 12).map((h, i) => (
+                  <span
+                    key={i}
+                    className={`status-dot dot-col-${h.status} caption`}
+                    title={`${h.execution_id} · ${h.status} · ${h.executed_at ?? "sem data"}`}
+                  />
+                ))}
+              </div>
+              {history.slice(0, 5).map((h, i) => (
+                <div key={i} className="exec-item">
+                  <span className="mono">{h.execution_id}</span>
+                  <span className={`status-dot dot-col-${h.status} caption`}>
+                    {h.status}
+                  </span>
+                  <span className="caption muted">
+                    {(h.executed_at ?? "").slice(0, 10)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="toolbar" style={{ marginTop: 12 }}>
+            <button className="primary" onClick={onOpenEditor}>
+              Abrir editor
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

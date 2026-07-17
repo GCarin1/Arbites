@@ -3,6 +3,7 @@ import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
+import { useToast } from "./Toast";
 import type { Decision } from "../types";
 
 const STATUSES: Decision["status"][] = ["proposed", "accepted", "superseded"];
@@ -118,14 +119,21 @@ export function Decisions({
         </div>
       </div>
 
+      <p className="subtitle block">
+        O porquê das escolhas do projeto sob teste — cada decisão registra
+        contexto, o que foi decidido e as consequências. Meses depois, o time
+        (e a IA, que recebe as decisões aceitas como contexto) ainda sabe o
+        motivo.
+      </p>
+
       {items.length === 0 ? (
         <div className="empty-state">
           <div className="empty-title">Nenhuma decisão registrada</div>
           <div className="empty-body">
-            Registre decisões arquiteturais relevantes ao projeto sob teste —
-            contexto, o que foi decidido e as consequências. Parte da memória
-            histórica do projeto: meses depois, o time (e a IA) ainda sabe o
-            porquê.
+            Exemplo: "Usar máscara de dados anonimizados nos testes de
+            pagamento — contexto: dados reais são sensíveis; decisão: gerar
+            massa sintética; consequência: cadastros de teste não validam em
+            produção". Clique em "Nova decisão" para registrar a primeira.
           </div>
         </div>
       ) : (
@@ -252,7 +260,9 @@ function DecisionModal({
   const [supersedes, setSupersedes] = useState(decision?.supersedes ?? "");
   const [body, setBody] = useState(decision?.body ?? "");
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (decision && decision.body === undefined) {
@@ -280,6 +290,7 @@ function DecisionModal({
     try {
       if (decision) await api.updateDecision(decision.id, payload);
       else await api.createDecision(payload);
+      toast("Decisão salva");
       onSaved();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -291,6 +302,7 @@ function DecisionModal({
     <Modal
       title={decision ? `Editar ${decision.id}` : "Nova decisão"}
       onClose={onClose}
+      dirty={dirty && !saving}
       initialFocus={titleRef}
       footer={
         <>
@@ -303,6 +315,7 @@ function DecisionModal({
         </>
       }
     >
+      <div className="modal-form" onInput={() => setDirty(true)}>
       <div className="modal-field">
         <label htmlFor="decision-title">Título</label>
         <input
@@ -349,6 +362,7 @@ function DecisionModal({
           onChange={setBody}
           placeholder="## Contexto&#10;&#10;...&#10;&#10;## Decisão&#10;&#10;...&#10;&#10;## Consequências&#10;&#10;..."
         />
+      </div>
       </div>
     </Modal>
   );

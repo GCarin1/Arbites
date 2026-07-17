@@ -4,22 +4,30 @@ import type { TimelineEntry } from "../types";
 
 const KIND_LABEL: Record<string, string> = {
   requirement: "Requisito",
+  testcase: "Caso de teste",
   defect: "Defeito",
   lesson: "Lição aprendida",
   decision: "Decisão",
   agent: "Agente de IA",
+  result: "Resultado de execução",
 };
 
 const KIND_DOT: Record<string, string> = {
   requirement: "dot-col-in_progress",
+  testcase: "dot-col-in_progress",
   defect: "dot-col-failed",
   lesson: "dot-col-blocked",
   decision: "dot-col-passed",
   agent: "dot-col-pending",
+  result: "dot-col-retest",
 };
 
-const ALL_KINDS = ["requirement", "defect", "lesson", "decision", "agent"];
-const NAVIGABLE = new Set(["requirement", "defect", "decision"]);
+const ALL_KINDS = [
+  "requirement", "testcase", "defect", "lesson", "decision", "agent", "result",
+];
+// `result` é verboso (cada transição de status) — começa DESLIGADO (opt-in)
+const DEFAULT_KINDS = ALL_KINDS.filter((k) => k !== "result");
+const NAVIGABLE = new Set(["requirement", "testcase", "defect", "decision", "result"]);
 
 function formatDate(iso: string): string {
   if (!iso) return "—";
@@ -50,7 +58,7 @@ export function Memory({
   onNavigate: (id: string) => void;
 }) {
   const [events, setEvents] = useState<TimelineEntry[]>([]);
-  const [kinds, setKinds] = useState<string[]>(ALL_KINDS);
+  const [kinds, setKinds] = useState<string[]>(DEFAULT_KINDS);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -62,8 +70,10 @@ export function Memory({
       return;
     }
     setLoading(true);
+    // sempre lista explícita: o default do backend exclui `result`, então
+    // "" não representaria "todos os marcados" quando result está ligado
     api
-      .memoryTimeline(kinds.length === ALL_KINDS.length ? "" : kinds.join(","), 100)
+      .memoryTimeline(kinds.join(","), 100)
       .then(setEvents)
       .catch((e) => onError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));

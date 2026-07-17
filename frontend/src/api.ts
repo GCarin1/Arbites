@@ -6,6 +6,7 @@ import type {
   AutomationReport,
   DailyContext,
   DailyDigestResult,
+  DashboardOverview,
   Decision,
   Defect,
   DefectsReport,
@@ -14,6 +15,7 @@ import type {
   MeetingSummaryResult,
   RiskMap,
   SavedDaily,
+  TestCaseResult,
   TimelineEntry,
   Execution,
   ExecutionSummary,
@@ -76,6 +78,8 @@ export const api = {
 
   testcases: (params = "") => request<TestCase[]>(`/testcases${params}`),
   testcase: (id: string) => request<TestCase>(`/testcases/${id}`),
+  testcaseResults: (id: string) =>
+    request<TestCaseResult[]>(`/testcases/${id}/results`),
   createTestcase: (body: object) =>
     request<TestCase>("/testcases", { method: "POST", body: JSON.stringify(body) }),
   updateTestcase: (id: string, body: object) =>
@@ -116,7 +120,13 @@ export const api = {
       body: JSON.stringify({ content }),
     }),
 
-  executions: () => request<ExecutionSummary[]>("/executions"),
+  executions: (query = "") => request<ExecutionSummary[]>(`/executions${query}`),
+  deleteExecution: (id: string) =>
+    request<void>(`/executions/${id}`, { method: "DELETE" }),
+  runsActive: () =>
+    request<{ count: number; runs: { exec_id: string; target: string; status: string }[] }>(
+      "/runs/active",
+    ),
   execution: (id: string) => request<Execution>(`/executions/${id}`),
   createExecution: (body: object) =>
     request<Execution>("/executions", { method: "POST", body: JSON.stringify(body) }),
@@ -186,6 +196,8 @@ export const api = {
   auditHistory: (limit = 20) =>
     request<AuditHistoryEntry[]>(`/audit/history?limit=${limit}`),
   audit: (id: string) => request<AuditReport>(`/audit/${id}`),
+
+  profile: () => request<{ name: string; memory: string }>("/profile"),
 
   memoryTimeline: (kinds = "", limit = 50) =>
     request<TimelineEntry[]>(
@@ -262,6 +274,11 @@ export const api = {
   metricsHealth: (sprint = "", days = 0, squad = "") =>
     request<HealthScore>(
       `/metrics/health?sprint=${encodeURIComponent(sprint)}&days=${days}` +
+        `&squad=${encodeURIComponent(squad)}`,
+    ),
+  metricsDashboard: (sprint = "", days = 30, squad = "") =>
+    request<DashboardOverview>(
+      `/metrics/dashboard?sprint=${encodeURIComponent(sprint)}&days=${days}` +
         `&squad=${encodeURIComponent(squad)}`,
     ),
   riskMap: (days = 90) => request<RiskMap>(`/risk-map?days=${days}`),

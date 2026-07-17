@@ -42,7 +42,13 @@ from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .executions import ExecutionError
-from .gherkin_scan import DEFAULT_FEATURES_GLOB, list_feature_files, scan_target
+from . import feature_sync as feature_sync_ops
+from .gherkin_scan import (
+    DEFAULT_FEATURES_GLOB,
+    ct_tag_re,
+    list_feature_files,
+    scan_target,
+)
 from .runner import RunManager
 from .xray_import import XrayImportError
 from .indexer import connect, reindex_file, reindex_full
@@ -83,7 +89,11 @@ class RequirementUpdate(BaseModel):
 
 class AutomationRef(BaseModel):
     target: str
-    scenario_tag: str
+    # vínculo por TAG no .feature (ADR 0003)…
+    scenario_tag: str | None = None
+    # …ou por NOME de cenário (mudança 0075; repo de automação read-only)
+    feature_path: str | None = None
+    scenario_name: str | None = None
 
 
 class TestcaseIn(BaseModel):
@@ -166,6 +176,9 @@ class LocalRunIn(BaseModel):
     tags: list[str] = []
     testcase_ids: list[str] = []
     feature: str | None = None  # .feature específico (behave <arquivo> --tags=)
+    # 1..N arquivos .feature (mudança 0076) — todos entram como posicionais
+    # do behave e a execution inclui os CTs lastreados de todos eles
+    features: list[str] = []
 
 
 class CIRunIn(BaseModel):
@@ -233,6 +246,25 @@ class AutomationTargetIn(BaseModel):
 
 class AutomationTargetsIn(BaseModel):
     targets: list[AutomationTargetIn] = []
+
+
+class FeatureSyncItem(BaseModel):
+    feature_path: str
+    scenario_name: str
+
+
+class FeatureSyncRelink(BaseModel):
+    ct_id: str
+    feature_path: str
+    scenario_name: str
+
+
+class FeatureSyncApplyIn(BaseModel):
+    target: str
+    create: list[FeatureSyncItem] = []
+    update: list[str] = []  # ct_ids com steps modificados → re-basear body
+    relink: list[FeatureSyncRelink] = []
+    folder: str | None = None  # pasta dos CTs criados (default automacao/<target>)
 
 
 class GenerateIn(BaseModel):
@@ -737,6 +769,7 @@ def _register_routes(app: FastAPI) -> None:
         status: str = "",
         tag: str = "",
         type: str = "",
+        priority: str = "",
         folder: str = "",
         squad: str = "",
         q: str = "",
@@ -750,6 +783,7 @@ def _register_routes(app: FastAPI) -> None:
             ("story_id", story),
             ("status", status),
             ("type", type),
+            ("priority", priority),
             ("squad_effective", squad),
         ):
             if value:
@@ -770,6 +804,12 @@ def _register_routes(app: FastAPI) -> None:
         if payload.type != "manual" and payload.automation is None:
             raise _error(422, "automation_required",
                          "casos automated/hybrid exigem o bloco 'automation'")
+        if payload.automation is not None and not (
+            payload.automation.scenario_tag or payload.automation.scenario_name
+        ):
+            raise _error(422, "automation_link_required",
+                         "automation exige scenario_tag OU scenario_name"
+                         " (vínculo por tag ou por nome de cenário)")
         new_id = ws.next_id("testcase")
         today = date.today().isoformat()
         meta: dict[str, Any] = {
@@ -786,7 +826,7 @@ def _register_routes(app: FastAPI) -> None:
         if payload.squad:
             meta["squad"] = payload.squad
         if payload.automation is not None:
-            meta["automation"] = payload.automation.model_dump()
+            meta["automation"] = payload.automation.model_dump(exclude_none=True)
         folder = payload.folder.strip("/").replace("\\", "/")
         target_dir = ws.root / "testcases" / folder if folder else ws.root / "testcases"
         if not str(target_dir.resolve()).startswith(str((ws.root / "testcases").resolve())):
@@ -872,6 +912,11 @@ def _register_routes(app: FastAPI) -> None:
         if "automation" in changes and changes["automation"] is None:
             meta.pop("automation", None)
             changes.pop("automation")
+        elif isinstance(changes.get("automation"), dict):
+            # não gravar chaves None do vínculo (tag OU nome) no YAML
+            changes["automation"] = {
+                k: v for k, v in changes["automation"].items() if v is not None
+            }
         if "squad" in changes and not changes["squad"]:
             meta.pop("squad", None)
             changes.pop("squad")
@@ -894,6 +939,23 @@ def _register_routes(app: FastAPI) -> None:
         ws = ws_of(request)
         rel = _find_path(conn_of(request), "testcases", entity_id)
         return (ws.root / rel).read_text(encoding="utf-8")
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/results")
+    async def testcase_results(request: Request, entity_id: str):
+        """Histórico de resultados do CT (0074): responde "já passou no
+        passado?" — leitura pura da tabela `results` JOIN executions,
+        mais recente primeiro."""
+        conn = conn_of(request)
+        _find_path(conn, "testcases", entity_id)  # 404 se o CT não existe
+        rows = conn.execute(
+            "SELECT r.execution_id, e.name execution_name, r.status,"
+            " r.executed_at, r.duration_seconds"
+            " FROM results r JOIN executions e ON e.id = r.execution_id"
+            " WHERE r.testcase_id = ?"
+            " ORDER BY r.executed_at DESC, r.execution_id DESC",
+            (entity_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     @app.put(API_PREFIX + "/testcases/{entity_id}/raw")
     async def put_testcase_raw(request: Request, entity_id: str, payload: RawIn):
@@ -978,6 +1040,23 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
         return exec_ops.load(ws_of(request), exec_id)
+
+    @app.delete(API_PREFIX + "/executions/{exec_id}", status_code=204)
+    async def delete_execution(request: Request, exec_id: str):
+        """Move a PASTA da execution (JSON + evidências) para a lixeira e
+        reindexa — nunca apaga do disco (padrão de trash da casa)."""
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        run = runner.runs.get(exec_id)
+        if run and run.status in ("queued", "running"):
+            raise _error(409, "run_active",
+                         f"{exec_id} tem um run de automação ativo — cancele antes")
+        execution = exec_ops.load(ws, exec_id)  # 404 se não existe
+        folder = exec_ops.exec_dir(ws, exec_id, execution["created_at"])
+        json_path = folder / "execution.json"
+        ws.trash(folder)
+        # reindex do arquivo removido limpa results/result_events/evidences
+        reindex_file(ws, conn, json_path)
 
     @app.patch(API_PREFIX + "/executions/{exec_id}")
     async def patch_execution(request: Request, exec_id: str, payload: ExecutionPatch):
@@ -1126,6 +1205,66 @@ def _register_routes(app: FastAPI) -> None:
             conn_of(request), weights, sprint or None, days or None, squad or None,
             pattern,
         )
+
+    # -- Dashboard executivo (painel de decisão, capability reporting) ------
+    # Consolida sinais que já existem: variação vs período anterior, alertas
+    # de risco (achados `bad` do Auditor + Health Score baixo), top problemas
+    # (automação/defeitos) e ações recomendadas (achados reformulados como
+    # "faça X"). Nada de coleta nova — orquestra os reports existentes.
+
+    _ACTION_VERB = {
+        "uncovered_story": "Criar cobertura para",
+        "forgotten_defect": "Registrar causa raiz e tratar",
+        "aging_defect": "Revisar/fechar",
+        "broken_automation": "Investigar automação quebrada:",
+    }
+
+    @app.get(API_PREFIX + "/metrics/dashboard")
+    async def metrics_dashboard(
+        request: Request, sprint: str = "", days: int = 30, squad: str = ""
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        cfg = ws.config()
+        pattern = (cfg.get("ci_monitoring") or {}).get("name_pattern")
+        audit_cfg = cfg.get("audit") or {}
+        s, sq = sprint or None, squad or None
+
+        findings = audit_ops.collect_findings(
+            conn, audit_cfg.get("defect_aging_days"),
+            audit_cfg.get("broken_automation_days"), pattern,
+        )
+        weights = (cfg.get("health_score") or {}).get("weights")
+        health = metrics_ops.health_score(conn, weights, s, days or None, sq, pattern)
+
+        # alertas de risco = achados `bad` + Health Score baixo
+        alerts = [
+            {"severity": f["severity"], "category": f["category"],
+             "message": f["message"], "ref": f["ref"]}
+            for f in findings if f["severity"] == "bad"
+        ]
+        if health["score"] is not None and health["score"] < 50:
+            alerts.insert(0, {
+                "severity": "bad", "category": "health",
+                "message": f"Health Score baixo: {health['score']}/100", "ref": None,
+            })
+
+        # ações recomendadas = achados (bad+warn) reformulados como "faça X"
+        recommended_actions = [
+            {"message": f"{_ACTION_VERB.get(f['code'], 'Tratar')} {f['ref'] or f['message']}",
+             "ref": f["ref"], "category": f["category"]}
+            for f in findings if f["severity"] in ("bad", "warn")
+        ][:8]
+
+        reindex_row = conn.execute(
+            "SELECT value FROM index_meta WHERE key = 'last_reindex'"
+        ).fetchone()
+        return {
+            "last_reindex": reindex_row["value"] if reindex_row else None,
+            "pass_rate_trend": metrics_ops.period_pass_rate(conn, days, s, sq),
+            "alerts": alerts,
+            "top_problems": metrics_ops.top_problems(conn, pattern, days or None),
+            "recommended_actions": recommended_actions,
+        }
 
     @app.get(API_PREFIX + "/metrics/automation")
     async def metrics_automation(request: Request, days: int = 0, env: str = ""):
@@ -1307,6 +1446,110 @@ def _register_routes(app: FastAPI) -> None:
             raise _error(422, "scan_error", f"falha ao escanear: {exc}") from exc
         return {"local_path": local_path, "features": features}
 
+    # -- sync .feature ↔ CT por nome (mudança 0075) -------------------------
+    # Repo de automação read-only (ADR 0003): o vínculo alternativo à tag é
+    # automation.feature_path + scenario_name. A sync classifica cada
+    # cenário (linked_tag/linked/modified/new + broken) e o modal decide.
+
+    @app.get(API_PREFIX + "/automation/features-sync")
+    async def features_sync_status(request: Request, target: str):
+        ws, conn = ws_of(request), conn_of(request)
+        cfg = _find_target(ws, target)
+        tag_re = ct_tag_re(ws.id_prefixes()["testcase"])
+        return feature_sync_ops.sync_status(ws, conn, cfg, tag_re)
+
+    @app.post(API_PREFIX + "/automation/features-sync/apply")
+    async def features_sync_apply(request: Request, payload: FeatureSyncApplyIn):
+        """Aplica as escolhas do modal: criar CTs (steps verbatim), atualizar
+        body de CTs `modified` e re-vincular CTs quebrados. Nada é decidido
+        automaticamente — só o que veio na seleção."""
+        ws, conn = ws_of(request), conn_of(request)
+        cfg = _find_target(ws, payload.target)
+        local_path = Path(str(cfg.get("local_path", "")))
+        glob = str(cfg.get("features_glob") or DEFAULT_FEATURES_GLOB)
+        features = {
+            f["path"]: f
+            for f in feature_sync_ops.scan_feature_files(local_path, glob)
+        }
+
+        def find_scenario(feature_path: str, scenario_name: str) -> tuple[dict, dict]:
+            feat = features.get(feature_path)
+            if not feat:
+                raise _error(422, "feature_not_found",
+                             f"{feature_path} não encontrado no target")
+            sc = next((s for s in feat["scenarios"] if s["name"] == scenario_name), None)
+            if not sc:
+                raise _error(422, "scenario_not_found",
+                             f'cenário "{scenario_name}" não existe em {feature_path}')
+            return feat, sc
+
+        created: list[str] = []
+        folder = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
+        target_dir = _safe_area_dir(ws, "testcases", folder)
+        for item in payload.create:
+            feat, sc = find_scenario(item.feature_path, item.scenario_name)
+            new_id = ws.next_id("testcase")
+            today = date.today().isoformat()
+            meta = {
+                "id": new_id,
+                "title": sc["name"],
+                "type": "automated",
+                "priority": "medium",
+                "status": "ready",
+                "automation": {
+                    "target": payload.target,
+                    "feature_path": item.feature_path,
+                    "scenario_name": item.scenario_name,
+                },
+                "created": today,
+                "updated": today,
+            }
+            body = feature_sync_ops.scenario_body(
+                feat["feature_name"], sc, feat["language"]
+            )
+            path = target_dir / f"{new_id}-{slugify(sc['name'])}.md"
+            _write_doc(path, meta, body)
+            reindex_file(ws, conn, path)
+            created.append(new_id)
+
+        updated: list[str] = []
+        for ct_id in payload.update:
+            rel = _find_path(conn, "testcases", ct_id)
+            meta, _old_body = _load_doc(ws, rel)
+            automation = meta.get("automation") or {}
+            feat, sc = find_scenario(
+                str(automation.get("feature_path", "")),
+                str(automation.get("scenario_name", "")),
+            )
+            meta["updated"] = date.today().isoformat()
+            _write_doc(ws.root / rel, meta, feature_sync_ops.scenario_body(
+                feat["feature_name"], sc, feat["language"]
+            ))
+            reindex_file(ws, conn, ws.root / rel)
+            updated.append(ct_id)
+
+        relinked: list[str] = []
+        for item in payload.relink:
+            rel = _find_path(conn, "testcases", item.ct_id)
+            meta, old_body = _load_doc(ws, rel)
+            feat, sc = find_scenario(item.feature_path, item.scenario_name)
+            automation = dict(meta.get("automation") or {})
+            automation["feature_path"] = item.feature_path
+            automation["scenario_name"] = item.scenario_name
+            meta["automation"] = automation
+            meta["updated"] = date.today().isoformat()
+            # re-vincular também re-baseia o body nos steps atuais (o CT
+            # volta a espelhar o cenário; o diff da sync volta a funcionar)
+            _write_doc(ws.root / rel, meta, feature_sync_ops.scenario_body(
+                feat["feature_name"], sc, feat["language"]
+            ))
+            reindex_file(ws, conn, ws.root / rel)
+            relinked.append(item.ct_id)
+
+        # re-scan do target: tabela scenarios reflete os vínculos novos
+        scan_target(ws, conn, cfg)
+        return {"created": created, "updated": updated, "relinked": relinked}
+
     @app.post(API_PREFIX + "/targets/{name}/scan")
     async def scan_target_route(request: Request, name: str):
         ws, conn = ws_of(request), conn_of(request)
@@ -1346,7 +1589,10 @@ def _register_routes(app: FastAPI) -> None:
             mapped_by_feature[r["feature_path"]] = (
                 mapped_by_feature.get(r["feature_path"], 0) + 1
             )
-            tags.add(r["tag"])
+            # tags sintéticas de vínculo por nome ("name:<arquivo>:<linha>",
+            # mudança 0075) não são tags do behave — fora do dropdown
+            if r["tag"].startswith("@"):
+                tags.add(r["tag"])
 
         return {
             "features": [
@@ -1452,16 +1698,26 @@ def _register_routes(app: FastAPI) -> None:
         runner: RunManager = request.app.state.runner
         target = _find_target(ws, payload.target)
 
-        # resolve seleção → CTs da execution + tags do behave
+        # resolve seleção → CTs da execution + tags do behave.
+        # `features` (0076) e `feature` (legado) somam numa lista única —
+        # 1..N arquivos, inclusive de features diferentes, numa execution só.
+        feature_files = [f for f in payload.features if f]
+        if payload.feature and payload.feature not in feature_files:
+            feature_files.append(payload.feature)
         ct_ids: list[str] = list(payload.testcase_ids)
         tags: list[str] = [t if t.startswith("@") else f"@{t}" for t in payload.tags]
-        if payload.feature and not ct_ids and not tags:
-            # rodar um .feature inteiro: CTs = cenários daquele arquivo
+        if feature_files and not ct_ids and not tags:
+            # rodar arquivos inteiros: CTs = cenários de TODOS os arquivos
+            # (vinculados por tag OU por nome — coluna ct_id, mudança 0075)
+            placeholders = ",".join("?" for _ in feature_files)
             rows = conn.execute(
-                "SELECT tag FROM scenarios WHERE target = ? AND feature_path = ?",
-                (payload.target, payload.feature),
+                "SELECT tag, ct_id FROM scenarios"
+                f" WHERE target = ? AND feature_path IN ({placeholders})",
+                (payload.target, *feature_files),
             ).fetchall()
-            ct_ids = sorted({r["tag"].lstrip("@") for r in rows})
+            ct_ids = sorted({
+                r["ct_id"] or r["tag"].lstrip("@") for r in rows if r["ct_id"] or r["tag"].startswith("@")
+            })
         if tags and not ct_ids:
             rows = conn.execute(
                 "SELECT DISTINCT t.id FROM testcases t JOIN tc_tags g"
@@ -1478,14 +1734,14 @@ def _register_routes(app: FastAPI) -> None:
                 r["tag"].lstrip("@") for r in by_scenario
             ]
             ct_ids = sorted(set(ct_ids))
-        if not ct_ids and not payload.feature:
+        if not ct_ids and not feature_files:
             raise _error(422, "empty_selection",
                          "informe testcase_ids, tags ou feature que resolvam para CTs")
-        # payload.feature sem nenhum cenário mapeado a CT ainda roda: o
-        # arquivo inteiro vai pro behave (ct_ids fica vazio, a execution
-        # nasce sem CTs vinculados) — vínculo por tag é o caminho para
-        # rastreabilidade, não um pré-requisito para executar (mudança 0067)
-        if not tags and not payload.feature:
+        # feature sem nenhum cenário mapeado a CT ainda roda: o arquivo
+        # inteiro vai pro behave (ct_ids fica vazio, a execution nasce sem
+        # CTs vinculados) — vínculo é o caminho para rastreabilidade, não um
+        # pré-requisito para executar (mudança 0067)
+        if not tags and not feature_files:
             rows = conn.execute(
                 "SELECT id, scenario_tag FROM testcases WHERE id IN (%s)"
                 % ",".join("?" for _ in ct_ids),
@@ -1505,11 +1761,36 @@ def _register_routes(app: FastAPI) -> None:
             doc = parse_markdown(ws.root / row["path"])
             testcases.append({"id": ct_id, "steps": doc.steps})
 
-        execution = runner.submit(target, testcases, tags, feature=payload.feature)
+        # mapa nome-do-cenário → ct_id (tag e nome-linked) para o progresso
+        # ao vivo e para o parse do JSON final casar por nome (0075/0076)
+        live_map = {
+            r["scenario_name"]: (r["ct_id"] or r["tag"].lstrip("@"))
+            for r in conn.execute(
+                "SELECT scenario_name, tag, ct_id FROM scenarios WHERE target = ?",
+                (payload.target,),
+            )
+            if r["scenario_name"] and (r["ct_id"] or r["tag"].startswith("@"))
+        }
+        execution = runner.submit(
+            target, testcases, tags, feature=payload.feature,
+            features=feature_files, live_map=live_map,
+        )
         return {
             "execution": execution,
             "run": runner.runs[execution["id"]].snapshot(),
         }
+
+    @app.get(API_PREFIX + "/runs/active")
+    async def runs_active(request: Request):
+        """Runs em fila/execução — alimenta o indicador pulsante no menu
+        lateral (mudança 0076). Leve: consultado no refresh de 5s do App."""
+        runner: RunManager = request.app.state.runner
+        active = [
+            {"exec_id": r.exec_id, "target": str(r.target.get("name")),
+             "status": r.status}
+            for r in runner.runs.values() if r.status in ("queued", "running")
+        ]
+        return {"count": len(active), "runs": active}
 
     @app.get(API_PREFIX + "/runs/{exec_id}")
     async def run_status(request: Request, exec_id: str):
@@ -1951,11 +2232,16 @@ def _register_routes(app: FastAPI) -> None:
         return out
 
     @app.get(API_PREFIX + "/defects")
-    async def list_defects(request: Request, status: str = "", has_lesson: bool = False):
+    async def list_defects(
+        request: Request, status: str = "", testcase: str = "", has_lesson: bool = False
+    ):
         sql, params = "SELECT * FROM defects WHERE 1=1", []
         if status:
             sql += " AND status = ?"
             params.append(status)
+        if testcase:
+            sql += " AND testcase_id = ?"
+            params.append(testcase)
         if has_lesson:
             sql += " AND (root_cause IS NOT NULL OR fix IS NOT NULL OR prevention IS NOT NULL)"
         return [

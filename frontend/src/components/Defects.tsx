@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
+import { useToast } from "./Toast";
 import type { Defect } from "../types";
 
 const STATUSES: Defect["status"][] = ["open", "fixed", "closed"];
@@ -292,7 +293,9 @@ function DefectModal({
   const [fix, setFix] = useState(defect?.fix ?? "");
   const [prevention, setPrevention] = useState(defect?.prevention ?? "");
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (defect && defect.body === undefined) {
@@ -321,6 +324,7 @@ function DefectModal({
     try {
       if (defect) await api.updateDefect(defect.id, payload);
       else await api.createDefect(payload);
+      toast("Defeito salvo");
       onSaved();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -332,6 +336,7 @@ function DefectModal({
     <Modal
       title={defect ? `Editar ${defect.id}` : "Novo defeito"}
       onClose={onClose}
+      dirty={dirty && !saving}
       initialFocus={titleRef}
       footer={
         <>
@@ -344,6 +349,7 @@ function DefectModal({
         </>
       }
     >
+      <div className="modal-form" onInput={() => setDirty(true)}>
       <div className="modal-field">
         <label htmlFor="defect-title">Título</label>
         <input
@@ -443,6 +449,7 @@ function DefectModal({
           onChange={(e) => setPrevention(e.target.value)}
           placeholder="Ex.: sempre testar CPF vazio"
         />
+      </div>
       </div>
     </Modal>
   );

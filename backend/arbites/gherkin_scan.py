@@ -25,10 +25,11 @@ _SCAN_WARNING_CODES = ("orphan_scenario", "broken_automation",
                        "duplicate_scenario_tag", "unparseable_feature")
 
 
-def _ct_tag_re(prefix: str) -> re.Pattern[str]:
+def ct_tag_re(prefix: str) -> re.Pattern[str]:
     """Regex de tag de cenário com o prefixo CONFIGURADO do workspace
     (`id_prefixes.testcase`) — hardcodar `CT-` quebraria o vínculo
-    cenário↔CT em workspaces com prefixo customizado."""
+    cenário↔CT em workspaces com prefixo customizado. Público: a sync de
+    features (feature_sync/api) usa a mesma regex."""
     return re.compile(rf"^@({re.escape(prefix)}-\d+)$")
 
 
@@ -39,7 +40,7 @@ def scan_target(
     name = str(target.get("name"))
     local_path = Path(str(target.get("local_path", "")))
     glob = str(target.get("features_glob") or DEFAULT_FEATURES_GLOB)
-    ct_tag_re = _ct_tag_re(ws.id_prefixes()["testcase"])
+    tag_re = ct_tag_re(ws.id_prefixes()["testcase"])
 
     conn.execute("DELETE FROM scenarios WHERE target = ?", (name,))
     placeholders = ",".join("?" for _ in _SCAN_WARNING_CODES)
@@ -68,6 +69,21 @@ def scan_target(
     scenario_count = 0
     feature_count = 0
 
+    # vínculo por NOME (mudança 0075): CTs do target lastreados por
+    # automation.feature_path + scenario_name — sem tag no .feature, o repo
+    # de automação segue read-only (ADR 0003)
+    name_links: dict[tuple[str, str], str] = {
+        (r["feature_path"], r["scenario_name"]): r["id"]
+        for r in conn.execute(
+            "SELECT id, feature_path, scenario_name FROM testcases"
+            " WHERE automation_target = ? AND scenario_name IS NOT NULL"
+            " AND feature_path IS NOT NULL",
+            (name,),
+        )
+    }
+
+    seen_names: set[tuple[str, str]] = set()
+
     for feature_path in sorted(local_path.glob(glob)):
         rel = feature_path.relative_to(local_path).as_posix()
         try:
@@ -85,9 +101,11 @@ def scan_target(
             if not scenario:
                 continue
             scenario_count += 1
+            seen_names.add((rel, scenario.get("name", "")))
+            linked_here = False
             for tag in scenario.get("tags", []):
                 tag_name = tag.get("name", "")
-                if not ct_tag_re.match(tag_name):
+                if not tag_re.match(tag_name):
                     continue
                 where = f"{rel}:{scenario['location']['line']}"
                 if tag_name in seen_tags:
@@ -99,13 +117,29 @@ def scan_target(
                         )
                     continue
                 seen_tags[tag_name] = where
+                linked_here = True
                 conn.execute(
                     "INSERT OR REPLACE INTO scenarios"
-                    "(target, tag, feature_path, scenario_name, line, language)"
-                    " VALUES (?,?,?,?,?,?)",
+                    "(target, tag, feature_path, scenario_name, line, language, ct_id)"
+                    " VALUES (?,?,?,?,?,?,?)",
                     (name, tag_name, rel, scenario.get("name", ""),
-                     scenario["location"]["line"], language),
+                     scenario["location"]["line"], language,
+                     tag_name.lstrip("@")),
                 )
+            # cenário sem tag reconhecida, mas com CT vinculado por nome —
+            # tag sintética "name:<arquivo>:<linha>" (não colide com @CT-)
+            if not linked_here:
+                ct_id = name_links.get((rel, scenario.get("name", "")))
+                if ct_id:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO scenarios"
+                        "(target, tag, feature_path, scenario_name, line,"
+                        " language, ct_id)"
+                        " VALUES (?,?,?,?,?,?,?)",
+                        (name, f"name:{rel}:{scenario['location']['line']}",
+                         rel, scenario.get("name", ""),
+                         scenario["location"]["line"], language, ct_id),
+                    )
 
     # cruzamentos com o índice de CTs
     for tag_name, where in seen_tags.items():
@@ -116,10 +150,19 @@ def scan_target(
             warn("orphan_scenario", where,
                  f"cenário órfão: tag {tag_name} sem CT correspondente")
     for row in conn.execute(
-        "SELECT id, scenario_tag FROM testcases"
+        "SELECT id, scenario_tag, feature_path, scenario_name FROM testcases"
         " WHERE type IN ('automated','hybrid') AND automation_target = ?",
         (name,),
     ).fetchall():
+        if row["scenario_name"] and row["feature_path"]:
+            # vínculo por NOME (0075): quebrado quando o cenário sumiu/renomeou
+            if (row["feature_path"], row["scenario_name"]) not in seen_names:
+                warn("broken_automation", row["id"],
+                     f"automação quebrada: {row['id']} espera cenário"
+                     f" \"{row['scenario_name']}\" em {row['feature_path']}"
+                     f" no target '{name}' (renomeado/removido? use a"
+                     " sincronização de .feature)")
+            continue
         expected = row["scenario_tag"] or f"@{row['id']}"
         if expected not in seen_tags:
             warn("broken_automation", row["id"],

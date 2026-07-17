@@ -5,7 +5,7 @@
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
 **Last updated:** 2026-07-11
-**Version:** 0.10.0
+**Version:** 0.11.0
 
 ## Purpose
 
@@ -92,6 +92,13 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 - While nenhum provider está configurado (`default_provider: null`), the
   system shall ocultar/desabilitar as funções de IA mantendo todo o resto
   da plataforma funcional.
+- While a área de IA está aberta, the system shall apresentar a visão de
+  TRABALHO primeiro (gerar/revisar/context pack) com o contexto ativo
+  visível (memória do perfil preenchida ou não, decisões aceitas no recap,
+  lições aprendidas disponíveis) e o histórico de interações de IA
+  (agent_events da capability `project-memory`, via
+  `GET /memory/timeline?kinds=agent`); a configuração de providers fica em
+  seção secundária/colapsada.
 - While a IA processa uma importação, the system shall submeter a conversão
   apenas por ação explícita do usuário (botão "Enviar"), nunca no simples
   `onChange` de seleção de arquivo, e sinalizar que modelos locais de
@@ -166,14 +173,25 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     quando existem no workspace; sem nenhuma, o prompt fica limpo (sem
     bloco de recap) — verified by `backend/tests/test_project_memory.py`.
 
+12. [verified] A área de IA abre na visão de trabalho com o contexto ativo
+    visível (perfil/decisões/lições) e o histórico de interações
+    (agent_events); a config de providers fica colapsada; cada função sem
+    entrada oferece um exemplo clicável e o preview sinaliza explicitamente
+    "nada gravado, aceite item a item" — verified by build + smoke dos
+    endpoints consumidos (`/profile`, `/decisions?status=accepted`,
+    `/defects?has_lesson=true`, `/memory/timeline?kinds=agent`, já cobertos
+    por `backend/tests/test_project_memory.py` e
+    `backend/tests/test_decisions.py`) + revisão visual.
+
 ## Maturity
 
 **MVP (committed):**
 
 - 4 classes de provider, 3 funções (gerar/revisar/negativos), preview
-  obrigatório, config UI, cruzamento com lições aprendidas (ver `defects`) na
-  geração de CTs, recap de decisões+lições recentes do projeto injetado em
-  geração e revisão (ver `project-memory`).
+  obrigatório, config UI (colapsada — a visão de trabalho vem primeiro, com
+  contexto ativo e histórico de interações), cruzamento com lições
+  aprendidas (ver `defects`) na geração de CTs, recap de decisões+lições
+  recentes do projeto injetado em geração e revisão (ver `project-memory`).
 
 **Future (aspirational, not committed):**
 

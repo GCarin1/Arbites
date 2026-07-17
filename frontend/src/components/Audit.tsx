@@ -102,6 +102,17 @@ export function Audit({ onError }: { onError: (message: string) => void }) {
           </button>
         </div>
       </div>
+      <p className="subtitle block">
+        Verificação automática de pendências do workspace: consolida problemas
+        de indexação, stories sem caso de teste, defeitos abertos há muito
+        tempo e automações quebradas. Roda quando você clica em "Auditar
+        agora" — ou sozinha, no máximo uma vez a cada 24h ao abrir esta aba.
+      </p>
+      <div className="audit-legend caption muted block">
+        <span className="status-dot dot-col-failed">bad — precisa de ação</span>
+        <span className="status-dot dot-col-blocked">warn — vale atenção</span>
+        <span className="status-dot dot-col-pending">info — contexto</span>
+      </div>
 
       {loading ? (
         <p className="empty">Carregando auditoria…</p>
@@ -127,9 +138,10 @@ export function Audit({ onError }: { onError: (message: string) => void }) {
             <div className="empty-state">
               <div className="empty-title">Tudo em dia</div>
               <div className="empty-body">
-                Nenhum achado nesta rodada — sem warnings de indexação,
-                stories descobertas, defeitos esquecidos ou automação
-                quebrada.
+                Nenhuma pendência nesta rodada. Se algo surgir — uma story
+                ficar sem caso de teste, um defeito envelhecer sem causa
+                raiz, uma automação quebrar — o achado aparece aqui com a
+                severidade e a referência do item.
               </div>
             </div>
           ) : (

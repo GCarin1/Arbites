@@ -3,6 +3,7 @@ import { api } from "../api";
 import { LinksInput, MentionTextarea } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
+import { useToast } from "./Toast";
 import type { Todo } from "../types";
 
 const STATUS_DOT: Record<string, string> = {
@@ -373,7 +374,9 @@ function TodoModal({
   const [links, setLinks] = useState((todo?.links ?? []).map((l) => l.id).join(", "));
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (todo) {
@@ -401,6 +404,7 @@ function TodoModal({
     try {
       if (todo) await api.updateTodo(todo.id, body);
       else await api.createTodo(body);
+      toast("Afazer salvo");
       onSaved();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -412,6 +416,7 @@ function TodoModal({
     <Modal
       title={todo ? `Editar ${todo.id}` : "Novo afazer"}
       onClose={onClose}
+      dirty={dirty && !saving}
       initialFocus={titleRef}
       footer={
         <>
@@ -424,6 +429,7 @@ function TodoModal({
         </>
       }
     >
+      <div className="modal-form" onInput={() => setDirty(true)}>
       <div className="modal-field">
         <label htmlFor="todo-title">Título</label>
         <input
@@ -465,6 +471,7 @@ function TodoModal({
           onChange={setDescription}
           placeholder="Detalhes do afazer. Ex.: bloqueado por @CT-0007…"
         />
+      </div>
       </div>
     </Modal>
   );

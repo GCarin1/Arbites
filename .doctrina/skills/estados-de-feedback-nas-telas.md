@@ -45,10 +45,25 @@ a UI precisa melhorar, não o texto crescer.
 - Fechar modal dirty descartando silenciosamente o que foi digitado.
 - Parágrafos de ajuda repetindo o que os labels já dizem.
 
+## Implementação canônica (landou na 0061)
+
+- **Salvo:** `useToast().toast("X salvo")` após o `await api.save…` — antes
+  do `onSaved()`. Provider único em `main.tsx` (`ToastProvider`).
+- **Dirty:** passar `dirty={dirty && !saving}` ao `Modal` compartilhado —
+  ele já pede confirmação ao fechar por Esc/backdrop/X. Detecção sem tocar
+  cada setter: envolver os campos num `<div className="modal-form"
+  onInput={() => setDirty(true)}>` — a classe é `display: contents`, então
+  captura os eventos por bubbling sem gerar caixa (zero impacto no layout) e
+  o `setBody` programático do load assíncrono NÃO dispara (evita falso
+  dirty).
+- **Carregando/erro:** `.spinner`/`.skeleton`/`.field-error` no CSS.
+
 ## Related material
 
+- `frontend/src/components/Toast.tsx` · `frontend/src/components/Modal.tsx`
+  (prop `dirty`) · `frontend/src/styles.css` (`.toast`/`.spinner`/
+  `.field-error`/`.modal-form`).
 - `.doctrina/specs/design-system/spec.md` — critério #3 (estados).
-- `.doctrina/changes/0061-design-system-estados-e-feedback-tornar-visiveis/`
 - [[salvar-inclui-formulario-pendente]] · [[modais-aninhados-esc-fecha-so-o-do-topo]]
   — lições de modal/salvamento já capturadas.
 - [[gramatica-de-componentes-canonicos]] — a slice irmã (fundação).

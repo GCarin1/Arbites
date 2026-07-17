@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)
 **Realizes:** SC1
 **Last updated:** 2026-07-09
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -31,6 +31,12 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
 
 - The system shall carimbar `created` (data) no frontmatter do requisito na
   criação, indexá-lo e expô-lo na listagem/detalhe.
+
+- The system shall exibir, por story na tela de Requisitos, o estado de
+  cobertura (coberta com N CTs vinculados / sem cobertura, badge
+  status-dot) e, por epic, o agregado "X/Y cobertas" — mesma fonte da
+  matriz de rastreabilidade (`GET /metrics/traceability`), sem cálculo
+  paralelo; com o filtro "só sem cobertura".
 
 ### Event-driven
 
@@ -66,6 +72,11 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
 
 4. [verified] Requisito criado recebe `created` e a listagem o expõe —
    verified by `backend/tests/test_requirements.py`.
+
+5. [verified] Story sem CT aparece "sem cobertura" e o filtro isola essas
+   stories; story com CT mostra a contagem; epic agrega "X/Y cobertas" —
+   dados da matriz, coberta por `backend/tests/test_metrics.py`
+   (traceability) + build/revisão visual da tela.
 
 ## Maturity
 

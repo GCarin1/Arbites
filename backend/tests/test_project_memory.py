@@ -262,3 +262,37 @@ def test_agent_event_survives_reindex(memory_client):
 
     events = memory_client.get("/api/v1/memory/timeline").json()
     assert len([e for e in events if e["kind"] == "agent"]) == 1
+
+
+def test_timeline_includes_testcase_creation(client):
+    """0073: criar um CT gera evento `testcase` na timeline (default)."""
+    ct = client.post("/api/v1/testcases", json={"title": "CT novo"}).json()
+    events = client.get("/api/v1/memory/timeline").json()
+    tc_events = [e for e in events if e["kind"] == "testcase"]
+    assert [e["id"] for e in tc_events] == [ct["id"]]
+    assert "criado" in tc_events[0]["summary"]
+
+
+def test_timeline_result_events_are_opt_in(client):
+    """0073: transições de resultado só aparecem com kinds=result (verboso
+    por natureza — default não afoga a timeline)."""
+    ct = client.post("/api/v1/testcases", json={"title": "CT exec"}).json()
+    execu = client.post(
+        "/api/v1/executions", json={"name": "Reg", "testcase_ids": [ct["id"]]}
+    ).json()
+    client.post(
+        f"/api/v1/executions/{execu['id']}/results/{ct['id']}/status",
+        json={"status": "passed"},
+    )
+
+    default = client.get("/api/v1/memory/timeline").json()
+    assert not [e for e in default if e["kind"] == "result"]
+
+    with_results = client.get(
+        "/api/v1/memory/timeline", params={"kinds": "result"}
+    ).json()
+    assert len(with_results) == 1
+    assert with_results[0]["kind"] == "result"
+    assert ct["id"] in with_results[0]["summary"]
+    assert "passou" in with_results[0]["summary"]
+    assert execu["id"] in with_results[0]["summary"]

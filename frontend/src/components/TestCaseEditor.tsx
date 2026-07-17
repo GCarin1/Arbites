@@ -3,7 +3,8 @@ import { api } from "../api";
 import { SingleRefInput } from "./Autocomplete";
 import { ConfirmModal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
-import type { TestCase } from "../types";
+import { useToast } from "./Toast";
+import type { TestCase, TestCaseResult } from "../types";
 
 export function TestCaseEditor({
   id,
@@ -21,9 +22,15 @@ export function TestCaseEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [history, setHistory] = useState<TestCaseResult[]>([]);
+  const { toast } = useToast();
 
   const load = useCallback(() => {
     setError(null);
+    api
+      .testcaseResults(id)
+      .then(setHistory)
+      .catch(() => {});
     return api
       .testcase(id)
       .then(setTc)
@@ -74,6 +81,7 @@ export function TestCaseEditor({
         setTc(updated);
       }
       setEditing(false); // após salvar, volta ao modo leitura
+      toast("Caso de teste salvo");
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -165,6 +173,56 @@ export function TestCaseEditor({
             </div>
             <DocBody text={tc.body} />
           </div>
+          {history.length > 0 && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <div className="card-head">
+                <h3>Histórico de resultados</h3>
+                <span className="spacer" />
+                <span className="caption muted">
+                  {history.length} execução{history.length === 1 ? "" : "ões"}
+                </span>
+              </div>
+              <div className="tc-history-dots" title="mais recente à esquerda">
+                {history.slice(0, 20).map((h, i) => (
+                  <span
+                    key={i}
+                    className={`status-dot dot-col-${h.status} caption`}
+                    title={`${h.execution_id} · ${h.status}`}
+                  />
+                ))}
+              </div>
+              <div className="table-wrap">
+                <table className="dense">
+                  <thead>
+                    <tr>
+                      <th>Execução</th>
+                      <th>Status</th>
+                      <th>Quando</th>
+                      <th>Duração</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h, i) => (
+                      <tr key={i}>
+                        <td className="mono">{h.execution_id}</td>
+                        <td>
+                          <span className={`status-dot dot-col-${h.status} caption`}>
+                            {h.status}
+                          </span>
+                        </td>
+                        <td className="caption muted">
+                          {(h.executed_at ?? "").slice(0, 16).replace("T", " ") || "—"}
+                        </td>
+                        <td className="caption muted">
+                          {h.duration_seconds !== null ? `${h.duration_seconds}s` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <>

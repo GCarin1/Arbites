@@ -43,6 +43,14 @@ export interface TestCase {
   body?: string;
 }
 
+export interface TestCaseResult {
+  execution_id: string;
+  execution_name: string;
+  status: string;
+  executed_at: string | null;
+  duration_seconds: number | null;
+}
+
 export interface TodoLink {
   id: string;
   kind: string | null;
@@ -362,6 +370,41 @@ export interface TimelineEntry {
   id: string;
   title: string;
   summary: string;
+}
+
+export interface DashboardAlert {
+  severity: "bad" | "warn" | "info";
+  category: string;
+  message: string;
+  ref: string | null;
+}
+
+export interface DashboardOverview {
+  last_reindex: string | null;
+  pass_rate_trend: {
+    days: number;
+    current: number | null;
+    previous: number | null;
+    delta: number | null;
+  };
+  alerts: DashboardAlert[];
+  top_problems: {
+    worst_repos: {
+      repo: string;
+      failed: number;
+      runs: number;
+      failure_rate: number | null;
+      broken_since: string | null;
+    }[];
+    top_failing_testcases: AutomationFailingCt[];
+    oldest_defects: {
+      id: string;
+      title: string;
+      severity: string | null;
+      age_days: number;
+    }[];
+  };
+  recommended_actions: { message: string; ref: string | null; category: string }[];
 }
 
 export interface HealthComponent {
