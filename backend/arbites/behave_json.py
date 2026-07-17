@@ -38,9 +38,12 @@ class BehaveJsonError(Exception):
 
 
 def parse_behave_json(
-    content: bytes | str, ct_prefix: str = _DEFAULT_CT_PREFIX
+    content: bytes | str, ct_prefix: str = _DEFAULT_CT_PREFIX,
+    name_map: dict[str, str] | None = None,
 ) -> dict[str, ScenarioResult]:
-    """Retorna {<PREFIXO>-XXXX: ScenarioResult} para cenários com tag do CT.
+    """Retorna {<PREFIXO>-XXXX: ScenarioResult} para cenários com tag do CT
+    OU vinculados por NOME de cenário (`name_map`: nome → ct_id, mudança
+    0075 — repo de automação read-only, sem tag no .feature).
 
     `ct_prefix` vem de `id_prefixes.testcase` do workspace (default "CT" só
     para chamadas sem workspace, ex. testes unitários deste módulo) — um
@@ -66,6 +69,8 @@ def parse_behave_json(
                 if m:
                     ct_id = m.group(1)
                     break
+            if not ct_id and name_map:
+                ct_id = name_map.get(str(element.get("name", "")))
             if not ct_id:
                 continue
 

@@ -1,6 +1,7 @@
 # Change 0071-clareza-da-aba-auditoria-subtitle-e-texto-de — Clareza da aba Auditoria: subtitle e texto de proposito (o que o auditor consolida e quando roda), legenda de severidades, empty state instrutivo; seguir o design system
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** audit
@@ -35,8 +36,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

@@ -1,6 +1,7 @@
 # Change 0069-deletar-test-execution-pela-ui-delete-executions — Deletar test execution pela UI: DELETE /executions/{id} move a pasta para a lixeira e reindexa; botao Excluir com ConfirmModal no repositorio de execucoes; execution com run ativo nao pode ser deletada
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** executions
@@ -32,8 +33,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-07-10
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -49,6 +49,15 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall abrir a edição de um resultado (passos, evidências,
   comentário, defeitos) num modal centralizado com botão de fechar (X),
   não mais como painel inline abaixo do Kanban.
+
+- The system shall expor `DELETE /executions/{id}`: move a PASTA inteira da
+  execution (JSON + evidências) para a lixeira e a remove do índice; uma
+  execution com run de automação ativo é recusada (409); nunca apaga do
+  disco.
+- The system shall aceitar atualizações incrementais de resultado durante
+  um run automatizado (por cenário concluído, progresso ao vivo), com o
+  estado final oficial vindo da reconciliação com o Cucumber JSON do fim
+  do run.
 
 ### Event-driven
 
@@ -94,6 +103,14 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
    barra da execução empilha todos os status (não só passed) — derivado de
    `results[].steps[]`/colunas, sem novo campo no backend — verified by
    `backend/tests/test_executions.py`.
+
+6. [verified] `DELETE /executions/{id}` move a pasta para a lixeira, some
+   do índice, e run ativo devolve 409 — verified by
+   `backend/tests/test_executions.py`.
+7. [verified] Durante um run a execution recebe resultados parciais por
+   cenário e o JSON final reconcilia o estado oficial — verified by
+   `backend/tests/test_local_runs.py`
+   (`test_live_progress_reconciled_by_final_json`).
 
 ## Maturity
 

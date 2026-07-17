@@ -1,6 +1,7 @@
 # Change 0075-lastreamento-feature-ct-por-nome-de-cenario — Lastreamento .feature-CT por nome de cenario: modal ao buscar .feature lista features e cenarios e o usuario escolhe quais vincular ao Arbites (cria CT automated com automation.feature_path e scenario_name; repositorio de automacao segue read-only, ADR 0003 preservado); sync re-executavel detecta features novos, cenarios novos em features ja vinculados, steps modificados (diff contra o body do CT) e cenarios renomeados ou sumidos (vinculo quebrado), e o modal permite escolher o que criar, atualizar ou re-vincular
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** local-automation
@@ -46,8 +47,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

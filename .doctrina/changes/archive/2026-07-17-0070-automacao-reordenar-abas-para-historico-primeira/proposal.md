@@ -1,6 +1,7 @@
 # Change 0070-automacao-reordenar-abas-para-historico-primeira — Automacao: reordenar abas para Historico (primeira e default) depois Executar e Configurar por ultimo; primeiro uso sem target orienta para Configurar via empty state
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** local-automation
@@ -31,8 +32,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

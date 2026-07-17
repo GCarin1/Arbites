@@ -123,6 +123,10 @@ export const api = {
   executions: (query = "") => request<ExecutionSummary[]>(`/executions${query}`),
   deleteExecution: (id: string) =>
     request<void>(`/executions/${id}`, { method: "DELETE" }),
+  runsActive: () =>
+    request<{ count: number; runs: { exec_id: string; target: string; status: string }[] }>(
+      "/runs/active",
+    ),
   execution: (id: string) => request<Execution>(`/executions/${id}`),
   createExecution: (body: object) =>
     request<Execution>("/executions", { method: "POST", body: JSON.stringify(body) }),

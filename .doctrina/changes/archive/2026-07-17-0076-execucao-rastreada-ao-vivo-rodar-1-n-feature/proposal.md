@@ -1,6 +1,7 @@
 # Change 0076-execucao-rastreada-ao-vivo-rodar-1-n-feature — Execucao rastreada ao vivo: rodar 1..N .feature (inclusive de features diferentes) cria automaticamente um test execution com todos os CTs lastreados (por tag ou por nome); modal pos-disparo oferece ir ao execution ver o andamento; cards e steps atualizam ao vivo por parsing best-effort do output do behave com o JSON final reconciliando; toast de sucesso ou erro ao terminar; indicador pulsante executando no item Automacao do menu lateral via endpoint leve de runs ativos
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** local-automation
@@ -48,8 +49,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

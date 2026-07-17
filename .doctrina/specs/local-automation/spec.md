@@ -5,7 +5,7 @@
 **Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
 **Last updated:** 2026-07-10
-**Version:** 0.6.0
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -62,6 +62,26 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   exista/esteja salvo) e devolve caminho relativo + contagem de cenários de
   cada um, para o usuário escolher em vez de digitar um glob às cegas.
 
+- The system shall permitir vincular cenários de .feature a CTs pelo NOME
+  do cenário (`automation.feature_path` + `scenario_name`), sem escrever
+  nada no repositório de automação (ADR 0003 preservado): `GET
+  /automation/features-sync?target=` classifica cada cenário
+  (linked_tag/linked/modified/new) e lista vínculos quebrados
+  (rename/remoção); `POST /automation/features-sync/apply` cria CTs com os
+  steps verbatim, re-baseia body de `modified` e re-vincula quebrados —
+  só o que o usuário selecionou no modal, nunca automático.
+- The system shall aceitar 1..N arquivos .feature em `POST /runs/local`
+  (`features: list`), criando UMA execution com todos os CTs lastreados
+  (por tag ou por nome); o parse do resultado casa cenário→CT também por
+  nome (`name_map`).
+- The system shall expor `GET /runs/active` (runs queued/running), e o menu
+  lateral shall exibir um indicador pulsante no item Automação enquanto
+  houver run ativo.
+- The system shall definir `PYTHONIOENCODING=utf-8` no ambiente do
+  subprocess do Behave — sem isso, no Windows o stream sai no encoding do
+  console e acentos viram mojibake (quebrando terminal ao vivo e o parse
+  de progresso).
+
 ### Event-driven
 
 - When um run é solicitado para um target já em execução, the system shall
@@ -82,6 +102,13 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   por tag é o caminho para rastreabilidade, não um pré-requisito para
   executar.
 
+- When um run é disparado pela UI, the system shall oferecer em modal ir à
+  execution criada ("ver andamento"); when o run termina, the system shall
+  exibir toast de sucesso/erro.
+- When o behave emite progresso (stream plain, EN/PT), the system shall
+  persistir resultados parciais por cenário concluído (best-effort), com o
+  Cucumber JSON final SEMPRE reconciliando o estado oficial.
+
 ### State-driven
 
 - While um run está ativo em um target, the system shall manter lock por
@@ -97,10 +124,12 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   (virtualenv é responsabilidade do usuário).
 - The system shall not misturar controles de setup (targets/.env/token) com
   controles de operação (disparo/terminal) no mesmo bloco visual — a tela
-  de Automação separa Configurar (setup), Executar (operação) e Histórico
-  (observabilidade: runs recentes com status + resumo por repositório com
-  runs/falhas/MTTR/última execução, reutilizando `GET /executions?origin=`
-  e `GET /metrics/automation`).
+  de Automação separa, NA ORDEM, Histórico (primeira e default;
+  observabilidade: runs recentes com status + resumo por repositório com
+  runs/falhas/MTTR/última execução, via `GET /executions?origin=` e
+  `GET /metrics/automation`), Executar (operação) e Configurar (última;
+  sem auto-troca de aba — o empty state do Histórico orienta o primeiro
+  uso).
 - The system shall not quebrar o repo de automação standalone: sem
   `ARBITES_EVIDENCE_DIR`, os hooks não fazem nada.
 - The system shall not usar fontes divergentes para o preview de features e
@@ -160,6 +189,15 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
     (`GET /executions?origin=`, `GET /metrics/automation`) + revisão visual
     (endpoints já cobertos por `backend/tests/test_executions.py` e
     `backend/tests/test_automation_report.py`).
+
+13. [verified] Sync por nome: vincular cria CT verbatim; editar steps vira
+    `modified` e o update re-baseia; rename vira vínculo quebrado e o
+    relink conserta; CT por nome entra no run do arquivo — verified by
+    `backend/tests/test_feature_sync.py` (5 testes).
+14. [verified] Run com N features cria 1 execution com todos os CTs;
+    `/runs/active` reflete o run e esvazia ao fim; progresso parcial
+    aparece no stream e o JSON final reconcilia (behave real) — verified
+    by `backend/tests/test_local_runs.py`.
 
 ## Maturity
 

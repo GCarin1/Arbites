@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-07-10
-**Version:** 0.6.0
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -66,6 +66,15 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall aceitar `external_key` opcional no frontmatter do CT
   (chave no sistema externo de origem) e indexá-la para detecção de
   duplicidade na migração (spec `xray-migration`).
+
+- The system shall expor `GET /testcases/{id}/results` (histórico de
+  resultados do CT: execution, status, data, duração — mais recente
+  primeiro, da tabela `results`), exibido no painel lateral do repositório
+  e no editor ("já passou no passado?").
+- The system shall aceitar em `automation` o par `feature_path` +
+  `scenario_name` como vínculo alternativo à `scenario_tag` (lastreamento
+  por nome de cenário; ver `local-automation`); `automation` exige tag OU
+  nome (422 sem nenhum).
 
 ### Event-driven
 
@@ -131,6 +140,14 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
    (`status`/`q`/`tag`/`type`) em `GET /testcases`, e
    `GET /defects?testcase=` lista os defeitos vinculados a um CT (fonte do
    painel lateral) — verified by `backend/tests/test_testcases.py`.
+
+10. [verified] O histórico de resultados por CT lista as execuções
+    passadas em ordem (endpoint + painel/editor) — verified by
+    `backend/tests/test_testcases.py` (`test_testcase_results_history`).
+11. [verified] CT com `automation.scenario_name` é indexado, entra no scan
+    do target e o run/coleta casa resultado por nome — verified by
+    `backend/tests/test_feature_sync.py` e
+    `backend/tests/test_local_runs.py`.
 
 ## Maturity
 

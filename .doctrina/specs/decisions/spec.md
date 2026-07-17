@@ -5,7 +5,7 @@
 **Implementation:** verified — M14 (backend/arbites/indexer.py, backend/arbites/api.py, frontend/src/components/Decisions.tsx)
 **Realizes:** n/a — capability nova (Memória Histórica do Projeto), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-11
-**Version:** 0.1.0
+**Version:** 0.1.1
 
 ## Purpose
 
@@ -66,6 +66,10 @@ metadados, sem tentar ser um sistema de governança completo.
 3. [verified] Uma decisão aparece em `GET /search` com `kind: "decision"` e
    sobrevive a um reindex completo — verified by
    `backend/tests/test_decisions.py`.
+
+4. [verified] A aba exibe subtitle de propósito e o empty state traz um
+   exemplo concreto (genérico) de decisão — verified by build + revisão
+   visual (`frontend/src/components/Decisions.tsx`).
 
 ## Maturity
 

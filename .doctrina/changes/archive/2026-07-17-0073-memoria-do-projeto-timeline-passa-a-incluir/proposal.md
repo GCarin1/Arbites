@@ -1,6 +1,7 @@
 # Change 0073-memoria-do-projeto-timeline-passa-a-incluir — Memoria do Projeto: timeline passa a incluir criacao de caso de teste (testcases.created) e mudancas de resultado dentro de executions (result_events: CT passou/falhou/bloqueado em EXEC-X) como novos tipos filtraveis; derivado do indice existente, sem persistencia nova
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** project-memory
@@ -34,8 +35,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

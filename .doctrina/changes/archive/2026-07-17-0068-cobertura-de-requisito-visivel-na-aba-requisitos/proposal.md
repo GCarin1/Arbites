@@ -1,6 +1,7 @@
 # Change 0068-cobertura-de-requisito-visivel-na-aba-requisitos — Cobertura de requisito visivel na aba Requisitos: cada story mostra se esta coberta (>=1 CT vinculado) ou nao, com contagem de CTs; filtro sem-cobertura; o dado ja existe na matriz do Dashboard, falta na tela de Requisitos
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-17
 - **Date:** 2026-07-17
 - **Owner:**
 - **Affects specs:** requirements
@@ -33,8 +34,8 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
 
 ## Open questions
 

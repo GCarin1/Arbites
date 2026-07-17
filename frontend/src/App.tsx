@@ -134,6 +134,7 @@ function NavItem({
   problemCount,
   pinned,
   onTogglePin,
+  live = false,
 }: {
   item: { key: Tab; label: string };
   tab: Tab;
@@ -141,6 +142,8 @@ function NavItem({
   problemCount: number;
   pinned: boolean;
   onTogglePin: () => void;
+  // indicador "algo executando" (0076): dot pulsante no item
+  live?: boolean;
 }) {
   return (
     <div className={`nav-row ${tab === item.key ? "active" : ""}`}>
@@ -150,6 +153,7 @@ function NavItem({
         aria-current={tab === item.key ? "page" : undefined}
       >
         {item.label}
+        {live && <span className="nav-live-dot" title="automação executando" />}
         {item.key === "problems" && problemCount > 0 && (
           <span className="count">{problemCount}</span>
         )}
@@ -178,6 +182,8 @@ export default function App() {
   const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
+  // runs de automação ativos → dot pulsante no item Automação (0076)
+  const [activeRuns, setActiveRuns] = useState(0);
   const [reqVersion, setReqVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reindexing, setReindexing] = useState(false);
@@ -218,6 +224,12 @@ export default function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+    // indicador "executando" no menu — fora do try principal: falha aqui
+    // não pode virar banner de erro (é acessório)
+    api
+      .runsActive()
+      .then((r) => setActiveRuns(r.count))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -363,6 +375,7 @@ export default function App() {
                       problemCount={problemCount}
                       pinned
                       onTogglePin={() => togglePin(k)}
+                      live={k === "automation" && activeRuns > 0}
                     />
                   ))}
               </div>
@@ -389,6 +402,7 @@ export default function App() {
                       problemCount={problemCount}
                       pinned={pins.includes(k)}
                       onTogglePin={() => togglePin(k)}
+                      live={k === "automation" && activeRuns > 0}
                     />
                   ))}
               </div>
@@ -409,7 +423,11 @@ export default function App() {
             </Suspense>
           ) : tab === "automation" ? (
             <Suspense fallback={<p className="empty">Carregando automação…</p>}>
-              <Automation onChanged={() => void refresh()} onError={setError} />
+              <Automation
+                onChanged={() => void refresh()}
+                onError={setError}
+                onNavigate={navigateTo}
+              />
             </Suspense>
           ) : tab === "ia" ? (
             <Suspense fallback={<p className="empty">Carregando IA…</p>}>

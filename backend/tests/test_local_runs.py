@@ -179,3 +179,56 @@ def test_run_whole_feature_without_any_ct_tag_does_not_422(tmp_path):
         _wait_run(client, execution["id"])
         stream = client.get(f"/api/v1/runs/{execution['id']}/stream")
         assert "sem_tag.feature" in stream.text  # o behave rodou o arquivo
+
+
+def test_multi_feature_run_creates_one_execution_with_all_cts(auto_client):
+    """0076: 1..N .feature de features diferentes numa execution só."""
+    repo = Path(auto_client.ws.config()["automation_targets"][0]["local_path"])
+    resp = auto_client.post(
+        "/api/v1/runs/local",
+        json={
+            "target": "frontend-web",
+            "features": ["features/login.feature", "features/lento.feature"],
+        },
+    )
+    assert resp.status_code == 201
+    execution = resp.json()["execution"]
+    ids = {r["testcase_id"] for r in execution["results"]}
+    # login tem CT-9001/9002 (+ órfão 9099 sem CT espelho); lento tem CT-9003
+    assert {"CT-9001", "CT-9002", "CT-9003"} <= ids
+    assert repo.exists()
+    _wait_run(auto_client, execution["id"], expect="done", timeout_s=90)
+
+
+def test_runs_active_reflects_running_then_empties(auto_client):
+    """0076: /runs/active mostra o run em andamento e esvazia ao terminar."""
+    resp = auto_client.post(
+        "/api/v1/runs/local",
+        json={"target": "frontend-web", "testcase_ids": ["CT-9001"]},
+    )
+    exec_id = resp.json()["execution"]["id"]
+    active = auto_client.get("/api/v1/runs/active").json()
+    assert active["count"] >= 1
+    assert any(r["exec_id"] == exec_id for r in active["runs"])
+
+    _wait_run(auto_client, exec_id)
+    active = auto_client.get("/api/v1/runs/active").json()
+    assert all(r["exec_id"] != exec_id for r in active["runs"])
+
+
+def test_live_progress_reconciled_by_final_json(auto_client):
+    """0076: o progresso ao vivo é best-effort e o JSON final SEMPRE
+    reconcilia — no fim, os resultados batem com o comportamento real
+    (CT-9001 passed, CT-9002 failed), independentemente do parcial."""
+    resp = auto_client.post(
+        "/api/v1/runs/local",
+        json={"target": "frontend-web", "testcase_ids": ["CT-9001", "CT-9002"]},
+    )
+    exec_id = resp.json()["execution"]["id"]
+    _wait_run(auto_client, exec_id)
+    execution = auto_client.get(f"/api/v1/executions/{exec_id}").json()
+    by_ct = {r["testcase_id"]: r["status"] for r in execution["results"]}
+    assert by_ct == {"CT-9001": "passed", "CT-9002": "failed"}
+    # o stream registrou parciais ao vivo (best-effort) antes do fim
+    stream = auto_client.get(f"/api/v1/runs/{exec_id}/stream")
+    assert "[arbites] parcial:" in stream.text
