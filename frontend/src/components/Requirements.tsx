@@ -104,12 +104,25 @@ export function ReqRepository({
   const [dragStory, setDragStory] = useState<string | null>(null);
   const [dropEpic, setDropEpic] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Requirement | null>(null);
+  // Cobertura por story (0068): reuso da matriz de rastreabilidade — a
+  // mesma fonte do Dashboard, sem endpoint novo. story_id → nº de CTs.
+  const [coverage, setCoverage] = useState<Map<string, number> | null>(null);
+  const [onlyUncovered, setOnlyUncovered] = useState(false);
 
   const load = useCallback(() => {
     api
       .requirements()
       .then(setItems)
       .catch((e) => onError(e.message));
+    api
+      .traceability("", "")
+      .then((m) => {
+        const map = new Map<string, number>();
+        for (const epic of m.epics)
+          for (const s of epic.stories) map.set(s.id, s.ct_count);
+        setCoverage(map);
+      })
+      .catch(() => {});
   }, [onError]);
 
   useEffect(() => {
@@ -162,8 +175,15 @@ export function ReqRepository({
   }
 
   const epics = items.filter((r) => r.kind === "epic");
-  const stories = items.filter((r) => r.kind === "story");
+  const allStories = items.filter((r) => r.kind === "story");
+  // cobertura (0068): 0 CTs = descoberta; filtro isola as descobertas
+  const ctsOf = (id: string) => coverage?.get(id) ?? 0;
+  const stories = onlyUncovered
+    ? allStories.filter((s) => ctsOf(s.id) === 0)
+    : allStories;
   const orphans = stories.filter((s) => !epics.some((e) => e.id === s.epic_id));
+  const coveredCount = (epicId: string) =>
+    allStories.filter((s) => s.epic_id === epicId && ctsOf(s.id) > 0).length;
 
   const storyRow = (story: Requirement, prefix: string, isLast: boolean) => (
     <div
@@ -181,6 +201,14 @@ export function ReqRepository({
         <span className="mono muted">{story.id}</span>
         <span className="repo-file-title">{story.title}</span>
       </button>
+      {coverage &&
+        (ctsOf(story.id) > 0 ? (
+          <span className="status-dot dot-col-passed caption">
+            coberta ({ctsOf(story.id)} CT{ctsOf(story.id) === 1 ? "" : "s"})
+          </span>
+        ) : (
+          <span className="status-dot dot-col-blocked caption">sem cobertura</span>
+        ))}
       <span className={`status-dot dot-${story.status} caption`}>{story.status}</span>
       <span className="caption mono muted">{story.created ?? ""}</span>
       <span className="repo-actions">
@@ -200,6 +228,14 @@ export function ReqRepository({
         <h1 className="page-title">Requisitos</h1>
         <span className="spacer" />
         <div className="head-controls">
+          <label className="caption" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="checkbox"
+              checked={onlyUncovered}
+              onChange={(e) => setOnlyUncovered(e.target.checked)}
+            />
+            só sem cobertura
+          </label>
           <button onClick={() => setCreating("epic")}>Novo epic</button>
           <button className="primary" onClick={() => setCreating("story")}>
             Nova story
@@ -245,6 +281,13 @@ export function ReqRepository({
                       <span className="repo-folder-name">{epic.title}</span>
                     </button>
                     <span className="caption muted">{children.length}</span>
+                    {coverage && (
+                      <span className="caption muted">
+                        {coveredCount(epic.id)}/
+                        {allStories.filter((s) => s.epic_id === epic.id).length}{" "}
+                        cobertas
+                      </span>
+                    )}
                     <span className="caption mono muted">{epic.created ?? ""}</span>
                     <span className="repo-actions">
                       <button className="btn-sm danger" onClick={() => setDeleting(epic)}>

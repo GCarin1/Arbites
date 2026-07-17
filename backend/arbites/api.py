@@ -83,7 +83,11 @@ class RequirementUpdate(BaseModel):
 
 class AutomationRef(BaseModel):
     target: str
-    scenario_tag: str
+    # vínculo por TAG no .feature (ADR 0003)…
+    scenario_tag: str | None = None
+    # …ou por NOME de cenário (mudança 0075; repo de automação read-only)
+    feature_path: str | None = None
+    scenario_name: str | None = None
 
 
 class TestcaseIn(BaseModel):
@@ -897,6 +901,23 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn_of(request), "testcases", entity_id)
         return (ws.root / rel).read_text(encoding="utf-8")
 
+    @app.get(API_PREFIX + "/testcases/{entity_id}/results")
+    async def testcase_results(request: Request, entity_id: str):
+        """Histórico de resultados do CT (0074): responde "já passou no
+        passado?" — leitura pura da tabela `results` JOIN executions,
+        mais recente primeiro."""
+        conn = conn_of(request)
+        _find_path(conn, "testcases", entity_id)  # 404 se o CT não existe
+        rows = conn.execute(
+            "SELECT r.execution_id, e.name execution_name, r.status,"
+            " r.executed_at, r.duration_seconds"
+            " FROM results r JOIN executions e ON e.id = r.execution_id"
+            " WHERE r.testcase_id = ?"
+            " ORDER BY r.executed_at DESC, r.execution_id DESC",
+            (entity_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     @app.put(API_PREFIX + "/testcases/{entity_id}/raw")
     async def put_testcase_raw(request: Request, entity_id: str, payload: RawIn):
         ws, conn = ws_of(request), conn_of(request)
@@ -980,6 +1001,23 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
         return exec_ops.load(ws_of(request), exec_id)
+
+    @app.delete(API_PREFIX + "/executions/{exec_id}", status_code=204)
+    async def delete_execution(request: Request, exec_id: str):
+        """Move a PASTA da execution (JSON + evidências) para a lixeira e
+        reindexa — nunca apaga do disco (padrão de trash da casa)."""
+        ws, conn = ws_of(request), conn_of(request)
+        runner: RunManager = request.app.state.runner
+        run = runner.runs.get(exec_id)
+        if run and run.status in ("queued", "running"):
+            raise _error(409, "run_active",
+                         f"{exec_id} tem um run de automação ativo — cancele antes")
+        execution = exec_ops.load(ws, exec_id)  # 404 se não existe
+        folder = exec_ops.exec_dir(ws, exec_id, execution["created_at"])
+        json_path = folder / "execution.json"
+        ws.trash(folder)
+        # reindex do arquivo removido limpa results/result_events/evidences
+        reindex_file(ws, conn, json_path)
 
     @app.patch(API_PREFIX + "/executions/{exec_id}")
     async def patch_execution(request: Request, exec_id: str, payload: ExecutionPatch):

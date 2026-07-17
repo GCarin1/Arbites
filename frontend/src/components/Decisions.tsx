@@ -119,14 +119,21 @@ export function Decisions({
         </div>
       </div>
 
+      <p className="subtitle block">
+        O porquê das escolhas do projeto sob teste — cada decisão registra
+        contexto, o que foi decidido e as consequências. Meses depois, o time
+        (e a IA, que recebe as decisões aceitas como contexto) ainda sabe o
+        motivo.
+      </p>
+
       {items.length === 0 ? (
         <div className="empty-state">
           <div className="empty-title">Nenhuma decisão registrada</div>
           <div className="empty-body">
-            Registre decisões arquiteturais relevantes ao projeto sob teste —
-            contexto, o que foi decidido e as consequências. Parte da memória
-            histórica do projeto: meses depois, o time (e a IA) ainda sabe o
-            porquê.
+            Exemplo: "Usar máscara de dados anonimizados nos testes de
+            pagamento — contexto: dados reais são sensíveis; decisão: gerar
+            massa sintética; consequência: cadastros de teste não validam em
+            produção". Clique em "Nova decisão" para registrar a primeira.
           </div>
         </div>
       ) : (

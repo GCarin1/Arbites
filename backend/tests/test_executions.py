@@ -194,3 +194,40 @@ def test_execution_survives_index_rebuild(client):
     listed = client.get("/api/v1/executions").json()
     assert listed[0]["id"] == execution["id"]
     assert listed[0]["result_counts"] == {"blocked": 1}
+
+
+def test_delete_execution_moves_folder_to_trash(client):
+    """0069: DELETE move a pasta inteira (JSON + evidências) p/ a lixeira."""
+    ct = make_ct(client, "Login")
+    execution = make_exec(client, ct_ids=[ct["id"]])
+    resp = client.delete(f"/api/v1/executions/{execution['id']}")
+    assert resp.status_code == 204
+
+    listed = client.get("/api/v1/executions").json()
+    assert all(e["id"] != execution["id"] for e in listed)
+    assert client.get(f"/api/v1/executions/{execution['id']}").status_code == 404
+    # a pasta foi para a lixeira, não apagada
+    trashed = list(client.ws.trash_dir.rglob("execution.json"))
+    assert len(trashed) == 1
+
+
+def test_delete_execution_with_active_run_is_409(client):
+    """0069: execution com run ativo no runner não pode ser deletada."""
+    from arbites.runner import RunInfo
+
+    ct = make_ct(client, "Login")
+    execution = make_exec(client, ct_ids=[ct["id"]])
+    runner = client.app.state.runner
+    fake = RunInfo(execution["id"], {"name": "t"}, [])
+    fake.status = "running"
+    runner.runs[execution["id"]] = fake
+    try:
+        resp = client.delete(f"/api/v1/executions/{execution['id']}")
+        assert resp.status_code == 409
+        assert resp.json()["error"]["code"] == "run_active"
+    finally:
+        del runner.runs[execution["id"]]
+
+
+def test_delete_unknown_execution_404(client):
+    assert client.delete("/api/v1/executions/EXEC-9999").status_code == 404

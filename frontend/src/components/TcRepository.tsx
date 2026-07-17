@@ -3,7 +3,13 @@ import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
 import { useToast } from "./Toast";
-import type { Defect, GeneratedTestcase, TestCase, TreeNode } from "../types";
+import type {
+  Defect,
+  GeneratedTestcase,
+  TestCase,
+  TestCaseResult,
+  TreeNode,
+} from "../types";
 
 type DragState =
   | { kind: "ct"; id: string }
@@ -491,6 +497,7 @@ function TcDetailPanel({
 }) {
   const [tc, setTc] = useState<TestCase | null>(null);
   const [defects, setDefects] = useState<Defect[]>([]);
+  const [history, setHistory] = useState<TestCaseResult[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -503,6 +510,10 @@ function TcDetailPanel({
     api
       .defects(`?testcase=${encodeURIComponent(id)}`)
       .then((d) => alive && setDefects(d))
+      .catch(() => {});
+    api
+      .testcaseResults(id)
+      .then((h) => alive && setHistory(h))
       .catch(() => {});
     return () => {
       alive = false;
@@ -575,6 +586,33 @@ function TcDetailPanel({
                   <span className="exec-item-msg">{d.title}</span>
                   <span className={`status-dot ${d.status === "open" ? "dot-col-failed" : "dot-col-passed"} caption`}>
                     {d.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {history.length > 0 && (
+            <div className="tc-panel-defects">
+              <span className="caption muted">
+                Histórico de resultados ({history.length})
+              </span>
+              <div className="tc-history-dots" title="mais recente à esquerda">
+                {history.slice(0, 12).map((h, i) => (
+                  <span
+                    key={i}
+                    className={`status-dot dot-col-${h.status} caption`}
+                    title={`${h.execution_id} · ${h.status} · ${h.executed_at ?? "sem data"}`}
+                  />
+                ))}
+              </div>
+              {history.slice(0, 5).map((h, i) => (
+                <div key={i} className="exec-item">
+                  <span className="mono">{h.execution_id}</span>
+                  <span className={`status-dot dot-col-${h.status} caption`}>
+                    {h.status}
+                  </span>
+                  <span className="caption muted">
+                    {(h.executed_at ?? "").slice(0, 10)}
                   </span>
                 </div>
               ))}

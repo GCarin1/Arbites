@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
+import { useToast } from "./Toast";
 import type { Execution, ExecutionSummary, ResultEntry, TestCase } from "../types";
 
 /**
@@ -141,13 +142,30 @@ export function ExecutionsRepo({
 }) {
   const [items, setItems] = useState<ExecutionSummary[]>([]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<ExecutionSummary | null>(null);
+  const { toast } = useToast();
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .executions()
       .then(setItems)
       .catch((e) => onError(e.message));
-  }, [version, onError]);
+  }, [onError]);
+
+  useEffect(() => {
+    load();
+  }, [version, load]);
+
+  async function remove(item: ExecutionSummary) {
+    setDeleting(null);
+    try {
+      await api.deleteExecution(item.id);
+      toast("Execução movida para a lixeira");
+      load();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   function toggle(year: string) {
     setCollapsed((old) => {
@@ -230,6 +248,14 @@ export function ExecutionsRepo({
                         <span className="caption mono muted">
                           {(item.created_at ?? "").slice(0, 10)}
                         </span>
+                        <span className="repo-actions">
+                          <button
+                            className="btn-sm danger"
+                            onClick={() => setDeleting(item)}
+                          >
+                            Excluir
+                          </button>
+                        </span>
                       </div>
                     );
                   })}
@@ -238,6 +264,21 @@ export function ExecutionsRepo({
           })
         )}
       </div>
+      {deleting && (
+        <ConfirmModal
+          title="Excluir execução"
+          message={
+            <>
+              Mover <span className="mono">{deleting.id}</span> ({deleting.name})
+              e suas evidências para a lixeira?
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void remove(deleting)}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
     </div>
   );
 }

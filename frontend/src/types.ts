@@ -43,6 +43,14 @@ export interface TestCase {
   body?: string;
 }
 
+export interface TestCaseResult {
+  execution_id: string;
+  execution_name: string;
+  status: string;
+  executed_at: string | null;
+  duration_seconds: number | null;
+}
+
 export interface TodoLink {
   id: string;
   kind: string | null;

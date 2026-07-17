@@ -1847,6 +1847,13 @@ a {
   gap: var(--s2);
 }
 
+/* ------------------------------------------- Auditoria (0071) */
+.audit-legend {
+  display: flex;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
 /* --------------------------------------- Assistente de IA (0066) */
 .assist-context {
   display: flex;
@@ -1932,6 +1939,11 @@ a {
 }
 .repo-file.selected {
   background: var(--selected);
+}
+.tc-history-dots {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0;
 }
 .crumbs {
   display: flex;

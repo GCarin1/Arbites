@@ -15,6 +15,7 @@ import type {
   MeetingSummaryResult,
   RiskMap,
   SavedDaily,
+  TestCaseResult,
   TimelineEntry,
   Execution,
   ExecutionSummary,
@@ -77,6 +78,8 @@ export const api = {
 
   testcases: (params = "") => request<TestCase[]>(`/testcases${params}`),
   testcase: (id: string) => request<TestCase>(`/testcases/${id}`),
+  testcaseResults: (id: string) =>
+    request<TestCaseResult[]>(`/testcases/${id}/results`),
   createTestcase: (body: object) =>
     request<TestCase>("/testcases", { method: "POST", body: JSON.stringify(body) }),
   updateTestcase: (id: string, body: object) =>
@@ -118,6 +121,8 @@ export const api = {
     }),
 
   executions: (query = "") => request<ExecutionSummary[]>(`/executions${query}`),
+  deleteExecution: (id: string) =>
+    request<void>(`/executions/${id}`, { method: "DELETE" }),
   execution: (id: string) => request<Execution>(`/executions/${id}`),
   createExecution: (body: object) =>
     request<Execution>("/executions", { method: "POST", body: JSON.stringify(body) }),

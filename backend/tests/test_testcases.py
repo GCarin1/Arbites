@@ -117,3 +117,25 @@ def test_defects_filter_by_testcase(client):
 
     by_ct = client.get("/api/v1/defects", params={"testcase": ct["id"]}).json()
     assert [d["id"] for d in by_ct] == [linked["id"]]
+
+
+def test_testcase_results_history(client):
+    """0074: histórico de resultados por CT — já passou no passado?"""
+    ct = client.post("/api/v1/testcases", json={"title": "CT histórico"}).json()
+    for name, status in (("Reg 1", "passed"), ("Reg 2", "failed")):
+        execu = client.post(
+            "/api/v1/executions", json={"name": name, "testcase_ids": [ct["id"]]}
+        ).json()
+        client.post(
+            f"/api/v1/executions/{execu['id']}/results/{ct['id']}/status",
+            json={"status": status},
+        )
+
+    history = client.get(f"/api/v1/testcases/{ct['id']}/results").json()
+    assert len(history) == 2
+    assert {h["status"] for h in history} == {"passed", "failed"}
+    assert all(h["execution_id"] and h["execution_name"] for h in history)
+    # mais recente primeiro
+    assert history[0]["executed_at"] >= history[1]["executed_at"]
+
+    assert client.get("/api/v1/testcases/CT-9999/results").status_code == 404
