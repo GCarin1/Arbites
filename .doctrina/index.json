@@ -110,6 +110,14 @@
         ]
       },
       {
+        "id": "home",
+        "path": ".doctrina/specs/home/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-19",
+        "implementation": "planned — entrega na change 0080 (backlog da varredura de 2026-07-19)"
+      },
+      {
         "id": "indexing",
         "path": ".doctrina/specs/indexing/spec.md",
         "status": "active",
@@ -330,7 +338,141 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0080-tela-hoje-landing-com-visao-do-dia",
+        "title": "tela hoje: landing com visao do dia",
+        "path": ".doctrina/changes/0080-tela-hoje-landing-com-visao-do-dia",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
+        "title": "lixeira: listar e restaurar itens da trash pela UI",
+        "path": ".doctrina/changes/0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "title": "pickers canonicos por titulo em referencias a entidades",
+        "path": ".doctrina/changes/0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "title": "acoes em lote no repositorio de CTs e nas executions",
+        "path": ".doctrina/changes/0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0084-aba-e-filtros-na-url-para-deep-link",
+        "title": "aba e filtros na URL para deep-link",
+        "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0085-testar-provider-de-ia-na-configuracao",
+        "title": "testar provider de IA na configuracao",
+        "path": ".doctrina/changes/0085-testar-provider-de-ia-na-configuracao",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0086-story-360-cadeia-completa-navegavel-por-story",
+        "title": "story 360: cadeia completa navegavel por story",
+        "path": ".doctrina/changes/0086-story-360-cadeia-completa-navegavel-por-story",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0087-cobertura-semantica-passando-falhando-ou-nunca",
+        "title": "cobertura semantica: passando, falhando ou nunca executada",
+        "path": ".doctrina/changes/0087-cobertura-semantica-passando-falhando-ou-nunca",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0088-diff-entre-duas-executions",
+        "title": "diff entre duas executions",
+        "path": ".doctrina/changes/0088-diff-entre-duas-executions",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "title": "flaky visivel no CT e quarentena fora do pass rate",
+        "path": ".doctrina/changes/0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "title": "sync de feature atualizado marca CT precisa re-execucao",
+        "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0091-editor-e-lint-de-criterios-ears-na-story",
+        "title": "editor e lint de criterios EARS na story",
+        "path": ".doctrina/changes/0091-editor-e-lint-de-criterios-ears-na-story",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
+        "title": "spec coverage: criterio EARS vinculado a CT no auditor",
+        "path": ".doctrina/changes/0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0093-gerar-cts-por-criterio-ears-com-vinculo-gravado",
+        "title": "gerar CTs por criterio EARS com vinculo gravado",
+        "path": ".doctrina/changes/0093-gerar-cts-por-criterio-ears-com-vinculo-gravado",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0094-pacote-de-agente-exportar-agents-md-e-skills-do",
+        "title": "pacote de agente: exportar AGENTS.md e skills do escopo",
+        "path": ".doctrina/changes/0094-pacote-de-agente-exportar-agents-md-e-skills-do",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0095-licoes-de-defeito-estruturadas-como-skills",
+        "title": "licoes de defeito estruturadas como skills",
+        "path": ".doctrina/changes/0095-licoes-de-defeito-estruturadas-como-skills",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
+        "title": "resumo de falha pos-run pela IA com defeito draft",
+        "path": ".doctrina/changes/0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0097-action-items-de-reuniao-viram-afazeres",
+        "title": "action items de reuniao viram afazeres",
+        "path": ".doctrina/changes/0097-action-items-de-reuniao-viram-afazeres",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0098-reporte-executivo-narrado-pela-ia",
+        "title": "reporte executivo narrado pela IA",
+        "path": ".doctrina/changes/0098-reporte-executivo-narrado-pela-ia",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1374,6 +1516,12 @@
         "path": ".doctrina/skills/default-por-tipo-de-provider.md",
         "description": "Fallback único (ex. base_url → OpenAI) para vários tipos rota provider local para a nuvem quando o campo é omitido — use default por tipo.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "delta-prose-exige-operation-modified",
+        "path": ".doctrina/skills/delta-prose-exige-operation-modified.md",
+        "description": "Como escrever deltas de spec à mão neste repo sem quebrar os gates — todo delta prose precisa do header `**Operation:** MODIFIED`, o merge na spec é manual (apply só confere), e specs editadas exigem `doctrina validate --fix` para re-sincronizar o index.",
+        "last_updated": "2026-07-19"
       },
       {
         "id": "descobrir-em-vez-de-digitar-config-de-caminho-externo",
