@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.12.0",
-  "last_updated": "2026-07-17",
+  "last_updated": "2026-07-19",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,8 +15,8 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.11.0",
-        "last_updated": "2026-07-11",
+        "version": "0.12.0",
+        "last_updated": "2026-07-19",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
@@ -56,8 +56,8 @@
         "id": "context-pack",
         "path": ".doctrina/specs/context-pack/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-12",
+        "version": "0.2.0",
+        "last_updated": "2026-07-19",
         "implementation": "verified"
       },
       {
@@ -158,8 +158,8 @@
         "id": "project-memory",
         "path": ".doctrina/specs/project-memory/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-12",
+        "version": "0.3.0",
+        "last_updated": "2026-07-19",
         "implementation": "verified"
       },
       {
@@ -1297,6 +1297,45 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0077-memoria-do-projeto-agrupar-timeline-por-dia",
+        "title": "memoria do projeto: agrupar timeline por dia colapsavel e filtro de periodo ano/mes com filtro de data no backend",
+        "path": ".doctrina/changes/archive/2026-07-19-0077-memoria-do-projeto-agrupar-timeline-por-dia",
+        "status": "applied",
+        "applied": "2026-07-19",
+        "specs_affected": [
+          {
+            "capability": "project-memory",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0078-reformular-aba-de-ia-sub-abas-gerar-revisar",
+        "title": "reformular aba de IA: sub-abas gerar/revisar/context-pack/configuracao e seletor de provider global no topo",
+        "path": ".doctrina/changes/archive/2026-07-19-0078-reformular-aba-de-ia-sub-abas-gerar-revisar",
+        "status": "applied",
+        "applied": "2026-07-19",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0079-context-pack-escopo-com-pickers-que-listam-itens",
+        "title": "context-pack: escopo com pickers que listam itens + autocomplete, toggles de secao (CTs/defeitos/decisoes), ultimo resultado por CT, decisoes em qualquer escopo, preview com contagens e copiar/baixar",
+        "path": ".doctrina/changes/archive/2026-07-19-0079-context-pack-escopo-com-pickers-que-listam-itens",
+        "status": "applied",
+        "applied": "2026-07-19",
+        "specs_affected": [
+          {
+            "capability": "context-pack",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -1341,6 +1380,12 @@
         "path": ".doctrina/skills/descobrir-em-vez-de-digitar-config-de-caminho-externo.md",
         "description": "Quando um formulário de config pede um caminho externo (pasta/glob de outro repositório) que o usuário não decora, ofereça um botão que ESCANEIA o filesystem de verdade e devolve a lista real para escolher — não deixe o usuário digitar um padrão às cegas.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "design-system-canonico",
+        "path": ".doctrina/skills/design-system-canonico.md",
+        "description": "Gramática visual canônica do frontend Arbites (capability design-system) — as convenções fixas de botão/input/card/badge/abas/hierarquia/feedback que toda tela nova ou alterada deve seguir, em vez de estilo ad-hoc.",
+        "last_updated": "2026-07-19"
       },
       {
         "id": "efeito-de-foco-so-no-mount",

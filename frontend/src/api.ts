@@ -199,14 +199,29 @@ export const api = {
 
   profile: () => request<{ name: string; memory: string }>("/profile"),
 
-  memoryTimeline: (kinds = "", limit = 50) =>
-    request<TimelineEntry[]>(
-      `/memory/timeline?kinds=${encodeURIComponent(kinds)}&limit=${limit}`,
+  memoryTimeline: (kinds = "", limit = 50, dateFrom = "", dateTo = "") => {
+    const qs = new URLSearchParams({ kinds, limit: String(limit) });
+    if (dateFrom) qs.set("date_from", dateFrom);
+    if (dateTo) qs.set("date_to", dateTo);
+    return request<TimelineEntry[]>(`/memory/timeline?${qs.toString()}`);
+  },
+  memoryTimelineYears: (kinds = "") =>
+    request<string[]>(
+      `/memory/timeline/years?kinds=${encodeURIComponent(kinds)}`,
     ),
 
   contextPackUrl: (params: Record<string, string>) => {
     const qs = new URLSearchParams(params);
     return `${BASE}/context-pack?${qs.toString()}`;
+  },
+  contextPack: (params: Record<string, string>) => {
+    const qs = new URLSearchParams({ ...params, format: "json" });
+    return request<{
+      scope: Record<string, string>;
+      counts: { requirements: number; testcases: number; defects: number; decisions: number };
+      bytes: number;
+      markdown: string;
+    }>(`/context-pack?${qs.toString()}`);
   },
 
   todos: (query = "") => request<Todo[]>(`/todos${query}`),

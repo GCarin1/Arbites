@@ -99,3 +99,84 @@ def test_context_pack_story_not_in_scope_is_excluded(client):
     body = client.get("/api/v1/context-pack", params={"story": story["id"]}).text
     assert story["id"] in body
     assert other["id"] not in body
+
+
+# ----------------------------------------------------------------- 0079
+
+
+def test_context_pack_json_format_returns_counts_and_markdown(client):
+    _epic, story, ct, defect = _build_dataset(client)
+    data = client.get(
+        "/api/v1/context-pack", params={"story": story["id"], "format": "json"}
+    ).json()
+
+    assert data["scope"] == {"story": story["id"]}
+    assert data["counts"]["requirements"] >= 1
+    assert data["counts"]["testcases"] == 1
+    assert data["counts"]["defects"] == 1
+    assert data["bytes"] == len(data["markdown"].encode("utf-8"))
+    assert ct["id"] in data["markdown"]
+    assert defect["id"] in data["markdown"]
+
+
+def test_context_pack_section_toggles_remove_sections(client):
+    _epic, story, ct, defect = _build_dataset(client)
+    params = {
+        "story": story["id"], "format": "json",
+        "testcases": "false", "defects": "false",
+    }
+    data = client.get("/api/v1/context-pack", params=params).json()
+
+    assert data["counts"]["testcases"] == 0
+    assert data["counts"]["defects"] == 0
+    assert ct["id"] not in data["markdown"]
+    assert defect["id"] not in data["markdown"]
+    # a story em si continua no pack
+    assert story["id"] in data["markdown"]
+
+
+def test_context_pack_includes_accepted_decisions_without_squad(client):
+    _epic, story, _ct, _defect = _build_dataset(client)
+    dec = client.post(
+        "/api/v1/decisions",
+        json={"title": "Usar UTC em timestamps", "status": "accepted",
+              "body": "Sempre gravar em UTC."},
+    ).json()
+
+    # sem squad, mas com decisions ligado (default) → ADRs aceitas entram
+    data = client.get(
+        "/api/v1/context-pack", params={"story": story["id"], "format": "json"}
+    ).json()
+    assert data["counts"]["decisions"] >= 1
+    assert dec["id"] in data["markdown"]
+    assert "Usar UTC em timestamps" in data["markdown"]
+
+    # com decisions=false, some
+    off = client.get(
+        "/api/v1/context-pack",
+        params={"story": story["id"], "format": "json", "decisions": "false"},
+    ).json()
+    assert off["counts"]["decisions"] == 0
+    assert dec["id"] not in off["markdown"]
+
+
+def test_context_pack_last_result_appends_latest_status(client):
+    _epic, story, ct, _defect = _build_dataset(client)
+    execu = client.post(
+        "/api/v1/executions", json={"name": "Regressão", "testcase_ids": [ct["id"]]}
+    ).json()
+    client.post(
+        f"/api/v1/executions/{execu['id']}/results/{ct['id']}/status",
+        json={"status": "passed"},
+    )
+
+    off = client.get(
+        "/api/v1/context-pack", params={"story": story["id"], "format": "json"}
+    ).json()
+    assert "Último resultado" not in off["markdown"]
+
+    on = client.get(
+        "/api/v1/context-pack",
+        params={"story": story["id"], "format": "json", "last_result": "true"},
+    ).json()
+    assert "Último resultado: passed" in on["markdown"]

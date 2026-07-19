@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-11
-**Version:** 0.11.0
+**Last updated:** 2026-07-19
+**Version:** 0.12.0
 
 ## Purpose
 
@@ -92,13 +92,17 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 - While nenhum provider está configurado (`default_provider: null`), the
   system shall ocultar/desabilitar as funções de IA mantendo todo o resto
   da plataforma funcional.
-- While a área de IA está aberta, the system shall apresentar a visão de
-  TRABALHO primeiro (gerar/revisar/context pack) com o contexto ativo
-  visível (memória do perfil preenchida ou não, decisões aceitas no recap,
-  lições aprendidas disponíveis) e o histórico de interações de IA
-  (agent_events da capability `project-memory`, via
-  `GET /memory/timeline?kinds=agent`); a configuração de providers fica em
-  seção secundária/colapsada.
+- While a área de IA está aberta, the system shall organizá-la em sub-abas
+  internas **Gerar · Revisar · Context Pack · Configuração**, abrindo em
+  Gerar (trabalho), com o contexto ativo (memória do perfil preenchida ou
+  não, decisões aceitas no recap, lições disponíveis) e o histórico de
+  interações de IA (agent_events da capability `project-memory`, via
+  `GET /memory/timeline?kinds=agent`) acompanhando as abas de trabalho; a
+  configuração de providers vive na sub-aba Configuração (não mais um card
+  colapsado atrás de um toggle).
+- While a área de IA está aberta, the system shall oferecer um seletor de
+  provider ÚNICO no cabeçalho da tela, usado por Gerar, Revisar e Casos
+  negativos — sem repetir o dropdown de provider por card.
 - While a IA processa uma importação, the system shall submeter a conversão
   apenas por ação explícita do usuário (botão "Enviar"), nunca no simples
   `onChange` de seleção de arquivo, e sinalizar que modelos locais de
@@ -173,14 +177,16 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     quando existem no workspace; sem nenhuma, o prompt fica limpo (sem
     bloco de recap) — verified by `backend/tests/test_project_memory.py`.
 
-12. [verified] A área de IA abre na visão de trabalho com o contexto ativo
-    visível (perfil/decisões/lições) e o histórico de interações
-    (agent_events); a config de providers fica colapsada; cada função sem
-    entrada oferece um exemplo clicável e o preview sinaliza explicitamente
-    "nada gravado, aceite item a item" — verified by build + smoke dos
-    endpoints consumidos (`/profile`, `/decisions?status=accepted`,
-    `/defects?has_lesson=true`, `/memory/timeline?kinds=agent`, já cobertos
-    por `backend/tests/test_project_memory.py` e
+12. [verified] A área de IA abre na sub-aba Gerar, alterna entre
+    Gerar/Revisar/Context Pack/Configuração, com o contexto ativo
+    (perfil/decisões/lições) e o histórico de interações (agent_events)
+    visíveis no trabalho e a config de providers na sua sub-aba; o provider
+    escolhido no cabeçalho vale para gerar/revisar/negativos; o preview
+    segue sinalizando "nada gravado, aceite item a item" — verified by build
+    + smoke dos endpoints consumidos (`/ai/providers`, `/profile`,
+    `/decisions?status=accepted`, `/defects?has_lesson=true`,
+    `/memory/timeline?kinds=agent`, já cobertos por
+    `backend/tests/test_project_memory.py` e
     `backend/tests/test_decisions.py`) + revisão visual.
 
 ## Maturity

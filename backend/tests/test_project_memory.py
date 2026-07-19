@@ -296,3 +296,49 @@ def test_timeline_result_events_are_opt_in(client):
     assert ct["id"] in with_results[0]["summary"]
     assert "passou" in with_results[0]["summary"]
     assert execu["id"] in with_results[0]["summary"]
+
+
+def test_timeline_date_range_filters_all_sources(client):
+    """0077: date_from/date_to recortam a timeline pelo prefixo de data de
+    `at`, uniforme para todas as fontes."""
+    from datetime import date, timedelta
+
+    dec = client.post("/api/v1/decisions", json={"title": "Dec"}).json()
+    events = client.get("/api/v1/memory/timeline").json()
+    day = next(e["at"][:10] for e in events if e["id"] == dec["id"])
+
+    d = date.fromisoformat(day)
+    before = (d - timedelta(days=1)).isoformat()
+    after = (d + timedelta(days=1)).isoformat()
+
+    # janela que contém o dia → presente
+    inside = client.get(
+        "/api/v1/memory/timeline", params={"date_from": day, "date_to": day}
+    ).json()
+    assert dec["id"] in [e["id"] for e in inside]
+
+    # janela inteiramente ANTES → ausente
+    past = client.get(
+        "/api/v1/memory/timeline", params={"date_from": before, "date_to": before}
+    ).json()
+    assert dec["id"] not in [e["id"] for e in past]
+
+    # janela inteiramente DEPOIS → ausente
+    future = client.get(
+        "/api/v1/memory/timeline", params={"date_from": after, "date_to": after}
+    ).json()
+    assert dec["id"] not in [e["id"] for e in future]
+
+
+def test_timeline_years_lists_years_with_events(client):
+    """0077: /memory/timeline/years devolve os anos distintos com eventos,
+    em ordem decrescente; workspace vazio → lista vazia."""
+    assert client.get("/api/v1/memory/timeline/years").json() == []
+
+    dec = client.post("/api/v1/decisions", json={"title": "Dec"}).json()
+    events = client.get("/api/v1/memory/timeline").json()
+    year = next(e["at"][:4] for e in events if e["id"] == dec["id"])
+
+    years = client.get("/api/v1/memory/timeline/years").json()
+    assert year in years
+    assert years == sorted(years, reverse=True)

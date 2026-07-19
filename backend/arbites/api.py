@@ -1324,7 +1324,15 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/context-pack")
     async def get_context_pack(
-        request: Request, epic: str = "", story: str = "", squad: str = ""
+        request: Request,
+        epic: str = "",
+        story: str = "",
+        squad: str = "",
+        testcases: bool = True,
+        defects: bool = True,
+        decisions: bool = True,
+        last_result: bool = False,
+        format: str = "md",
     ):
         if not (epic or story or squad):
             raise _error(
@@ -1333,11 +1341,18 @@ def _register_routes(app: FastAPI) -> None:
                 " workspace inteiro sem escopo",
             )
         ws, conn = ws_of(request), conn_of(request)
-        body = context_pack_ops.build(
-            conn, ws.root, epic or None, story or None, squad or None
+        pack = context_pack_ops.build(
+            conn, ws.root, epic or None, story or None, squad or None,
+            include_testcases=testcases, include_defects=defects,
+            include_decisions=decisions, include_last_result=last_result,
         )
+        if format == "json":
+            scope = {k: v for k, v in (("epic", epic), ("story", story),
+                                       ("squad", squad)) if v}
+            return {"scope": scope, "counts": pack["counts"],
+                    "bytes": pack["bytes"], "markdown": pack["markdown"]}
         return PlainTextResponse(
-            body,
+            pack["markdown"],
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": 'attachment; filename="context-pack.md"'},
         )
@@ -2799,9 +2814,23 @@ def _register_routes(app: FastAPI) -> None:
     # `_log_agent_event`); o resto é derivado do que já está no índice.
 
     @app.get(API_PREFIX + "/memory/timeline")
-    async def get_memory_timeline(request: Request, kinds: str = "", limit: int = 50):
+    async def get_memory_timeline(
+        request: Request,
+        kinds: str = "",
+        limit: int = 50,
+        date_from: str = "",
+        date_to: str = "",
+    ):
         wanted = [k for k in kinds.split(",") if k] or None
-        return memory_ops.timeline(conn_of(request), wanted, max(1, min(limit, 200)))
+        return memory_ops.timeline(
+            conn_of(request), wanted, max(1, min(limit, 200)),
+            date_from or None, date_to or None,
+        )
+
+    @app.get(API_PREFIX + "/memory/timeline/years")
+    async def get_memory_timeline_years(request: Request, kinds: str = ""):
+        wanted = [k for k in kinds.split(",") if k] or None
+        return memory_ops.timeline_years(conn_of(request), wanted)
 
 
 def _mount_frontend(app: FastAPI) -> None:

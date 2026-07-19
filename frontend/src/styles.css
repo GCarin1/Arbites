@@ -1444,6 +1444,46 @@ table.dense tbody tr:hover td {
   color: var(--text-subtle);
   margin-top: 2px;
 }
+/* filtros + agrupamento por dia colapsável (0077) */
+.memory-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.memory-search {
+  max-width: 280px;
+}
+.memory-day {
+  margin-bottom: var(--s2);
+}
+.memory-day-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  justify-content: flex-start;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  margin-bottom: var(--s2);
+  color: var(--text);
+}
+.memory-day-caret {
+  color: var(--text-muted);
+  font-size: 10px;
+  width: 12px;
+  flex: 0 0 12px;
+}
+.memory-day-date {
+  font-weight: 600;
+}
+/* checkbox inline com rótulo (toggles de seção, filtros) */
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .heatmap-legend {
   display: flex;
   align-items: center;
