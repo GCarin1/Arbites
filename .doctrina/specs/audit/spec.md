@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Agente Auditor), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
-**Last updated:** 2026-07-12
-**Version:** 0.1.2
+**Last updated:** 2026-07-20
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -26,9 +26,12 @@ atenção.
 - The system shall expor `POST /audit/run` que roda uma auditoria
   imediatamente (`trigger: manual`), persiste o resultado como Markdown com
   frontmatter em `audits/AUD-NNNN.md` e devolve o relatório completo.
-- The system shall consolidar 4 categorias de achados por rodada: `indexing`
+- The system shall consolidar 5 categorias de achados por rodada: `indexing`
   (warnings já existentes na tabela de indexação), `coverage` (stories sem
-  nenhum caso de teste vinculado), `defects` (defeitos abertos há mais de
+  nenhum caso de teste vinculado), `spec` (cobertura no nível critério EARS↔CT
+  — critério sem CT vinculado = `uncovered_criterion`/warn; CT ready ou
+  automated de story COM critérios que não declara qual cobre =
+  `unlinked_testcase`/info), `defects` (defeitos abertos há mais de
   `audit.defect_aging_days` dias, default 14) e `automation` (repositórios de
   automação quebrados há mais de `audit.broken_automation_days` dias,
   default 3). O check de automação usa o mesmo `ci_monitoring.name_pattern`
@@ -123,11 +126,16 @@ atenção.
    empty state instrutivo — verified by build + revisão visual
    (`frontend/src/components/Audit.tsx`).
 
+8. [verified] A categoria `spec` acusa critério EARS sem CT vinculado
+   (`uncovered_criterion`/warn) e CT ready/automated de story com critérios
+   sem vínculo (`unlinked_testcase`/info) — verified by
+   `backend/tests/test_audit.py` (`test_audit_spec_coverage_criteria`).
+
 ## Maturity
 
 **MVP (committed):**
 
-- 4 categorias de achado (indexação/cobertura/defeitos/automação),
+- 5 categorias de achado (indexação/cobertura/spec/defeitos/automação),
   severidade explícita, ordenação pior-primeiro, persistência como Markdown
   em `audits/`, execução sob demanda ou lazy (sem daemon), histórico de
   rodadas, limiares configuráveis.

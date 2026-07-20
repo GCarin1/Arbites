@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-11
-**Version:** 0.11.0
+**Last updated:** 2026-07-20
+**Version:** 0.14.0
 
 ## Purpose
 
@@ -48,12 +48,30 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   IA para identificar casos de teste em texto livre, sugerir uma pasta e
   convertê-los para BDD — sempre preview; o aceite é o `POST /testcases`
   normal. Prompt enxuto (modelos ≤ 9B).
+- The system shall expor `POST /ai/providers/test` que faz uma chamada
+  mínima ao provider (salvo por `name` ou config inline `kind`/`model`/
+  `base_url`/`key`) com timeout curto e devolve `{ok, error}` — o erro real
+  (401/timeout/DNS) vira texto, nunca crasha a rota; a UI de configuração
+  oferece "Testar" por provider. Testar não bloqueia salvar.
+- The system shall expor `POST /ai/analyze-run/{exec_id}` que junta os CTs
+  failed/blocked da execution (erro + passos) e devolve resumo, causa
+  provável e um DRAFT de defeito (título/severidade/descrição já vinculado
+  ao CT e à execution) — preview; o aceite é o `POST /defects` normal.
+  Execution sem falhas → `422 no_failures`.
 
 ### Event-driven
 
 - When o usuário solicita geração a partir de uma story, the system shall
   produzir uma lista de CTs como diff/preview aceitável/rejeitável item a
   item.
+- When o usuário informa uma story com critérios EARS e seleciona
+  critérios (`criteria: [EARS-n, ...]`), the system shall gerar POR critério
+  (um prompt focado por critério selecionado) e marcar cada CT do preview
+  com o vínculo `criteria` correspondente + a `story` de origem, de modo que
+  o aceite (`POST /testcases`) grave `story` + `criteria` automaticamente
+  (fecha o loop do validador de spec, ver `audit`); story sem critérios ou
+  seleção vazia mantém a geração da story inteira, sem vínculo fino. Um
+  `criteria` inexistente na story → `422 no_criteria`.
 - When o usuário solicita geração de CTs a partir de uma story, the system
   shall buscar defeitos com lição aprendida cujo título/causa/prevenção
   compartilhe palavra-chave (≥4 letras) com a story, injetar essas lições no
@@ -92,13 +110,17 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 - While nenhum provider está configurado (`default_provider: null`), the
   system shall ocultar/desabilitar as funções de IA mantendo todo o resto
   da plataforma funcional.
-- While a área de IA está aberta, the system shall apresentar a visão de
-  TRABALHO primeiro (gerar/revisar/context pack) com o contexto ativo
-  visível (memória do perfil preenchida ou não, decisões aceitas no recap,
-  lições aprendidas disponíveis) e o histórico de interações de IA
-  (agent_events da capability `project-memory`, via
-  `GET /memory/timeline?kinds=agent`); a configuração de providers fica em
-  seção secundária/colapsada.
+- While a área de IA está aberta, the system shall organizá-la em sub-abas
+  internas **Gerar · Revisar · Context Pack · Configuração**, abrindo em
+  Gerar (trabalho), com o contexto ativo (memória do perfil preenchida ou
+  não, decisões aceitas no recap, lições disponíveis) e o histórico de
+  interações de IA (agent_events da capability `project-memory`, via
+  `GET /memory/timeline?kinds=agent`) acompanhando as abas de trabalho; a
+  configuração de providers vive na sub-aba Configuração (não mais um card
+  colapsado atrás de um toggle).
+- While a área de IA está aberta, the system shall oferecer um seletor de
+  provider ÚNICO no cabeçalho da tela, usado por Gerar, Revisar e Casos
+  negativos — sem repetir o dropdown de provider por card.
 - While a IA processa uma importação, the system shall submeter a conversão
   apenas por ação explícita do usuário (botão "Enviar"), nunca no simples
   `onChange` de seleção de arquivo, e sinalizar que modelos locais de
@@ -173,15 +195,33 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     quando existem no workspace; sem nenhuma, o prompt fica limpo (sem
     bloco de recap) — verified by `backend/tests/test_project_memory.py`.
 
-12. [verified] A área de IA abre na visão de trabalho com o contexto ativo
-    visível (perfil/decisões/lições) e o histórico de interações
-    (agent_events); a config de providers fica colapsada; cada função sem
-    entrada oferece um exemplo clicável e o preview sinaliza explicitamente
-    "nada gravado, aceite item a item" — verified by build + smoke dos
-    endpoints consumidos (`/profile`, `/decisions?status=accepted`,
-    `/defects?has_lesson=true`, `/memory/timeline?kinds=agent`, já cobertos
-    por `backend/tests/test_project_memory.py` e
+12. [verified] A área de IA abre na sub-aba Gerar, alterna entre
+    Gerar/Revisar/Context Pack/Configuração, com o contexto ativo
+    (perfil/decisões/lições) e o histórico de interações (agent_events)
+    visíveis no trabalho e a config de providers na sua sub-aba; o provider
+    escolhido no cabeçalho vale para gerar/revisar/negativos; o preview
+    segue sinalizando "nada gravado, aceite item a item" — verified by build
+    + smoke dos endpoints consumidos (`/ai/providers`, `/profile`,
+    `/decisions?status=accepted`, `/defects?has_lesson=true`,
+    `/memory/timeline?kinds=agent`, já cobertos por
+    `backend/tests/test_project_memory.py` e
     `backend/tests/test_decisions.py`) + revisão visual.
+
+13. [verified] Geração POR critério envia o critério no prompt e cada CT do
+    preview vem com `criteria` + a `story`; o aceite grava o vínculo (checado
+    via `GET /testcases/{id}`); dois critérios tagueiam cada lote; sem
+    `criteria` mantém o fluxo de story inteira; critério inexistente → 422 —
+    verified by `backend/tests/test_ai_generate.py` + build + revisão visual
+    (`frontend/src/components/AiAssist.tsx`).
+
+14. [verified] `POST /ai/providers/test` devolve `{ok:true}` para chave
+    válida (salva ou inline) e `{ok:false, error}` com o 401 real para chave
+    inválida; sem `name`/`kind` → 422; provider salvo inexistente → 404 —
+    verified by `backend/tests/test_ai_providers.py`.
+15. [verified] `POST /ai/analyze-run/{id}` devolve resumo + causa + draft de
+    defeito vinculado ao CT/execution para execution com falha; sem falhas
+    → 422; execution inexistente → 404; o aceite do draft cria o defeito
+    vinculado — verified by `backend/tests/test_ai_analyze_run.py`.
 
 ## Maturity
 

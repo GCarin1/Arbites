@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)
 **Realizes:** SC1
-**Last updated:** 2026-07-09
-**Version:** 0.4.0
+**Last updated:** 2026-07-20
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -28,6 +28,26 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
   `GET/PUT/DELETE /requirements/{id}`, com filtros `kind` e `status`.
 - The system shall suportar critérios de aceite em formato EARS no corpo
   da story (insumo para geração de CTs por IA no M5).
+- The system shall parsear e indexar os critérios de aceite EARS da story
+  (seção `## Critérios de aceite`, itens `- [EARS-n] ...`) na tabela
+  `criteria` com a forma detectada por critério (ubiquitous/event/state/
+  unwanted/optional ou nenhuma), expostos por `GET /requirements/{id}/
+  criteria`; oferecer no editor templates dos 5 tipos EARS (ID sequencial
+  automático) e emitir warnings de lint determinístico no reindex —
+  `ears_no_form` (sem verbo modal), `ears_vague` (termo vago configurável em
+  `requirements.vague_terms`), `ears_duplicate` — sem NUNCA bloquear o save;
+  stories sem a seção ficam fora do lint (opt-in pela presença da seção).
+- The system shall expor por story, na matriz de rastreabilidade
+  (`GET /metrics/traceability`) e na aba Requisitos, a contagem de critérios
+  EARS cobertos (`criteria_covered`/`criteria_total`) — critério coberto =
+  com ≥1 CT vinculado via `criteria` — badge exibido só quando a story tem
+  critérios.
+- The system shall derivar por story um estado semântico de cobertura
+  (`coverage_state`) do último resultado dos CTs vinculados — `uncovered`
+  (sem CT), `untested` (com CT, nenhum executado), `failing` (pior resultado
+  executado é failed/blocked/…) ou `passing` (todos os executados passaram)
+  — na mesma matriz (fonte única com o dashboard), com badge de 4 estados e
+  filtro por estado na aba Requisitos.
 
 - The system shall carimbar `created` (data) no frontmatter do requisito na
   criação, indexá-lo e expô-lo na listagem/detalhe.
@@ -37,6 +57,12 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
   status-dot) e, por epic, o agregado "X/Y cobertas" — mesma fonte da
   matriz de rastreabilidade (`GET /metrics/traceability`), sem cálculo
   paralelo; com o filtro "só sem cobertura".
+- The system shall expor `GET /requirements/{id}/chain` devolvendo, para
+  uma story, a cadeia completa de rastreabilidade — story → CTs (status de
+  documento, último resultado, contagem de evidências, execuções que os
+  rodaram) → executions envolvidas → defeitos vinculados — em leitura pura
+  sobre as tabelas existentes; a UI oferece a visão "Story 360" navegável a
+  partir da aba Requisitos (cada nó abre a tela do item).
 
 ### Event-driven
 
@@ -78,15 +104,44 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
    dados da matriz, coberta por `backend/tests/test_metrics.py`
    (traceability) + build/revisão visual da tela.
 
+6. [verified] `GET /requirements/{id}/chain` devolve a cadeia completa da
+   story (CTs com último resultado + nº de evidências + execuções que os
+   rodaram, executions envolvidas, defeitos vinculados) e a soma
+   passing/failing/untested; id inexistente → 404 — verified by
+   `backend/tests/test_requirements.py`. A visão Story 360 é navegável por
+   nó — verified by build + revisão visual (`frontend/src/components/Story360.tsx`).
+
+7. [verified] Critérios EARS são extraídos/indexados com a forma detectada e
+   expostos por `GET /requirements/{id}/criteria`; o lint acusa
+   `ears_no_form`/`ears_vague`/`ears_duplicate` e uma story legada sem a
+   seção não gera nenhum desses warnings; os templates do editor geram IDs
+   sequenciais — verified by `backend/tests/test_ears.py` + build + revisão
+   visual (`frontend/src/components/Requirements.tsx`).
+
+8. [verified] A matriz e a aba Requisitos expõem por story a contagem de
+   critérios EARS cobertos (`criteria_covered`/`criteria_total`, critério com
+   ≥1 CT vinculado) — verified by `backend/tests/test_metrics.py`
+   (`test_traceability_criteria_coverage`) + build + revisão visual.
+
+9. [verified] `coverage_state` por story deriva corretamente
+   uncovered/untested/passing/failing do último resultado dos CTs, com badge
+   de 4 estados e filtro na aba Requisitos — verified by
+   `backend/tests/test_metrics.py` (`test_traceability_coverage_state`) +
+   build + revisão visual (`frontend/src/components/Requirements.tsx`).
+
 ## Maturity
 
 **MVP (committed):**
 
 - CRUD de epic/story, vínculo story→epic, tela de lista/editor na UI.
+- Story 360 (cadeia completa navegável) e critérios EARS
+  (parse/índice/templates/lint) na story.
 
 **Future (aspirational, not committed):**
 
 - Import read-only de cards do Businessmap como requisitos locais (M6).
+- Reescrever um critério em EARS pela IA (preview) — o gancho de IA existe;
+  fica para uma slice própria.
 
 ## Out of scope for this spec
 

@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Memória Histórica do Projeto e para a IA), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
-**Last updated:** 2026-07-12
-**Version:** 0.2.0
+**Last updated:** 2026-07-19
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -47,6 +47,15 @@ conforme o projeto cresce, não presa a um contexto fixo.
   filtráveis; `result` é verboso por natureza e fica FORA do default (sem
   `kinds` explícito) — opt-in na UI.
 
+- The system shall aceitar em `GET /memory/timeline` os parâmetros opcionais
+  `date_from` e `date_to` (`YYYY-MM-DD`, inclusivos), recortando os eventos
+  de TODAS as fontes pelo prefixo de data de `at` antes do corte por
+  `limit`.
+- The system shall expor `GET /memory/timeline/years?kinds=` devolvendo, em
+  ordem decrescente, os anos distintos que têm ao menos um evento (UNION
+  sobre as colunas de data das mesmas fontes), para popular o seletor de ano
+  com dados reais.
+
 ### Event-driven
 
 - When um defeito tem `root_cause` preenchido, the system shall também
@@ -56,6 +65,14 @@ conforme o projeto cresce, não presa a um contexto fixo.
 - When nenhuma decisão aceita ou lição existe no workspace, the system
   shall injetar o texto original sem nenhum bloco de recap (prompt limpo,
   sem seção vazia).
+
+### State-driven
+
+- While a aba Memória está aberta, the system shall agrupar os eventos por
+  DIA em cabeçalhos colapsáveis (data + contagem), com os dias mais recentes
+  expandidos e os antigos colapsados, e oferecer controles combináveis de
+  Ano, Mês, tipos e busca textual (a busca filtra client-side por
+  id/título/resumo; Ano/Mês viram `date_from`/`date_to`).
 
 ### Unwanted-behavior (must-not)
 
@@ -106,6 +123,14 @@ conforme o projeto cresce, não presa a um contexto fixo.
 8. [verified] Criar um CT gera evento `testcase` (default); transições de
    resultado só aparecem com `kinds=result` (opt-in) — verified by
    `backend/tests/test_project_memory.py`.
+
+9. [verified] `GET /memory/timeline` com `date_from`/`date_to` recorta os
+   eventos ao período em todas as fontes, e `GET /memory/timeline/years`
+   lista os anos com eventos em ordem decrescente — verified by
+   `backend/tests/test_project_memory.py`.
+10. [verified] A aba agrupa a timeline por dia colapsável e os filtros
+    Ano/Mês/tipos/busca combinam — verified by build + revisão visual
+    (`frontend/src/components/Memory.tsx`).
 
 ## Maturity
 

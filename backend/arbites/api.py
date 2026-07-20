@@ -7,10 +7,12 @@ Toda resposta de escrita retorna a entidade atualizada (contrato http-api).
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import os
 import sqlite3
+import zipfile
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -30,6 +32,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import __version__
+from . import agent_pack as agent_pack_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
@@ -106,6 +109,7 @@ class TestcaseIn(BaseModel):
     squad: str | None = None
     folder: str = ""
     automation: AutomationRef | None = None
+    criteria: list[str] | None = None
     body: str | None = None
 
 
@@ -118,6 +122,7 @@ class TestcaseUpdate(BaseModel):
     story: str | None = None
     squad: str | None = None
     automation: AutomationRef | None = None
+    criteria: list[str] | None = None
     body: str | None = None
 
 
@@ -270,10 +275,34 @@ class FeatureSyncApplyIn(BaseModel):
 class GenerateIn(BaseModel):
     source: str  # story_id (ST-XXXX) ou texto/markdown livre
     provider: str | None = None  # default_provider se omitido
+    criteria: list[str] | None = None  # gerar POR critério EARS (0093)
 
 
 class AIByCtIn(BaseModel):
     provider: str | None = None
+
+
+class ProviderTestIn(BaseModel):
+    # testa um provider SALVO (name) ou uma config INLINE ainda não salva (0085)
+    name: str | None = None
+    kind: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    key: str | None = None
+
+
+class _InlineKeys:
+    """Keystore efêmero: devolve a chave inline para o provider em teste,
+    delegando o resto ao keystore real (0085)."""
+
+    def __init__(self, base, name: str, key: str):
+        self._base, self._name, self._key = base, name, key
+
+    def get(self, name: str):
+        return self._key if name == self._name else self._base.get(name)
+
+    def configured(self, name: str) -> bool:
+        return True if name == self._name else self._base.configured(name)
 
 
 class DefectIn(BaseModel):
@@ -289,6 +318,11 @@ class DefectIn(BaseModel):
     root_cause: str | None = None
     fix: str | None = None
     prevention: str | None = None
+    # Lição estruturada (0095): when/procedure/anti-pattern — preferida na
+    # injeção de IA e vira skill no Pacote de Agente.
+    lesson_when: str | None = None
+    lesson_procedure: str | None = None
+    lesson_antipattern: str | None = None
 
 
 class DefectUpdate(BaseModel):
@@ -302,6 +336,9 @@ class DefectUpdate(BaseModel):
     root_cause: str | None = None
     fix: str | None = None
     prevention: str | None = None
+    lesson_when: str | None = None
+    lesson_procedure: str | None = None
+    lesson_antipattern: str | None = None
 
 
 class TodoIn(BaseModel):
@@ -595,6 +632,13 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
             "SELECT tag FROM tc_tags WHERE testcase_id = ?", (entity_id,)
         )
     ]
+    out["criteria"] = [
+        r["ears_id"]
+        for r in conn.execute(
+            "SELECT ears_id FROM tc_criteria WHERE testcase_id = ? ORDER BY ears_id",
+            (entity_id,),
+        )
+    ]
     _, out["body"] = _load_doc(ws, row["path"])
     return out
 
@@ -646,6 +690,32 @@ def _register_routes(app: FastAPI) -> None:
                 " ORDER BY source_path, code"
             )
         ]
+
+    # -- lixeira (0081) ---------------------------------------------------
+
+    @app.get(API_PREFIX + "/trash")
+    async def get_trash(request: Request):
+        return ws_of(request).list_trash()
+
+    @app.post(API_PREFIX + "/trash/{name}/restore")
+    async def restore_trash(request: Request, name: str):
+        ws, conn = ws_of(request), conn_of(request)
+        try:
+            restored = ws.restore(name)
+        except FileNotFoundError:
+            raise _error(404, "not_found", f"{name} não está na lixeira")
+        # reindexa o que voltou: arquivo único ou todos os artefatos da pasta
+        if restored.is_dir():
+            for p in restored.rglob("*"):
+                if p.suffix == ".md" or p.name == "execution.json":
+                    reindex_file(ws, conn, p)
+        else:
+            reindex_file(ws, conn, restored)
+        return {"restored": ws.relpath(restored)}
+
+    @app.delete(API_PREFIX + "/trash")
+    async def empty_trash(request: Request):
+        return {"removed": ws_of(request).empty_trash()}
 
     # -- tree -------------------------------------------------------------
 
@@ -737,6 +807,130 @@ def _register_routes(app: FastAPI) -> None:
     async def get_requirement(request: Request, entity_id: str):
         return _req_out(conn_of(request), ws_of(request), entity_id)
 
+    @app.get(API_PREFIX + "/requirements/{entity_id}/criteria")
+    async def requirement_criteria(request: Request, entity_id: str):
+        """Critérios EARS indexados da story (0091), em ordem — cada um com a
+        forma detectada (ubiquitous/event/state/unwanted/optional) ou null
+        quando fora de EARS."""
+        conn = conn_of(request)
+        _find_path(conn, "requirements", entity_id)  # 404 se não existe
+        rows = conn.execute(
+            "SELECT ears_id, ord, text, form FROM criteria WHERE story_id = ?"
+            " ORDER BY ord",
+            (entity_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    @app.get(API_PREFIX + "/requirements/{entity_id}/chain")
+    async def requirement_chain(request: Request, entity_id: str):
+        """Story 360 (0086): a cadeia completa da story — Epic → Story → CTs
+        (status de documento + último resultado + nº de evidências +
+        execuções que os rodaram) → Defeitos vinculados. Só leitura, SQL
+        sobre tabelas já existentes; responde "essa história foi validada?
+        qual evidência comprova?" numa chamada."""
+        conn = conn_of(request)
+        story = conn.execute(
+            "SELECT id, title, status, epic_id, squad FROM requirements WHERE id = ?",
+            (entity_id,),
+        ).fetchone()
+        if not story:
+            raise _error(404, "not_found", f"{entity_id} não encontrado")
+        epic = None
+        if story["epic_id"]:
+            epic = conn.execute(
+                "SELECT id, title, status FROM requirements WHERE id = ?",
+                (story["epic_id"],),
+            ).fetchone()
+
+        cts = conn.execute(
+            "SELECT id, title, type, status FROM testcases WHERE story_id = ?"
+            " ORDER BY id",
+            (entity_id,),
+        ).fetchall()
+
+        testcases: list[dict[str, Any]] = []
+        exec_seen: dict[str, dict] = {}
+        passing = failing = untested = evidences_total = 0
+        for ct in cts:
+            cid = ct["id"]
+            runs = conn.execute(
+                "SELECT r.execution_id, e.name execution_name, r.status,"
+                " r.executed_at FROM results r"
+                " JOIN executions e ON e.id = r.execution_id"
+                " WHERE r.testcase_id = ?"
+                " ORDER BY r.executed_at DESC, r.execution_id DESC",
+                (cid,),
+            ).fetchall()
+            ev_count = conn.execute(
+                "SELECT COUNT(*) n FROM evidences WHERE testcase_id = ?", (cid,)
+            ).fetchone()["n"]
+            evidences_total += ev_count
+            last = runs[0] if runs else None
+            if last is None:
+                untested += 1
+            elif last["status"] == "passed":
+                passing += 1
+            else:
+                failing += 1
+            for r in runs:
+                if r["execution_id"] not in exec_seen:
+                    exec_seen[r["execution_id"]] = {
+                        "id": r["execution_id"], "name": r["execution_name"],
+                    }
+            testcases.append({
+                **dict(ct),
+                "last_result": (
+                    {"status": last["status"], "executed_at": last["executed_at"]}
+                    if last else None
+                ),
+                "evidence_count": ev_count,
+                "executions": [dict(r) for r in runs],
+            })
+
+        # metadados das execuções envolvidas (status/data da execution em si)
+        executions = []
+        if exec_seen:
+            ph = ",".join("?" * len(exec_seen))
+            executions = [
+                dict(r) for r in conn.execute(
+                    f"SELECT id, name, status, created_at FROM executions"
+                    f" WHERE id IN ({ph}) ORDER BY id DESC",
+                    list(exec_seen.keys()),
+                )
+            ]
+
+        # defeitos vinculados aos CTs da story ou às execuções envolvidas
+        defects = []
+        ct_ids = [c["id"] for c in cts]
+        if ct_ids or exec_seen:
+            conds, params = [], []
+            if ct_ids:
+                conds.append(f"testcase_id IN ({','.join('?' * len(ct_ids))})")
+                params += ct_ids
+            if exec_seen:
+                conds.append(f"execution_id IN ({','.join('?' * len(exec_seen))})")
+                params += list(exec_seen.keys())
+            defects = [
+                dict(r) for r in conn.execute(
+                    "SELECT id, title, status, severity, testcase_id, execution_id"
+                    f" FROM defects WHERE {' OR '.join(conds)} ORDER BY id",
+                    params,
+                )
+            ]
+
+        return {
+            "story": dict(story),
+            "epic": dict(epic) if epic else None,
+            "testcases": testcases,
+            "executions": executions,
+            "defects": defects,
+            "summary": {
+                "testcases": len(cts), "passing": passing, "failing": failing,
+                "untested": untested, "executions": len(executions),
+                "defects": len(defects), "evidences": evidences_total,
+            },
+        }
+
     @app.put(API_PREFIX + "/requirements/{entity_id}")
     async def update_requirement(request: Request, entity_id: str, payload: RequirementUpdate):
         ws, conn = ws_of(request), conn_of(request)
@@ -827,6 +1021,8 @@ def _register_routes(app: FastAPI) -> None:
             meta["squad"] = payload.squad
         if payload.automation is not None:
             meta["automation"] = payload.automation.model_dump(exclude_none=True)
+        if payload.criteria:
+            meta["criteria"] = payload.criteria
         folder = payload.folder.strip("/").replace("\\", "/")
         target_dir = ws.root / "testcases" / folder if folder else ws.root / "testcases"
         if not str(target_dir.resolve()).startswith(str((ws.root / "testcases").resolve())):
@@ -920,6 +1116,9 @@ def _register_routes(app: FastAPI) -> None:
         if "squad" in changes and not changes["squad"]:
             meta.pop("squad", None)
             changes.pop("squad")
+        if "criteria" in changes and not changes["criteria"]:
+            meta.pop("criteria", None)  # lista vazia/None limpa o vínculo
+            changes.pop("criteria")
         meta.update(changes)
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
@@ -1324,7 +1523,15 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/context-pack")
     async def get_context_pack(
-        request: Request, epic: str = "", story: str = "", squad: str = ""
+        request: Request,
+        epic: str = "",
+        story: str = "",
+        squad: str = "",
+        testcases: bool = True,
+        defects: bool = True,
+        decisions: bool = True,
+        last_result: bool = False,
+        format: str = "md",
     ):
         if not (epic or story or squad):
             raise _error(
@@ -1333,13 +1540,54 @@ def _register_routes(app: FastAPI) -> None:
                 " workspace inteiro sem escopo",
             )
         ws, conn = ws_of(request), conn_of(request)
-        body = context_pack_ops.build(
-            conn, ws.root, epic or None, story or None, squad or None
+        pack = context_pack_ops.build(
+            conn, ws.root, epic or None, story or None, squad or None,
+            include_testcases=testcases, include_defects=defects,
+            include_decisions=decisions, include_last_result=last_result,
         )
+        if format == "json":
+            scope = {k: v for k, v in (("epic", epic), ("story", story),
+                                       ("squad", squad)) if v}
+            return {"scope": scope, "counts": pack["counts"],
+                    "bytes": pack["bytes"], "markdown": pack["markdown"]}
         return PlainTextResponse(
-            body,
+            pack["markdown"],
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": 'attachment; filename="context-pack.md"'},
+        )
+
+    @app.get(API_PREFIX + "/agent-pack")
+    async def get_agent_pack(
+        request: Request,
+        epic: str = "",
+        story: str = "",
+        squad: str = "",
+        layout: str = "agents-md",
+    ):
+        """Pacote de Agente (0094): ZIP com AGENTS.md + specs/ + skills/ do
+        escopo, pronto para colar num repositório. Mesmo escopo obrigatório
+        do context-pack."""
+        if not (epic or story or squad):
+            raise _error(
+                422, "scope_required",
+                "informe epic, story ou squad — o pacote de agente não exporta"
+                " o workspace inteiro sem escopo",
+            )
+        if layout not in ("agents-md", "claude"):
+            raise _error(422, "invalid_layout", "layout deve ser agents-md ou claude")
+        ws, conn = ws_of(request), conn_of(request)
+        pack = agent_pack_ops.build_pack(
+            conn, ws.root, epic or None, story or None, squad or None, layout=layout
+        )
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path, content in pack["files"].items():
+                zf.writestr(path, content)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="agent-pack.zip"'},
         )
 
     @app.get(API_PREFIX + "/risk-map")
@@ -2070,6 +2318,33 @@ def _register_routes(app: FastAPI) -> None:
     async def get_ai_providers(request: Request):
         return _providers_out(request)
 
+    @app.post(API_PREFIX + "/ai/providers/test")
+    async def test_ai_provider(request: Request, payload: ProviderTestIn):
+        """Chamada mínima ao provider (0085) — `{ok, error}`. Aceita um
+        provider salvo (`name`) ou uma config inline (`kind`/`model`/
+        `base_url`/`key`) ainda não persistida."""
+        keys = request.app.state.ai_keys
+        transport = request.app.state.ai_transport
+        if payload.name and not payload.kind:
+            config = _ai_config(ws_of(request))
+            cfg = next((p for p in config.get("providers") or []
+                        if p.get("name") == payload.name), None)
+            if not cfg:
+                raise _error(404, "not_found",
+                             f"provider '{payload.name}' não configurado")
+            provider = ai_ops.build_provider(cfg, keys, transport=transport)
+        else:
+            if not payload.kind:
+                raise _error(422, "invalid_request",
+                             "informe `name` (provider salvo) ou `kind`+`model` (inline)")
+            name = payload.name or "__inline__"
+            cfg = {"name": name, "kind": payload.kind,
+                   "model": payload.model or "", "base_url": payload.base_url}
+            eff_keys = _InlineKeys(keys, name, payload.key) if payload.key else keys
+            provider = ai_ops.build_provider(cfg, eff_keys, transport=transport)
+        ok, error = await asyncio.to_thread(ai_ops.test_provider, provider)
+        return {"ok": ok, "error": error}
+
     @app.put(API_PREFIX + "/ai/providers")
     async def put_ai_providers(request: Request, payload: AIProvidersIn):
         ws = ws_of(request)
@@ -2116,10 +2391,47 @@ def _register_routes(app: FastAPI) -> None:
             source_title = row["title"] if row else None
             source = (ws.root / rel).read_text(encoding="utf-8-sig")
         lessons = ai_ops.find_relevant_lessons(conn, source)
+        lessons_used = [{"id": l["id"], "title": l["title"]} for l in lessons]
+
+        # Geração POR CRITÉRIO (0093): story + critérios selecionados → um
+        # prompt focado por critério, e o vínculo `criteria` já vem no
+        # preview (o aceite grava story + criteria automaticamente).
+        if source_id and payload.criteria:
+            rows = conn.execute(
+                "SELECT ears_id, text FROM criteria WHERE story_id = ?"
+                f" AND ears_id IN ({','.join('?' * len(payload.criteria))})"
+                " ORDER BY ord",
+                [source_id, *payload.criteria],
+            ).fetchall()
+            if not rows:
+                raise _error(422, "no_criteria",
+                             "nenhum critério EARS informado existe nesta story")
+            items: list[dict] = []
+            for cr in rows:
+                focus = (
+                    f"{source}\n\n## Foco\nGere casos que validam ESPECIFICAMENTE"
+                    f" o critério de aceite {cr['ears_id']}: {cr['text']}"
+                )
+                gen = await asyncio.to_thread(
+                    ai_ops.generate_testcases, provider,
+                    _with_project_recap(conn, ws, focus), lessons,
+                )
+                for it in gen.testcases:
+                    items.append({
+                        **it.model_dump(), "body": ai_ops.testcase_body(it),
+                        "criteria": [cr["ears_id"]],
+                    })
+            _log_agent_event(
+                ws, conn, "generate_testcases", source_id, source_title,
+                f"Gerou {len(items)} caso(s) por critério "
+                f"({', '.join(r['ears_id'] for r in rows)}) para {source_id}",
+            )
+            return {"preview": True, "story": source_id, "testcases": items,
+                    "lessons_used": lessons_used}
+
         generated = await asyncio.to_thread(
             ai_ops.generate_testcases, provider, _with_project_recap(conn, ws, source), lessons
         )
-        lessons_used = [{"id": l["id"], "title": l["title"]} for l in lessons]
         _log_agent_event(
             ws, conn, "generate_testcases", source_id, source_title,
             f"Gerou {len(generated.testcases)} caso(s) de teste"
@@ -2151,6 +2463,64 @@ def _register_routes(app: FastAPI) -> None:
         )
         return {"preview": True, "similar_considered": similar,
                 **result.model_dump()}
+
+    @app.post(API_PREFIX + "/ai/structure-lesson/{defect_id}")
+    async def ai_structure_lesson(request: Request, defect_id: str, payload: AIByCtIn):
+        """Sugere a lição estruturada (when/procedure/anti-pattern) a partir
+        do defeito (0095) — preview: preenche o form, nada é gravado sem o
+        save do defeito."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "defects", defect_id)
+        defect_md = (ws.root / rel).read_text(encoding="utf-8-sig")
+        result = await asyncio.to_thread(ai_ops.structure_lesson, provider, defect_md)
+        return {"preview": True, **result.model_dump()}
+
+    @app.post(API_PREFIX + "/ai/analyze-run/{exec_id}")
+    async def ai_analyze_run(request: Request, exec_id: str, payload: AIByCtIn):
+        """Resumo de falha pós-run (0096): junta os CTs failed/blocked da
+        execution (erro + passos) e devolve resumo, causa provável e um draft
+        de defeito — preview. O aceite é o `POST /defects` normal, já com
+        `testcase`/`execution` preenchidos pelo cliente."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        try:
+            execution = exec_ops.load(ws, exec_id)
+        except (FileNotFoundError, OSError):
+            raise _error(404, "not_found", f"{exec_id} não encontrado")
+        failed = [
+            r for r in execution.get("results", [])
+            if r.get("status") in ("failed", "blocked")
+        ]
+        if not failed:
+            raise _error(422, "no_failures",
+                         "a execution não tem CTs failed/blocked para analisar")
+        lines = [f"# Falha na execução {exec_id} — {execution.get('name', '')}", ""]
+        first_ct = failed[0]["testcase_id"]
+        for r in failed:
+            row = conn.execute(
+                "SELECT title FROM testcases WHERE id = ?", (r["testcase_id"],)
+            ).fetchone()
+            lines.append(f"## {r['testcase_id']} — {row['title'] if row else ''} "
+                         f"({r['status']})")
+            if r.get("error"):
+                lines.append(f"Erro: {r['error']}")
+            for st in r.get("steps", []):
+                if st.get("status") in ("failed", "blocked"):
+                    lines.append(f"- passo falho: {st.get('text', '')}")
+            lines.append("")
+        analysis = await asyncio.to_thread(
+            ai_ops.analyze_run, provider, "\n".join(lines)
+        )
+        _log_agent_event(
+            ws, conn, "analyze_run", exec_id, execution.get("name"),
+            f"Analisou a falha de {exec_id}: {len(failed)} CT(s) com falha",
+        )
+        draft = analysis.defect.model_dump()
+        draft["testcase"] = first_ct
+        draft["execution"] = exec_id
+        return {"preview": True, "summary": analysis.summary,
+                "probable_cause": analysis.probable_cause, "defect": draft}
 
     @app.post(API_PREFIX + "/ai/negative-cases/{ct_id}")
     async def ai_negative(request: Request, ct_id: str, payload: AIByCtIn):
@@ -2264,6 +2634,9 @@ def _register_routes(app: FastAPI) -> None:
             "root_cause": payload.root_cause,
             "fix": payload.fix,
             "prevention": payload.prevention,
+            "lesson_when": payload.lesson_when,
+            "lesson_procedure": payload.lesson_procedure,
+            "lesson_antipattern": payload.lesson_antipattern,
         }
         path = ws.root / "defects" / f"{defect_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body)
@@ -2799,9 +3172,23 @@ def _register_routes(app: FastAPI) -> None:
     # `_log_agent_event`); o resto é derivado do que já está no índice.
 
     @app.get(API_PREFIX + "/memory/timeline")
-    async def get_memory_timeline(request: Request, kinds: str = "", limit: int = 50):
+    async def get_memory_timeline(
+        request: Request,
+        kinds: str = "",
+        limit: int = 50,
+        date_from: str = "",
+        date_to: str = "",
+    ):
         wanted = [k for k in kinds.split(",") if k] or None
-        return memory_ops.timeline(conn_of(request), wanted, max(1, min(limit, 200)))
+        return memory_ops.timeline(
+            conn_of(request), wanted, max(1, min(limit, 200)),
+            date_from or None, date_to or None,
+        )
+
+    @app.get(API_PREFIX + "/memory/timeline/years")
+    async def get_memory_timeline_years(request: Request, kinds: str = ""):
+        wanted = [k for k in kinds.split(",") if k] or None
+        return memory_ops.timeline_years(conn_of(request), wanted)
 
 
 def _mount_frontend(app: FastAPI) -> None:

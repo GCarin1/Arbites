@@ -2,8 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
+import { Story360 } from "./Story360";
 import { useToast } from "./Toast";
-import type { Requirement } from "../types";
+import type { Criterion, MatrixStory, Requirement } from "../types";
+
+// estado semântico de cobertura por story (0087) — cor + rótulo + hint
+const COV_STATE: Record<
+  MatrixStory["coverage_state"],
+  { label: string; dot: string; hint: string }
+> = {
+  passing: { label: "passando", dot: "dot-col-passed", hint: "todos os CTs executados passaram" },
+  failing: { label: "com falhas", dot: "dot-col-failed", hint: "algum CT com último resultado failed/blocked" },
+  untested: { label: "nunca executada", dot: "dot-col-pending", hint: "tem CT vinculado, mas nenhum foi executado" },
+  uncovered: { label: "sem cobertura", dot: "dot-col-blocked", hint: "nenhum CT vinculado" },
+};
 
 export function RequirementsList({
   version,
@@ -90,24 +102,31 @@ export function RequirementsList({
 export function ReqRepository({
   version,
   onOpen,
+  onNavigate,
   onChanged,
   onError,
 }: {
   version: number;
   onOpen: (id: string) => void;
+  onNavigate: (id: string) => void;
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
   const [items, setItems] = useState<Requirement[]>([]);
   const [creating, setCreating] = useState<"epic" | "story" | null>(null);
+  const [chainOf, setChainOf] = useState<string | null>(null); // Story 360 (0086)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragStory, setDragStory] = useState<string | null>(null);
   const [dropEpic, setDropEpic] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Requirement | null>(null);
-  // Cobertura por story (0068): reuso da matriz de rastreabilidade — a
-  // mesma fonte do Dashboard, sem endpoint novo. story_id → nº de CTs.
-  const [coverage, setCoverage] = useState<Map<string, number> | null>(null);
-  const [onlyUncovered, setOnlyUncovered] = useState(false);
+  // Cobertura por story (0068/0087/0092): reuso da matriz de rastreabilidade
+  // — mesma fonte do Dashboard, sem endpoint novo. story_id → CTs + estado
+  // semântico + critérios.
+  const [coverage, setCoverage] = useState<Map<
+    string,
+    { ct: number; state: MatrixStory["coverage_state"]; critTotal: number; critCovered: number }
+  > | null>(null);
+  const [covFilter, setCovFilter] = useState<"all" | MatrixStory["coverage_state"]>("all");
 
   const load = useCallback(() => {
     api
@@ -117,9 +136,18 @@ export function ReqRepository({
     api
       .traceability("", "")
       .then((m) => {
-        const map = new Map<string, number>();
+        const map = new Map<
+          string,
+          { ct: number; state: MatrixStory["coverage_state"]; critTotal: number; critCovered: number }
+        >();
         for (const epic of m.epics)
-          for (const s of epic.stories) map.set(s.id, s.ct_count);
+          for (const s of epic.stories)
+            map.set(s.id, {
+              ct: s.ct_count,
+              state: s.coverage_state,
+              critTotal: s.criteria_total,
+              critCovered: s.criteria_covered,
+            });
         setCoverage(map);
       })
       .catch(() => {});
@@ -176,11 +204,12 @@ export function ReqRepository({
 
   const epics = items.filter((r) => r.kind === "epic");
   const allStories = items.filter((r) => r.kind === "story");
-  // cobertura (0068): 0 CTs = descoberta; filtro isola as descobertas
-  const ctsOf = (id: string) => coverage?.get(id) ?? 0;
-  const stories = onlyUncovered
-    ? allStories.filter((s) => ctsOf(s.id) === 0)
-    : allStories;
+  // cobertura (0068/0087): estado semântico por story
+  const ctsOf = (id: string) => coverage?.get(id)?.ct ?? 0;
+  const critOf = (id: string) => coverage?.get(id); // {critTotal, critCovered}
+  const stateOf = (id: string) => coverage?.get(id)?.state ?? "uncovered";
+  const stories =
+    covFilter === "all" ? allStories : allStories.filter((s) => stateOf(s.id) === covFilter);
   const orphans = stories.filter((s) => !epics.some((e) => e.id === s.epic_id));
   const coveredCount = (epicId: string) =>
     allStories.filter((s) => s.epic_id === epicId && ctsOf(s.id) > 0).length;
@@ -202,16 +231,37 @@ export function ReqRepository({
         <span className="repo-file-title">{story.title}</span>
       </button>
       {coverage &&
-        (ctsOf(story.id) > 0 ? (
-          <span className="status-dot dot-col-passed caption">
-            coberta ({ctsOf(story.id)} CT{ctsOf(story.id) === 1 ? "" : "s"})
+        (() => {
+          const st = stateOf(story.id);
+          const n = ctsOf(story.id);
+          const meta = COV_STATE[st];
+          return (
+            <span className={`status-dot ${meta.dot} caption`} title={meta.hint}>
+              {meta.label}
+              {n > 0 && st !== "uncovered" ? ` (${n} CT${n === 1 ? "" : "s"})` : ""}
+            </span>
+          );
+        })()}
+      {/* cobertura de critérios EARS (0092): só quando a story tem critérios */}
+      {(() => {
+        const c = critOf(story.id);
+        if (!c || c.critTotal === 0) return null;
+        const full = c.critCovered === c.critTotal;
+        return (
+          <span
+            className={`status-dot ${full ? "dot-col-passed" : "dot-col-blocked"} caption`}
+            title="critérios EARS cobertos por CT"
+          >
+            {c.critCovered}/{c.critTotal} critérios
           </span>
-        ) : (
-          <span className="status-dot dot-col-blocked caption">sem cobertura</span>
-        ))}
+        );
+      })()}
       <span className={`status-dot dot-${story.status} caption`}>{story.status}</span>
       <span className="caption mono muted">{story.created ?? ""}</span>
       <span className="repo-actions">
+        <button className="btn-sm" onClick={() => setChainOf(story.id)} title="Story 360 — cadeia completa">
+          360
+        </button>
         <button className="btn-sm danger" onClick={() => setDeleting(story)}>
           Excluir
         </button>
@@ -228,13 +278,15 @@ export function ReqRepository({
         <h1 className="page-title">Requisitos</h1>
         <span className="spacer" />
         <div className="head-controls">
-          <label className="caption" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <input
-              type="checkbox"
-              checked={onlyUncovered}
-              onChange={(e) => setOnlyUncovered(e.target.checked)}
-            />
-            só sem cobertura
+          <label className="check-inline caption">
+            Cobertura
+            <select value={covFilter} onChange={(e) => setCovFilter(e.target.value as typeof covFilter)}>
+              <option value="all">todas</option>
+              <option value="passing">passando</option>
+              <option value="failing">com falhas</option>
+              <option value="untested">nunca executada</option>
+              <option value="uncovered">sem cobertura</option>
+            </select>
           </label>
           <button onClick={() => setCreating("epic")}>Novo epic</button>
           <button className="primary" onClick={() => setCreating("story")}>
@@ -349,6 +401,9 @@ export function ReqRepository({
           onConfirm={() => void remove(deleting)}
           onCancel={() => setDeleting(null)}
         />
+      )}
+      {chainOf && (
+        <Story360 storyId={chainOf} onClose={() => setChainOf(null)} onNavigate={onNavigate} />
       )}
     </div>
   );
@@ -585,6 +640,7 @@ export function RequirementEditor({
             </div>
             <DocBody text={req.body} />
           </div>
+          {req.kind === "story" && <CriteriaCard id={req.id} />}
         </>
       ) : (
         <>
@@ -662,6 +718,29 @@ export function RequirementEditor({
             ? "Corpo (Resumo / Critérios de aceite — EARS quando fizer sentido)"
             : "Corpo (Descrição)"}
         </label>
+        {req.kind === "story" && (
+          <div className="ears-templates">
+            <span className="caption muted">Inserir critério EARS:</span>
+            {(
+              [
+                ["ubiquitous", "Ubíquo"],
+                ["event", "Evento"],
+                ["state", "Estado"],
+                ["unwanted", "Proibição"],
+                ["optional", "Opcional"],
+              ] as const
+            ).map(([form, label]) => (
+              <button
+                key={form}
+                type="button"
+                className="btn-sm"
+                onClick={() => set("body", appendEarsCriterion(req.body ?? "", form))}
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           className="raw"
           value={req.body ?? ""}
@@ -671,6 +750,75 @@ export function RequirementEditor({
       </div>
         </>
       )}
+    </div>
+  );
+}
+
+// -------------------------------------------------- EARS (0091)
+
+const EARS_TEMPLATE: Record<string, string> = {
+  ubiquitous: "O sistema deve ",
+  event: "Quando <condição>, o sistema deve ",
+  state: "Enquanto <estado>, o sistema deve ",
+  unwanted: "O sistema não deve ",
+  optional: "Onde <recurso disponível>, o sistema pode ",
+};
+
+const FORM_LABEL: Record<string, string> = {
+  ubiquitous: "ubíquo",
+  event: "evento",
+  state: "estado",
+  unwanted: "proibição",
+  optional: "opcional",
+};
+
+/** Insere `- [EARS-n]` com o próximo número, criando a seção se faltar. */
+function appendEarsCriterion(body: string, form: string): string {
+  const nums = [...body.matchAll(/\[EARS-(\d+)\]/g)].map((m) => Number(m[1]));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  const line = `- [EARS-${next}] ${EARS_TEMPLATE[form]}`;
+  let out = body;
+  if (!/^##\s+crit[ée]rios de aceite/im.test(out)) {
+    out = out.replace(/\s*$/, "") + "\n\n## Critérios de aceite\n";
+  }
+  return out.replace(/\s*$/, "") + "\n" + line + "\n";
+}
+
+/** Critérios EARS indexados da story, com a forma detectada por critério —
+ * dá visibilidade ao lint (cinza = fora de EARS). */
+function CriteriaCard({ id }: { id: string }) {
+  const [crits, setCrits] = useState<Criterion[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    api.requirementCriteria(id).then((c) => alive && setCrits(c)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (crits.length === 0) return null;
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3>Critérios de aceite (EARS)</h3>
+        <span className="spacer" />
+        <span className="caption muted">{crits.length} critério(s)</span>
+      </div>
+      <div className="criteria-list">
+        {crits.map((c) => (
+          <div key={c.ears_id} className="criteria-row">
+            <span className="mono muted">{c.ears_id}</span>
+            <span
+              className={`status-dot ${c.form ? "dot-col-passed" : "dot-col-blocked"} caption`}
+            >
+              {c.form ? FORM_LABEL[c.form] ?? c.form : "fora de EARS"}
+            </span>
+            <span className="criteria-text">{c.text}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

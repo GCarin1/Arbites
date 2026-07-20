@@ -160,3 +160,70 @@ def test_traceability_matrix(client, dataset):
     assert mfa["covered"] and mfa["last_status"] is None  # CT draft, sem execução
     senha = stories["Recuperar senha"]
     assert not senha["covered"]  # sem cobertura
+
+
+def test_traceability_coverage_state(client):
+    """0087: estado semântico por story — uncovered/untested/passing/failing."""
+    epic = client.post("/api/v1/requirements", json={"kind": "epic", "title": "E"}).json()
+
+    def story(title):
+        return client.post(
+            "/api/v1/requirements",
+            json={"kind": "story", "title": title, "epic": epic["id"]},
+        ).json()
+
+    def ct(story_id, title):
+        return client.post(
+            "/api/v1/testcases", json={"title": title, "story": story_id}
+        ).json()
+
+    def run(ct_id, status):
+        ex = client.post(
+            "/api/v1/executions", json={"name": "R", "testcase_ids": [ct_id]}
+        ).json()
+        client.post(
+            f"/api/v1/executions/{ex['id']}/results/{ct_id}/status",
+            json={"status": status},
+        )
+
+    s_uncovered = story("Sem CT")
+    s_untested = story("Com CT sem execução")
+    ct(s_untested["id"], "CT-untested")
+    s_passing = story("Passando")
+    run(ct(s_passing["id"], "CT-pass")["id"], "passed")
+    s_failing = story("Falhando")
+    run(ct(s_failing["id"], "CT-a")["id"], "passed")
+    run(ct(s_failing["id"], "CT-b")["id"], "failed")  # pior = failed
+
+    states = {}
+    for e in client.get("/api/v1/metrics/traceability").json()["epics"]:
+        for s in e["stories"]:
+            states[s["id"]] = s["coverage_state"]
+
+    assert states[s_uncovered["id"]] == "uncovered"
+    assert states[s_untested["id"]] == "untested"
+    assert states[s_passing["id"]] == "passing"
+    assert states[s_failing["id"]] == "failing"
+
+
+def test_traceability_criteria_coverage(client):
+    """0092: contagem X/Y critérios EARS cobertos por story."""
+    body = (
+        "## Critérios de aceite\n\n"
+        "- [EARS-1] O sistema deve enviar o link.\n"
+        "- [EARS-2] O sistema deve expirar o link.\n"
+    )
+    epic = client.post("/api/v1/requirements", json={"kind": "epic", "title": "E"}).json()
+    story = client.post(
+        "/api/v1/requirements",
+        json={"kind": "story", "title": "Senha", "epic": epic["id"], "body": body},
+    ).json()
+    client.post(
+        "/api/v1/testcases",
+        json={"title": "CT1", "story": story["id"], "criteria": ["EARS-1"]},
+    )
+
+    matrix = client.get("/api/v1/metrics/traceability").json()
+    s = matrix["epics"][0]["stories"][0]
+    assert s["criteria_total"] == 2
+    assert s["criteria_covered"] == 1  # só EARS-1 tem CT

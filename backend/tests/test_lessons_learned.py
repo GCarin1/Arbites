@@ -209,3 +209,106 @@ def test_generate_testcases_no_lessons_used_when_no_match(lessons_client):
     sent = lessons_client.requests[0]
     system_msg = next(m["content"] for m in sent["messages"] if m["role"] == "system")
     assert "Lições aprendidas" not in system_msg
+
+
+# ------------------------------------------------------- 0095 estruturadas
+
+def test_structured_lesson_fields_persist_and_index(client):
+    d = client.post(
+        "/api/v1/defects",
+        json={
+            "title": "Token não expira",
+            "root_cause": "comparação de data ingênua",
+            "lesson_when": "ao comparar timestamps de expiração",
+            "lesson_procedure": "usar datetime timezone-aware em UTC",
+            "lesson_antipattern": "comparar datetime naive com aware",
+        },
+    ).json()
+    assert d["lesson_when"] == "ao comparar timestamps de expiração"
+    assert d["lesson_procedure"] == "usar datetime timezone-aware em UTC"
+    assert d["lesson_antipattern"] == "comparar datetime naive com aware"
+
+    fetched = client.get(f"/api/v1/defects/{d['id']}").json()
+    assert fetched["lesson_antipattern"] == "comparar datetime naive com aware"
+    text = (client.ws.root / d["path"]).read_text(encoding="utf-8")
+    assert "timezone-aware" in text
+
+
+def test_find_relevant_lessons_matches_structured_only(client):
+    # defeito SEM root_cause, só com lição estruturada
+    client.post(
+        "/api/v1/defects",
+        json={
+            "title": "Bug de expiração",
+            "lesson_when": "ao validar expiração de token de sessão",
+            "lesson_antipattern": "comparar naive com aware",
+        },
+    )
+    conn = connect(client.ws)
+    lessons = find_relevant_lessons(conn, "Sessão deve validar expiração do token")
+    assert len(lessons) == 1
+    assert lessons[0]["lesson_when"] == "ao validar expiração de token de sessão"
+
+
+def test_generate_prefers_structured_lesson_in_prompt(lessons_client):
+    lessons_client.post(
+        "/api/v1/defects",
+        json={
+            "title": "Bug #99",
+            "root_cause": "causa antiga solta",
+            "lesson_when": "ao validar documento obrigatório",
+            "lesson_procedure": "exigir o campo antes de salvar",
+            "lesson_antipattern": "salvar sem validar o documento",
+        },
+    )
+    story = lessons_client.post(
+        "/api/v1/requirements",
+        json={"kind": "story", "title": "Cadastro",
+              "body": "O cadastro deve exigir validação do documento obrigatório."},
+    ).json()
+    lessons_client.post("/api/v1/ai/generate-testcases", json={"source": story["id"]})
+    sent = lessons_client.requests[0]
+    system_msg = next(m["content"] for m in sent["messages"] if m["role"] == "system")
+    # formato estruturado preferido (evite=/faça=), não o solto (causa=)
+    assert "evite=salvar sem validar o documento" in system_msg
+    assert "faça=exigir o campo antes de salvar" in system_msg
+    assert "causa antiga solta" not in system_msg
+
+
+def test_ai_structure_lesson_endpoint_is_preview(tmp_path):
+    """POST /ai/structure-lesson devolve a lição estruturada em preview,
+    sem gravar nada no defeito (o save fica a cargo do usuário)."""
+    structured = {
+        "lesson_when": "ao comparar datas de expiração",
+        "lesson_procedure": "usar datetime timezone-aware em UTC",
+        "lesson_antipattern": "comparar naive com aware",
+    }
+    ws = Workspace(tmp_path / "workspace")
+    ws.ensure()
+    config = dict(DEFAULT_CONFIG)
+    config["ai"] = {
+        "default_provider": "local",
+        "providers": [{"name": "local", "kind": "openai_compatible",
+                       "base_url": "http://localhost:1234/v1", "model": "qwen"}],
+    }
+    ws.config_path.write_text(
+        yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    app = create_app(
+        ws.root, watch=False, ai_key_store=FakeAIKeyStore(),
+        ai_transport=_recording_transport(json.dumps(structured, ensure_ascii=False), []),
+        github_client=object(),
+    )
+    with TestClient(app) as c:
+        d = c.post(
+            "/api/v1/defects",
+            json={"title": "Token não expira", "root_cause": "comparação ingênua"},
+        ).json()
+        resp = c.post(f"/api/v1/ai/structure-lesson/{d['id']}", json={})
+        assert resp.status_code == 200, resp.text
+        out = resp.json()
+        assert out["preview"] is True
+        assert out["lesson_procedure"] == "usar datetime timezone-aware em UTC"
+        # preview não grava: o defeito segue sem os campos estruturados
+        fetched = c.get(f"/api/v1/defects/{d['id']}").json()
+        assert fetched["lesson_procedure"] is None

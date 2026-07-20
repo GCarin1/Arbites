@@ -27,6 +27,52 @@ export interface Requirement {
   body?: string;
 }
 
+export interface ChainTestcase {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  last_result: { status: string; executed_at: string | null } | null;
+  evidence_count: number;
+  executions: {
+    execution_id: string;
+    execution_name: string;
+    status: string;
+    executed_at: string | null;
+  }[];
+}
+
+export interface StoryChain {
+  story: { id: string; title: string; status: string; epic_id: string | null; squad: string | null };
+  epic: { id: string; title: string; status: string } | null;
+  testcases: ChainTestcase[];
+  executions: { id: string; name: string; status: string; created_at: string | null }[];
+  defects: {
+    id: string;
+    title: string;
+    status: string;
+    severity: string | null;
+    testcase_id: string | null;
+    execution_id: string | null;
+  }[];
+  summary: {
+    testcases: number;
+    passing: number;
+    failing: number;
+    untested: number;
+    executions: number;
+    defects: number;
+    evidences: number;
+  };
+}
+
+export interface Criterion {
+  ears_id: string;
+  ord: number;
+  text: string;
+  form: string | null; // ubiquitous|event|state|unwanted|optional | null (fora de EARS)
+}
+
 export interface TestCase {
   id: string;
   title: string;
@@ -40,6 +86,7 @@ export interface TestCase {
   squad: string | null;
   squad_effective: string | null;
   tags?: string[];
+  criteria?: string[]; // EARS ids da story que este CT cobre (0092)
   body?: string;
 }
 
@@ -157,6 +204,14 @@ export interface Warning {
   created_at: string;
 }
 
+export interface TrashItem {
+  name: string;
+  origin: string | null;
+  trashed_at: string | null;
+  kind: string;
+  is_dir: boolean;
+}
+
 export interface StepEntry {
   index: number;
   text: string;
@@ -228,6 +283,9 @@ export interface Defect {
   root_cause: string | null;
   fix: string | null;
   prevention: string | null;
+  lesson_when?: string | null; // lição estruturada (0095)
+  lesson_procedure?: string | null;
+  lesson_antipattern?: string | null;
   body?: string;
 }
 
@@ -487,6 +545,9 @@ export interface MatrixStory {
   status: string;
   ct_count: number;
   covered: boolean;
+  coverage_state: "uncovered" | "untested" | "passing" | "failing";
+  criteria_total: number;
+  criteria_covered: number;
   last_status: string | null;
   last_execution: string | null;
   evidence_count: number;
@@ -532,10 +593,12 @@ export interface GeneratedTestcase {
   passos: string[];
   resultado_esperado: string;
   body: string;
+  criteria?: string[]; // vínculo EARS quando gerado por critério (0093)
 }
 
 export interface GeneratePreview {
   preview: boolean;
+  story?: string; // story de origem quando gerado por critério (0093)
   testcases: GeneratedTestcase[];
   lessons_used?: { id: string; title: string }[];
 }

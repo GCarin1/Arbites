@@ -4,6 +4,9 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import type { TreeNode, Warning, WorkspaceInfo } from "./types";
 
+const Home = lazy(() =>
+  import("./components/Home").then((m) => ({ default: m.Home }))
+);
 const TcRepository = lazy(() =>
   import("./components/TcRepository").then((m) => ({ default: m.TcRepository }))
 );
@@ -69,6 +72,7 @@ const CommandPalette = lazy(() =>
 );
 
 type Tab =
+  | "home"
   | "testcases"
   | "requirements"
   | "executions"
@@ -87,6 +91,7 @@ type Tab =
   | "profile";
 
 const NAV: { key: Tab; label: string }[] = [
+  { key: "home", label: "Hoje" },
   { key: "testcases", label: "Test cases" },
   { key: "requirements", label: "Requisitos" },
   { key: "executions", label: "Execuções" },
@@ -171,7 +176,7 @@ function NavItem({
 }
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("testcases");
+  const [tab, setTab] = useState<Tab>("home");
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
@@ -359,6 +364,15 @@ export default function App() {
       <div className="app-body">
         <aside className="sidebar">
           <nav className="nav">
+            <div className="nav-group">
+              <button
+                className={`nav-item ${tab === "home" ? "active" : ""}`}
+                onClick={() => setTab("home")}
+                aria-current={tab === "home" ? "page" : undefined}
+              >
+                Hoje
+              </button>
+            </div>
             {pins.length > 0 && (
               <div className="nav-group">
                 <div className="nav-group-title">
@@ -413,9 +427,22 @@ export default function App() {
           <div className="main-inner">
           {error && <div className="error-banner">{error}</div>}
           <ErrorBoundary key={tab}>
-          {tab === "problems" ? (
+          {tab === "home" ? (
+            <Suspense fallback={<p className="empty">Carregando…</p>}>
+              <Home
+                workspace={workspace}
+                warnings={warnings}
+                onNavigate={navigateTo}
+                onOpen={(t) => setTab(t as Tab)}
+              />
+            </Suspense>
+          ) : tab === "problems" ? (
             <Suspense fallback={<p className="empty">Carregando problemas…</p>}>
-              <WarningsView warnings={warnings} />
+              <WarningsView
+                warnings={warnings}
+                onChanged={() => void refresh()}
+                onError={setError}
+              />
             </Suspense>
           ) : tab === "dashboard" ? (
             <Suspense fallback={<p className="empty">Carregando dashboard…</p>}>
@@ -552,6 +579,7 @@ export default function App() {
                 <ReqRepository
                   version={reqVersion}
                   onOpen={setSelectedReq}
+                  onNavigate={navigateTo}
                   onChanged={() => void refresh()}
                   onError={setError}
                 />

@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-10
-**Version:** 0.7.0
+**Last updated:** 2026-07-20
+**Version:** 0.8.1
 
 ## Purpose
 
@@ -75,6 +75,11 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   `scenario_name` como vínculo alternativo à `scenario_tag` (lastreamento
   por nome de cenário; ver `local-automation`); `automation` exige tag OU
   nome (422 sem nenhum).
+- The system shall aceitar `criteria: [EARS-n, ...]` no frontmatter do CT
+  (vínculo aos critérios EARS da story, indexado em `tc_criteria` e exposto
+  em `GET /testcases/{id}`), com picker na UI do CT restrito aos critérios
+  da story vinculada; lista vazia limpa o vínculo (ver `requirements` para o
+  parse dos critérios e `audit` para a cobertura de spec).
 
 ### Event-driven
 
@@ -148,6 +153,16 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     do target e o run/coleta casa resultado por nome — verified by
     `backend/tests/test_feature_sync.py` e
     `backend/tests/test_local_runs.py`.
+12. [verified] CT aceita `criteria: [EARS-n]`, indexa em `tc_criteria` e o
+    expõe em `GET /testcases/{id}`; edição troca e lista vazia limpa; picker
+    na UI restrito aos critérios da story — verified by
+    `backend/tests/test_testcases.py`
+    (`test_testcase_criteria_link_indexed_and_editable`) + build + revisão
+    visual (`frontend/src/components/TestCaseEditor.tsx`).
+13. [verified] O aceite de um CT gerado POR critério (ver `ai-assist`)
+    persiste `story` + `criteria` no CT criado — verified by
+    `backend/tests/test_ai_generate.py`
+    (`test_generate_per_criterion_tags_and_accept_links`).
 
 ## Maturity
 

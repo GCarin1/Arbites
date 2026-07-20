@@ -4,7 +4,7 @@ import { SingleRefInput } from "./Autocomplete";
 import { ConfirmModal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import { useToast } from "./Toast";
-import type { TestCase, TestCaseResult } from "../types";
+import type { Criterion, TestCase, TestCaseResult } from "../types";
 
 export function TestCaseEditor({
   id,
@@ -23,7 +23,25 @@ export function TestCaseEditor({
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [history, setHistory] = useState<TestCaseResult[]>([]);
+  const [storyCriteria, setStoryCriteria] = useState<Criterion[]>([]); // 0092
   const { toast } = useToast();
+
+  // critérios EARS da story vinculada (para o picker de vínculo criteria↔CT)
+  useEffect(() => {
+    const story = tc?.story_id;
+    if (!story) {
+      setStoryCriteria([]);
+      return;
+    }
+    let alive = true;
+    api
+      .requirementCriteria(story)
+      .then((c) => alive && setStoryCriteria(c))
+      .catch(() => alive && setStoryCriteria([]));
+    return () => {
+      alive = false;
+    };
+  }, [tc?.story_id]);
 
   const load = useCallback(() => {
     setError(null);
@@ -76,6 +94,7 @@ export function TestCaseEditor({
           story: tc.story_id || null,
           squad: tc.squad || null,
           tags: tc.tags ?? [],
+          criteria: tc.criteria ?? [],
           body: tc.body ?? "",
         });
         setTc(updated);
@@ -149,6 +168,11 @@ export function TestCaseEditor({
               value={<span className={`status-dot dot-${tc.status}`}>{tc.status}</span>}
             />
             <ReadField label="Story" value={tc.story_id} mono />
+            <ReadField
+              label="Critérios EARS"
+              value={(tc.criteria ?? []).length ? (tc.criteria ?? []).join(", ") : null}
+              mono
+            />
             <ReadField
               label="Squad"
               value={
@@ -309,6 +333,34 @@ export function TestCaseEditor({
                 onChange={(e) => set("squad", e.target.value || null)}
               />
             </div>
+            {storyCriteria.length > 0 && (
+              <div className="field wide">
+                <label>Critérios EARS cobertos (da story)</label>
+                <div className="criteria-picker">
+                  {storyCriteria.map((c) => {
+                    const checked = (tc.criteria ?? []).includes(c.ears_id);
+                    return (
+                      <label key={c.ears_id} className="check-inline caption">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            set(
+                              "criteria",
+                              checked
+                                ? (tc.criteria ?? []).filter((x) => x !== c.ears_id)
+                                : [...(tc.criteria ?? []), c.ears_id],
+                            )
+                          }
+                        />
+                        <span className="mono">{c.ears_id}</span>
+                        <span className="muted">{c.text}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="field">
               <label>Tags (vírgula)</label>
               <input

@@ -139,3 +139,33 @@ def test_testcase_results_history(client):
     assert history[0]["executed_at"] >= history[1]["executed_at"]
 
     assert client.get("/api/v1/testcases/CT-9999/results").status_code == 404
+
+
+CRIT_BODY = (
+    "## Critérios de aceite\n\n"
+    "- [EARS-1] O sistema deve enviar o link.\n"
+    "- [EARS-2] O sistema deve expirar o link em 30 minutos.\n"
+)
+
+
+def test_testcase_criteria_link_indexed_and_editable(client):
+    """0092: CT aceita `criteria: [EARS-n]`, indexa e expõe; edição troca."""
+    story = client.post(
+        "/api/v1/requirements",
+        json={"kind": "story", "title": "Senha", "body": CRIT_BODY},
+    ).json()
+    ct = client.post(
+        "/api/v1/testcases",
+        json={"title": "Valida link", "story": story["id"], "criteria": ["EARS-1"]},
+    ).json()
+    assert ct["criteria"] == ["EARS-1"]
+
+    # edição troca o vínculo
+    updated = client.put(
+        f"/api/v1/testcases/{ct['id']}", json={"criteria": ["EARS-1", "EARS-2"]}
+    ).json()
+    assert updated["criteria"] == ["EARS-1", "EARS-2"]
+
+    # lista vazia limpa o vínculo
+    cleared = client.put(f"/api/v1/testcases/{ct['id']}", json={"criteria": []}).json()
+    assert cleared["criteria"] == []

@@ -26,6 +26,64 @@ REQUIRED_TC_HEADINGS = ["Passos", "Resultado esperado"]
 
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*?)\s*#*\s*$")
 _ORDERED_ITEM_RE = re.compile(r"^\s*\d+[.)]\s+(.*)$")
+
+# Critérios de aceite EARS na story (0091): itens `- [EARS-n] <frase>` sob a
+# seção `## Critérios de aceite`. O parse é determinístico (mesmo motivo dos
+# demais: orçamento de reindex).
+_EARS_ITEM_RE = re.compile(r"^\s*[-*]\s*\[EARS-(\d+)\]\s*(.+?)\s*$", re.IGNORECASE)
+_CRIT_SECTION_RE = re.compile(
+    r"^(crit[ée]rios de aceite|acceptance criteria)\b", re.IGNORECASE
+)
+_EARS_MODAL_RE = re.compile(
+    r"\b(shall|must|should|will|deve|dever[áa]|dever[ãa]o|precisa|may|pode|poder[áa])\b",
+    re.IGNORECASE,
+)
+_EARS_NEG_RE = re.compile(
+    r"\b(shall not|must not|cannot|n[ãa]o deve|n[ãa]o pode|nunca)\b", re.IGNORECASE
+)
+
+
+def ears_form(text: str) -> str | None:
+    """Forma EARS detectada (ubiquitous/event/state/unwanted/optional) ou
+    None quando não há verbo modal (shall/deve/may/pode) — o sinal de que a
+    frase não está em EARS."""
+    t = text.strip()
+    if not _EARS_MODAL_RE.search(t):
+        return None
+    if _EARS_NEG_RE.search(t):
+        return "unwanted"
+    low = t.lower()
+    if re.match(r"^(when|quando)\b", low):
+        return "event"
+    if re.match(r"^(while|enquanto)\b", low):
+        return "state"
+    if re.match(r"^(where|onde|caso)\b", low):
+        return "optional"
+    return "ubiquitous"
+
+
+def parse_criteria(body: str) -> list[dict[str, Any]]:
+    """Extrai os critérios EARS da seção `## Critérios de aceite`. Fora da
+    seção nada é coletado — stories legadas sem a seção ficam com lista vazia
+    (o lint é opt-in pela presença da seção)."""
+    out: list[dict[str, Any]] = []
+    in_section = False
+    for line in body.splitlines():
+        h = _HEADING_RE.match(line)
+        if h:
+            in_section = bool(_CRIT_SECTION_RE.match(h.group(1).strip()))
+            continue
+        if not in_section:
+            continue
+        m = _EARS_ITEM_RE.match(line)
+        if m:
+            ordn = int(m.group(1))
+            text = m.group(2).strip()
+            out.append({
+                "ears_id": f"EARS-{ordn}", "ord": ordn,
+                "text": text, "form": ears_form(text),
+            })
+    return out
 # BDD/Gherkin: steps são as linhas Given/When/Then/And/But (EN e PT-BR)
 _GHERKIN_STEP_RE = re.compile(
     r"^\s*(Given|When|Then|And|But|Dado|Quando|Então|Entao|E|Mas)\s+(.+)$"

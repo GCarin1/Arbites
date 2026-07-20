@@ -23,7 +23,9 @@ import type {
   GeneratePreview,
   HealthScore,
   MetricsSummary,
+  Criterion,
   Requirement,
+  StoryChain,
   ReviewResponse,
   SearchResult,
   TestCase,
@@ -31,6 +33,7 @@ import type {
   TraceabilityMatrix,
   TreeNode,
   TrendPoint,
+  TrashItem,
   Warning,
   WorkspaceInfo,
 } from "./types";
@@ -65,10 +68,20 @@ export const api = {
   workspace: () => request<WorkspaceInfo>("/workspace"),
   reindex: () => request<unknown>("/workspace/reindex", { method: "POST" }),
   warnings: () => request<Warning[]>("/warnings"),
+  trash: () => request<TrashItem[]>("/trash"),
+  restoreTrash: (name: string) =>
+    request<{ restored: string }>(`/trash/${encodeURIComponent(name)}/restore`, {
+      method: "POST",
+    }),
+  emptyTrash: () => request<{ removed: number }>("/trash", { method: "DELETE" }),
   tree: () => request<TreeNode>("/tree"),
 
   requirements: (params = "") => request<Requirement[]>(`/requirements${params}`),
   requirement: (id: string) => request<Requirement>(`/requirements/${id}`),
+  requirementChain: (id: string) =>
+    request<StoryChain>(`/requirements/${id}/chain`),
+  requirementCriteria: (id: string) =>
+    request<Criterion[]>(`/requirements/${id}/criteria`),
   createRequirement: (body: object) =>
     request<Requirement>("/requirements", { method: "POST", body: JSON.stringify(body) }),
   updateRequirement: (id: string, body: object) =>
@@ -199,14 +212,33 @@ export const api = {
 
   profile: () => request<{ name: string; memory: string }>("/profile"),
 
-  memoryTimeline: (kinds = "", limit = 50) =>
-    request<TimelineEntry[]>(
-      `/memory/timeline?kinds=${encodeURIComponent(kinds)}&limit=${limit}`,
+  memoryTimeline: (kinds = "", limit = 50, dateFrom = "", dateTo = "") => {
+    const qs = new URLSearchParams({ kinds, limit: String(limit) });
+    if (dateFrom) qs.set("date_from", dateFrom);
+    if (dateTo) qs.set("date_to", dateTo);
+    return request<TimelineEntry[]>(`/memory/timeline?${qs.toString()}`);
+  },
+  memoryTimelineYears: (kinds = "") =>
+    request<string[]>(
+      `/memory/timeline/years?kinds=${encodeURIComponent(kinds)}`,
     ),
 
   contextPackUrl: (params: Record<string, string>) => {
     const qs = new URLSearchParams(params);
     return `${BASE}/context-pack?${qs.toString()}`;
+  },
+  agentPackUrl: (params: Record<string, string>) => {
+    const qs = new URLSearchParams(params);
+    return `${BASE}/agent-pack?${qs.toString()}`;
+  },
+  contextPack: (params: Record<string, string>) => {
+    const qs = new URLSearchParams({ ...params, format: "json" });
+    return request<{
+      scope: Record<string, string>;
+      counts: { requirements: number; testcases: number; defects: number; decisions: number };
+      bytes: number;
+      markdown: string;
+    }>(`/context-pack?${qs.toString()}`);
   },
 
   todos: (query = "") => request<Todo[]>(`/todos${query}`),
@@ -299,7 +331,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
-  aiGenerate: (body: { source: string; provider?: string | null }) =>
+  aiGenerate: (body: {
+    source: string;
+    provider?: string | null;
+    criteria?: string[];
+  }) =>
     request<GeneratePreview>("/ai/generate-testcases", {
       method: "POST",
       body: JSON.stringify(body),
@@ -311,6 +347,34 @@ export const api = {
     }),
   aiNegativeCases: (ctId: string, body: { provider?: string | null }) =>
     request<GeneratePreview>(`/ai/negative-cases/${ctId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  aiProviderTest: (body: {
+    name?: string;
+    kind?: string;
+    model?: string;
+    base_url?: string | null;
+    key?: string;
+  }) =>
+    request<{ ok: boolean; error: string | null }>("/ai/providers/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  aiAnalyzeRun: (execId: string, body: { provider?: string | null } = {}) =>
+    request<{
+      preview: boolean;
+      summary: string;
+      probable_cause: string;
+      defect: { title: string; severity: string; description: string; testcase: string; execution: string };
+    }>(`/ai/analyze-run/${execId}`, { method: "POST", body: JSON.stringify(body) }),
+  aiStructureLesson: (defectId: string, body: { provider?: string | null } = {}) =>
+    request<{
+      preview: boolean;
+      lesson_when: string;
+      lesson_procedure: string;
+      lesson_antipattern: string;
+    }>(`/ai/structure-lesson/${defectId}`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

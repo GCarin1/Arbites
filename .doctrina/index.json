@@ -1,8 +1,8 @@
 {
   "$schema_version": "0.1.0",
   "project": "Arbites",
-  "framework_version": "0.12.0",
-  "last_updated": "2026-07-17",
+  "framework_version": "0.13.0",
+  "last_updated": "2026-07-20",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -15,8 +15,8 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.11.0",
-        "last_updated": "2026-07-11",
+        "version": "0.14.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
           "SC7"
@@ -26,8 +26,8 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.1.2",
-        "last_updated": "2026-07-12",
+        "version": "0.2.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified"
       },
       {
@@ -56,8 +56,8 @@
         "id": "context-pack",
         "path": ".doctrina/specs/context-pack/spec.md",
         "status": "active",
-        "version": "0.1.0",
-        "last_updated": "2026-07-12",
+        "version": "0.3.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified"
       },
       {
@@ -83,8 +83,8 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.7.0",
-        "last_updated": "2026-07-11",
+        "version": "0.8.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -108,6 +108,14 @@
         "realizes": [
           "SC2"
         ]
+      },
+      {
+        "id": "home",
+        "path": ".doctrina/specs/home/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-07-19",
+        "implementation": "verified — change 0080 (frontend/src/components/Home.tsx, frontend/src/App.tsx)"
       },
       {
         "id": "indexing",
@@ -158,8 +166,8 @@
         "id": "project-memory",
         "path": ".doctrina/specs/project-memory/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-12",
+        "version": "0.3.0",
+        "last_updated": "2026-07-19",
         "implementation": "verified"
       },
       {
@@ -177,8 +185,8 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-09",
+        "version": "0.8.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC1"
@@ -207,8 +215,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.7.0",
-        "last_updated": "2026-07-10",
+        "version": "0.8.1",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -229,8 +237,8 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.3.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
           "SC1"
@@ -330,7 +338,64 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "title": "pickers canonicos por titulo em referencias a entidades",
+        "path": ".doctrina/changes/0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "title": "acoes em lote no repositorio de CTs e nas executions",
+        "path": ".doctrina/changes/0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0084-aba-e-filtros-na-url-para-deep-link",
+        "title": "aba e filtros na URL para deep-link",
+        "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0088-diff-entre-duas-executions",
+        "title": "diff entre duas executions",
+        "path": ".doctrina/changes/0088-diff-entre-duas-executions",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "title": "flaky visivel no CT e quarentena fora do pass rate",
+        "path": ".doctrina/changes/0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "title": "sync de feature atualizado marca CT precisa re-execucao",
+        "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0097-action-items-de-reuniao-viram-afazeres",
+        "title": "action items de reuniao viram afazeres",
+        "path": ".doctrina/changes/0097-action-items-de-reuniao-viram-afazeres",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      },
+      {
+        "id": "0098-reporte-executivo-narrado-pela-ia",
+        "title": "reporte executivo narrado pela IA",
+        "path": ".doctrina/changes/0098-reporte-executivo-narrado-pela-ia",
+        "status": "proposed",
+        "opened": "2026-07-19"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1297,6 +1362,200 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0077-memoria-do-projeto-agrupar-timeline-por-dia",
+        "title": "memoria do projeto: agrupar timeline por dia colapsavel e filtro de periodo ano/mes com filtro de data no backend",
+        "path": ".doctrina/changes/archive/2026-07-19-0077-memoria-do-projeto-agrupar-timeline-por-dia",
+        "status": "applied",
+        "applied": "2026-07-19",
+        "specs_affected": [
+          {
+            "capability": "project-memory",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0078-reformular-aba-de-ia-sub-abas-gerar-revisar",
+        "title": "reformular aba de IA: sub-abas gerar/revisar/context-pack/configuracao e seletor de provider global no topo",
+        "path": ".doctrina/changes/archive/2026-07-19-0078-reformular-aba-de-ia-sub-abas-gerar-revisar",
+        "status": "applied",
+        "applied": "2026-07-19",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0079-context-pack-escopo-com-pickers-que-listam-itens",
+        "title": "context-pack: escopo com pickers que listam itens + autocomplete, toggles de secao (CTs/defeitos/decisoes), ultimo resultado por CT, decisoes em qualquer escopo, preview com contagens e copiar/baixar",
+        "path": ".doctrina/changes/archive/2026-07-19-0079-context-pack-escopo-com-pickers-que-listam-itens",
+        "status": "applied",
+        "applied": "2026-07-19",
+        "specs_affected": [
+          {
+            "capability": "context-pack",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0080-tela-hoje-landing-com-visao-do-dia",
+        "title": "tela hoje: landing com visao do dia",
+        "path": ".doctrina/changes/archive/2026-07-20-0080-tela-hoje-landing-com-visao-do-dia",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "home",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
+        "title": "lixeira: listar e restaurar itens da trash pela UI",
+        "path": ".doctrina/changes/archive/2026-07-20-0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0085-testar-provider-de-ia-na-configuracao",
+        "title": "testar provider de IA na configuracao",
+        "path": ".doctrina/changes/archive/2026-07-20-0085-testar-provider-de-ia-na-configuracao",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0086-story-360-cadeia-completa-navegavel-por-story",
+        "title": "story 360: cadeia completa navegavel por story",
+        "path": ".doctrina/changes/archive/2026-07-20-0086-story-360-cadeia-completa-navegavel-por-story",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0087-cobertura-semantica-passando-falhando-ou-nunca",
+        "title": "cobertura semantica: passando, falhando ou nunca executada",
+        "path": ".doctrina/changes/archive/2026-07-20-0087-cobertura-semantica-passando-falhando-ou-nunca",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0091-editor-e-lint-de-criterios-ears-na-story",
+        "title": "editor e lint de criterios EARS na story",
+        "path": ".doctrina/changes/archive/2026-07-20-0091-editor-e-lint-de-criterios-ears-na-story",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
+        "title": "spec coverage: criterio EARS vinculado a CT no auditor",
+        "path": ".doctrina/changes/archive/2026-07-20-0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0093-gerar-cts-por-criterio-ears-com-vinculo-gravado",
+        "title": "gerar CTs por criterio EARS com vinculo gravado",
+        "path": ".doctrina/changes/archive/2026-07-20-0093-gerar-cts-por-criterio-ears-com-vinculo-gravado",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0094-pacote-de-agente-exportar-agents-md-e-skills-do",
+        "title": "pacote de agente: exportar AGENTS.md e skills do escopo",
+        "path": ".doctrina/changes/archive/2026-07-20-0094-pacote-de-agente-exportar-agents-md-e-skills-do",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "context-pack",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0095-licoes-de-defeito-estruturadas-como-skills",
+        "title": "licoes de defeito estruturadas como skills",
+        "path": ".doctrina/changes/archive/2026-07-20-0095-licoes-de-defeito-estruturadas-como-skills",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
+        "title": "resumo de falha pos-run pela IA com defeito draft",
+        "path": ".doctrina/changes/archive/2026-07-20-0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -1337,10 +1596,22 @@
         "last_updated": "2026-07-10"
       },
       {
+        "id": "delta-prose-exige-operation-modified",
+        "path": ".doctrina/skills/delta-prose-exige-operation-modified.md",
+        "description": "Como escrever deltas de spec à mão neste repo sem quebrar os gates — todo delta prose precisa do header `**Operation:** MODIFIED`, o merge na spec é manual (apply só confere), e specs editadas exigem `doctrina validate --fix` para re-sincronizar o index.",
+        "last_updated": "2026-07-19"
+      },
+      {
         "id": "descobrir-em-vez-de-digitar-config-de-caminho-externo",
         "path": ".doctrina/skills/descobrir-em-vez-de-digitar-config-de-caminho-externo.md",
         "description": "Quando um formulário de config pede um caminho externo (pasta/glob de outro repositório) que o usuário não decora, ofereça um botão que ESCANEIA o filesystem de verdade e devolve a lista real para escolher — não deixe o usuário digitar um padrão às cegas.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "design-system-canonico",
+        "path": ".doctrina/skills/design-system-canonico.md",
+        "description": "Gramática visual canônica do frontend Arbites (capability design-system) — as convenções fixas de botão/input/card/badge/abas/hierarquia/feedback que toda tela nova ou alterada deve seguir, em vez de estilo ad-hoc.",
+        "last_updated": "2026-07-19"
       },
       {
         "id": "efeito-de-foco-so-no-mount",

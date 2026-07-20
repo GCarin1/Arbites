@@ -17,7 +17,11 @@ _ALL_KINDS = (
 
 
 def timeline(
-    conn: sqlite3.Connection, kinds: list[str] | None = None, limit: int = 50,
+    conn: sqlite3.Connection,
+    kinds: list[str] | None = None,
+    limit: int = 50,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> list[dict[str, Any]]:
     """Eventos ordenados do mais recente para o mais antigo, cruzando as
     fontes já indexadas — nada é materializado além do já existente, exceto
@@ -25,7 +29,11 @@ def timeline(
 
     Sem `kinds` explícito, o tipo `result` (transições de resultado) fica
     FORA — é verboso por natureza e afogaria a timeline; quem quiser pede
-    `kinds=...,result` (a UI oferece como opt-in)."""
+    `kinds=...,result` (a UI oferece como opt-in).
+
+    `date_from`/`date_to` (`YYYY-MM-DD`, inclusivos) recortam os eventos pelo
+    prefixo de data de `at` — uniforme para todas as fontes, aplicado ANTES
+    do corte por `limit`."""
     wanted = set(kinds) if kinds else set(_ALL_KINDS) - {"result"}
     events: list[dict[str, Any]] = []
 
@@ -106,8 +114,52 @@ def timeline(
                 "summary": a["summary"] or a["action"],
             })
 
+    if date_from or date_to:
+        lo = date_from or ""
+        hi = date_to or "9999-12-31"
+        events = [e for e in events if e["at"] and lo <= e["at"][:10] <= hi]
+
     events.sort(key=lambda e: e["at"] or "", reverse=True)
     return events[:limit]
+
+
+# fontes → (tabela, coluna de data, filtro) para descoberta de anos; espelha
+# exatamente os `SELECT`s de `timeline()` (defect e lesson dividem `defects`).
+def _year_sources(wanted: set[str]) -> list[tuple[str, str, str]]:
+    sources: list[tuple[str, str, str]] = []
+    if "requirement" in wanted:
+        sources.append(("requirements", "created", "created IS NOT NULL"))
+    if "testcase" in wanted:
+        sources.append(("testcases", "created", "created IS NOT NULL"))
+    if "defect" in wanted or "lesson" in wanted:
+        sources.append(("defects", "opened_at", "opened_at IS NOT NULL"))
+    if "decision" in wanted:
+        sources.append(("decisions", "created", "created IS NOT NULL"))
+    if "agent" in wanted:
+        sources.append(("agent_events", "at", "at IS NOT NULL"))
+    if "result" in wanted:
+        sources.append(("result_events", "at",
+                        "at IS NOT NULL AND status IN "
+                        "('passed','failed','blocked','retest')"))
+    return sources
+
+
+def timeline_years(
+    conn: sqlite3.Connection, kinds: list[str] | None = None,
+) -> list[str]:
+    """Anos DISTINTOS (`YYYY`) com ao menos um evento das fontes pedidas, em
+    ordem decrescente — popula o seletor de ano da UI com dados reais em vez
+    de um range chutado. Mesmo default de `result` que `timeline()`."""
+    wanted = set(kinds) if kinds else set(_ALL_KINDS) - {"result"}
+    years: set[str] = set()
+    for table, col, where in _year_sources(wanted):
+        for row in conn.execute(
+            f"SELECT DISTINCT substr({col}, 1, 4) AS y FROM {table} WHERE {where}"
+        ):
+            y = row["y"]
+            if y and y.isdigit():
+                years.add(y)
+    return sorted(years, reverse=True)
 
 
 def recent_recap(conn: sqlite3.Connection, limit: int = 5) -> str:
@@ -121,8 +173,10 @@ def recent_recap(conn: sqlite3.Connection, limit: int = 5) -> str:
         (limit,),
     ).fetchall()
     lessons = conn.execute(
-        "SELECT id, title, root_cause, fix FROM defects"
-        " WHERE root_cause IS NOT NULL AND root_cause != ''"
+        "SELECT id, title, root_cause, fix, lesson_when, lesson_procedure"
+        " FROM defects"
+        " WHERE (root_cause IS NOT NULL AND root_cause != '')"
+        "    OR (lesson_when IS NOT NULL AND lesson_when != '')"
         " ORDER BY opened_at DESC, id DESC LIMIT ?",
         (limit,),
     ).fetchall()
@@ -133,8 +187,14 @@ def recent_recap(conn: sqlite3.Connection, limit: int = 5) -> str:
     for d in decisions:
         lines.append(f"- Decisão {d['id']}: {d['title']}")
     for lesson in lessons:
-        line = f"- Lição de {lesson['id']} ({lesson['title']}): {lesson['root_cause']}"
-        if lesson["fix"]:
-            line += f" — correção: {lesson['fix']}"
+        # lição estruturada tem preferência sobre causa/correção soltas (0095)
+        if lesson["lesson_when"]:
+            line = f"- Lição de {lesson['id']} ({lesson['title']}): {lesson['lesson_when']}"
+            if lesson["lesson_procedure"]:
+                line += f" — faça: {lesson['lesson_procedure']}"
+        else:
+            line = f"- Lição de {lesson['id']} ({lesson['title']}): {lesson['root_cause']}"
+            if lesson["fix"]:
+                line += f" — correção: {lesson['fix']}"
         lines.append(line)
     return "\n".join(lines)
