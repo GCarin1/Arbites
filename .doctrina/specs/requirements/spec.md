@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)
 **Realizes:** SC1
 **Last updated:** 2026-07-20
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -42,6 +42,12 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
   EARS cobertos (`criteria_covered`/`criteria_total`) — critério coberto =
   com ≥1 CT vinculado via `criteria` — badge exibido só quando a story tem
   critérios.
+- The system shall derivar por story um estado semântico de cobertura
+  (`coverage_state`) do último resultado dos CTs vinculados — `uncovered`
+  (sem CT), `untested` (com CT, nenhum executado), `failing` (pior resultado
+  executado é failed/blocked/…) ou `passing` (todos os executados passaram)
+  — na mesma matriz (fonte única com o dashboard), com badge de 4 estados e
+  filtro por estado na aba Requisitos.
 
 - The system shall carimbar `created` (data) no frontmatter do requisito na
   criação, indexá-lo e expô-lo na listagem/detalhe.
@@ -116,6 +122,12 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
    critérios EARS cobertos (`criteria_covered`/`criteria_total`, critério com
    ≥1 CT vinculado) — verified by `backend/tests/test_metrics.py`
    (`test_traceability_criteria_coverage`) + build + revisão visual.
+
+9. [verified] `coverage_state` por story deriva corretamente
+   uncovered/untested/passing/failing do último resultado dos CTs, com badge
+   de 4 estados e filtro na aba Requisitos — verified by
+   `backend/tests/test_metrics.py` (`test_traceability_coverage_state`) +
+   build + revisão visual (`frontend/src/components/Requirements.tsx`).
 
 ## Maturity
 

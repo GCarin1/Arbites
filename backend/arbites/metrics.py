@@ -401,11 +401,21 @@ def traceability(
                 "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)",
                 (story["id"],),
             ).fetchone()["c"]
+            # estado semântico de cobertura (0087): honesto além de "tem CT?"
+            if not cts:
+                coverage_state = "uncovered"
+            elif agg_status is None:
+                coverage_state = "untested"  # tem CT, nenhum executado
+            elif agg_status == "passed":
+                coverage_state = "passing"  # todos os executados passaram
+            else:
+                coverage_state = "failing"  # pior executado é failed/blocked/…
             out_stories.append(
                 {
                     **dict(story),
                     "ct_count": len(cts),
                     "covered": len(cts) > 0,
+                    "coverage_state": coverage_state,
                     "criteria_total": criteria_total,
                     "criteria_covered": criteria_covered,
                     "last_status": agg_status,

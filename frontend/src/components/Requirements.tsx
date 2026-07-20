@@ -4,7 +4,18 @@ import { ConfirmModal, Modal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import { Story360 } from "./Story360";
 import { useToast } from "./Toast";
-import type { Criterion, Requirement } from "../types";
+import type { Criterion, MatrixStory, Requirement } from "../types";
+
+// estado semântico de cobertura por story (0087) — cor + rótulo + hint
+const COV_STATE: Record<
+  MatrixStory["coverage_state"],
+  { label: string; dot: string; hint: string }
+> = {
+  passing: { label: "passando", dot: "dot-col-passed", hint: "todos os CTs executados passaram" },
+  failing: { label: "com falhas", dot: "dot-col-failed", hint: "algum CT com último resultado failed/blocked" },
+  untested: { label: "nunca executada", dot: "dot-col-pending", hint: "tem CT vinculado, mas nenhum foi executado" },
+  uncovered: { label: "sem cobertura", dot: "dot-col-blocked", hint: "nenhum CT vinculado" },
+};
 
 export function RequirementsList({
   version,
@@ -108,13 +119,14 @@ export function ReqRepository({
   const [dragStory, setDragStory] = useState<string | null>(null);
   const [dropEpic, setDropEpic] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Requirement | null>(null);
-  // Cobertura por story (0068/0092): reuso da matriz de rastreabilidade — a
-  // mesma fonte do Dashboard, sem endpoint novo. story_id → CTs + critérios.
+  // Cobertura por story (0068/0087/0092): reuso da matriz de rastreabilidade
+  // — mesma fonte do Dashboard, sem endpoint novo. story_id → CTs + estado
+  // semântico + critérios.
   const [coverage, setCoverage] = useState<Map<
     string,
-    { ct: number; critTotal: number; critCovered: number }
+    { ct: number; state: MatrixStory["coverage_state"]; critTotal: number; critCovered: number }
   > | null>(null);
-  const [onlyUncovered, setOnlyUncovered] = useState(false);
+  const [covFilter, setCovFilter] = useState<"all" | MatrixStory["coverage_state"]>("all");
 
   const load = useCallback(() => {
     api
@@ -124,11 +136,15 @@ export function ReqRepository({
     api
       .traceability("", "")
       .then((m) => {
-        const map = new Map<string, { ct: number; critTotal: number; critCovered: number }>();
+        const map = new Map<
+          string,
+          { ct: number; state: MatrixStory["coverage_state"]; critTotal: number; critCovered: number }
+        >();
         for (const epic of m.epics)
           for (const s of epic.stories)
             map.set(s.id, {
               ct: s.ct_count,
+              state: s.coverage_state,
               critTotal: s.criteria_total,
               critCovered: s.criteria_covered,
             });
@@ -188,12 +204,12 @@ export function ReqRepository({
 
   const epics = items.filter((r) => r.kind === "epic");
   const allStories = items.filter((r) => r.kind === "story");
-  // cobertura (0068): 0 CTs = descoberta; filtro isola as descobertas
+  // cobertura (0068/0087): estado semântico por story
   const ctsOf = (id: string) => coverage?.get(id)?.ct ?? 0;
   const critOf = (id: string) => coverage?.get(id); // {critTotal, critCovered}
-  const stories = onlyUncovered
-    ? allStories.filter((s) => ctsOf(s.id) === 0)
-    : allStories;
+  const stateOf = (id: string) => coverage?.get(id)?.state ?? "uncovered";
+  const stories =
+    covFilter === "all" ? allStories : allStories.filter((s) => stateOf(s.id) === covFilter);
   const orphans = stories.filter((s) => !epics.some((e) => e.id === s.epic_id));
   const coveredCount = (epicId: string) =>
     allStories.filter((s) => s.epic_id === epicId && ctsOf(s.id) > 0).length;
@@ -215,13 +231,17 @@ export function ReqRepository({
         <span className="repo-file-title">{story.title}</span>
       </button>
       {coverage &&
-        (ctsOf(story.id) > 0 ? (
-          <span className="status-dot dot-col-passed caption">
-            coberta ({ctsOf(story.id)} CT{ctsOf(story.id) === 1 ? "" : "s"})
-          </span>
-        ) : (
-          <span className="status-dot dot-col-blocked caption">sem cobertura</span>
-        ))}
+        (() => {
+          const st = stateOf(story.id);
+          const n = ctsOf(story.id);
+          const meta = COV_STATE[st];
+          return (
+            <span className={`status-dot ${meta.dot} caption`} title={meta.hint}>
+              {meta.label}
+              {n > 0 && st !== "uncovered" ? ` (${n} CT${n === 1 ? "" : "s"})` : ""}
+            </span>
+          );
+        })()}
       {/* cobertura de critérios EARS (0092): só quando a story tem critérios */}
       {(() => {
         const c = critOf(story.id);
@@ -258,13 +278,15 @@ export function ReqRepository({
         <h1 className="page-title">Requisitos</h1>
         <span className="spacer" />
         <div className="head-controls">
-          <label className="caption" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <input
-              type="checkbox"
-              checked={onlyUncovered}
-              onChange={(e) => setOnlyUncovered(e.target.checked)}
-            />
-            só sem cobertura
+          <label className="check-inline caption">
+            Cobertura
+            <select value={covFilter} onChange={(e) => setCovFilter(e.target.value as typeof covFilter)}>
+              <option value="all">todas</option>
+              <option value="passing">passando</option>
+              <option value="failing">com falhas</option>
+              <option value="untested">nunca executada</option>
+              <option value="uncovered">sem cobertura</option>
+            </select>
           </label>
           <button onClick={() => setCreating("epic")}>Novo epic</button>
           <button className="primary" onClick={() => setCreating("story")}>

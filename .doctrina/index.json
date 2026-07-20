@@ -185,7 +185,7 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.7.0",
+        "version": "0.8.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
@@ -371,13 +371,6 @@
         "id": "0085-testar-provider-de-ia-na-configuracao",
         "title": "testar provider de IA na configuracao",
         "path": ".doctrina/changes/0085-testar-provider-de-ia-na-configuracao",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0087-cobertura-semantica-passando-falhando-ou-nunca",
-        "title": "cobertura semantica: passando, falhando ou nunca executada",
-        "path": ".doctrina/changes/0087-cobertura-semantica-passando-falhando-ou-nunca",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1454,6 +1447,19 @@
         "id": "0086-story-360-cadeia-completa-navegavel-por-story",
         "title": "story 360: cadeia completa navegavel por story",
         "path": ".doctrina/changes/archive/2026-07-20-0086-story-360-cadeia-completa-navegavel-por-story",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0087-cobertura-semantica-passando-falhando-ou-nunca",
+        "title": "cobertura semantica: passando, falhando ou nunca executada",
+        "path": ".doctrina/changes/archive/2026-07-20-0087-cobertura-semantica-passando-falhando-ou-nunca",
         "status": "applied",
         "applied": "2026-07-20",
         "specs_affected": [

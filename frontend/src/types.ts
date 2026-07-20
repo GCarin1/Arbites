@@ -534,6 +534,7 @@ export interface MatrixStory {
   status: string;
   ct_count: number;
   covered: boolean;
+  coverage_state: "uncovered" | "untested" | "passing" | "failing";
   criteria_total: number;
   criteria_covered: number;
   last_status: string | null;

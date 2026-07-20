@@ -162,6 +162,50 @@ def test_traceability_matrix(client, dataset):
     assert not senha["covered"]  # sem cobertura
 
 
+def test_traceability_coverage_state(client):
+    """0087: estado semântico por story — uncovered/untested/passing/failing."""
+    epic = client.post("/api/v1/requirements", json={"kind": "epic", "title": "E"}).json()
+
+    def story(title):
+        return client.post(
+            "/api/v1/requirements",
+            json={"kind": "story", "title": title, "epic": epic["id"]},
+        ).json()
+
+    def ct(story_id, title):
+        return client.post(
+            "/api/v1/testcases", json={"title": title, "story": story_id}
+        ).json()
+
+    def run(ct_id, status):
+        ex = client.post(
+            "/api/v1/executions", json={"name": "R", "testcase_ids": [ct_id]}
+        ).json()
+        client.post(
+            f"/api/v1/executions/{ex['id']}/results/{ct_id}/status",
+            json={"status": status},
+        )
+
+    s_uncovered = story("Sem CT")
+    s_untested = story("Com CT sem execução")
+    ct(s_untested["id"], "CT-untested")
+    s_passing = story("Passando")
+    run(ct(s_passing["id"], "CT-pass")["id"], "passed")
+    s_failing = story("Falhando")
+    run(ct(s_failing["id"], "CT-a")["id"], "passed")
+    run(ct(s_failing["id"], "CT-b")["id"], "failed")  # pior = failed
+
+    states = {}
+    for e in client.get("/api/v1/metrics/traceability").json()["epics"]:
+        for s in e["stories"]:
+            states[s["id"]] = s["coverage_state"]
+
+    assert states[s_uncovered["id"]] == "uncovered"
+    assert states[s_untested["id"]] == "untested"
+    assert states[s_passing["id"]] == "passing"
+    assert states[s_failing["id"]] == "failing"
+
+
 def test_traceability_criteria_coverage(client):
     """0092: contagem X/Y critérios EARS cobertos por story."""
     body = (

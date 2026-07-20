@@ -1,6 +1,7 @@
 # Change 0087-cobertura-semantica-passando-falhando-ou-nunca — cobertura semantica: passando, falhando ou nunca executada
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** requirements
@@ -30,10 +31,10 @@ dados permitem.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Story com CT failed → `failing`; todos passed → `passing`; CTs nunca executados → `untested` — `backend/tests/test_metrics.py`.
-- [ ] Badges de 4 estados + filtro na aba Requisitos — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Story com CT failed → `failing`; todos passed → `passing`; CTs nunca executados → `untested` — `backend/tests/test_metrics.py`.
+- [x] Badges de 4 estados + filtro na aba Requisitos — build + revisão visual.
 
 ## Open questions
 
