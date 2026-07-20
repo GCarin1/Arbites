@@ -1,6 +1,7 @@
 # Change 0094-pacote-de-agente-exportar-agents-md-e-skills-do — pacote de agente: exportar AGENTS.md e skills do escopo
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** context-pack
@@ -34,10 +35,10 @@ AGENTS.md + skills prontos para colar no projeto.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] ZIP contém AGENTS.md + skills das lições + specs do escopo; layout=claude muda caminhos; escopo obrigatório (422) — novo `backend/tests/test_agent_pack.py`.
-- [ ] UI baixa o zip — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] ZIP contém AGENTS.md + skills das lições + specs do escopo; layout=claude muda caminhos; escopo obrigatório (422) — novo `backend/tests/test_agent_pack.py`.
+- [x] UI baixa o zip — build + revisão visual.
 
 ## Open questions
 

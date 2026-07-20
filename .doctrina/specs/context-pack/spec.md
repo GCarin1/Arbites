@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified
 **Realizes:** n/a — capability nova (Context Pack para agentes de IA), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
-**Last updated:** 2026-07-19
-**Version:** 0.2.0
+**Last updated:** 2026-07-20
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -48,6 +48,15 @@ provider configurado.
   `{scope, counts, bytes, markdown}` (com `counts` de requisitos/CTs/
   defeitos/decisões incluídos) para preview na UI; sem `format=json` mantém
   o Markdown como `attachment`.
+- The system shall expor `GET /agent-pack` (mesmo escopo obrigatório do
+  context-pack) devolvendo um ZIP em formato REPOSITÓRIO — `AGENTS.md`
+  (convenções derivadas das decisões aceitas + glossário dos artefatos),
+  `skills/<slug>.md` (uma por defeito do escopo COM causa raiz, estruturada
+  como when/procedure/anti-pattern) e `specs/<story>.md` (descrição da story
+  + CTs BDD) — com `layout=agents-md` (padrão, default) ou `layout=claude`
+  (skills em `.claude/skills/<slug>/SKILL.md`) controlando os caminhos;
+  `layout` inválido → `422 invalid_layout`. A UI oferece o download na
+  sub-aba Context Pack (seletor de layout + Baixar .zip).
 
 ### Event-driven
 
@@ -105,6 +114,12 @@ provider configurado.
 8. [verified] O card lista epics/stories/squads e filtra ao digitar, e o
    preview mostra contagens + Copiar/Baixar — verified by build + revisão
    visual (`frontend/src/components/AiAssist.tsx`).
+9. [verified] `GET /agent-pack` devolve um ZIP com `AGENTS.md` (convenções =
+   decisões aceitas), `specs/` (story + CTs BDD) e `skills/` (só defeitos com
+   causa raiz, como when/procedure/anti-pattern); `layout=claude` move as
+   skills para `.claude/skills/<slug>/SKILL.md`; escopo ausente → 422 e
+   layout inválido → 422 — verified by `backend/tests/test_agent_pack.py` +
+   build + revisão visual (`frontend/src/components/AiAssist.tsx`).
 
 ## Maturity
 
@@ -117,11 +132,17 @@ provider configurado.
   qualquer escopo, preview com contagens + Copiar/Baixar, e download via
   `format=json` (client-side) ou `Content-Disposition: attachment`.
 
+- Pacote de Agente (`GET /agent-pack`): ZIP em formato repositório
+  (AGENTS.md + skills/ + specs/) nos layouts agents-md e claude.
+
 **Future (aspirational, not committed):**
 
 - Botão de export por story/epic diretamente na tela de Requisitos (hoje o
   botão vive na aba de IA).
 - Filtro dos pickers também por título (hoje o `<datalist>` casa pelo ID).
+- Skills do pacote a partir de lições ESTRUTURADAS do defeito
+  (when/procedure/anti-pattern próprios) quando a change 0095 landar — hoje
+  derivam de root_cause/fix/prevention.
 
 ## Out of scope for this spec
 

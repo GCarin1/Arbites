@@ -828,6 +828,7 @@ function ContextPackCard() {
   const [inclDec, setInclDec] = useState(true);
   const [pack, setPack] = useState<PackPreview | null>(null);
   const [loading, setLoading] = useState(false);
+  const [layout, setLayout] = useState("agents-md"); // Pacote de Agente (0094)
 
   useEffect(() => {
     api.requirements("?kind=epic").then(setEpics).catch(() => {});
@@ -1012,6 +1013,51 @@ function ContextPackCard() {
           )}
         </>
       ) : null}
+
+      {/* Pacote de Agente (0094): mesmo escopo, saída em formato REPOSITÓRIO */}
+      <div className="block" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--s2)" }}>
+        <div className="card-head">
+          <h4 className="section-title" style={{ margin: 0 }}>Pacote de Agente</h4>
+          <span className="spacer" />
+          <span className="caption muted">
+            AGENTS.md + skills + specs do escopo, pronto para colar num repositório
+          </span>
+        </div>
+        <p className="muted caption">
+          Gera um .zip com <span className="mono">AGENTS.md</span> (convenções =
+          decisões aceitas), <span className="mono">skills/</span> (uma por lição
+          de defeito com causa raiz) e <span className="mono">specs/</span> (story
+          + CTs BDD).
+        </p>
+        <div className="step-row" style={{ flexWrap: "wrap" }}>
+          <label className="caption memory-filter">
+            Layout
+            <select value={layout} onChange={(e) => setLayout(e.target.value)}>
+              <option value="agents-md">AGENTS.md (padrão aberto)</option>
+              <option value="claude">Claude (.claude/skills)</option>
+            </select>
+          </label>
+          <span className="spacer" />
+          {hasScope ? (
+            <a
+              className="button-link"
+              href={api.agentPackUrl({
+                ...(epic.trim() ? { epic: epic.trim() } : {}),
+                ...(story.trim() ? { story: story.trim() } : {}),
+                ...(squad.trim() ? { squad: squad.trim() } : {}),
+                layout,
+              })}
+              download
+            >
+              Baixar pacote .zip
+            </a>
+          ) : (
+            <button disabled title="Escolha ao menos um escopo acima">
+              Baixar pacote .zip
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

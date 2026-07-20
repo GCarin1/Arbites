@@ -56,8 +56,8 @@
         "id": "context-pack",
         "path": ".doctrina/specs/context-pack/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-19",
+        "version": "0.3.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified"
       },
       {
@@ -420,13 +420,6 @@
         "id": "0093-gerar-cts-por-criterio-ears-com-vinculo-gravado",
         "title": "gerar CTs por criterio EARS com vinculo gravado",
         "path": ".doctrina/changes/0093-gerar-cts-por-criterio-ears-com-vinculo-gravado",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0094-pacote-de-agente-exportar-agents-md-e-skills-do",
-        "title": "pacote de agente: exportar AGENTS.md e skills do escopo",
-        "path": ".doctrina/changes/0094-pacote-de-agente-exportar-agents-md-e-skills-do",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1487,6 +1480,19 @@
         "specs_affected": [
           {
             "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0094-pacote-de-agente-exportar-agents-md-e-skills-do",
+        "title": "pacote de agente: exportar AGENTS.md e skills do escopo",
+        "path": ".doctrina/changes/archive/2026-07-20-0094-pacote-de-agente-exportar-agents-md-e-skills-do",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "context-pack",
             "operation": "MODIFIED"
           }
         ]

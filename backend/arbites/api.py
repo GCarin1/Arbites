@@ -7,10 +7,12 @@ Toda resposta de escrita retorna a entidade atualizada (contrato http-api).
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import os
 import sqlite3
+import zipfile
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -30,6 +32,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import __version__
+from . import agent_pack as agent_pack_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
@@ -1465,6 +1468,40 @@ def _register_routes(app: FastAPI) -> None:
             pack["markdown"],
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": 'attachment; filename="context-pack.md"'},
+        )
+
+    @app.get(API_PREFIX + "/agent-pack")
+    async def get_agent_pack(
+        request: Request,
+        epic: str = "",
+        story: str = "",
+        squad: str = "",
+        layout: str = "agents-md",
+    ):
+        """Pacote de Agente (0094): ZIP com AGENTS.md + specs/ + skills/ do
+        escopo, pronto para colar num repositório. Mesmo escopo obrigatório
+        do context-pack."""
+        if not (epic or story or squad):
+            raise _error(
+                422, "scope_required",
+                "informe epic, story ou squad — o pacote de agente não exporta"
+                " o workspace inteiro sem escopo",
+            )
+        if layout not in ("agents-md", "claude"):
+            raise _error(422, "invalid_layout", "layout deve ser agents-md ou claude")
+        ws, conn = ws_of(request), conn_of(request)
+        pack = agent_pack_ops.build_pack(
+            conn, ws.root, epic or None, story or None, squad or None, layout=layout
+        )
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path, content in pack["files"].items():
+                zf.writestr(path, content)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="agent-pack.zip"'},
         )
 
     @app.get(API_PREFIX + "/risk-map")

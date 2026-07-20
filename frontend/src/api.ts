@@ -217,6 +217,10 @@ export const api = {
     const qs = new URLSearchParams(params);
     return `${BASE}/context-pack?${qs.toString()}`;
   },
+  agentPackUrl: (params: Record<string, string>) => {
+    const qs = new URLSearchParams(params);
+    return `${BASE}/agent-pack?${qs.toString()}`;
+  },
   contextPack: (params: Record<string, string>) => {
     const qs = new URLSearchParams({ ...params, format: "json" });
     return request<{
