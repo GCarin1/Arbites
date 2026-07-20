@@ -85,3 +85,5 @@ One line per archived change, newest last. Appended by
 - 2026-07-20 — 0080-tela-hoje-landing-com-visao-do-dia — tela hoje: landing com visao do dia (specs: home MODIFIED)
 - 2026-07-20 — 0086-story-360-cadeia-completa-navegavel-por-story — story 360: cadeia completa navegavel por story (specs: requirements MODIFIED)
 - 2026-07-20 — 0094-pacote-de-agente-exportar-agents-md-e-skills-do — pacote de agente: exportar AGENTS.md e skills do escopo (specs: context-pack MODIFIED)
+- 2026-07-20 — 0091-editor-e-lint-de-criterios-ears-na-story — editor e lint de criterios EARS na story (specs: requirements MODIFIED)
+- 2026-07-20 — 0092-spec-coverage-criterio-ears-vinculado-a-ct-no — spec coverage: criterio EARS vinculado a CT no auditor (specs: audit MODIFIED, requirements MODIFIED, testcases MODIFIED)

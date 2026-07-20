@@ -32,6 +32,38 @@ def test_audit_finds_uncovered_story(client):
     assert coverage_findings[0]["ref"] == story["id"]
 
 
+def test_audit_spec_coverage_criteria(client):
+    """0092: categoria `spec` — critério sem CT (warn) e CT sem vínculo (info)."""
+    body = (
+        "## Critérios de aceite\n\n"
+        "- [EARS-1] O sistema deve enviar o link.\n"
+        "- [EARS-2] O sistema deve expirar o link.\n"
+    )
+    story = client.post(
+        "/api/v1/requirements", json={"kind": "story", "title": "Senha", "body": body}
+    ).json()
+    # CT ready vinculado só a EARS-1 → EARS-2 fica descoberto (warn);
+    # outro CT ready SEM vínculo → info
+    client.post(
+        "/api/v1/testcases",
+        json={"title": "CT1", "story": story["id"], "status": "ready",
+              "criteria": ["EARS-1"]},
+    )
+    client.post(
+        "/api/v1/testcases",
+        json={"title": "CT2", "story": story["id"], "status": "ready"},
+    )
+
+    findings = client.post("/api/v1/audit/run").json()["findings"]
+    spec = [f for f in findings if f["category"] == "spec"]
+    codes = {f["code"] for f in spec}
+    assert "uncovered_criterion" in codes  # EARS-2
+    assert "unlinked_testcase" in codes  # CT2
+    uncovered = [f for f in spec if f["code"] == "uncovered_criterion"]
+    assert any("EARS-2" in f["message"] for f in uncovered)
+    assert all(f["code"] != "uncovered_criterion" or "EARS-1" not in f["message"] for f in spec)
+
+
 def _age_defect(client, defect_id: str, days_old: int) -> None:
     """Reescreve `opened` (frontmatter) do defeito à mão (simula defeito antigo)."""
     path = next((client.ws.root / "defects").glob(f"{defect_id}-*.md"))

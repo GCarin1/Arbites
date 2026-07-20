@@ -66,6 +66,13 @@ export interface StoryChain {
   };
 }
 
+export interface Criterion {
+  ears_id: string;
+  ord: number;
+  text: string;
+  form: string | null; // ubiquitous|event|state|unwanted|optional | null (fora de EARS)
+}
+
 export interface TestCase {
   id: string;
   title: string;
@@ -79,6 +86,7 @@ export interface TestCase {
   squad: string | null;
   squad_effective: string | null;
   tags?: string[];
+  criteria?: string[]; // EARS ids da story que este CT cobre (0092)
   body?: string;
 }
 
@@ -526,6 +534,8 @@ export interface MatrixStory {
   status: string;
   ct_count: number;
   covered: boolean;
+  criteria_total: number;
+  criteria_covered: number;
   last_status: string | null;
   last_execution: string | null;
   evidence_count: number;

@@ -23,6 +23,7 @@ import type {
   GeneratePreview,
   HealthScore,
   MetricsSummary,
+  Criterion,
   Requirement,
   StoryChain,
   ReviewResponse,
@@ -72,6 +73,8 @@ export const api = {
   requirement: (id: string) => request<Requirement>(`/requirements/${id}`),
   requirementChain: (id: string) =>
     request<StoryChain>(`/requirements/${id}/chain`),
+  requirementCriteria: (id: string) =>
+    request<Criterion[]>(`/requirements/${id}/criteria`),
   createRequirement: (body: object) =>
     request<Requirement>("/requirements", { method: "POST", body: JSON.stringify(body) }),
   updateRequirement: (id: string, body: object) =>

@@ -4,7 +4,7 @@ import { ConfirmModal, Modal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import { Story360 } from "./Story360";
 import { useToast } from "./Toast";
-import type { Requirement } from "../types";
+import type { Criterion, Requirement } from "../types";
 
 export function RequirementsList({
   version,
@@ -108,9 +108,12 @@ export function ReqRepository({
   const [dragStory, setDragStory] = useState<string | null>(null);
   const [dropEpic, setDropEpic] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Requirement | null>(null);
-  // Cobertura por story (0068): reuso da matriz de rastreabilidade — a
-  // mesma fonte do Dashboard, sem endpoint novo. story_id → nº de CTs.
-  const [coverage, setCoverage] = useState<Map<string, number> | null>(null);
+  // Cobertura por story (0068/0092): reuso da matriz de rastreabilidade — a
+  // mesma fonte do Dashboard, sem endpoint novo. story_id → CTs + critérios.
+  const [coverage, setCoverage] = useState<Map<
+    string,
+    { ct: number; critTotal: number; critCovered: number }
+  > | null>(null);
   const [onlyUncovered, setOnlyUncovered] = useState(false);
 
   const load = useCallback(() => {
@@ -121,9 +124,14 @@ export function ReqRepository({
     api
       .traceability("", "")
       .then((m) => {
-        const map = new Map<string, number>();
+        const map = new Map<string, { ct: number; critTotal: number; critCovered: number }>();
         for (const epic of m.epics)
-          for (const s of epic.stories) map.set(s.id, s.ct_count);
+          for (const s of epic.stories)
+            map.set(s.id, {
+              ct: s.ct_count,
+              critTotal: s.criteria_total,
+              critCovered: s.criteria_covered,
+            });
         setCoverage(map);
       })
       .catch(() => {});
@@ -181,7 +189,8 @@ export function ReqRepository({
   const epics = items.filter((r) => r.kind === "epic");
   const allStories = items.filter((r) => r.kind === "story");
   // cobertura (0068): 0 CTs = descoberta; filtro isola as descobertas
-  const ctsOf = (id: string) => coverage?.get(id) ?? 0;
+  const ctsOf = (id: string) => coverage?.get(id)?.ct ?? 0;
+  const critOf = (id: string) => coverage?.get(id); // {critTotal, critCovered}
   const stories = onlyUncovered
     ? allStories.filter((s) => ctsOf(s.id) === 0)
     : allStories;
@@ -213,6 +222,20 @@ export function ReqRepository({
         ) : (
           <span className="status-dot dot-col-blocked caption">sem cobertura</span>
         ))}
+      {/* cobertura de critérios EARS (0092): só quando a story tem critérios */}
+      {(() => {
+        const c = critOf(story.id);
+        if (!c || c.critTotal === 0) return null;
+        const full = c.critCovered === c.critTotal;
+        return (
+          <span
+            className={`status-dot ${full ? "dot-col-passed" : "dot-col-blocked"} caption`}
+            title="critérios EARS cobertos por CT"
+          >
+            {c.critCovered}/{c.critTotal} critérios
+          </span>
+        );
+      })()}
       <span className={`status-dot dot-${story.status} caption`}>{story.status}</span>
       <span className="caption mono muted">{story.created ?? ""}</span>
       <span className="repo-actions">
@@ -595,6 +618,7 @@ export function RequirementEditor({
             </div>
             <DocBody text={req.body} />
           </div>
+          {req.kind === "story" && <CriteriaCard id={req.id} />}
         </>
       ) : (
         <>
@@ -672,6 +696,29 @@ export function RequirementEditor({
             ? "Corpo (Resumo / Critérios de aceite — EARS quando fizer sentido)"
             : "Corpo (Descrição)"}
         </label>
+        {req.kind === "story" && (
+          <div className="ears-templates">
+            <span className="caption muted">Inserir critério EARS:</span>
+            {(
+              [
+                ["ubiquitous", "Ubíquo"],
+                ["event", "Evento"],
+                ["state", "Estado"],
+                ["unwanted", "Proibição"],
+                ["optional", "Opcional"],
+              ] as const
+            ).map(([form, label]) => (
+              <button
+                key={form}
+                type="button"
+                className="btn-sm"
+                onClick={() => set("body", appendEarsCriterion(req.body ?? "", form))}
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           className="raw"
           value={req.body ?? ""}
@@ -681,6 +728,75 @@ export function RequirementEditor({
       </div>
         </>
       )}
+    </div>
+  );
+}
+
+// -------------------------------------------------- EARS (0091)
+
+const EARS_TEMPLATE: Record<string, string> = {
+  ubiquitous: "O sistema deve ",
+  event: "Quando <condição>, o sistema deve ",
+  state: "Enquanto <estado>, o sistema deve ",
+  unwanted: "O sistema não deve ",
+  optional: "Onde <recurso disponível>, o sistema pode ",
+};
+
+const FORM_LABEL: Record<string, string> = {
+  ubiquitous: "ubíquo",
+  event: "evento",
+  state: "estado",
+  unwanted: "proibição",
+  optional: "opcional",
+};
+
+/** Insere `- [EARS-n]` com o próximo número, criando a seção se faltar. */
+function appendEarsCriterion(body: string, form: string): string {
+  const nums = [...body.matchAll(/\[EARS-(\d+)\]/g)].map((m) => Number(m[1]));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  const line = `- [EARS-${next}] ${EARS_TEMPLATE[form]}`;
+  let out = body;
+  if (!/^##\s+crit[ée]rios de aceite/im.test(out)) {
+    out = out.replace(/\s*$/, "") + "\n\n## Critérios de aceite\n";
+  }
+  return out.replace(/\s*$/, "") + "\n" + line + "\n";
+}
+
+/** Critérios EARS indexados da story, com a forma detectada por critério —
+ * dá visibilidade ao lint (cinza = fora de EARS). */
+function CriteriaCard({ id }: { id: string }) {
+  const [crits, setCrits] = useState<Criterion[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    api.requirementCriteria(id).then((c) => alive && setCrits(c)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (crits.length === 0) return null;
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3>Critérios de aceite (EARS)</h3>
+        <span className="spacer" />
+        <span className="caption muted">{crits.length} critério(s)</span>
+      </div>
+      <div className="criteria-list">
+        {crits.map((c) => (
+          <div key={c.ears_id} className="criteria-row">
+            <span className="mono muted">{c.ears_id}</span>
+            <span
+              className={`status-dot ${c.form ? "dot-col-passed" : "dot-col-blocked"} caption`}
+            >
+              {c.form ? FORM_LABEL[c.form] ?? c.form : "fora de EARS"}
+            </span>
+            <span className="criteria-text">{c.text}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

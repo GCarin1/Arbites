@@ -26,8 +26,8 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.1.2",
-        "last_updated": "2026-07-12",
+        "version": "0.2.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified"
       },
       {
@@ -185,7 +185,7 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.5.0",
+        "version": "0.7.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
@@ -215,8 +215,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.7.0",
-        "last_updated": "2026-07-10",
+        "version": "0.8.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -399,20 +399,6 @@
         "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
         "title": "sync de feature atualizado marca CT precisa re-execucao",
         "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0091-editor-e-lint-de-criterios-ears-na-story",
-        "title": "editor e lint de criterios EARS na story",
-        "path": ".doctrina/changes/0091-editor-e-lint-de-criterios-ears-na-story",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
-        "title": "spec coverage: criterio EARS vinculado a CT no auditor",
-        "path": ".doctrina/changes/0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1480,6 +1466,40 @@
         "specs_affected": [
           {
             "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0091-editor-e-lint-de-criterios-ears-na-story",
+        "title": "editor e lint de criterios EARS na story",
+        "path": ".doctrina/changes/archive/2026-07-20-0091-editor-e-lint-de-criterios-ears-na-story",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
+        "title": "spec coverage: criterio EARS vinculado a CT no auditor",
+        "path": ".doctrina/changes/archive/2026-07-20-0092-spec-coverage-criterio-ears-vinculado-a-ct-no",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
             "operation": "MODIFIED"
           }
         ]

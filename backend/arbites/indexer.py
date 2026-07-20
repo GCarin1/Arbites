@@ -15,8 +15,24 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .parser import ParsedDoc, check_testcase_headings, parse_markdown, parse_text
+from .parser import (
+    ParsedDoc,
+    check_testcase_headings,
+    parse_criteria,
+    parse_markdown,
+    parse_text,
+)
 from .workspace import Workspace
+
+# Termos vagos default do lint de critérios EARS (0091) — configuráveis via
+# arbites.yaml `requirements.vague_terms`. Frase mensurável não os usa.
+DEFAULT_VAGUE_TERMS = [
+    "rápido", "rapido", "lento", "alguns", "algumas", "adequado", "adequada",
+    "apropriado", "eficiente", "fácil", "facil", "simples", "melhor", "vários",
+    "varios", "razoável", "razoavel", "robusto", "amigável", "amigavel",
+    "intuitivo", "fast", "slow", "some", "adequate", "efficient", "easy",
+    "several", "reasonable", "user-friendly", "intuitive",
+]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS requirements(
@@ -30,6 +46,10 @@ CREATE TABLE IF NOT EXISTS testcases(
   squad TEXT, squad_effective TEXT, created TEXT,
   feature_path TEXT, scenario_name TEXT);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
+CREATE TABLE IF NOT EXISTS criteria(
+  story_id TEXT, ears_id TEXT, ord INTEGER, text TEXT, form TEXT,
+  PRIMARY KEY(story_id, ears_id));
+CREATE TABLE IF NOT EXISTS tc_criteria(testcase_id TEXT, ears_id TEXT);
 CREATE TABLE IF NOT EXISTS scenarios(
   target TEXT, tag TEXT PRIMARY KEY, feature_path TEXT,
   scenario_name TEXT, line INTEGER, language TEXT, ct_id TEXT);
@@ -124,6 +144,8 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM requirements")
     conn.execute("DELETE FROM testcases")
     conn.execute("DELETE FROM tc_tags")
+    conn.execute("DELETE FROM criteria")
+    conn.execute("DELETE FROM tc_criteria")
     conn.execute("DELETE FROM defects")
     conn.execute("DELETE FROM executions")
     conn.execute("DELETE FROM results")
@@ -180,12 +202,15 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
             return doc
         return parse_text(path, text)
 
+    vague = _vague_terms(ws)
     for path, text, error in read_all(ws.root / "requirements"):
         doc = parse_one(path, text, error)
         rel = ws.relpath(path)
         _flush_doc_warnings(conn, doc, rel)
         if doc.id and track_id(doc, rel):
             _insert_requirement(conn, doc, rel)
+            if str(doc.meta.get("kind")) == "story":
+                index_criteria(conn, doc, rel, vague)
 
     for path, text, error in read_all(ws.root / "testcases"):
         doc = parse_one(path, text, error)
@@ -311,6 +336,9 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
             if table == "testcases":
                 conn.execute("DELETE FROM tc_tags WHERE testcase_id = ?", (row["id"],))
+                conn.execute("DELETE FROM tc_criteria WHERE testcase_id = ?", (row["id"],))
+            elif table == "requirements":
+                conn.execute("DELETE FROM criteria WHERE story_id = ?", (row["id"],))
         conn.execute(f"DELETE FROM {table} WHERE path = ?", (rel,))
 
     if path.exists():
@@ -329,6 +357,8 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
                     )
             elif top == "requirements":
                 _insert_requirement(conn, doc, rel)
+                if str(doc.meta.get("kind")) == "story":
+                    index_criteria(conn, doc, rel, _vague_terms(ws))
             elif top == "testcases":
                 _insert_testcase(conn, doc, rel)
             elif top == "defects":
@@ -370,6 +400,52 @@ def _squad(doc: ParsedDoc) -> str | None:
         return None
     value = str(raw).strip()
     return value or None
+
+
+def index_criteria(
+    conn: sqlite3.Connection, doc: ParsedDoc, rel: str, vague_terms: list[str],
+) -> None:
+    """Indexa os critérios EARS da story e emite o lint determinístico
+    (0091): forma EARS ausente, termo vago, duplicata — tudo como warning,
+    nunca erro. Só stories; story sem a seção → nada."""
+    story_id = doc.id
+    conn.execute("DELETE FROM criteria WHERE story_id = ?", (story_id,))
+    crits = parse_criteria(doc.body)
+    seen: dict[str, str] = {}
+    for c in crits:
+        conn.execute(
+            "INSERT OR REPLACE INTO criteria(story_id, ears_id, ord, text, form)"
+            " VALUES (?,?,?,?,?)",
+            (story_id, c["ears_id"], c["ord"], c["text"], c["form"]),
+        )
+        if c["form"] is None:
+            _add_warning(
+                conn, rel, "ears_no_form",
+                f"{story_id} {c['ears_id']}: critério sem forma EARS reconhecível"
+                " (use shall/deve, When/Quando, While/Enquanto)",
+            )
+        low = c["text"].lower()
+        for term in vague_terms:
+            if re.search(r"\b" + re.escape(term.lower()) + r"\b", low):
+                _add_warning(
+                    conn, rel, "ears_vague",
+                    f"{story_id} {c['ears_id']}: termo vago '{term}' —"
+                    " prefira um critério mensurável",
+                )
+                break
+        norm = re.sub(r"\s+", " ", low).strip()
+        if norm and norm in seen:
+            _add_warning(
+                conn, rel, "ears_duplicate",
+                f"{story_id} {c['ears_id']}: duplicata de {seen[norm]}",
+            )
+        elif norm:
+            seen[norm] = c["ears_id"]
+
+
+def _vague_terms(ws: Workspace) -> list[str]:
+    cfg = (ws.config().get("requirements") or {}).get("vague_terms")
+    return list(cfg) if isinstance(cfg, list) and cfg else DEFAULT_VAGUE_TERMS
 
 
 def _insert_requirement(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
@@ -425,6 +501,15 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
     )
     for tag in _tags(doc):
         conn.execute("INSERT INTO tc_tags(testcase_id, tag) VALUES (?,?)", (doc.id, tag))
+    # vínculo critério↔CT (0092): `criteria: [EARS-n, ...]` no frontmatter
+    crit = doc.meta.get("criteria")
+    if isinstance(crit, list):
+        for ears in crit:
+            if ears:
+                conn.execute(
+                    "INSERT INTO tc_criteria(testcase_id, ears_id) VALUES (?,?)",
+                    (doc.id, str(ears)),
+                )
 
 
 def _recompute_effective_squads(conn: sqlite3.Connection) -> None:

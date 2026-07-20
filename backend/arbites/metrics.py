@@ -388,11 +388,26 @@ def traceability(
                     (story["id"],),
                 )
             ]
+            # cobertura de critérios EARS (0092): total × cobertos (critério
+            # com ≥1 CT vinculado via `criteria`)
+            criteria_total = conn.execute(
+                "SELECT COUNT(*) c FROM criteria WHERE story_id = ?",
+                (story["id"],),
+            ).fetchone()["c"]
+            criteria_covered = conn.execute(
+                "SELECT COUNT(DISTINCT c.ears_id) c FROM criteria c"
+                " WHERE c.story_id = ? AND EXISTS ("
+                "  SELECT 1 FROM tc_criteria x JOIN testcases t ON t.id = x.testcase_id"
+                "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)",
+                (story["id"],),
+            ).fetchone()["c"]
             out_stories.append(
                 {
                     **dict(story),
                     "ct_count": len(cts),
                     "covered": len(cts) > 0,
+                    "criteria_total": criteria_total,
+                    "criteria_covered": criteria_covered,
                     "last_status": agg_status,
                     "last_execution": newest["execution_id"] if newest else None,
                     "evidence_count": evidence_count,

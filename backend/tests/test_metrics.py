@@ -160,3 +160,26 @@ def test_traceability_matrix(client, dataset):
     assert mfa["covered"] and mfa["last_status"] is None  # CT draft, sem execução
     senha = stories["Recuperar senha"]
     assert not senha["covered"]  # sem cobertura
+
+
+def test_traceability_criteria_coverage(client):
+    """0092: contagem X/Y critérios EARS cobertos por story."""
+    body = (
+        "## Critérios de aceite\n\n"
+        "- [EARS-1] O sistema deve enviar o link.\n"
+        "- [EARS-2] O sistema deve expirar o link.\n"
+    )
+    epic = client.post("/api/v1/requirements", json={"kind": "epic", "title": "E"}).json()
+    story = client.post(
+        "/api/v1/requirements",
+        json={"kind": "story", "title": "Senha", "epic": epic["id"], "body": body},
+    ).json()
+    client.post(
+        "/api/v1/testcases",
+        json={"title": "CT1", "story": story["id"], "criteria": ["EARS-1"]},
+    )
+
+    matrix = client.get("/api/v1/metrics/traceability").json()
+    s = matrix["epics"][0]["stories"][0]
+    assert s["criteria_total"] == 2
+    assert s["criteria_covered"] == 1  # só EARS-1 tem CT

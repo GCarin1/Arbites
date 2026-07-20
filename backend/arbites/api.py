@@ -109,6 +109,7 @@ class TestcaseIn(BaseModel):
     squad: str | None = None
     folder: str = ""
     automation: AutomationRef | None = None
+    criteria: list[str] | None = None
     body: str | None = None
 
 
@@ -121,6 +122,7 @@ class TestcaseUpdate(BaseModel):
     story: str | None = None
     squad: str | None = None
     automation: AutomationRef | None = None
+    criteria: list[str] | None = None
     body: str | None = None
 
 
@@ -598,6 +600,13 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
             "SELECT tag FROM tc_tags WHERE testcase_id = ?", (entity_id,)
         )
     ]
+    out["criteria"] = [
+        r["ears_id"]
+        for r in conn.execute(
+            "SELECT ears_id FROM tc_criteria WHERE testcase_id = ? ORDER BY ears_id",
+            (entity_id,),
+        )
+    ]
     _, out["body"] = _load_doc(ws, row["path"])
     return out
 
@@ -739,6 +748,20 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/requirements/{entity_id}")
     async def get_requirement(request: Request, entity_id: str):
         return _req_out(conn_of(request), ws_of(request), entity_id)
+
+    @app.get(API_PREFIX + "/requirements/{entity_id}/criteria")
+    async def requirement_criteria(request: Request, entity_id: str):
+        """Critérios EARS indexados da story (0091), em ordem — cada um com a
+        forma detectada (ubiquitous/event/state/unwanted/optional) ou null
+        quando fora de EARS."""
+        conn = conn_of(request)
+        _find_path(conn, "requirements", entity_id)  # 404 se não existe
+        rows = conn.execute(
+            "SELECT ears_id, ord, text, form FROM criteria WHERE story_id = ?"
+            " ORDER BY ord",
+            (entity_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     @app.get(API_PREFIX + "/requirements/{entity_id}/chain")
     async def requirement_chain(request: Request, entity_id: str):
@@ -940,6 +963,8 @@ def _register_routes(app: FastAPI) -> None:
             meta["squad"] = payload.squad
         if payload.automation is not None:
             meta["automation"] = payload.automation.model_dump(exclude_none=True)
+        if payload.criteria:
+            meta["criteria"] = payload.criteria
         folder = payload.folder.strip("/").replace("\\", "/")
         target_dir = ws.root / "testcases" / folder if folder else ws.root / "testcases"
         if not str(target_dir.resolve()).startswith(str((ws.root / "testcases").resolve())):
@@ -1033,6 +1058,9 @@ def _register_routes(app: FastAPI) -> None:
         if "squad" in changes and not changes["squad"]:
             meta.pop("squad", None)
             changes.pop("squad")
+        if "criteria" in changes and not changes["criteria"]:
+            meta.pop("criteria", None)  # lista vazia/None limpa o vínculo
+            changes.pop("criteria")
         meta.update(changes)
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)

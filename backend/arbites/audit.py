@@ -35,6 +35,7 @@ def collect_findings(
     findings: list[dict[str, Any]] = []
     findings += _indexing_warnings(conn)
     findings += _uncovered_stories(conn)
+    findings += _spec_coverage(conn)
     findings += _forgotten_defects(conn, aging)
     findings += _broken_automations(conn, broken, name_pattern)
 
@@ -75,6 +76,41 @@ def _uncovered_stories(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+def _spec_coverage(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Cobertura de SPEC no nível critério↔CT (0092): critério EARS sem CT
+    vinculado (warn) e CT ready/automated de uma story COM critérios que não
+    declara qual critério cobre (info)."""
+    out: list[dict[str, Any]] = []
+    for r in conn.execute(
+        "SELECT c.story_id, c.ears_id FROM criteria c WHERE NOT EXISTS ("
+        "  SELECT 1 FROM tc_criteria x JOIN testcases t ON t.id = x.testcase_id"
+        "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)"
+        " ORDER BY c.story_id, c.ord"
+    ):
+        out.append({
+            "category": "spec",
+            "code": "uncovered_criterion",
+            "severity": "warn",
+            "message": f'{r["story_id"]} {r["ears_id"]}: critério EARS sem CT vinculado',
+            "ref": r["story_id"],
+        })
+    for r in conn.execute(
+        "SELECT t.id, t.title FROM testcases t"
+        " WHERE (t.status = 'ready' OR t.type = 'automated')"
+        " AND t.story_id IN (SELECT DISTINCT story_id FROM criteria)"
+        " AND t.id NOT IN (SELECT DISTINCT testcase_id FROM tc_criteria)"
+        " ORDER BY t.id"
+    ):
+        out.append({
+            "category": "spec",
+            "code": "unlinked_testcase",
+            "severity": "info",
+            "message": f'{r["id"]} "{r["title"]}" não declara qual critério EARS cobre',
+            "ref": r["id"],
+        })
+    return out
 
 
 def _forgotten_defects(conn: sqlite3.Connection, aging_days: int) -> list[dict[str, Any]]:
@@ -153,6 +189,7 @@ def summarize(findings: list[dict[str, Any]]) -> dict[str, Any]:
 _CATEGORY_LABEL = {
     "indexing": "Indexação",
     "coverage": "Cobertura",
+    "spec": "Especificação (EARS)",
     "defects": "Defeitos",
     "automation": "Automação",
 }

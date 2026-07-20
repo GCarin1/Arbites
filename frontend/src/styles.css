@@ -1485,6 +1485,39 @@ table.dense tbody tr:hover td {
   gap: 4px;
 }
 
+/* ------------------------------------------ Critérios EARS (0091) */
+.ears-templates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.criteria-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.criteria-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.criteria-text {
+  min-width: 0;
+}
+.criteria-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 8px 10px;
+  background: var(--bg);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
 /* --------------------------------------------------- Tela Hoje (0080) */
 .home-grid {
   display: grid;

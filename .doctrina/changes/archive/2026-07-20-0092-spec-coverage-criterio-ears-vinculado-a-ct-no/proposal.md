@@ -1,6 +1,7 @@
 # Change 0092-spec-coverage-criterio-ears-vinculado-a-ct-no — spec coverage: criterio EARS vinculado a CT no auditor
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** audit, requirements, testcases
@@ -28,9 +29,9 @@ critério↔CT. Depende da 0091 (critérios parseáveis).
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Achados `spec` no auditor (critério sem CT; CT sem criteria); contagem X/Y por story — `backend/tests/test_audit.py` + `test_metrics.py`.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Achados `spec` no auditor (critério sem CT; CT sem criteria); contagem X/Y por story — `backend/tests/test_audit.py` + `test_metrics.py`.
 
 ## Open questions
 
