@@ -275,6 +275,7 @@ class FeatureSyncApplyIn(BaseModel):
 class GenerateIn(BaseModel):
     source: str  # story_id (ST-XXXX) ou texto/markdown livre
     provider: str | None = None  # default_provider se omitido
+    criteria: list[str] | None = None  # gerar POR critério EARS (0093)
 
 
 class AIByCtIn(BaseModel):
@@ -2306,10 +2307,47 @@ def _register_routes(app: FastAPI) -> None:
             source_title = row["title"] if row else None
             source = (ws.root / rel).read_text(encoding="utf-8-sig")
         lessons = ai_ops.find_relevant_lessons(conn, source)
+        lessons_used = [{"id": l["id"], "title": l["title"]} for l in lessons]
+
+        # Geração POR CRITÉRIO (0093): story + critérios selecionados → um
+        # prompt focado por critério, e o vínculo `criteria` já vem no
+        # preview (o aceite grava story + criteria automaticamente).
+        if source_id and payload.criteria:
+            rows = conn.execute(
+                "SELECT ears_id, text FROM criteria WHERE story_id = ?"
+                f" AND ears_id IN ({','.join('?' * len(payload.criteria))})"
+                " ORDER BY ord",
+                [source_id, *payload.criteria],
+            ).fetchall()
+            if not rows:
+                raise _error(422, "no_criteria",
+                             "nenhum critério EARS informado existe nesta story")
+            items: list[dict] = []
+            for cr in rows:
+                focus = (
+                    f"{source}\n\n## Foco\nGere casos que validam ESPECIFICAMENTE"
+                    f" o critério de aceite {cr['ears_id']}: {cr['text']}"
+                )
+                gen = await asyncio.to_thread(
+                    ai_ops.generate_testcases, provider,
+                    _with_project_recap(conn, ws, focus), lessons,
+                )
+                for it in gen.testcases:
+                    items.append({
+                        **it.model_dump(), "body": ai_ops.testcase_body(it),
+                        "criteria": [cr["ears_id"]],
+                    })
+            _log_agent_event(
+                ws, conn, "generate_testcases", source_id, source_title,
+                f"Gerou {len(items)} caso(s) por critério "
+                f"({', '.join(r['ears_id'] for r in rows)}) para {source_id}",
+            )
+            return {"preview": True, "story": source_id, "testcases": items,
+                    "lessons_used": lessons_used}
+
         generated = await asyncio.to_thread(
             ai_ops.generate_testcases, provider, _with_project_recap(conn, ws, source), lessons
         )
-        lessons_used = [{"id": l["id"], "title": l["title"]} for l in lessons]
         _log_agent_event(
             ws, conn, "generate_testcases", source_id, source_title,
             f"Gerou {len(generated.testcases)} caso(s) de teste"

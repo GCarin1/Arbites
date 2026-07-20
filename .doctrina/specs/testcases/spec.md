@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-07-20
-**Version:** 0.8.0
+**Version:** 0.8.1
 
 ## Purpose
 
@@ -159,6 +159,10 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     `backend/tests/test_testcases.py`
     (`test_testcase_criteria_link_indexed_and_editable`) + build + revisão
     visual (`frontend/src/components/TestCaseEditor.tsx`).
+13. [verified] O aceite de um CT gerado POR critério (ver `ai-assist`)
+    persiste `story` + `criteria` no CT criado — verified by
+    `backend/tests/test_ai_generate.py`
+    (`test_generate_per_criterion_tags_and_accept_links`).
 
 ## Maturity
 

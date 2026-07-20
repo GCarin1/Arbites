@@ -224,3 +224,75 @@ def test_negative_cases_returns_preview(ai_client):
     assert resp.status_code == 200
     assert resp.json()["preview"] is True
     assert len(resp.json()["testcases"]) == 2
+
+
+# --------------------------------------------------------- 0093 por critério
+
+EARS_STORY_BODY = (
+    "## Resumo\n\nComo usuário quero recuperar a senha.\n\n"
+    "## Critérios de aceite\n\n"
+    "- [EARS-1] O sistema deve enviar um link de redefinição por e-mail.\n"
+    "- [EARS-2] O sistema deve expirar o link em 30 minutos.\n"
+)
+
+
+def _ears_story(client):
+    return client.post(
+        "/api/v1/requirements",
+        json={"kind": "story", "title": "Recuperar senha", "body": EARS_STORY_BODY},
+    ).json()
+
+
+def test_generate_per_criterion_tags_and_accept_links(ai_client):
+    story = _ears_story(ai_client)
+    resp = ai_client.post(
+        "/api/v1/ai/generate-testcases",
+        json={"source": story["id"], "criteria": ["EARS-1"]},
+    )
+    assert resp.status_code == 200, resp.text
+    preview = resp.json()
+    assert preview["preview"] is True
+    assert preview["story"] == story["id"]
+    assert preview["testcases"]
+    assert all(tc["criteria"] == ["EARS-1"] for tc in preview["testcases"])
+
+    # aceite grava story + criteria → indexado e exposto
+    tc = preview["testcases"][0]
+    created = ai_client.post(
+        "/api/v1/testcases",
+        json={"title": tc["title"], "priority": tc["priority"], "tags": tc["tags"],
+              "story": preview["story"], "criteria": tc["criteria"], "body": tc["body"]},
+    ).json()
+    assert created["criteria"] == ["EARS-1"]
+
+
+def test_generate_multi_criteria_tags_each_batch(ai_client):
+    story = _ears_story(ai_client)
+    preview = ai_client.post(
+        "/api/v1/ai/generate-testcases",
+        json={"source": story["id"], "criteria": ["EARS-1", "EARS-2"]},
+    ).json()
+    # mock devolve 2 CTs por chamada × 2 critérios = 4, tagueados por critério
+    tags = [tc["criteria"] for tc in preview["testcases"]]
+    assert len(preview["testcases"]) == 4
+    assert tags.count(["EARS-1"]) == 2
+    assert tags.count(["EARS-2"]) == 2
+
+
+def test_generate_without_criteria_keeps_whole_story_flow(ai_client):
+    story = _ears_story(ai_client)
+    preview = ai_client.post(
+        "/api/v1/ai/generate-testcases", json={"source": story["id"]}
+    ).json()
+    assert "story" not in preview  # modo story-inteira não injeta o vínculo
+    assert all("criteria" not in tc for tc in preview["testcases"])
+
+
+def test_generate_unknown_criterion_is_422(ai_client):
+    story = _ears_story(ai_client)
+    resp = ai_client.post(
+        "/api/v1/ai/generate-testcases",
+        json={"source": story["id"], "criteria": ["EARS-9"]},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "no_criteria"

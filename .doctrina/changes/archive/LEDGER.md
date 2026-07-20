@@ -87,3 +87,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-20 — 0094-pacote-de-agente-exportar-agents-md-e-skills-do — pacote de agente: exportar AGENTS.md e skills do escopo (specs: context-pack MODIFIED)
 - 2026-07-20 — 0091-editor-e-lint-de-criterios-ears-na-story — editor e lint de criterios EARS na story (specs: requirements MODIFIED)
 - 2026-07-20 — 0092-spec-coverage-criterio-ears-vinculado-a-ct-no — spec coverage: criterio EARS vinculado a CT no auditor (specs: audit MODIFIED, requirements MODIFIED, testcases MODIFIED)
+- 2026-07-20 — 0093-gerar-cts-por-criterio-ears-com-vinculo-gravado — gerar CTs por criterio EARS com vinculo gravado (specs: ai-assist MODIFIED, testcases MODIFIED)

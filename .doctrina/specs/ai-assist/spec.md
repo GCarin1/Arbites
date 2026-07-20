@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
-**Last updated:** 2026-07-19
-**Version:** 0.12.0
+**Last updated:** 2026-07-20
+**Version:** 0.13.0
 
 ## Purpose
 
@@ -54,6 +54,14 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
 - When o usuário solicita geração a partir de uma story, the system shall
   produzir uma lista de CTs como diff/preview aceitável/rejeitável item a
   item.
+- When o usuário informa uma story com critérios EARS e seleciona
+  critérios (`criteria: [EARS-n, ...]`), the system shall gerar POR critério
+  (um prompt focado por critério selecionado) e marcar cada CT do preview
+  com o vínculo `criteria` correspondente + a `story` de origem, de modo que
+  o aceite (`POST /testcases`) grave `story` + `criteria` automaticamente
+  (fecha o loop do validador de spec, ver `audit`); story sem critérios ou
+  seleção vazia mantém a geração da story inteira, sem vínculo fino. Um
+  `criteria` inexistente na story → `422 no_criteria`.
 - When o usuário solicita geração de CTs a partir de uma story, the system
   shall buscar defeitos com lição aprendida cujo título/causa/prevenção
   compartilhe palavra-chave (≥4 letras) com a story, injetar essas lições no
@@ -188,6 +196,13 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     `/memory/timeline?kinds=agent`, já cobertos por
     `backend/tests/test_project_memory.py` e
     `backend/tests/test_decisions.py`) + revisão visual.
+
+13. [verified] Geração POR critério envia o critério no prompt e cada CT do
+    preview vem com `criteria` + a `story`; o aceite grava o vínculo (checado
+    via `GET /testcases/{id}`); dois critérios tagueiam cada lote; sem
+    `criteria` mantém o fluxo de story inteira; critério inexistente → 422 —
+    verified by `backend/tests/test_ai_generate.py` + build + revisão visual
+    (`frontend/src/components/AiAssist.tsx`).
 
 ## Maturity
 

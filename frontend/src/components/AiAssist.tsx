@@ -5,6 +5,7 @@ import { useToast } from "./Toast";
 import type {
   AiProvider,
   AiProvidersInfo,
+  Criterion,
   GeneratedTestcase,
   Requirement,
   ReviewResponse,
@@ -498,14 +499,41 @@ function GenerateCard({
   const [source, setSource] = useState("");
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<GeneratedTestcase[] | null>(null);
+  const [previewStory, setPreviewStory] = useState<string | null>(null);
   const [lessonsUsed, setLessonsUsed] = useState<{ id: string; title: string }[]>([]);
+  // geração por critério (0093): se `source` é uma story com critérios EARS
+  const [criteria, setCriteria] = useState<Criterion[]>([]);
+  const [selCrit, setSelCrit] = useState<Set<string>>(new Set());
 
-  async function generate() {
+  // detecta um ID de story digitado e busca seus critérios EARS
+  const storyId = /^\s*(ST-\d+)\s*$/i.exec(source)?.[1]?.toUpperCase() ?? null;
+  useEffect(() => {
+    if (!storyId) {
+      setCriteria([]);
+      setSelCrit(new Set());
+      return;
+    }
+    let alive = true;
+    api
+      .requirementCriteria(storyId)
+      .then((c) => alive && setCriteria(c))
+      .catch(() => alive && setCriteria([]));
+    return () => {
+      alive = false;
+    };
+  }, [storyId]);
+
+  async function generate(useCriteria: boolean) {
     if (!source.trim()) return;
     setBusy(true);
     try {
-      const data = await api.aiGenerate({ source: source.trim(), provider });
+      const data = await api.aiGenerate({
+        source: source.trim(),
+        provider,
+        ...(useCriteria ? { criteria: [...selCrit] } : {}),
+      });
       setItems(data.testcases);
+      setPreviewStory(data.story ?? null);
       setLessonsUsed(data.lessons_used ?? []);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -552,10 +580,47 @@ function GenerateCard({
           </p>
         )}
       </div>
+      {criteria.length > 0 && (
+        <div className="field wide" style={{ marginBottom: 12 }}>
+          <label>Critérios EARS da story — gerar CTs por critério (vínculo automático)</label>
+          <div className="criteria-picker">
+            {criteria.map((c) => {
+              const checked = selCrit.has(c.ears_id);
+              return (
+                <label key={c.ears_id} className="check-inline caption">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setSelCrit((old) => {
+                        const next = new Set(old);
+                        if (next.has(c.ears_id)) next.delete(c.ears_id);
+                        else next.add(c.ears_id);
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="mono">{c.ears_id}</span>
+                  <span className="muted">{c.text}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="step-row">
-        <button className="primary" onClick={() => void generate()} disabled={busy || !source.trim()}>
+        <button className="primary" onClick={() => void generate(false)} disabled={busy || !source.trim()}>
           {busy ? "Gerando…" : "Gerar preview"}
         </button>
+        {criteria.length > 0 && (
+          <button
+            onClick={() => void generate(true)}
+            disabled={busy || selCrit.size === 0}
+            title="Um CT por critério selecionado, com o vínculo já preenchido"
+          >
+            {busy ? "Gerando…" : `Gerar por critério (${selCrit.size})`}
+          </button>
+        )}
       </div>
 
       {lessonsUsed.length > 0 && (
@@ -570,6 +635,7 @@ function GenerateCard({
         <PreviewList
           items={items}
           setItems={setItems}
+          story={previewStory}
           onChanged={onChanged}
           onError={onError}
         />
@@ -583,11 +649,13 @@ function GenerateCard({
 function PreviewList({
   items,
   setItems,
+  story,
   onChanged,
   onError,
 }: {
   items: GeneratedTestcase[];
   setItems: (items: GeneratedTestcase[]) => void;
+  story?: string | null;
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
@@ -602,6 +670,9 @@ function PreviewList({
         tags: item.tags,
         folder,
         body: item.body,
+        // vínculo fino quando gerado por critério (0093)
+        ...(story ? { story } : {}),
+        ...(item.criteria?.length ? { criteria: item.criteria } : {}),
       });
       setItems(items.filter((i) => i !== item));
       onChanged();
@@ -647,6 +718,11 @@ function PreviewList({
               {item.type} · {item.priority}
               {item.tags.length > 0 ? ` · ${item.tags.join(", ")}` : ""}
             </span>
+            {item.criteria?.length ? (
+              <span className="status-dot dot-col-passed caption" style={{ marginLeft: 8 }}>
+                {item.criteria.join(", ")}
+              </span>
+            ) : null}
           </div>
           <DocBody text={item.body} />
           <div className="toolbar">

@@ -324,7 +324,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
-  aiGenerate: (body: { source: string; provider?: string | null }) =>
+  aiGenerate: (body: {
+    source: string;
+    provider?: string | null;
+    criteria?: string[];
+  }) =>
     request<GeneratePreview>("/ai/generate-testcases", {
       method: "POST",
       body: JSON.stringify(body),

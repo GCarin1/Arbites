@@ -581,10 +581,12 @@ export interface GeneratedTestcase {
   passos: string[];
   resultado_esperado: string;
   body: string;
+  criteria?: string[]; // vínculo EARS quando gerado por critério (0093)
 }
 
 export interface GeneratePreview {
   preview: boolean;
+  story?: string; // story de origem quando gerado por critério (0093)
   testcases: GeneratedTestcase[];
   lessons_used?: { id: string; title: string }[];
 }

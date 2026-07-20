@@ -1,6 +1,7 @@
 # Change 0093-gerar-cts-por-criterio-ears-com-vinculo-gravado — gerar CTs por criterio EARS com vinculo gravado
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** ai-assist, testcases
@@ -27,9 +28,9 @@ graça e fecha o loop do validador de SPEC.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Geração por critério envia o critério no prompt e o aceite grava `criteria` — `backend/tests/test_ai_generate.py` (MockTransport).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Geração por critério envia o critério no prompt e o aceite grava `criteria` — `backend/tests/test_ai_generate.py` (MockTransport).
 
 ## Open questions
 
