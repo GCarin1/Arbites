@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS evidences(
 CREATE TABLE IF NOT EXISTS defects(
   id TEXT PRIMARY KEY, title TEXT, status TEXT, severity TEXT,
   testcase_id TEXT, execution_id TEXT, external_key TEXT, path TEXT,
-  opened_at TEXT, root_cause TEXT, fix TEXT, prevention TEXT);
+  opened_at TEXT, root_cause TEXT, fix TEXT, prevention TEXT,
+  lesson_when TEXT, lesson_procedure TEXT, lesson_antipattern TEXT);
 CREATE TABLE IF NOT EXISTS todos(
   id TEXT PRIMARY KEY, title TEXT, status TEXT, due TEXT, squad TEXT,
   links TEXT, created TEXT, path TEXT, mtime REAL);
@@ -112,6 +113,9 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE testcases ADD COLUMN feature_path TEXT",
         "ALTER TABLE testcases ADD COLUMN scenario_name TEXT",
         "ALTER TABLE scenarios ADD COLUMN ct_id TEXT",
+        "ALTER TABLE defects ADD COLUMN lesson_when TEXT",
+        "ALTER TABLE defects ADD COLUMN lesson_procedure TEXT",
+        "ALTER TABLE defects ADD COLUMN lesson_antipattern TEXT",
     ):
         try:
             conn.execute(ddl)
@@ -533,8 +537,9 @@ def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO defects"
         "(id, title, status, severity, testcase_id, execution_id, external_key, path,"
-        " opened_at, root_cause, fix, prevention)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        " opened_at, root_cause, fix, prevention,"
+        " lesson_when, lesson_procedure, lesson_antipattern)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -548,6 +553,9 @@ def _insert_defect(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             doc.meta.get("root_cause"),
             doc.meta.get("fix"),
             doc.meta.get("prevention"),
+            doc.meta.get("lesson_when"),
+            doc.meta.get("lesson_procedure"),
+            doc.meta.get("lesson_antipattern"),
         ),
     )
 

@@ -275,6 +275,9 @@ export interface Defect {
   root_cause: string | null;
   fix: string | null;
   prevention: string | null;
+  lesson_when?: string | null; // lição estruturada (0095)
+  lesson_procedure?: string | null;
+  lesson_antipattern?: string | null;
   body?: string;
 }
 

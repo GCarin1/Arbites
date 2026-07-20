@@ -295,6 +295,11 @@ class DefectIn(BaseModel):
     root_cause: str | None = None
     fix: str | None = None
     prevention: str | None = None
+    # Lição estruturada (0095): when/procedure/anti-pattern — preferida na
+    # injeção de IA e vira skill no Pacote de Agente.
+    lesson_when: str | None = None
+    lesson_procedure: str | None = None
+    lesson_antipattern: str | None = None
 
 
 class DefectUpdate(BaseModel):
@@ -308,6 +313,9 @@ class DefectUpdate(BaseModel):
     root_cause: str | None = None
     fix: str | None = None
     prevention: str | None = None
+    lesson_when: str | None = None
+    lesson_procedure: str | None = None
+    lesson_antipattern: str | None = None
 
 
 class TodoIn(BaseModel):
@@ -2380,6 +2388,18 @@ def _register_routes(app: FastAPI) -> None:
         return {"preview": True, "similar_considered": similar,
                 **result.model_dump()}
 
+    @app.post(API_PREFIX + "/ai/structure-lesson/{defect_id}")
+    async def ai_structure_lesson(request: Request, defect_id: str, payload: AIByCtIn):
+        """Sugere a lição estruturada (when/procedure/anti-pattern) a partir
+        do defeito (0095) — preview: preenche o form, nada é gravado sem o
+        save do defeito."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "defects", defect_id)
+        defect_md = (ws.root / rel).read_text(encoding="utf-8-sig")
+        result = await asyncio.to_thread(ai_ops.structure_lesson, provider, defect_md)
+        return {"preview": True, **result.model_dump()}
+
     @app.post(API_PREFIX + "/ai/negative-cases/{ct_id}")
     async def ai_negative(request: Request, ct_id: str, payload: AIByCtIn):
         ws, conn = ws_of(request), conn_of(request)
@@ -2492,6 +2512,9 @@ def _register_routes(app: FastAPI) -> None:
             "root_cause": payload.root_cause,
             "fix": payload.fix,
             "prevention": payload.prevention,
+            "lesson_when": payload.lesson_when,
+            "lesson_procedure": payload.lesson_procedure,
+            "lesson_antipattern": payload.lesson_antipattern,
         }
         path = ws.root / "defects" / f"{defect_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body)

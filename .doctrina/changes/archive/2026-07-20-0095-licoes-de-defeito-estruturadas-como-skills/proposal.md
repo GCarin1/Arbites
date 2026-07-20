@@ -1,6 +1,7 @@
 # Change 0095-licoes-de-defeito-estruturadas-como-skills — licoes de defeito estruturadas como skills
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** defects
@@ -28,9 +29,9 @@ alimenta o Pacote de Agente (0094) com skills de verdade.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Campos persistem/indexam; injeção usa os estruturados quando presentes — `backend/tests/test_lessons_learned.py`.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Campos persistem/indexam; injeção usa os estruturados quando presentes — `backend/tests/test_lessons_learned.py`.
 
 ## Open questions
 

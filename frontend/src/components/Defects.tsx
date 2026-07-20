@@ -292,6 +292,11 @@ function DefectModal({
   const [rootCause, setRootCause] = useState(defect?.root_cause ?? "");
   const [fix, setFix] = useState(defect?.fix ?? "");
   const [prevention, setPrevention] = useState(defect?.prevention ?? "");
+  // lição estruturada (0095)
+  const [lWhen, setLWhen] = useState(defect?.lesson_when ?? "");
+  const [lProc, setLProc] = useState(defect?.lesson_procedure ?? "");
+  const [lAnti, setLAnti] = useState(defect?.lesson_antipattern ?? "");
+  const [suggesting, setSuggesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -320,6 +325,9 @@ function DefectModal({
       root_cause: rootCause.trim() || null,
       fix: fix.trim() || null,
       prevention: prevention.trim() || null,
+      lesson_when: lWhen.trim() || null,
+      lesson_procedure: lProc.trim() || null,
+      lesson_antipattern: lAnti.trim() || null,
     };
     try {
       if (defect) await api.updateDefect(defect.id, payload);
@@ -450,6 +458,56 @@ function DefectModal({
           placeholder="Ex.: sempre testar CPF vazio"
         />
       </div>
+
+      {/* Lição estruturada (0095): aparece quando há causa raiz — vira skill
+          no Pacote de Agente e é preferida na injeção de IA */}
+      {rootCause.trim() && (
+        <div className="lesson-struct block">
+          <div className="card-head">
+            <h4 className="section-title" style={{ margin: 0 }}>Estruturar lição</h4>
+            <span className="spacer" />
+            {defect && (
+              <button
+                type="button"
+                className="btn-sm"
+                disabled={suggesting}
+                onClick={async () => {
+                  setSuggesting(true);
+                  try {
+                    const s = await api.aiStructureLesson(defect.id);
+                    setLWhen(s.lesson_when);
+                    setLProc(s.lesson_procedure);
+                    setLAnti(s.lesson_antipattern);
+                    setDirty(true);
+                  } catch (e) {
+                    onError(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setSuggesting(false);
+                  }
+                }}
+                title="Preenche os campos com uma sugestão da IA (preview — nada é gravado sem salvar)"
+              >
+                {suggesting ? "Sugerindo…" : "Sugerir com IA"}
+              </button>
+            )}
+          </div>
+          <div className="modal-field">
+            <label htmlFor="lesson-when">Quando se aplica</label>
+            <input id="lesson-when" value={lWhen} onChange={(e) => setLWhen(e.target.value)}
+              placeholder="Ex.: ao comparar timestamps de expiração" />
+          </div>
+          <div className="modal-field">
+            <label htmlFor="lesson-proc">Procedimento (o que fazer)</label>
+            <input id="lesson-proc" value={lProc} onChange={(e) => setLProc(e.target.value)}
+              placeholder="Ex.: usar datetime timezone-aware em UTC" />
+          </div>
+          <div className="modal-field">
+            <label htmlFor="lesson-anti">Anti-padrão (o que evitar)</label>
+            <input id="lesson-anti" value={lAnti} onChange={(e) => setLAnti(e.target.value)}
+              placeholder="Ex.: comparar datetime naive com aware" />
+          </div>
+        </div>
+      )}
       </div>
     </Modal>
   );

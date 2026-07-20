@@ -83,8 +83,8 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.7.0",
-        "last_updated": "2026-07-11",
+        "version": "0.8.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -392,13 +392,6 @@
         "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
         "title": "sync de feature atualizado marca CT precisa re-execucao",
         "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0095-licoes-de-defeito-estruturadas-como-skills",
-        "title": "licoes de defeito estruturadas como skills",
-        "path": ".doctrina/changes/0095-licoes-de-defeito-estruturadas-como-skills",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1529,6 +1522,19 @@
         "specs_affected": [
           {
             "capability": "context-pack",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0095-licoes-de-defeito-estruturadas-como-skills",
+        "title": "licoes de defeito estruturadas como skills",
+        "path": ".doctrina/changes/archive/2026-07-20-0095-licoes-de-defeito-estruturadas-como-skills",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "defects",
             "operation": "MODIFIED"
           }
         ]

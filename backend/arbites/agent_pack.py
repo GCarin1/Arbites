@@ -120,11 +120,19 @@ def _spec_md(conn, root: Path, epic: dict, story: dict) -> str:
 
 
 def _skill_md(slug: str, defect: sqlite3.Row) -> str:
+    # lição ESTRUTURADA tem prioridade sobre causa/correção soltas (0095)
+    keys = defect.keys()
+    l_when = (defect["lesson_when"] if "lesson_when" in keys else None) or ""
+    l_proc = (defect["lesson_procedure"] if "lesson_procedure" in keys else None) or ""
+    l_anti = (defect["lesson_antipattern"] if "lesson_antipattern" in keys else None) or ""
     cause = (defect["root_cause"] or "").strip()
     fix = (defect["fix"] or "").strip()
     prevention = (defect["prevention"] or "").strip()
+    when_body = l_when.strip() or cause
+    proc_body = l_proc.strip() or fix
+    anti_body = l_anti.strip() or prevention
     desc = f"Lição do defeito {defect['id']}: {defect['title']}."
-    when = (f"Ao mexer em código relacionado a: {cause}" if cause
+    when = (f"Ao mexer em código relacionado a: {when_body}" if when_body
             else f"Contexto do defeito {defect['id']}.")
     lines = [
         "---",
@@ -139,15 +147,15 @@ def _skill_md(slug: str, defect: sqlite3.Row) -> str:
         "",
         "## When to use this skill",
         "",
-        cause or "Quando o contexto do defeito de origem se repetir.",
+        when_body or "Quando o contexto do defeito de origem se repetir.",
         "",
         "## Procedure",
         "",
-        fix or "Corrija seguindo a resolução registrada no defeito de origem.",
+        proc_body or "Corrija seguindo a resolução registrada no defeito de origem.",
         "",
         "## Anti-patterns",
         "",
-        prevention or "Evite reintroduzir a causa raiz descrita acima.",
+        anti_body or "Evite reintroduzir a causa raiz descrita acima.",
         "",
     ]
     return "\n".join(lines)
@@ -203,9 +211,11 @@ def build_pack(
     if ct_ids:
         ph = ",".join("?" * len(ct_ids))
         defects = conn.execute(
-            "SELECT id, title, root_cause, fix, prevention FROM defects"
+            "SELECT id, title, root_cause, fix, prevention,"
+            " lesson_when, lesson_procedure, lesson_antipattern FROM defects"
             f" WHERE testcase_id IN ({ph})"
-            " AND root_cause IS NOT NULL AND root_cause != ''"
+            " AND ((root_cause IS NOT NULL AND root_cause != '')"
+            "   OR (lesson_when IS NOT NULL AND lesson_when != ''))"
             " ORDER BY id",
             ct_ids,
         ).fetchall()

@@ -343,4 +343,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  aiStructureLesson: (defectId: string, body: { provider?: string | null } = {}) =>
+    request<{
+      preview: boolean;
+      lesson_when: string;
+      lesson_procedure: string;
+      lesson_antipattern: string;
+    }>(`/ai/structure-lesson/${defectId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

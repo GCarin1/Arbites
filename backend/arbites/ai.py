@@ -81,6 +81,12 @@ class ReviewResult(BaseModel):
     summary: str = ""
 
 
+class StructuredLesson(BaseModel):
+    lesson_when: str  # quando esta lição se aplica (gatilho)
+    lesson_procedure: str  # o que fazer para evitar/corrigir
+    lesson_antipattern: str  # o anti-padrão a não repetir
+
+
 class DailyDigest(BaseModel):
     summary: str  # resumo executivo do dia
     impediments: list[str] = []  # impedimentos
@@ -570,11 +576,23 @@ _GENERATE_SYSTEM = (
 
 
 def _lessons_block(lessons: list[dict]) -> str:
-    lines = [
-        f"- {lesson['title']}: causa={lesson.get('root_cause') or '?'};"
-        f" prevenção={lesson.get('prevention') or '?'}"
-        for lesson in lessons
-    ]
+    # prefere a lição ESTRUTURADA (when/procedure/anti-pattern) quando existe;
+    # cai para causa/prevenção soltas quando não (0095)
+    lines = []
+    for lesson in lessons:
+        when = lesson.get("lesson_when")
+        proc = lesson.get("lesson_procedure")
+        anti = lesson.get("lesson_antipattern")
+        if when or proc or anti:
+            lines.append(
+                f"- {lesson['title']}: quando={when or '?'};"
+                f" evite={anti or '?'}; faça={proc or '?'}"
+            )
+        else:
+            lines.append(
+                f"- {lesson['title']}: causa={lesson.get('root_cause') or '?'};"
+                f" prevenção={lesson.get('prevention') or '?'}"
+            )
     return (
         "\n\nLições aprendidas de bugs já encontrados em áreas relacionadas —"
         " gere casos que cubram estes cenários, não repita a mesma causa:\n"
@@ -597,6 +615,20 @@ _REVIEW_SYSTEM = (
     "resultado esperado vago (resultado_vago). Seja específico e cite o "
     "índice do passo quando aplicável."
 )
+
+
+_LESSON_SYSTEM = (
+    "Você transforma a causa raiz de um defeito numa LIÇÃO estruturada e "
+    "reutilizável, em português. Devolva três campos objetivos: quando a "
+    "lição se aplica (o gatilho/contexto), o procedimento (o que fazer para "
+    "evitar/corrigir) e o anti-padrão (o erro a não repetir). Frases curtas."
+)
+
+
+def structure_lesson(provider: _BaseProvider, defect_md: str) -> StructuredLesson:
+    result = provider.complete(_LESSON_SYSTEM, defect_md, StructuredLesson)
+    assert isinstance(result, StructuredLesson)
+    return result
 
 
 def review_testcase(provider: _BaseProvider, ct_md: str,
@@ -754,12 +786,17 @@ def find_relevant_lessons(conn: sqlite3.Connection, text: str, limit: int = 3) -
     for word in words:
         like = f"%{word}%"
         for row in conn.execute(
-            "SELECT id, title, root_cause, fix, prevention FROM defects"
-            " WHERE (root_cause IS NOT NULL OR fix IS NOT NULL OR prevention IS NOT NULL)"
+            "SELECT id, title, root_cause, fix, prevention,"
+            " lesson_when, lesson_procedure, lesson_antipattern FROM defects"
+            " WHERE (root_cause IS NOT NULL OR fix IS NOT NULL OR prevention IS NOT NULL"
+            "  OR lesson_when IS NOT NULL OR lesson_procedure IS NOT NULL"
+            "  OR lesson_antipattern IS NOT NULL)"
             " AND (LOWER(title) LIKE ? OR LOWER(COALESCE(root_cause,'')) LIKE ?"
-            " OR LOWER(COALESCE(prevention,'')) LIKE ?)"
+            " OR LOWER(COALESCE(prevention,'')) LIKE ?"
+            " OR LOWER(COALESCE(lesson_when,'')) LIKE ?"
+            " OR LOWER(COALESCE(lesson_antipattern,'')) LIKE ?)"
             " LIMIT 5",
-            (like, like, like),
+            (like, like, like, like, like),
         ):
             found[row["id"]] = dict(row)
     return list(found.values())[:limit]

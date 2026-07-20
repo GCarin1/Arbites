@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)
 **Realizes:** SC2
-**Last updated:** 2026-07-11
-**Version:** 0.7.0
+**Last updated:** 2026-07-20
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -24,6 +24,15 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
 - The system shall permitir registrar, por defeito, uma **lição aprendida**
   opcional em três campos de frontmatter: `root_cause` (causa raiz), `fix`
   (correção aplicada) e `prevention` (como prevenir a recorrência).
+- The system shall aceitar, por defeito, uma **lição estruturada** opcional
+  em `lesson_when` / `lesson_procedure` / `lesson_antipattern` (frontmatter
+  indexado; form na UI exibido quando há `root_cause`), com sugestão de IA
+  opcional via `POST /ai/structure-lesson/{id}` (preview — nada gravado sem
+  o save do defeito). As injeções de lição em prompts de IA
+  (`ai.find_relevant_lessons`, `_lessons_block`, `project_memory.recent_recap`)
+  e as skills do Pacote de Agente (`agent_pack`) shall PREFERIR os campos
+  estruturados quando presentes, caindo para `root_cause`/`fix`/`prevention`
+  quando não.
 - The system shall expor `GET /defects?has_lesson=true` filtrando apenas
   defeitos com ao menos um dos três campos de lição preenchido.
 - The system shall expor `GET /defects`, `GET /defects/{id}` (com corpo),
@@ -91,6 +100,12 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
    persiste os três campos, aparecem no `GET` individual, e
    `GET /defects?has_lesson=true` retorna só os defeitos com lição — verified
    by `backend/tests/test_lessons_learned.py`.
+
+7. [verified] Os campos `lesson_when`/`lesson_procedure`/`lesson_antipattern`
+   persistem e indexam; `find_relevant_lessons` casa um defeito só com lição
+   estruturada; a injeção no prompt prefere o formato estruturado; e
+   `POST /ai/structure-lesson/{id}` devolve a sugestão em preview sem gravar
+   — verified by `backend/tests/test_lessons_learned.py`.
 
 ## Maturity
 

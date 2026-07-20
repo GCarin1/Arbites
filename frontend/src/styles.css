@@ -1517,6 +1517,11 @@ table.dense tbody tr:hover td {
   max-height: 160px;
   overflow-y: auto;
 }
+/* seção de lição estruturada no defeito (0095) */
+.lesson-struct {
+  border-top: 1px solid var(--border);
+  padding-top: var(--s2);
+}
 
 /* --------------------------------------------------- Tela Hoje (0080) */
 .home-grid {

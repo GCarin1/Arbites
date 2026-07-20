@@ -89,3 +89,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-20 — 0092-spec-coverage-criterio-ears-vinculado-a-ct-no — spec coverage: criterio EARS vinculado a CT no auditor (specs: audit MODIFIED, requirements MODIFIED, testcases MODIFIED)
 - 2026-07-20 — 0093-gerar-cts-por-criterio-ears-com-vinculo-gravado — gerar CTs por criterio EARS com vinculo gravado (specs: ai-assist MODIFIED, testcases MODIFIED)
 - 2026-07-20 — 0087-cobertura-semantica-passando-falhando-ou-nunca — cobertura semantica: passando, falhando ou nunca executada (specs: requirements MODIFIED)
+- 2026-07-20 — 0095-licoes-de-defeito-estruturadas-como-skills — licoes de defeito estruturadas como skills (specs: defects MODIFIED)

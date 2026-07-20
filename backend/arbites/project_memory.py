@@ -173,8 +173,10 @@ def recent_recap(conn: sqlite3.Connection, limit: int = 5) -> str:
         (limit,),
     ).fetchall()
     lessons = conn.execute(
-        "SELECT id, title, root_cause, fix FROM defects"
-        " WHERE root_cause IS NOT NULL AND root_cause != ''"
+        "SELECT id, title, root_cause, fix, lesson_when, lesson_procedure"
+        " FROM defects"
+        " WHERE (root_cause IS NOT NULL AND root_cause != '')"
+        "    OR (lesson_when IS NOT NULL AND lesson_when != '')"
         " ORDER BY opened_at DESC, id DESC LIMIT ?",
         (limit,),
     ).fetchall()
@@ -185,8 +187,14 @@ def recent_recap(conn: sqlite3.Connection, limit: int = 5) -> str:
     for d in decisions:
         lines.append(f"- Decisão {d['id']}: {d['title']}")
     for lesson in lessons:
-        line = f"- Lição de {lesson['id']} ({lesson['title']}): {lesson['root_cause']}"
-        if lesson["fix"]:
-            line += f" — correção: {lesson['fix']}"
+        # lição estruturada tem preferência sobre causa/correção soltas (0095)
+        if lesson["lesson_when"]:
+            line = f"- Lição de {lesson['id']} ({lesson['title']}): {lesson['lesson_when']}"
+            if lesson["lesson_procedure"]:
+                line += f" — faça: {lesson['lesson_procedure']}"
+        else:
+            line = f"- Lição de {lesson['id']} ({lesson['title']}): {lesson['root_cause']}"
+            if lesson["fix"]:
+                line += f" — correção: {lesson['fix']}"
         lines.append(line)
     return "\n".join(lines)
