@@ -1484,6 +1484,69 @@ table.dense tbody tr:hover td {
   align-items: center;
   gap: 4px;
 }
+
+/* --------------------------------------------------- Tela Hoje (0080) */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--s3);
+}
+.home-card {
+  display: flex;
+  flex-direction: column;
+}
+.home-card-title {
+  background: transparent;
+  border: none;
+  padding: 0;
+  height: auto;
+  font-weight: 600;
+  color: var(--text);
+}
+.home-card-title:hover {
+  text-decoration: underline;
+}
+/* mesmo badge de contagem do menu, reusado no cabeçalho do card */
+.home-card .count {
+  font-size: var(--fs-caption);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 6px;
+}
+.home-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--s1);
+}
+.home-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-control);
+  padding: 4px 6px;
+  color: var(--text);
+  text-align: left;
+}
+.home-row:hover {
+  background: var(--surface-hover);
+}
+.home-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* pulsa como "algo ligado" — mesma linguagem do dot do menu (0076) */
+.home-pulse {
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
 .heatmap-legend {
   display: flex;
   align-items: center;

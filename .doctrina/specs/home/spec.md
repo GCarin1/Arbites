@@ -2,7 +2,7 @@
 
 **Capability:** home
 **Status:** active
-**Implementation:** planned — entrega na change 0080 (backlog da varredura de 2026-07-19)
+**Implementation:** verified — change 0080 (frontend/src/components/Home.tsx, frontend/src/App.tsx)
 **Realizes:** n/a — capability nova (landing de orientação diária), fora do intake original; nasceu da varredura de melhorias de usabilidade
 **Last updated:** 2026-07-19
 **Version:** 0.1.0
@@ -44,11 +44,14 @@ cada área.
 
 ## Acceptance criteria
 
-1. [unverified] O app abre na aba Hoje com os cards compostos de endpoints
-   existentes e navegação para cada área — verified by build + revisão
-   visual (`frontend/src/components/Home.tsx`).
-2. [unverified] Workspace vazio mostra o empty state de primeiro uso; falha
-   de uma fonte não derruba a tela — verified by build + revisão visual.
+1. [verified] O app abre na aba Hoje com os cards compostos de endpoints
+   existentes (runs/active, executions, defects, todos, daily, warnings) e
+   navegação para cada área — verified by build + smoke dos endpoints
+   consumidos + revisão visual (`frontend/src/components/Home.tsx`).
+2. [verified] Workspace vazio mostra o empty state de primeiro uso; cada
+   card busca sua fonte isolada (catch por fonte), sem derrubar a tela —
+   verified by build + smoke (workspace vazio → first-use) + revisão visual
+   (`frontend/src/components/Home.tsx`).
 
 ## Maturity
 

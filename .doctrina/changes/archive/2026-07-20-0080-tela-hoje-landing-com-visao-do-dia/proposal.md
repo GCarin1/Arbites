@@ -1,6 +1,7 @@
 # Change 0080-tela-hoje-landing-com-visao-do-dia — tela hoje: landing com visao do dia
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** home
@@ -29,9 +30,9 @@ afazer de hoje ou daily pendente.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] App abre na aba Hoje; cards compostos e navegáveis; empty state de primeiro uso; falha isolada por card — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] App abre na aba Hoje; cards compostos e navegáveis; empty state de primeiro uso; falha isolada por card — build + revisão visual.
 
 ## Open questions
 

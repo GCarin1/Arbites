@@ -82,3 +82,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-19 — 0077-memoria-do-projeto-agrupar-timeline-por-dia — memoria do projeto: agrupar timeline por dia colapsavel e filtro de periodo ano/mes com filtro de data no backend (specs: project-memory MODIFIED)
 - 2026-07-19 — 0078-reformular-aba-de-ia-sub-abas-gerar-revisar — reformular aba de IA: sub-abas gerar/revisar/context-pack/configuracao e seletor de provider global no topo (specs: ai-assist MODIFIED)
 - 2026-07-19 — 0079-context-pack-escopo-com-pickers-que-listam-itens — context-pack: escopo com pickers que listam itens + autocomplete, toggles de secao (CTs/defeitos/decisoes), ultimo resultado por CT, decisoes em qualquer escopo, preview com contagens e copiar/baixar (specs: context-pack MODIFIED)
+- 2026-07-20 — 0080-tela-hoje-landing-com-visao-do-dia — tela hoje: landing com visao do dia (specs: home MODIFIED)

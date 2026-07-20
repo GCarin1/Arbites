@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.13.0",
-  "last_updated": "2026-07-19",
+  "last_updated": "2026-07-20",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -115,7 +115,7 @@
         "status": "active",
         "version": "0.1.0",
         "last_updated": "2026-07-19",
-        "implementation": "planned — entrega na change 0080 (backlog da varredura de 2026-07-19)"
+        "implementation": "verified — change 0080 (frontend/src/components/Home.tsx, frontend/src/App.tsx)"
       },
       {
         "id": "indexing",
@@ -339,13 +339,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0080-tela-hoje-landing-com-visao-do-dia",
-        "title": "tela hoje: landing com visao do dia",
-        "path": ".doctrina/changes/0080-tela-hoje-landing-com-visao-do-dia",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
       {
         "id": "0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
         "title": "lixeira: listar e restaurar itens da trash pela UI",
@@ -1475,6 +1468,19 @@
         "specs_affected": [
           {
             "capability": "context-pack",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0080-tela-hoje-landing-com-visao-do-dia",
+        "title": "tela hoje: landing com visao do dia",
+        "path": ".doctrina/changes/archive/2026-07-20-0080-tela-hoje-landing-com-visao-do-dia",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "home",
             "operation": "MODIFIED"
           }
         ]
