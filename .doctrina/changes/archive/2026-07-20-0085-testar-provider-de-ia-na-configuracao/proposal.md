@@ -1,6 +1,7 @@
 # Change 0085-testar-provider-de-ia-na-configuracao — testar provider de IA na configuracao
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** ai-assist
@@ -24,9 +25,9 @@ errada/URL fora do ar quando a geração falha, com erro fora de contexto.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Provider válido → ok; chave inválida/URL fora → erro com mensagem; provider inline (não salvo) testável — `backend/tests/test_ai_providers.py` (MockTransport).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Provider válido → ok; chave inválida/URL fora → erro com mensagem; provider inline (não salvo) testável — `backend/tests/test_ai_providers.py` (MockTransport).
 
 ## Open questions
 

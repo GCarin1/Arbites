@@ -15,7 +15,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.13.0",
+        "version": "0.14.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -237,8 +237,8 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-03",
+        "version": "0.3.0",
+        "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
           "SC1"
@@ -340,13 +340,6 @@
     ],
     "changes": [
       {
-        "id": "0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
-        "title": "lixeira: listar e restaurar itens da trash pela UI",
-        "path": ".doctrina/changes/0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
         "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
         "title": "pickers canonicos por titulo em referencias a entidades",
         "path": ".doctrina/changes/0082-pickers-canonicos-por-titulo-em-referencias-a",
@@ -368,13 +361,6 @@
         "opened": "2026-07-19"
       },
       {
-        "id": "0085-testar-provider-de-ia-na-configuracao",
-        "title": "testar provider de IA na configuracao",
-        "path": ".doctrina/changes/0085-testar-provider-de-ia-na-configuracao",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
         "id": "0088-diff-entre-duas-executions",
         "title": "diff entre duas executions",
         "path": ".doctrina/changes/0088-diff-entre-duas-executions",
@@ -392,13 +378,6 @@
         "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
         "title": "sync de feature atualizado marca CT precisa re-execucao",
         "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
-        "title": "resumo de falha pos-run pela IA com defeito draft",
-        "path": ".doctrina/changes/0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1437,6 +1416,32 @@
         ]
       },
       {
+        "id": "0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
+        "title": "lixeira: listar e restaurar itens da trash pela UI",
+        "path": ".doctrina/changes/archive/2026-07-20-0081-lixeira-listar-e-restaurar-itens-da-trash-pela",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0085-testar-provider-de-ia-na-configuracao",
+        "title": "testar provider de IA na configuracao",
+        "path": ".doctrina/changes/archive/2026-07-20-0085-testar-provider-de-ia-na-configuracao",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
         "id": "0086-story-360-cadeia-completa-navegavel-por-story",
         "title": "story 360: cadeia completa navegavel por story",
         "path": ".doctrina/changes/archive/2026-07-20-0086-story-360-cadeia-completa-navegavel-por-story",
@@ -1535,6 +1540,19 @@
         "specs_affected": [
           {
             "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
+        "title": "resumo de falha pos-run pela IA com defeito draft",
+        "path": ".doctrina/changes/archive/2026-07-20-0096-resumo-de-falha-pos-run-pela-ia-com-defeito",
+        "status": "applied",
+        "applied": "2026-07-20",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
             "operation": "MODIFIED"
           }
         ]

@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)
 **Realizes:** SC1
-**Last updated:** 2026-07-03
-**Version:** 0.2.0
+**Last updated:** 2026-07-20
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -35,13 +35,19 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
   sem conversão.
 - The system shall servir a API em `http://localhost:8347` a partir de um
   processo único (uvicorn), servindo o frontend buildado como estático.
+- The system shall expor a lixeira pela API: `GET /trash` (itens com origem,
+  data e tipo), `POST /trash/{name}/restore` (devolve ao caminho de origem —
+  ou à pasta do tipo quando a origem não foi registrada — sufixando em
+  colisão, e reindexa o que voltou) e `DELETE /trash` (esvaziar). A UI
+  oferece listar/restaurar/esvaziar na aba Problemas.
 
 ### Event-driven
 
 - When um artefato é criado via UI/API, the system shall consumir o
   contador do prefixo correspondente em `counters.json` para atribuir o ID.
 - When um artefato é deletado via API, the system shall movê-lo para
-  `.arbites/trash/` em vez de apagar do disco.
+  `.arbites/trash/` em vez de apagar do disco, registrando um sidecar
+  `<nome>.arbtrash` com o caminho de origem e a data de moção.
 - When um arquivo criado à mão traz ID manual maior que o contador, the
   system shall ajustar o contador para `max(existente)+1` no reindex.
 
@@ -74,6 +80,11 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
    ID no frontmatter — verified by `backend/tests/test_workspace.py`.
 4. [verified] DELETE move o arquivo para `.arbites/trash/` e ele é
    removido do índice — verified by `backend/tests/test_workspace.py`.
+
+5. [verified] Um CT deletado aparece em `GET /trash` com origem/data;
+   restaurar devolve o arquivo ao caminho original e ao índice sem
+   sobrescrever (sufixa em colisão); esvaziar limpa a lixeira — verified by
+   `backend/tests/test_trash.py`.
 
 ## Maturity
 

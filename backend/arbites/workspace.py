@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,16 @@ SUBDIRS = [
     "dailies", "metrics", "meetings", "decisions", "audits", "agent_log",
     ".arbites",
 ]
+
+# Sidecar da lixeira (0081): guarda a origem para o restore devolver ao lugar.
+_TRASH_META_SUFFIX = ".arbtrash"
+# Fallback de pasta por prefixo de ID quando a origem não foi registrada
+# (itens da lixeira anteriores ao 0081).
+_PREFIX_FOLDER = {
+    "CT": "testcases", "EP": "requirements", "ST": "requirements",
+    "DF": "defects", "TD": "todos", "DEC": "decisions", "AUD": "audits",
+    "AGT": "agent_log", "EXEC": "executions", "MTG": "meetings",
+}
 
 
 def slugify(text: str) -> str:
@@ -141,12 +152,96 @@ class Workspace:
     # -- trash ----------------------------------------------------------
 
     def trash(self, path: Path) -> Path:
-        """Move um arquivo para .arbites/trash/ — nunca apaga direto."""
+        """Move um arquivo/pasta para .arbites/trash/ — nunca apaga direto.
+
+        Registra um sidecar `<nome>.arbtrash` com a origem (caminho relativo)
+        e a data de moção, para o restore devolver ao lugar certo (0081)."""
         self.trash_dir.mkdir(parents=True, exist_ok=True)
+        origin = self.relpath(path)
         dest = self.trash_dir / path.name
         i = 1
         while dest.exists():
             dest = self.trash_dir / f"{path.stem}-{i}{path.suffix}"
             i += 1
         shutil.move(str(path), str(dest))
+        (self.trash_dir / (dest.name + _TRASH_META_SUFFIX)).write_text(
+            json.dumps({
+                "origin": origin,
+                "trashed_at": datetime.now(timezone.utc).isoformat(),
+            }),
+            encoding="utf-8",
+        )
         return dest
+
+    def _trash_meta(self, entry: Path) -> dict:
+        side = self.trash_dir / (entry.name + _TRASH_META_SUFFIX)
+        if side.exists():
+            try:
+                return json.loads(side.read_text(encoding="utf-8"))
+            except ValueError:
+                return {}
+        return {}
+
+    def list_trash(self) -> list[dict]:
+        """Itens na lixeira, mais recentes primeiro — nome, origem, data,
+        tipo (inferido da origem ou do prefixo do ID)."""
+        if not self.trash_dir.exists():
+            return []
+        out = []
+        for entry in self.trash_dir.iterdir():
+            if entry.name.endswith(_TRASH_META_SUFFIX):
+                continue
+            meta = self._trash_meta(entry)
+            origin = meta.get("origin")
+            kind = (origin.split("/", 1)[0] if origin
+                    else _PREFIX_FOLDER.get(entry.name.split("-", 1)[0], "?"))
+            out.append({
+                "name": entry.name,
+                "origin": origin,
+                "trashed_at": meta.get("trashed_at"),
+                "kind": kind,
+                "is_dir": entry.is_dir(),
+            })
+        out.sort(key=lambda e: e.get("trashed_at") or "", reverse=True)
+        return out
+
+    def restore(self, name: str) -> Path:
+        """Devolve o item ao caminho de origem (ou à pasta do tipo, se a
+        origem não foi registrada). Sufixa em caso de colisão; nunca
+        sobrescreve. Retorna o caminho restaurado."""
+        entry = self.trash_dir / name
+        if not entry.exists() or name.endswith(_TRASH_META_SUFFIX):
+            raise FileNotFoundError(name)
+        origin = self._trash_meta(entry).get("origin")
+        if origin:
+            target = self.root / origin
+        else:
+            folder = _PREFIX_FOLDER.get(name.split("-", 1)[0], "")
+            target = self.root / folder / name if folder else self.root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        final = target
+        i = 1
+        while final.exists():
+            final = target.with_name(f"{target.stem}-{i}{target.suffix}")
+            i += 1
+        shutil.move(str(entry), str(final))
+        side = self.trash_dir / (name + _TRASH_META_SUFFIX)
+        if side.exists():
+            side.unlink()
+        return final
+
+    def empty_trash(self) -> int:
+        """Esvazia a lixeira (apaga de vez). Retorna quantos itens removeu."""
+        if not self.trash_dir.exists():
+            return 0
+        removed = 0
+        for entry in list(self.trash_dir.iterdir()):
+            if entry.name.endswith(_TRASH_META_SUFFIX):
+                entry.unlink(missing_ok=True)
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                entry.unlink(missing_ok=True)
+            removed += 1
+        return removed

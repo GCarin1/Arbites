@@ -33,6 +33,7 @@ import type {
   TraceabilityMatrix,
   TreeNode,
   TrendPoint,
+  TrashItem,
   Warning,
   WorkspaceInfo,
 } from "./types";
@@ -67,6 +68,12 @@ export const api = {
   workspace: () => request<WorkspaceInfo>("/workspace"),
   reindex: () => request<unknown>("/workspace/reindex", { method: "POST" }),
   warnings: () => request<Warning[]>("/warnings"),
+  trash: () => request<TrashItem[]>("/trash"),
+  restoreTrash: (name: string) =>
+    request<{ restored: string }>(`/trash/${encodeURIComponent(name)}/restore`, {
+      method: "POST",
+    }),
+  emptyTrash: () => request<{ removed: number }>("/trash", { method: "DELETE" }),
   tree: () => request<TreeNode>("/tree"),
 
   requirements: (params = "") => request<Requirement[]>(`/requirements${params}`),
@@ -343,6 +350,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  aiProviderTest: (body: {
+    name?: string;
+    kind?: string;
+    model?: string;
+    base_url?: string | null;
+    key?: string;
+  }) =>
+    request<{ ok: boolean; error: string | null }>("/ai/providers/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  aiAnalyzeRun: (execId: string, body: { provider?: string | null } = {}) =>
+    request<{
+      preview: boolean;
+      summary: string;
+      probable_cause: string;
+      defect: { title: string; severity: string; description: string; testcase: string; execution: string };
+    }>(`/ai/analyze-run/${execId}`, { method: "POST", body: JSON.stringify(body) }),
   aiStructureLesson: (defectId: string, body: { provider?: string | null } = {}) =>
     request<{
       preview: boolean;

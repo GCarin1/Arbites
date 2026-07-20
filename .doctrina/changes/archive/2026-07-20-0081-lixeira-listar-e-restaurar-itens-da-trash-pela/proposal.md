@@ -1,6 +1,7 @@
 # Change 0081-lixeira-listar-e-restaurar-itens-da-trash-pela — lixeira: listar e restaurar itens da trash pela UI
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** workspace-core
@@ -30,9 +31,9 @@ não aparece.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Deletar CT → aparece em `GET /trash`; restore devolve o arquivo ao lugar e o item volta ao índice; esvaziar limpa — `backend/tests/test_workspace.py` (ou novo `test_trash.py`).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Deletar CT → aparece em `GET /trash`; restore devolve o arquivo ao lugar e o item volta ao índice; esvaziar limpa — `backend/tests/test_workspace.py` (ou novo `test_trash.py`).
 
 ## Open questions
 

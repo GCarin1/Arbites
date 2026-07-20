@@ -1,6 +1,7 @@
 # Change 0096-resumo-de-falha-pos-run-pela-ia-com-defeito — resumo de falha pos-run pela IA com defeito draft
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** ai-assist
@@ -26,9 +27,9 @@ mais óbvio de automação: resumir a falha e pré-preencher o defeito.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Endpoint devolve resumo+draft de defeito para execution com falha; aceite cria defeito vinculado — `backend/tests/test_ai_analyze_run.py` (MockTransport).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Endpoint devolve resumo+draft de defeito para execution com falha; aceite cria defeito vinculado — `backend/tests/test_ai_analyze_run.py` (MockTransport).
 
 ## Open questions
 

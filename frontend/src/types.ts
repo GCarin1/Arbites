@@ -204,6 +204,14 @@ export interface Warning {
   created_at: string;
 }
 
+export interface TrashItem {
+  name: string;
+  origin: string | null;
+  trashed_at: string | null;
+  kind: string;
+  is_dir: boolean;
+}
+
 export interface StepEntry {
   index: number;
   text: string;

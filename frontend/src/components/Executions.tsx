@@ -406,6 +406,17 @@ export function ExecutionBoard({
   const [squadFilter, setSquadFilter] = useState("");
   const [squadOf, setSquadOf] = useState<Record<string, string | null>>({});
   const [titleOf, setTitleOf] = useState<Record<string, string>>({});
+  // análise de falha pela IA (0096)
+  const [analysis, setAnalysis] = useState<
+    | null
+    | "busy"
+    | {
+        summary: string;
+        probable_cause: string;
+        defect: { title: string; severity: string; description: string; testcase: string; execution: string };
+      }
+  >(null);
+  const { toast } = useToast();
 
   const reload = useCallback(() => {
     api
@@ -440,6 +451,35 @@ export function ExecutionBoard({
       const updated = await api.resultStatus(id, ctId, { status });
       setExecution(updated);
       onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function analyzeRun() {
+    setAnalysis("busy");
+    try {
+      setAnalysis(await api.aiAnalyzeRun(id));
+    } catch (e) {
+      setAnalysis(null);
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function createDefectFromDraft() {
+    if (!analysis || analysis === "busy") return;
+    try {
+      await api.createDefect({
+        title: analysis.defect.title,
+        severity: analysis.defect.severity,
+        testcase: analysis.defect.testcase,
+        execution: analysis.defect.execution,
+        body: analysis.defect.description,
+      });
+      toast("Defeito criado a partir da análise", "success");
+      setAnalysis(null);
+      onChanged();
+      reload();
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
@@ -500,11 +540,61 @@ export function ExecutionBoard({
           <span className={`status-dot dot-${closed ? "done" : "active"}`}>
             {execution.status}
           </span>
+          {execution.results.some((r) =>
+            ["failed", "blocked"].includes(r.column || r.status),
+          ) && (
+            <button onClick={() => void analyzeRun()} disabled={analysis === "busy"}>
+              {analysis === "busy" ? "Analisando…" : "Analisar falha (IA)"}
+            </button>
+          )}
           {!closed && (
             <button onClick={() => setConfirmClose(true)}>Fechar execução</button>
           )}
         </div>
       </div>
+
+      {analysis && analysis !== "busy" && (
+        <Modal
+          title="Análise da falha (IA)"
+          onClose={() => setAnalysis(null)}
+          footer={
+            <>
+              <button onClick={() => setAnalysis(null)}>Descartar</button>
+              <button className="primary" onClick={() => void createDefectFromDraft()}>
+                Criar defeito
+              </button>
+            </>
+          }
+        >
+          <p className="modal-text"><strong>Resumo:</strong> {analysis.summary}</p>
+          {analysis.probable_cause && (
+            <p className="modal-text"><strong>Causa provável:</strong> {analysis.probable_cause}</p>
+          )}
+          <div className="card block">
+            <div className="card-head">
+              <h4 className="section-title" style={{ margin: 0 }}>Rascunho de defeito</h4>
+              <span className="spacer" />
+              <span
+                className={`status-dot ${
+                  ["critical", "high"].includes(analysis.defect.severity)
+                    ? "dot-col-failed"
+                    : analysis.defect.severity === "medium"
+                      ? "dot-col-blocked"
+                      : "dot-col-pending"
+                } caption`}
+              >
+                {analysis.defect.severity}
+              </span>
+            </div>
+            <p className="modal-text"><strong>{analysis.defect.title}</strong></p>
+            <p className="modal-text caption muted">{analysis.defect.description}</p>
+            <p className="caption muted">
+              vinculado a <span className="mono">{analysis.defect.testcase}</span> ·{" "}
+              <span className="mono">{analysis.defect.execution}</span>
+            </p>
+          </div>
+        </Modal>
+      )}
 
       {confirmClose && (
         <ConfirmModal

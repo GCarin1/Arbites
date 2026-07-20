@@ -87,6 +87,18 @@ class StructuredLesson(BaseModel):
     lesson_antipattern: str  # o anti-padrão a não repetir
 
 
+class DefectDraft(BaseModel):
+    title: str
+    severity: str = Field(default="medium", pattern="^(critical|high|medium|low)$")
+    description: str = ""
+
+
+class RunAnalysis(BaseModel):
+    summary: str  # o que falhou, em uma frase
+    probable_cause: str = ""  # causa provável
+    defect: DefectDraft  # rascunho de defeito pré-preenchido
+
+
 class DailyDigest(BaseModel):
     summary: str  # resumo executivo do dia
     impediments: list[str] = []  # impedimentos
@@ -371,11 +383,12 @@ class _BaseProvider:
         self.model = model
         self.keys = keys
         self.transport = transport
+        self.timeout = 300  # o teste de provider (0085) baixa isto p/ falhar rápido
 
     def _client(self) -> httpx.Client:
         # modelos locais de raciocínio (glm/qwen) podem levar minutos p/ um
         # documento longo — timeout curto derruba a geração no meio.
-        return httpx.Client(timeout=300, transport=self.transport)
+        return httpx.Client(timeout=self.timeout, transport=self.transport)
 
     def _post(self, url: str, headers: dict, payload: dict) -> dict:
         with self._client() as client:
@@ -563,6 +576,19 @@ def build_provider(config: dict[str, Any], keys: AIKeyStore,
     raise AIProviderError("unknown_kind", f"kind de provider desconhecido: {kind}", 422)
 
 
+def test_provider(provider: _BaseProvider, timeout: int = 12) -> tuple[bool, str | None]:
+    """Chamada mínima (0085): confirma que o provider responde. Devolve
+    `(ok, erro)` — nunca levanta; o erro real (401/timeout/DNS) vira texto."""
+    provider.timeout = timeout
+    try:
+        provider._raw_complete("Você é um serviço de teste.", "Responda apenas: ok")
+        return True, None
+    except AIProviderError as exc:
+        return False, exc.message
+    except Exception as exc:  # rede/DNS/timeout — o teste nunca crasha a rota
+        return False, f"{type(exc).__name__}: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Funções (todas devolvem PREVIEW — nunca escrevem)
 
@@ -628,6 +654,20 @@ _LESSON_SYSTEM = (
 def structure_lesson(provider: _BaseProvider, defect_md: str) -> StructuredLesson:
     result = provider.complete(_LESSON_SYSTEM, defect_md, StructuredLesson)
     assert isinstance(result, StructuredLesson)
+    return result
+
+
+_ANALYZE_RUN_SYSTEM = (
+    "Você analisa a falha de uma execução de testes. A partir dos casos que "
+    "falharam (com erros e passos), devolva: um resumo do que falhou (uma "
+    "frase), a causa provável e um RASCUNHO de defeito (título objetivo, "
+    "severidade critical/high/medium/low e uma descrição curta). Português."
+)
+
+
+def analyze_run(provider: _BaseProvider, failure_md: str) -> RunAnalysis:
+    result = provider.complete(_ANALYZE_RUN_SYSTEM, failure_md, RunAnalysis)
+    assert isinstance(result, RunAnalysis)
     return result
 
 

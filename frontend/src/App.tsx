@@ -438,7 +438,11 @@ export default function App() {
             </Suspense>
           ) : tab === "problems" ? (
             <Suspense fallback={<p className="empty">Carregando problemas…</p>}>
-              <WarningsView warnings={warnings} />
+              <WarningsView
+                warnings={warnings}
+                onChanged={() => void refresh()}
+                onError={setError}
+              />
             </Suspense>
           ) : tab === "dashboard" ? (
             <Suspense fallback={<p className="empty">Carregando dashboard…</p>}>

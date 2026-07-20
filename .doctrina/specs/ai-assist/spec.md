@@ -5,7 +5,7 @@
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
 **Last updated:** 2026-07-20
-**Version:** 0.13.0
+**Version:** 0.14.0
 
 ## Purpose
 
@@ -48,6 +48,16 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   IA para identificar casos de teste em texto livre, sugerir uma pasta e
   convertê-los para BDD — sempre preview; o aceite é o `POST /testcases`
   normal. Prompt enxuto (modelos ≤ 9B).
+- The system shall expor `POST /ai/providers/test` que faz uma chamada
+  mínima ao provider (salvo por `name` ou config inline `kind`/`model`/
+  `base_url`/`key`) com timeout curto e devolve `{ok, error}` — o erro real
+  (401/timeout/DNS) vira texto, nunca crasha a rota; a UI de configuração
+  oferece "Testar" por provider. Testar não bloqueia salvar.
+- The system shall expor `POST /ai/analyze-run/{exec_id}` que junta os CTs
+  failed/blocked da execution (erro + passos) e devolve resumo, causa
+  provável e um DRAFT de defeito (título/severidade/descrição já vinculado
+  ao CT e à execution) — preview; o aceite é o `POST /defects` normal.
+  Execution sem falhas → `422 no_failures`.
 
 ### Event-driven
 
@@ -203,6 +213,15 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     `criteria` mantém o fluxo de story inteira; critério inexistente → 422 —
     verified by `backend/tests/test_ai_generate.py` + build + revisão visual
     (`frontend/src/components/AiAssist.tsx`).
+
+14. [verified] `POST /ai/providers/test` devolve `{ok:true}` para chave
+    válida (salva ou inline) e `{ok:false, error}` com o 401 real para chave
+    inválida; sem `name`/`kind` → 422; provider salvo inexistente → 404 —
+    verified by `backend/tests/test_ai_providers.py`.
+15. [verified] `POST /ai/analyze-run/{id}` devolve resumo + causa + draft de
+    defeito vinculado ao CT/execution para execution com falha; sem falhas
+    → 422; execution inexistente → 404; o aceite do draft cria o defeito
+    vinculado — verified by `backend/tests/test_ai_analyze_run.py`.
 
 ## Maturity
 

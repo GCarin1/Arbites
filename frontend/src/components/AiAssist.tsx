@@ -251,6 +251,8 @@ function ProvidersCard({
   const [defaultProvider, setDefaultProvider] = useState<string | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  // resultado do teste por provider (0085): "busy" | {ok, error}
+  const [tests, setTests] = useState<Record<string, "busy" | { ok: boolean; error: string | null }>>({});
 
   // form de novo provider
   const [name, setName] = useState("");
@@ -258,6 +260,22 @@ function ProvidersCard({
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [newKey, setNewKey] = useState("");
+
+  async function testSaved(pName: string) {
+    setTests((t) => ({ ...t, [pName]: "busy" }));
+    try {
+      // se o usuário digitou uma chave nova ainda não salva, testa inline
+      const pending = keys[pName];
+      const p = providers.find((x) => x.name === pName);
+      const body = pending && p
+        ? { kind: p.kind, model: p.model, base_url: p.base_url, key: pending }
+        : { name: pName };
+      const r = await api.aiProviderTest(body);
+      setTests((t) => ({ ...t, [pName]: r }));
+    } catch (e) {
+      setTests((t) => ({ ...t, [pName]: { ok: false, error: e instanceof Error ? e.message : String(e) } }));
+    }
+  }
 
   useEffect(() => {
     if (info) {
@@ -382,9 +400,28 @@ function ProvidersCard({
                     </span>
                   </td>
                   <td>
-                    <button className="btn-sm danger" onClick={() => removeProvider(p.name)}>
-                      Remover
-                    </button>
+                    <div className="step-row" style={{ gap: 6 }}>
+                      <button
+                        className="btn-sm"
+                        onClick={() => void testSaved(p.name)}
+                        disabled={tests[p.name] === "busy"}
+                      >
+                        {tests[p.name] === "busy" ? "Testando…" : "Testar"}
+                      </button>
+                      {tests[p.name] && tests[p.name] !== "busy" && (
+                        <span
+                          className={`status-dot ${
+                            (tests[p.name] as { ok: boolean }).ok ? "dot-active" : "dot-draft"
+                          } caption`}
+                          title={(tests[p.name] as { error: string | null }).error ?? "respondeu ok"}
+                        >
+                          {(tests[p.name] as { ok: boolean }).ok ? "ok" : "falhou"}
+                        </span>
+                      )}
+                      <button className="btn-sm danger" onClick={() => removeProvider(p.name)}>
+                        Remover
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

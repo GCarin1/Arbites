@@ -282,6 +282,29 @@ class AIByCtIn(BaseModel):
     provider: str | None = None
 
 
+class ProviderTestIn(BaseModel):
+    # testa um provider SALVO (name) ou uma config INLINE ainda não salva (0085)
+    name: str | None = None
+    kind: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    key: str | None = None
+
+
+class _InlineKeys:
+    """Keystore efêmero: devolve a chave inline para o provider em teste,
+    delegando o resto ao keystore real (0085)."""
+
+    def __init__(self, base, name: str, key: str):
+        self._base, self._name, self._key = base, name, key
+
+    def get(self, name: str):
+        return self._key if name == self._name else self._base.get(name)
+
+    def configured(self, name: str) -> bool:
+        return True if name == self._name else self._base.configured(name)
+
+
 class DefectIn(BaseModel):
     title: str
     severity: str = "medium"
@@ -667,6 +690,32 @@ def _register_routes(app: FastAPI) -> None:
                 " ORDER BY source_path, code"
             )
         ]
+
+    # -- lixeira (0081) ---------------------------------------------------
+
+    @app.get(API_PREFIX + "/trash")
+    async def get_trash(request: Request):
+        return ws_of(request).list_trash()
+
+    @app.post(API_PREFIX + "/trash/{name}/restore")
+    async def restore_trash(request: Request, name: str):
+        ws, conn = ws_of(request), conn_of(request)
+        try:
+            restored = ws.restore(name)
+        except FileNotFoundError:
+            raise _error(404, "not_found", f"{name} não está na lixeira")
+        # reindexa o que voltou: arquivo único ou todos os artefatos da pasta
+        if restored.is_dir():
+            for p in restored.rglob("*"):
+                if p.suffix == ".md" or p.name == "execution.json":
+                    reindex_file(ws, conn, p)
+        else:
+            reindex_file(ws, conn, restored)
+        return {"restored": ws.relpath(restored)}
+
+    @app.delete(API_PREFIX + "/trash")
+    async def empty_trash(request: Request):
+        return {"removed": ws_of(request).empty_trash()}
 
     # -- tree -------------------------------------------------------------
 
@@ -2269,6 +2318,33 @@ def _register_routes(app: FastAPI) -> None:
     async def get_ai_providers(request: Request):
         return _providers_out(request)
 
+    @app.post(API_PREFIX + "/ai/providers/test")
+    async def test_ai_provider(request: Request, payload: ProviderTestIn):
+        """Chamada mínima ao provider (0085) — `{ok, error}`. Aceita um
+        provider salvo (`name`) ou uma config inline (`kind`/`model`/
+        `base_url`/`key`) ainda não persistida."""
+        keys = request.app.state.ai_keys
+        transport = request.app.state.ai_transport
+        if payload.name and not payload.kind:
+            config = _ai_config(ws_of(request))
+            cfg = next((p for p in config.get("providers") or []
+                        if p.get("name") == payload.name), None)
+            if not cfg:
+                raise _error(404, "not_found",
+                             f"provider '{payload.name}' não configurado")
+            provider = ai_ops.build_provider(cfg, keys, transport=transport)
+        else:
+            if not payload.kind:
+                raise _error(422, "invalid_request",
+                             "informe `name` (provider salvo) ou `kind`+`model` (inline)")
+            name = payload.name or "__inline__"
+            cfg = {"name": name, "kind": payload.kind,
+                   "model": payload.model or "", "base_url": payload.base_url}
+            eff_keys = _InlineKeys(keys, name, payload.key) if payload.key else keys
+            provider = ai_ops.build_provider(cfg, eff_keys, transport=transport)
+        ok, error = await asyncio.to_thread(ai_ops.test_provider, provider)
+        return {"ok": ok, "error": error}
+
     @app.put(API_PREFIX + "/ai/providers")
     async def put_ai_providers(request: Request, payload: AIProvidersIn):
         ws = ws_of(request)
@@ -2399,6 +2475,52 @@ def _register_routes(app: FastAPI) -> None:
         defect_md = (ws.root / rel).read_text(encoding="utf-8-sig")
         result = await asyncio.to_thread(ai_ops.structure_lesson, provider, defect_md)
         return {"preview": True, **result.model_dump()}
+
+    @app.post(API_PREFIX + "/ai/analyze-run/{exec_id}")
+    async def ai_analyze_run(request: Request, exec_id: str, payload: AIByCtIn):
+        """Resumo de falha pós-run (0096): junta os CTs failed/blocked da
+        execution (erro + passos) e devolve resumo, causa provável e um draft
+        de defeito — preview. O aceite é o `POST /defects` normal, já com
+        `testcase`/`execution` preenchidos pelo cliente."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        try:
+            execution = exec_ops.load(ws, exec_id)
+        except (FileNotFoundError, OSError):
+            raise _error(404, "not_found", f"{exec_id} não encontrado")
+        failed = [
+            r for r in execution.get("results", [])
+            if r.get("status") in ("failed", "blocked")
+        ]
+        if not failed:
+            raise _error(422, "no_failures",
+                         "a execution não tem CTs failed/blocked para analisar")
+        lines = [f"# Falha na execução {exec_id} — {execution.get('name', '')}", ""]
+        first_ct = failed[0]["testcase_id"]
+        for r in failed:
+            row = conn.execute(
+                "SELECT title FROM testcases WHERE id = ?", (r["testcase_id"],)
+            ).fetchone()
+            lines.append(f"## {r['testcase_id']} — {row['title'] if row else ''} "
+                         f"({r['status']})")
+            if r.get("error"):
+                lines.append(f"Erro: {r['error']}")
+            for st in r.get("steps", []):
+                if st.get("status") in ("failed", "blocked"):
+                    lines.append(f"- passo falho: {st.get('text', '')}")
+            lines.append("")
+        analysis = await asyncio.to_thread(
+            ai_ops.analyze_run, provider, "\n".join(lines)
+        )
+        _log_agent_event(
+            ws, conn, "analyze_run", exec_id, execution.get("name"),
+            f"Analisou a falha de {exec_id}: {len(failed)} CT(s) com falha",
+        )
+        draft = analysis.defect.model_dump()
+        draft["testcase"] = first_ct
+        draft["execution"] = exec_id
+        return {"preview": True, "summary": analysis.summary,
+                "probable_cause": analysis.probable_cause, "defect": draft}
 
     @app.post(API_PREFIX + "/ai/negative-cases/{ct_id}")
     async def ai_negative(request: Request, ct_id: str, payload: AIByCtIn):

@@ -90,3 +90,6 @@ One line per archived change, newest last. Appended by
 - 2026-07-20 — 0093-gerar-cts-por-criterio-ears-com-vinculo-gravado — gerar CTs por criterio EARS com vinculo gravado (specs: ai-assist MODIFIED, testcases MODIFIED)
 - 2026-07-20 — 0087-cobertura-semantica-passando-falhando-ou-nunca — cobertura semantica: passando, falhando ou nunca executada (specs: requirements MODIFIED)
 - 2026-07-20 — 0095-licoes-de-defeito-estruturadas-como-skills — licoes de defeito estruturadas como skills (specs: defects MODIFIED)
+- 2026-07-20 — 0081-lixeira-listar-e-restaurar-itens-da-trash-pela — lixeira: listar e restaurar itens da trash pela UI (specs: workspace-core MODIFIED)
+- 2026-07-20 — 0085-testar-provider-de-ia-na-configuracao — testar provider de IA na configuracao (specs: ai-assist MODIFIED)
+- 2026-07-20 — 0096-resumo-de-falha-pos-run-pela-ia-com-defeito — resumo de falha pos-run pela IA com defeito draft (specs: ai-assist MODIFIED)
