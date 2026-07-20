@@ -22,6 +22,67 @@ def test_create_epic_and_story_with_sequential_ids(client):
     assert len(files) == 2
 
 
+def test_story_chain_aggregates_cts_results_executions_and_defects(client):
+    """Story 360 (0086): a cadeia completa numa chamada."""
+    epic = client.post(
+        "/api/v1/requirements", json={"kind": "epic", "title": "Pagamentos"}
+    ).json()
+    story = client.post(
+        "/api/v1/requirements",
+        json={"kind": "story", "title": "Checkout PIX", "epic": epic["id"]},
+    ).json()
+    ct_pass = client.post(
+        "/api/v1/testcases", json={"title": "PIX válido", "story": story["id"]}
+    ).json()
+    ct_fail = client.post(
+        "/api/v1/testcases", json={"title": "PIX inválido", "story": story["id"]}
+    ).json()
+    ct_untested = client.post(
+        "/api/v1/testcases", json={"title": "PIX limite", "story": story["id"]}
+    ).json()
+
+    execu = client.post(
+        "/api/v1/executions",
+        json={"name": "Regressão", "testcase_ids": [ct_pass["id"], ct_fail["id"]]},
+    ).json()
+    client.post(
+        f"/api/v1/executions/{execu['id']}/results/{ct_pass['id']}/status",
+        json={"status": "passed"},
+    )
+    client.post(
+        f"/api/v1/executions/{execu['id']}/results/{ct_fail['id']}/status",
+        json={"status": "failed"},
+    )
+    defect = client.post(
+        "/api/v1/defects",
+        json={"title": "PIX rejeita centavos", "testcase": ct_fail["id"]},
+    ).json()
+
+    chain = client.get(f"/api/v1/requirements/{story['id']}/chain").json()
+
+    assert chain["story"]["id"] == story["id"]
+    assert chain["epic"]["id"] == epic["id"]
+
+    by_id = {c["id"]: c for c in chain["testcases"]}
+    assert by_id[ct_pass["id"]]["last_result"]["status"] == "passed"
+    assert by_id[ct_fail["id"]]["last_result"]["status"] == "failed"
+    assert by_id[ct_untested["id"]]["last_result"] is None
+    # a execution que rodou os dois CTs aparece na cadeia de cada um
+    assert execu["id"] in [r["execution_id"] for r in by_id[ct_pass["id"]]["executions"]]
+
+    assert [e["id"] for e in chain["executions"]] == [execu["id"]]
+    assert defect["id"] in [d["id"] for d in chain["defects"]]
+
+    assert chain["summary"] == {
+        "testcases": 3, "passing": 1, "failing": 1, "untested": 1,
+        "executions": 1, "defects": 1, "evidences": 0,
+    }
+
+
+def test_story_chain_unknown_id_is_404(client):
+    assert client.get("/api/v1/requirements/ST-9999/chain").status_code == 404
+
+
 def test_list_filters_by_kind_and_status(client):
     client.post("/api/v1/requirements", json={"kind": "epic", "title": "E1"})
     client.post(

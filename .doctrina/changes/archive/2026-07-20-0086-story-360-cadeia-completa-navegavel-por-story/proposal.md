@@ -1,6 +1,7 @@
 # Change 0086-story-360-cadeia-completa-navegavel-por-story — story 360: cadeia completa navegavel por story
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-20
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** requirements
@@ -28,10 +29,10 @@ que responda "essa história foi validada? qual evidência comprova?".
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] `GET /requirements/{id}/chain` devolve a cadeia completa da story com último resultado e contagem de evidências por CT — `backend/tests/test_requirements.py` (ou novo test_chain).
-- [ ] Painel 360 navegável por nó — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] `GET /requirements/{id}/chain` devolve a cadeia completa da story com último resultado e contagem de evidências por CT — `backend/tests/test_requirements.py` (ou novo test_chain).
+- [x] Painel 360 navegável por nó — build + revisão visual.
 
 ## Open questions
 

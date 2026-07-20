@@ -27,6 +27,45 @@ export interface Requirement {
   body?: string;
 }
 
+export interface ChainTestcase {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  last_result: { status: string; executed_at: string | null } | null;
+  evidence_count: number;
+  executions: {
+    execution_id: string;
+    execution_name: string;
+    status: string;
+    executed_at: string | null;
+  }[];
+}
+
+export interface StoryChain {
+  story: { id: string; title: string; status: string; epic_id: string | null; squad: string | null };
+  epic: { id: string; title: string; status: string } | null;
+  testcases: ChainTestcase[];
+  executions: { id: string; name: string; status: string; created_at: string | null }[];
+  defects: {
+    id: string;
+    title: string;
+    status: string;
+    severity: string | null;
+    testcase_id: string | null;
+    execution_id: string | null;
+  }[];
+  summary: {
+    testcases: number;
+    passing: number;
+    failing: number;
+    untested: number;
+    executions: number;
+    defects: number;
+    evidences: number;
+  };
+}
+
 export interface TestCase {
   id: string;
   title: string;

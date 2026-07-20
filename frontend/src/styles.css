@@ -1547,6 +1547,75 @@ table.dense tbody tr:hover td {
 .home-pulse {
   animation: live-pulse 1.2s ease-in-out infinite;
 }
+
+/* ------------------------------------------------- Story 360 (0086) */
+.s360 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.s360-node {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+  color: var(--text);
+}
+.s360-node:hover {
+  background: var(--surface-hover);
+}
+.s360-epic {
+  border-left: 3px solid var(--border);
+}
+.s360-story {
+  border-left: 3px solid var(--text-muted);
+  font-weight: 600;
+}
+.s360-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.s360-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+.s360-ct {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* execuções recuadas sob o CT (a hierarquia visual da cadeia) */
+.s360-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: var(--s4);
+}
+.s360-run {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-control);
+  padding: 3px 8px;
+  color: var(--text-subtle);
+}
+.s360-run:hover {
+  background: var(--surface-hover);
+}
 .heatmap-legend {
   display: flex;
   align-items: center;

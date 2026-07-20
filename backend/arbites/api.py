@@ -737,6 +737,116 @@ def _register_routes(app: FastAPI) -> None:
     async def get_requirement(request: Request, entity_id: str):
         return _req_out(conn_of(request), ws_of(request), entity_id)
 
+    @app.get(API_PREFIX + "/requirements/{entity_id}/chain")
+    async def requirement_chain(request: Request, entity_id: str):
+        """Story 360 (0086): a cadeia completa da story — Epic → Story → CTs
+        (status de documento + último resultado + nº de evidências +
+        execuções que os rodaram) → Defeitos vinculados. Só leitura, SQL
+        sobre tabelas já existentes; responde "essa história foi validada?
+        qual evidência comprova?" numa chamada."""
+        conn = conn_of(request)
+        story = conn.execute(
+            "SELECT id, title, status, epic_id, squad FROM requirements WHERE id = ?",
+            (entity_id,),
+        ).fetchone()
+        if not story:
+            raise _error(404, "not_found", f"{entity_id} não encontrado")
+        epic = None
+        if story["epic_id"]:
+            epic = conn.execute(
+                "SELECT id, title, status FROM requirements WHERE id = ?",
+                (story["epic_id"],),
+            ).fetchone()
+
+        cts = conn.execute(
+            "SELECT id, title, type, status FROM testcases WHERE story_id = ?"
+            " ORDER BY id",
+            (entity_id,),
+        ).fetchall()
+
+        testcases: list[dict[str, Any]] = []
+        exec_seen: dict[str, dict] = {}
+        passing = failing = untested = evidences_total = 0
+        for ct in cts:
+            cid = ct["id"]
+            runs = conn.execute(
+                "SELECT r.execution_id, e.name execution_name, r.status,"
+                " r.executed_at FROM results r"
+                " JOIN executions e ON e.id = r.execution_id"
+                " WHERE r.testcase_id = ?"
+                " ORDER BY r.executed_at DESC, r.execution_id DESC",
+                (cid,),
+            ).fetchall()
+            ev_count = conn.execute(
+                "SELECT COUNT(*) n FROM evidences WHERE testcase_id = ?", (cid,)
+            ).fetchone()["n"]
+            evidences_total += ev_count
+            last = runs[0] if runs else None
+            if last is None:
+                untested += 1
+            elif last["status"] == "passed":
+                passing += 1
+            else:
+                failing += 1
+            for r in runs:
+                if r["execution_id"] not in exec_seen:
+                    exec_seen[r["execution_id"]] = {
+                        "id": r["execution_id"], "name": r["execution_name"],
+                    }
+            testcases.append({
+                **dict(ct),
+                "last_result": (
+                    {"status": last["status"], "executed_at": last["executed_at"]}
+                    if last else None
+                ),
+                "evidence_count": ev_count,
+                "executions": [dict(r) for r in runs],
+            })
+
+        # metadados das execuções envolvidas (status/data da execution em si)
+        executions = []
+        if exec_seen:
+            ph = ",".join("?" * len(exec_seen))
+            executions = [
+                dict(r) for r in conn.execute(
+                    f"SELECT id, name, status, created_at FROM executions"
+                    f" WHERE id IN ({ph}) ORDER BY id DESC",
+                    list(exec_seen.keys()),
+                )
+            ]
+
+        # defeitos vinculados aos CTs da story ou às execuções envolvidas
+        defects = []
+        ct_ids = [c["id"] for c in cts]
+        if ct_ids or exec_seen:
+            conds, params = [], []
+            if ct_ids:
+                conds.append(f"testcase_id IN ({','.join('?' * len(ct_ids))})")
+                params += ct_ids
+            if exec_seen:
+                conds.append(f"execution_id IN ({','.join('?' * len(exec_seen))})")
+                params += list(exec_seen.keys())
+            defects = [
+                dict(r) for r in conn.execute(
+                    "SELECT id, title, status, severity, testcase_id, execution_id"
+                    f" FROM defects WHERE {' OR '.join(conds)} ORDER BY id",
+                    params,
+                )
+            ]
+
+        return {
+            "story": dict(story),
+            "epic": dict(epic) if epic else None,
+            "testcases": testcases,
+            "executions": executions,
+            "defects": defects,
+            "summary": {
+                "testcases": len(cts), "passing": passing, "failing": failing,
+                "untested": untested, "executions": len(executions),
+                "defects": len(defects), "evidences": evidences_total,
+            },
+        }
+
     @app.put(API_PREFIX + "/requirements/{entity_id}")
     async def update_requirement(request: Request, entity_id: str, payload: RequirementUpdate):
         ws, conn = ws_of(request), conn_of(request)

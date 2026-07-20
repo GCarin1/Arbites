@@ -24,6 +24,7 @@ import type {
   HealthScore,
   MetricsSummary,
   Requirement,
+  StoryChain,
   ReviewResponse,
   SearchResult,
   TestCase,
@@ -69,6 +70,8 @@ export const api = {
 
   requirements: (params = "") => request<Requirement[]>(`/requirements${params}`),
   requirement: (id: string) => request<Requirement>(`/requirements/${id}`),
+  requirementChain: (id: string) =>
+    request<StoryChain>(`/requirements/${id}/chain`),
   createRequirement: (body: object) =>
     request<Requirement>("/requirements", { method: "POST", body: JSON.stringify(body) }),
   updateRequirement: (id: string, body: object) =>

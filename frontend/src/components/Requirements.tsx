@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { ConfirmModal, Modal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
+import { Story360 } from "./Story360";
 import { useToast } from "./Toast";
 import type { Requirement } from "../types";
 
@@ -90,16 +91,19 @@ export function RequirementsList({
 export function ReqRepository({
   version,
   onOpen,
+  onNavigate,
   onChanged,
   onError,
 }: {
   version: number;
   onOpen: (id: string) => void;
+  onNavigate: (id: string) => void;
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
   const [items, setItems] = useState<Requirement[]>([]);
   const [creating, setCreating] = useState<"epic" | "story" | null>(null);
+  const [chainOf, setChainOf] = useState<string | null>(null); // Story 360 (0086)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragStory, setDragStory] = useState<string | null>(null);
   const [dropEpic, setDropEpic] = useState<string | null>(null);
@@ -212,6 +216,9 @@ export function ReqRepository({
       <span className={`status-dot dot-${story.status} caption`}>{story.status}</span>
       <span className="caption mono muted">{story.created ?? ""}</span>
       <span className="repo-actions">
+        <button className="btn-sm" onClick={() => setChainOf(story.id)} title="Story 360 — cadeia completa">
+          360
+        </button>
         <button className="btn-sm danger" onClick={() => setDeleting(story)}>
           Excluir
         </button>
@@ -349,6 +356,9 @@ export function ReqRepository({
           onConfirm={() => void remove(deleting)}
           onCancel={() => setDeleting(null)}
         />
+      )}
+      {chainOf && (
+        <Story360 storyId={chainOf} onClose={() => setChainOf(null)} onNavigate={onNavigate} />
       )}
     </div>
   );

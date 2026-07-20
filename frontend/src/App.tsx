@@ -575,6 +575,7 @@ export default function App() {
                 <ReqRepository
                   version={reqVersion}
                   onOpen={setSelectedReq}
+                  onNavigate={navigateTo}
                   onChanged={() => void refresh()}
                   onError={setError}
                 />

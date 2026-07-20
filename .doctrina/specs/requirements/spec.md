@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)
 **Realizes:** SC1
-**Last updated:** 2026-07-09
-**Version:** 0.4.0
+**Last updated:** 2026-07-20
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -37,6 +37,12 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
   status-dot) e, por epic, o agregado "X/Y cobertas" — mesma fonte da
   matriz de rastreabilidade (`GET /metrics/traceability`), sem cálculo
   paralelo; com o filtro "só sem cobertura".
+- The system shall expor `GET /requirements/{id}/chain` devolvendo, para
+  uma story, a cadeia completa de rastreabilidade — story → CTs (status de
+  documento, último resultado, contagem de evidências, execuções que os
+  rodaram) → executions envolvidas → defeitos vinculados — em leitura pura
+  sobre as tabelas existentes; a UI oferece a visão "Story 360" navegável a
+  partir da aba Requisitos (cada nó abre a tela do item).
 
 ### Event-driven
 
@@ -77,6 +83,13 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
    stories; story com CT mostra a contagem; epic agrega "X/Y cobertas" —
    dados da matriz, coberta por `backend/tests/test_metrics.py`
    (traceability) + build/revisão visual da tela.
+
+6. [verified] `GET /requirements/{id}/chain` devolve a cadeia completa da
+   story (CTs com último resultado + nº de evidências + execuções que os
+   rodaram, executions envolvidas, defeitos vinculados) e a soma
+   passing/failing/untested; id inexistente → 404 — verified by
+   `backend/tests/test_requirements.py`. A visão Story 360 é navegável por
+   nó — verified by build + revisão visual (`frontend/src/components/Story360.tsx`).
 
 ## Maturity
 
