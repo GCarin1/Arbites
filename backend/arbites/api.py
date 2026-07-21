@@ -412,6 +412,12 @@ class MeetingActionItemsAcceptIn(BaseModel):
     items: list[str]
 
 
+class ExecutiveSummaryIn(BaseModel):
+    provider: str | None = None
+    sprint: str | None = None
+    squad: str | None = None
+
+
 # Catálogo do .env do projeto de automação (doc de ajustes §1.5.1 etapa 5)
 ENV_CATALOG: list[dict[str, str]] = [
     {"section": "Credenciais de Teste", "key": "TEST_DOCUMENTO", "description": "Documento (CPF) utilizado para login nos testes"},
@@ -1446,6 +1452,21 @@ def _register_routes(app: FastAPI) -> None:
         annotated["quarantine"] = metrics_ops.quarantine(conn, sq)
         return annotated
 
+    @app.post(API_PREFIX + "/ai/executive-summary")
+    async def ai_executive_summary(request: Request, payload: ExecutiveSummaryIn):
+        """0098: resumo executivo narrado pela IA a partir dos NÚMEROS já
+        apurados (preview editável, sem gravar). Sem provider → 409, e o
+        dashboard segue 100% funcional."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        context_md = metrics_ops.executive_context_markdown(
+            conn, payload.sprint or None, payload.squad or None
+        )
+        result = await asyncio.to_thread(
+            ai_ops.generate_executive_summary, provider, _with_memory(ws, context_md)
+        )
+        return {"preview": True, **result.model_dump(), "context_markdown": context_md}
+
     @app.get(API_PREFIX + "/metrics/trend")
     async def metrics_trend(request: Request, days: int = 7, sprint: str = "", squad: str = ""):
         if days not in (7, 15, 30):
@@ -1576,14 +1597,15 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/metrics/traceability/export")
     async def metrics_traceability_export(
-        request: Request, format: str = "md", epic: str = "", sprint: str = "", squad: str = ""
+        request: Request, format: str = "md", epic: str = "", sprint: str = "",
+        squad: str = "", summary: str = "",
     ):
         matrix = metrics_ops.traceability(
             conn_of(request), epic or None, sprint or None, squad or None
         )
         if format == "md":
             return PlainTextResponse(
-                metrics_ops.matrix_markdown(matrix),
+                metrics_ops.matrix_markdown(matrix, summary or None),
                 media_type="text/markdown; charset=utf-8",
                 headers={"Content-Disposition": 'attachment; filename="matriz.md"'},
             )
@@ -1591,7 +1613,7 @@ def _register_routes(app: FastAPI) -> None:
             from .export_pdf import matrix_pdf
 
             return Response(
-                content=matrix_pdf(matrix),
+                content=matrix_pdf(matrix, summary or None),
                 media_type="application/pdf",
                 headers={"Content-Disposition": 'attachment; filename="matriz.pdf"'},
             )

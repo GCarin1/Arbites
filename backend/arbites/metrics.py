@@ -1033,9 +1033,56 @@ def health_score(
     return {"score": score, "components": components}
 
 
-def matrix_markdown(matrix: dict) -> str:
-    """Renderiza a matriz em Markdown colável no Confluence."""
+def executive_context_markdown(
+    conn: sqlite3.Connection, sprint: str | None = None, squad: str | None = None
+) -> str:
+    """Monta o contexto factual (números já apurados) para a IA narrar o
+    resumo executivo (0098). A IA recebe ISTO e não deve inventar valores."""
+    def pct(metric: dict) -> str:
+        v = metric.get("value")
+        return "sem dados" if v is None else f"{round(v * 100)}%"
+
+    rc = requirement_coverage(conn, None, squad)
+    ec = execution_coverage(conn, sprint, None, squad)
+    pr = pass_rate(conn, sprint, None, squad)
+    br = blocked_rate(conn, sprint, None, squad)
+    rw = rework_rate(conn, sprint, None, squad)
+    qz = quarantine(conn, squad)
+    dr = defects_report(conn, squad)
+    fl = flaky(conn, 5, squad)
+
+    filtro = ", ".join(
+        f"{k}={v}" for k, v in (("sprint", sprint), ("squad", squad)) if v
+    ) or "geral (sem filtro)"
+    lines = [
+        "# Dados do relatório de qualidade",
+        f"Filtro: {filtro}",
+        "",
+        "## Métricas",
+        f"- Cobertura de requisito: {pct(rc)} ({rc['numerator']}/{rc['denominator']})",
+        f"- Cobertura de execução: {pct(ec)} ({ec['numerator']}/{ec['denominator']})",
+        f"- Pass rate: {pct(pr)} ({pr['numerator']}/{pr['denominator']})",
+        f"- Taxa de bloqueio: {pct(br)}",
+        f"- Retrabalho: {pct(rw)}",
+        f"- CTs flaky: {len(fl['testcases'])}",
+        f"- CTs em quarentena: {qz['count']}",
+        "",
+        "## Defeitos abertos",
+        f"- Total: {dr['open_count']}",
+        f"- Por severidade: {dr['by_severity'] or 'nenhum'}",
+        f"- Aging (dias): {dr['aging_buckets']}",
+    ]
+    return "\n".join(lines)
+
+
+def matrix_markdown(matrix: dict, summary: str | None = None) -> str:
+    """Renderiza a matriz em Markdown colável no Confluence.
+
+    `summary` (0098): resumo executivo já revisado, incluído como seção
+    inicial quando presente."""
     lines = ["# Matriz de rastreabilidade", ""]
+    if summary and summary.strip():
+        lines += ["## Resumo executivo", "", summary.strip(), ""]
     if matrix.get("sprint_filter"):
         lines.append(f"Sprint: {matrix['sprint_filter']}")
         lines.append("")

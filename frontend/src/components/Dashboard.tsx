@@ -47,13 +47,40 @@ export function Dashboard({
   const [health, setHealth] = useState<HealthScore | null>(null);
   const [riskMap, setRiskMap] = useState<RiskMap | null>(null);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  // 0098: resumo executivo narrado pela IA (preview editável → export)
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [execSummary, setExecSummary] = useState<string>("");
+  const [genBusy, setGenBusy] = useState(false);
 
   useEffect(() => {
     api
       .squads()
       .then((r) => setSquads(r.squads))
       .catch(() => {});
+    api
+      .aiProviders()
+      .then((info) => setAiEnabled(!!info.default_provider))
+      .catch(() => setAiEnabled(false));
   }, []);
+
+  async function generateExecutiveSummary() {
+    setGenBusy(true);
+    try {
+      const r = await api.executiveSummary(sprint, squad);
+      const text = [
+        r.synthesis,
+        r.risks.length ? `Riscos:\n${r.risks.map((x) => `- ${x}`).join("\n")}` : "",
+        r.recommendation ? `Recomendação: ${r.recommendation}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      setExecSummary(text);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -129,14 +156,41 @@ export function Dashboard({
             <option value={15}>15 dias</option>
             <option value={30}>30 dias</option>
           </select>
-          <a className="button-link" href={api.exportUrl("md", sprint, squad)} download>
+          {aiEnabled && (
+            <button onClick={() => void generateExecutiveSummary()} disabled={genBusy}>
+              {genBusy ? "Gerando…" : "Resumo executivo (IA)"}
+            </button>
+          )}
+          <a className="button-link" href={api.exportUrl("md", sprint, squad, execSummary)} download>
             Export MD
           </a>
-          <a className="button-link" href={api.exportUrl("pdf", sprint, squad)} download>
+          <a className="button-link" href={api.exportUrl("pdf", sprint, squad, execSummary)} download>
             Export PDF
           </a>
         </div>
       </div>
+
+      {aiEnabled && execSummary && (
+        <div className="card exec-summary-card">
+          <div className="card-head">
+            <h3>Resumo executivo (IA)</h3>
+            <span className="spacer" />
+            <span className="caption muted">
+              editável — entra no início do export PDF/MD
+            </span>
+            <button className="btn-sm" onClick={() => setExecSummary("")}>
+              Descartar
+            </button>
+          </div>
+          <textarea
+            className="raw"
+            style={{ minHeight: 120, width: "100%" }}
+            value={execSummary}
+            onChange={(e) => setExecSummary(e.target.value)}
+            spellCheck={false}
+          />
+        </div>
+      )}
 
       <ExecutivePanel overview={overview} onNavigate={onNavigate} />
 

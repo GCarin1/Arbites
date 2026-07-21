@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-07-21
-**Version:** 0.12.0
+**Version:** 0.13.0
 
 ## Purpose
 
@@ -136,6 +136,14 @@ export PDF e Markdown (para colar no Confluence).
 
 - Where a janela de flaky N é configurada, the system may recalcular a
   instabilidade sobre as últimas N execuções.
+- Where um provider de IA está configurado, the system may gerar via `POST
+  /ai/executive-summary` um resumo executivo narrado (síntese, riscos,
+  recomendação) a partir dos números já apurados do filtro atual (métricas,
+  defeitos abertos/aging, cobertura, flaky, quarentena) — sempre preview
+  editável, com os valores INJETADOS no prompt (a IA não inventa números) —
+  e incluir o texto revisado como seção inicial do export PDF/MD via o
+  parâmetro `summary`; sem provider, o dashboard e o export seguem
+  íntegros.
 
 ## Acceptance criteria
 
@@ -195,6 +203,11 @@ export PDF e Markdown (para colar no Confluence).
     e o summary expõe `quarantine.count` + lista para drill-down — verified
     by `backend/tests/test_metrics.py`
     (`test_quarantine_excluded_from_pass_rate_and_counted`).
+
+15. [verified] `POST /ai/executive-summary` devolve o resumo com os números
+    reais injetados no contexto (a IA não inventa) e o export inclui a seção
+    inicial quando aceita; sem provider devolve 409 e o export segue
+    íntegro — verified by `backend/tests/test_reporting_summary.py`.
 
 ## Maturity
 

@@ -191,6 +191,14 @@ export interface MeetingActionItems {
   converted: { id: string; title: string; status: string }[];
 }
 
+export interface ExecutiveSummaryResult {
+  preview: boolean;
+  synthesis: string;
+  risks: string[];
+  recommendation: string;
+  context_markdown: string;
+}
+
 export interface TreeNode {
   name: string;
   path: string;

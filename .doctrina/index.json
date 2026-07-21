@@ -174,7 +174,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.12.0",
+        "version": "0.13.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -357,13 +357,6 @@
         "id": "0084-aba-e-filtros-na-url-para-deep-link",
         "title": "aba e filtros na URL para deep-link",
         "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0098-reporte-executivo-narrado-pela-ia",
-        "title": "reporte executivo narrado pela IA",
-        "path": ".doctrina/changes/0098-reporte-executivo-narrado-pela-ia",
         "status": "proposed",
         "opened": "2026-07-19"
       }
@@ -1585,6 +1578,19 @@
         "specs_affected": [
           {
             "capability": "meetings",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0098-reporte-executivo-narrado-pela-ia",
+        "title": "reporte executivo narrado pela IA",
+        "path": ".doctrina/changes/archive/2026-07-21-0098-reporte-executivo-narrado-pela-ia",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]

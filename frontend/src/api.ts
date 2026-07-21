@@ -1,6 +1,7 @@
 import type {
   ActivityHeatmapData,
   AiProvidersInfo,
+  ExecutiveSummaryResult,
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
@@ -337,9 +338,15 @@ export const api = {
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +
         `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
     ),
-  exportUrl: (format: "md" | "pdf", sprint: string, squad = "") =>
+  exportUrl: (format: "md" | "pdf", sprint: string, squad = "", summary = "") =>
     `${BASE}/metrics/traceability/export?format=${format}` +
-    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
+    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}` +
+    (summary ? `&summary=${encodeURIComponent(summary)}` : ""),
+  executiveSummary: (sprint: string, squad = "", provider?: string | null) =>
+    request<ExecutiveSummaryResult>("/ai/executive-summary", {
+      method: "POST",
+      body: JSON.stringify({ sprint: sprint || null, squad: squad || null, provider: provider ?? null }),
+    }),
   evidenceFileUrl: (execId: string, ctId: string, index: number) =>
     `${BASE}/executions/${execId}/results/${ctId}/evidences/${index}/file`,
 
