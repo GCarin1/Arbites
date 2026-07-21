@@ -94,7 +94,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.5.0",
+        "version": "0.6.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -338,15 +338,7 @@
         "landed": "2026-07-03 — `backend/arbites/executions.py`"
       }
     ],
-    "changes": [
-      {
-        "id": "0084-aba-e-filtros-na-url-para-deep-link",
-        "title": "aba e filtros na URL para deep-link",
-        "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1603,6 +1595,19 @@
         "specs_affected": [
           {
             "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0084-aba-e-filtros-na-url-para-deep-link",
+        "title": "aba e filtros na URL para deep-link",
+        "path": ".doctrina/changes/archive/2026-07-21-0084-aba-e-filtros-na-url-para-deep-link",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]

@@ -29,13 +29,21 @@ import type {
 export function Dashboard({
   onError,
   onNavigate,
+  squad = "",
+  onSquadChange,
 }: {
   onError: (message: string) => void;
   onNavigate?: (id: string) => void;
+  // 0084: squad controlado pela URL (deep-link "board do squad X"); se não
+  // vier, cai para estado interno.
+  squad?: string;
+  onSquadChange?: (v: string) => void;
 }) {
   const [sprint, setSprint] = useState("");
   const [days, setDays] = useState(30);
-  const [squad, setSquad] = useState("");
+  const [localSquad, setLocalSquad] = useState("");
+  const effSquad = onSquadChange ? squad : localSquad;
+  const setSquad = onSquadChange ?? setLocalSquad;
   const [squads, setSquads] = useState<string[]>([]);
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
@@ -66,7 +74,7 @@ export function Dashboard({
   async function generateExecutiveSummary() {
     setGenBusy(true);
     try {
-      const r = await api.executiveSummary(sprint, squad);
+      const r = await api.executiveSummary(sprint, effSquad);
       const text = [
         r.synthesis,
         r.risks.length ? `Riscos:\n${r.risks.map((x) => `- ${x}`).join("\n")}` : "",
@@ -85,13 +93,13 @@ export function Dashboard({
   const load = useCallback(async () => {
     try {
       const [s, t, f, m, d, h, o] = await Promise.all([
-        api.metricsSummary(sprint, days, squad),
-        api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, squad),
+        api.metricsSummary(sprint, days, effSquad),
+        api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, effSquad),
         api.metricsFlaky(5),
-        api.traceability("", sprint, squad),
-        api.metricsDefects(squad),
-        api.metricsHealth(sprint, days, squad),
-        api.metricsDashboard(sprint, days, squad),
+        api.traceability("", sprint, effSquad),
+        api.metricsDefects(effSquad),
+        api.metricsHealth(sprint, days, effSquad),
+        api.metricsDashboard(sprint, days, effSquad),
       ]);
       setSummary(s);
       setTrend(t);
@@ -103,7 +111,7 @@ export function Dashboard({
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
-  }, [sprint, days, squad, onError]);
+  }, [sprint, days, effSquad, onError]);
 
   useEffect(() => {
     void load();
@@ -139,7 +147,7 @@ export function Dashboard({
           />
           {squads.length > 0 && (
             <select
-              value={squad}
+              value={effSquad}
               onChange={(e) => setSquad(e.target.value)}
               aria-label="Filtrar por squad"
             >
@@ -161,10 +169,10 @@ export function Dashboard({
               {genBusy ? "Gerando…" : "Resumo executivo (IA)"}
             </button>
           )}
-          <a className="button-link" href={api.exportUrl("md", sprint, squad, execSummary)} download>
+          <a className="button-link" href={api.exportUrl("md", sprint, effSquad, execSummary)} download>
             Export MD
           </a>
-          <a className="button-link" href={api.exportUrl("pdf", sprint, squad, execSummary)} download>
+          <a className="button-link" href={api.exportUrl("pdf", sprint, effSquad, execSummary)} download>
             Export PDF
           </a>
         </div>

@@ -32,6 +32,8 @@ export function TcRepository({
   onError,
   onNew,
   extraActions,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   root: TreeNode;
   onOpen: (id: string) => void;
@@ -39,6 +41,9 @@ export function TcRepository({
   onError: (message: string) => void;
   onNew: () => void;
   extraActions?: React.ReactNode;
+  // 0084: filtro de status refletido no hash da URL quando controlado
+  statusFilter?: string;
+  onStatusFilterChange?: (v: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -58,7 +63,9 @@ export function TcRepository({
   // árvore só exibe os IDs que casaram — uma fonte só, sem reimplementar a
   // lógica de filtro no cliente.
   const [q, setQ] = useState("");
-  const [fStatus, setFStatus] = useState("");
+  const [localStatus, setLocalStatus] = useState("");
+  const fStatus = onStatusFilterChange ? (statusFilter ?? "") : localStatus;
+  const setFStatus = onStatusFilterChange ?? setLocalStatus;
   const [fPriority, setFPriority] = useState("");
   const [fType, setFType] = useState("");
   const [fTag, setFTag] = useState("");

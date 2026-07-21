@@ -1,6 +1,7 @@
 # Change 0084-aba-e-filtros-na-url-para-deep-link — aba e filtros na URL para deep-link
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** design-system
@@ -26,9 +27,9 @@ um link que abre a matriz já filtrada.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Abrir URL com hash restaura aba+filtros; navegar atualiza o hash; back/forward funcionam — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Abrir URL com hash restaura aba+filtros; navegar atualiza o hash; back/forward funcionam — build + revisão visual.
 
 ## Open questions
 

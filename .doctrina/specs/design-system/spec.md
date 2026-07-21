@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-07-21
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -68,6 +68,12 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   livres que não são entidades (ex.: squad) e `<select>` a conjuntos fixos
   de valores (status/prioridade/tipo). Nenhuma referência a entidade casa
   só por ID.
+- The system shall refletir a aba ativa e os filtros de alto valor
+  (squad do dashboard, filtro de status do repositório de CTs, período/ano
+  da Memória, aba interna da Automação) num hash de URL restaurável
+  (`#/<aba>?filtro=valor`), sem lib de router: `App.tsx` lê o hash no load,
+  o escreve ao trocar aba/filtro e responde a `hashchange` (back/forward do
+  navegador); o deep-link é compartilhável.
 
 ### Unwanted-behavior (must-not)
 
@@ -112,6 +118,12 @@ e prova a sua fatia, citando o teste/artefato. -->
    de CT da revisão por IA deixaram de usar `<datalist>`/`<select>` por ID;
    squad segue em `<datalist>` (valor livre) — verified by
    `frontend/src/components/AiAssist.tsx`, grep sem datalist-por-entidade e
+   `npm run build` limpo.
+6. [verified] Abrir uma URL com hash restaura a aba e os filtros
+   serializados (dashboard squad, status do repositório, ano da Memória,
+   aba da Automação); trocar aba/filtro atualiza o hash e back/forward do
+   navegador navegam — verified by `frontend/src/App.tsx` (parse/serialize +
+   listener `hashchange`), os filtros controlados nos componentes e
    `npm run build` limpo.
 
 ## Maturity

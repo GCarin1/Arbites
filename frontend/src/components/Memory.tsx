@@ -70,14 +70,21 @@ function formatTime(iso: string): string {
 export function Memory({
   onError,
   onNavigate,
+  year: yearProp,
+  onYearChange,
 }: {
   onError: (message: string) => void;
   onNavigate: (id: string) => void;
+  // 0084: ano (período) refletido no hash da URL quando controlado
+  year?: string;
+  onYearChange?: (v: string) => void;
 }) {
   const [events, setEvents] = useState<TimelineEntry[]>([]);
   const [kinds, setKinds] = useState<string[]>(DEFAULT_KINDS);
   const [years, setYears] = useState<string[]>([]);
-  const [year, setYear] = useState(""); // "" = todos os anos
+  const [localYear, setLocalYear] = useState(""); // "" = todos os anos
+  const year = onYearChange ? (yearProp ?? "") : localYear;
+  const setYear = onYearChange ?? setLocalYear;
   const [month, setMonth] = useState(""); // "" = todos os meses (1..12)
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
