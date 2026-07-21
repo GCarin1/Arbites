@@ -169,3 +169,22 @@ def test_testcase_criteria_link_indexed_and_editable(client):
     # lista vazia limpa o vínculo
     cleared = client.put(f"/api/v1/testcases/{ct['id']}", json={"criteria": []}).json()
     assert cleared["criteria"] == []
+
+
+def test_quarantine_toggle_persists_in_frontmatter(client):
+    """0089: toggle de quarentena grava `quarantine: true` no frontmatter,
+    indexa e volta como bool; desligar remove a chave do YAML."""
+    ct = client.post(
+        "/api/v1/testcases", json={"title": "Instável", "status": "ready"}
+    ).json()
+    assert ct["quarantine"] is False
+
+    on = client.put(f"/api/v1/testcases/{ct['id']}", json={"quarantine": True}).json()
+    assert on["quarantine"] is True
+    text = (client.ws.root / ct["path"]).read_text(encoding="utf-8")
+    assert "quarantine: true" in text
+
+    off = client.put(f"/api/v1/testcases/{ct['id']}", json={"quarantine": False}).json()
+    assert off["quarantine"] is False
+    text = (client.ws.root / ct["path"]).read_text(encoding="utf-8")
+    assert "quarantine" not in text  # false não polui o frontmatter

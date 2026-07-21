@@ -160,6 +160,28 @@ export function Dashboard({
               {flaky?.testcases.map((f) => f.testcase_id).join(", ") || "nenhum CT"}
             </div>
           </div>
+          <div className="metric-card">
+            <div className="metric-label">Em quarentena</div>
+            <div className="metric-value">{summary.quarantine?.count ?? 0}</div>
+            <div className="metric-formula mono">
+              {summary.quarantine && summary.quarantine.count > 0 ? (
+                summary.quarantine.testcases.map((t, i) => (
+                  <span key={t.testcase_id}>
+                    {i > 0 && ", "}
+                    <button
+                      className="linklike mono"
+                      title={t.title ?? undefined}
+                      onClick={() => onNavigate?.(t.testcase_id)}
+                    >
+                      {t.testcase_id}
+                    </button>
+                  </span>
+                ))
+              ) : (
+                "nenhum CT (fora do pass rate)"
+              )}
+            </div>
+          </div>
         </div>
       )}
 

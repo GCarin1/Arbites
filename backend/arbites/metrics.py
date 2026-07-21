@@ -141,7 +141,11 @@ def execution_coverage(
     squad: str | None = None,
 ) -> dict:
     """CTs distintos executados no período ÷ CTs `ready`."""
-    ready_sql, ready_params = "SELECT COUNT(*) c FROM testcases WHERE status='ready'", []
+    ready_sql = (
+        "SELECT COUNT(*) c FROM testcases WHERE status='ready'"
+        " AND COALESCE(quarantine, 0) = 0"
+    )
+    ready_params: list[Any] = []
     if squad:
         ready_sql += " AND squad_effective = ?"
         ready_params.append(squad)
@@ -150,7 +154,7 @@ def execution_coverage(
     executed = conn.execute(
         "SELECT COUNT(DISTINCT r.testcase_id) c FROM results r"
         " JOIN executions e ON e.id = r.execution_id"
-        f" WHERE r.status IN {FINAL_STATUSES!r}" + where,
+        f" WHERE r.status IN {FINAL_STATUSES!r}" + where + _NOT_QUARANTINED,
         params,
     ).fetchone()["c"]
     return {
@@ -161,16 +165,24 @@ def execution_coverage(
     }
 
 
+# CTs em quarentena (0089) são excluídos do pass rate e da cobertura de
+# execução — decisão humana, sinalizada em separado no dashboard.
+_NOT_QUARANTINED = (
+    " AND r.testcase_id NOT IN (SELECT id FROM testcases WHERE quarantine = 1)"
+)
+
+
 def pass_rate(
     conn: sqlite3.Connection, sprint: str | None = None, days: int | None = None,
     squad: str | None = None,
 ) -> dict:
-    """`passed` ÷ resultados finais (`passed`+`failed`)."""
+    """`passed` ÷ resultados finais (`passed`+`failed`), fora quarentenados."""
     where, params = _results_where(sprint, days, squad)
     row = conn.execute(
         "SELECT SUM(CASE WHEN r.status='passed' THEN 1 ELSE 0 END) p,"
         " SUM(CASE WHEN r.status IN ('passed','failed') THEN 1 ELSE 0 END) f"
-        " FROM results r JOIN executions e ON e.id = r.execution_id WHERE 1=1" + where,
+        " FROM results r JOIN executions e ON e.id = r.execution_id WHERE 1=1"
+        + where + _NOT_QUARANTINED,
         params,
     ).fetchone()
     passed, final = row["p"] or 0, row["f"] or 0
@@ -263,6 +275,21 @@ def flaky(conn: sqlite3.Connection, window: int = 5, squad: str | None = None) -
         "formula": f"CTs com transicao pass<->fail nas ultimas {window} execucoes",
         "window": window,
         "testcases": sorted(flaky_cts, key=lambda x: x["testcase_id"]),
+    }
+
+
+def quarantine(conn: sqlite3.Connection, squad: str | None = None) -> dict:
+    """CTs em quarentena (excluídos do pass rate) — contagem + lista para
+    drill-down no dashboard. Nunca escondidos: a contagem é sempre visível."""
+    sql = "SELECT id, title FROM testcases WHERE COALESCE(quarantine, 0) = 1"
+    params: list[Any] = []
+    if squad:
+        sql += " AND squad_effective = ?"
+        params.append(squad)
+    rows = conn.execute(sql + " ORDER BY id", params).fetchall()
+    return {
+        "count": len(rows),
+        "testcases": [{"testcase_id": r["id"], "title": r["title"]} for r in rows],
     }
 
 

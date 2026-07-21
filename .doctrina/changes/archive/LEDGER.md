@@ -94,3 +94,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-20 — 0085-testar-provider-de-ia-na-configuracao — testar provider de IA na configuracao (specs: ai-assist MODIFIED)
 - 2026-07-20 — 0096-resumo-de-falha-pos-run-pela-ia-com-defeito — resumo de falha pos-run pela IA com defeito draft (specs: ai-assist MODIFIED)
 - 2026-07-21 — 0088-diff-entre-duas-executions — diff entre duas executions (specs: executions MODIFIED)
+- 2026-07-21 — 0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass — flaky visivel no CT e quarentena fora do pass rate (specs: reporting MODIFIED, testcases MODIFIED)

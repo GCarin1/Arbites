@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
-**Last updated:** 2026-07-10
-**Version:** 0.11.0
+**Last updated:** 2026-07-21
+**Version:** 0.12.0
 
 ## Purpose
 
@@ -41,6 +41,10 @@ export PDF e Markdown (para colar no Confluence).
   (ok/warn/bad/none) contra metas opcionais configuradas em `arbites.yaml`
   (`metric_thresholds`), respeitando a direção da métrica (maior-melhor ou
   menor-melhor).
+- The system shall excluir CTs em quarentena (`quarantine: true`) do pass
+  rate e da cobertura de execução, expondo SEMPRE em `GET /metrics/summary`
+  um bloco `quarantine` com a contagem e a lista dos CTs (drill-down no
+  dashboard) — nunca exclusão silenciosa.
 - The system shall expor `GET /metrics/defects` com um resumo dos defeitos
   abertos: contagem total, por severidade, por squad e por faixa de aging
   (dias em aberto), além da lista, filtrável por squad.
@@ -186,6 +190,11 @@ export PDF e Markdown (para colar no Confluence).
     (achados reformulados), top problemas (defeitos mais antigos ordenados,
     piores repos, CTs que mais falham) e `last_reindex` — verified by
     `backend/tests/test_dashboard_executive.py`.
+
+14. [verified] Pass rate e cobertura de execução ignoram CTs em quarentena
+    e o summary expõe `quarantine.count` + lista para drill-down — verified
+    by `backend/tests/test_metrics.py`
+    (`test_quarantine_excluded_from_pass_rate_and_counted`).
 
 ## Maturity
 

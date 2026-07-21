@@ -123,6 +123,7 @@ class TestcaseUpdate(BaseModel):
     squad: str | None = None
     automation: AutomationRef | None = None
     criteria: list[str] | None = None
+    quarantine: bool | None = None
     body: str | None = None
 
 
@@ -626,6 +627,7 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
     if not row:
         raise _error(404, "not_found", f"{entity_id} não encontrado")
     out = dict(row)
+    out["quarantine"] = bool(row["quarantine"])
     out["tags"] = [
         r["tag"]
         for r in conn.execute(
@@ -1119,6 +1121,9 @@ def _register_routes(app: FastAPI) -> None:
         if "criteria" in changes and not changes["criteria"]:
             meta.pop("criteria", None)  # lista vazia/None limpa o vínculo
             changes.pop("criteria")
+        if "quarantine" in changes and not changes["quarantine"]:
+            meta.pop("quarantine", None)  # false não polui o frontmatter
+            changes.pop("quarantine")
         meta.update(changes)
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
@@ -1422,7 +1427,10 @@ def _register_routes(app: FastAPI) -> None:
             "rework_rate": metrics_ops.rework_rate(conn, s, d, sq),
         }
         thresholds = ws_of(request).config().get("metric_thresholds")
-        return metrics_ops.annotate_thresholds(summary, thresholds)
+        annotated = metrics_ops.annotate_thresholds(summary, thresholds)
+        # contagem SEMPRE visível de quarentenados (excluídos do pass rate)
+        annotated["quarantine"] = metrics_ops.quarantine(conn, sq)
+        return annotated
 
     @app.get(API_PREFIX + "/metrics/trend")
     async def metrics_trend(request: Request, days: int = 7, sprint: str = "", squad: str = ""):

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS testcases(
   story_id TEXT, path TEXT, mtime REAL,
   automation_target TEXT, scenario_tag TEXT, external_key TEXT,
   squad TEXT, squad_effective TEXT, created TEXT,
-  feature_path TEXT, scenario_name TEXT);
+  feature_path TEXT, scenario_name TEXT, quarantine INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
 CREATE TABLE IF NOT EXISTS criteria(
   story_id TEXT, ears_id TEXT, ord INTEGER, text TEXT, form TEXT,
@@ -116,6 +116,7 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE defects ADD COLUMN lesson_when TEXT",
         "ALTER TABLE defects ADD COLUMN lesson_procedure TEXT",
         "ALTER TABLE defects ADD COLUMN lesson_antipattern TEXT",
+        "ALTER TABLE testcases ADD COLUMN quarantine INTEGER DEFAULT 0",
     ):
         try:
             conn.execute(ddl)
@@ -482,8 +483,8 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
         "INSERT OR REPLACE INTO testcases"
         "(id, title, type, priority, status, story_id, path, mtime,"
         " automation_target, scenario_tag, external_key, squad, squad_effective, created,"
-        " feature_path, scenario_name)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " feature_path, scenario_name, quarantine)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -501,6 +502,7 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
             str(doc.meta.get("created")) if doc.meta.get("created") else None,
             automation.get("feature_path") if isinstance(automation, dict) else None,
             automation.get("scenario_name") if isinstance(automation, dict) else None,
+            1 if doc.meta.get("quarantine") else 0,
         ),
     )
     for tag in _tags(doc):

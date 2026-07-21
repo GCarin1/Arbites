@@ -174,8 +174,8 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.11.0",
-        "last_updated": "2026-07-10",
+        "version": "0.12.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
@@ -215,8 +215,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.8.1",
-        "last_updated": "2026-07-20",
+        "version": "0.9.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -357,13 +357,6 @@
         "id": "0084-aba-e-filtros-na-url-para-deep-link",
         "title": "aba e filtros na URL para deep-link",
         "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
-        "title": "flaky visivel no CT e quarentena fora do pass rate",
-        "path": ".doctrina/changes/0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1559,6 +1552,23 @@
         "specs_affected": [
           {
             "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "title": "flaky visivel no CT e quarentena fora do pass rate",
+        "path": ".doctrina/changes/archive/2026-07-21-0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
             "operation": "MODIFIED"
           }
         ]

@@ -85,6 +85,7 @@ export interface TestCase {
   scenario_tag: string | null;
   squad: string | null;
   squad_effective: string | null;
+  quarantine?: boolean; // fora do pass rate quando true (0089)
   tags?: string[];
   criteria?: string[]; // EARS ids da story que este CT cobre (0092)
   body?: string;
@@ -332,12 +333,18 @@ export interface MetricValue {
   threshold?: { warn?: number; bad?: number; direction?: string } | null;
 }
 
+export interface QuarantineSummary {
+  count: number;
+  testcases: { testcase_id: string; title: string | null }[];
+}
+
 export interface MetricsSummary {
   requirement_coverage: MetricValue;
   execution_coverage: MetricValue;
   pass_rate: MetricValue;
   blocked_rate: MetricValue;
   rework_rate: MetricValue;
+  quarantine?: QuarantineSummary;
 }
 
 export interface TrendPoint {

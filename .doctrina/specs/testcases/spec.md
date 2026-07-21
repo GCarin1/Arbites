@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-20
-**Version:** 0.8.1
+**Last updated:** 2026-07-21
+**Version:** 0.9.0
 
 ## Purpose
 
@@ -80,6 +80,12 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   em `GET /testcases/{id}`), com picker na UI do CT restrito aos critérios
   da story vinculada; lista vazia limpa o vínculo (ver `requirements` para o
   parse dos critérios e `audit` para a cobertura de spec).
+- The system shall aceitar `quarantine: bool` no frontmatter do CT (toggle
+  na UI, indexado, exposto em `GET /testcases/{id}`); `false` não é gravado
+  no YAML. O detalhe do CT shall exibir um badge de `flaky` quando o
+  resultado alternou pass/fail nas últimas execuções (via `GET
+  /metrics/flaky`) e um badge de `quarentena` quando o CT está isolado (ver
+  `reporting` para o efeito no pass rate).
 
 ### Event-driven
 
@@ -163,6 +169,13 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     persiste `story` + `criteria` no CT criado — verified by
     `backend/tests/test_ai_generate.py`
     (`test_generate_per_criterion_tags_and_accept_links`).
+
+14. [verified] O toggle de quarentena persiste `quarantine: true` no
+    frontmatter (e `false` remove a chave), indexa e volta como bool; o
+    badge flaky aparece para CT com resultado alternante — verified by
+    `backend/tests/test_testcases.py`
+    (`test_quarantine_toggle_persists_in_frontmatter`) + build + revisão
+    visual.
 
 ## Maturity
 
