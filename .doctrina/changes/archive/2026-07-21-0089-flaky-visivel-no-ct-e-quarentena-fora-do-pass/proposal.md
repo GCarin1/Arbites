@@ -1,6 +1,7 @@
 # Change 0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass — flaky visivel no CT e quarentena fora do pass rate
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** testcases, reporting
@@ -27,9 +28,9 @@ vê.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] CT alternante ganha badge flaky; `quarantine: true` sai do pass rate e a contagem aparece — `backend/tests/test_metrics.py` + build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] CT alternante ganha badge flaky; `quarantine: true` sai do pass rate e a contagem aparece — `backend/tests/test_metrics.py` + build + revisão visual.
 
 ## Open questions
 

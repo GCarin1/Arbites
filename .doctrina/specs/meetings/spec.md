@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`
 **Realizes:** SC13
-**Last updated:** 2026-07-07
-**Version:** 0.2.0
+**Last updated:** 2026-07-21
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -34,6 +34,12 @@ automático depende da IA (opcional, M5), sempre como preview antes de gravar.
 - When o usuário solicita resumir uma reunião e há provider de IA
   configurado, the system shall devolver um resumo executivo em preview —
   sem gravar; o usuário aceita salvando em `summary`.
+- When o usuário extrai action items de uma reunião, the system shall
+  oferecer um preview: determinístico pelas linhas de checkbox aberto
+  (`- [ ]`) — sempre disponível, sem IA — e, se houver provider, uma
+  sugestão adicional por IA; when o usuário aceita itens selecionados, the
+  system shall criar um afazer por item, vinculado à reunião (`links`), e
+  expor os já convertidos no histórico da reunião.
 
 ### State-driven
 
@@ -62,6 +68,12 @@ automático depende da IA (opcional, M5), sempre como preview antes de gravar.
    `backend/tests/test_meetings.py`.
 3. [verified] As reuniões do dia aparecem no contexto da daily daquele dia
    — verified by `backend/tests/test_meetings.py`.
+4. [verified] Linhas `- [ ]` viram preview determinístico (sem provider) e
+   o aceite cria afazeres vinculados à reunião; a extração por IA devolve
+   preview e seus itens também viram afazeres — verified by
+   `backend/tests/test_meetings.py`
+   (`test_action_items_deterministic_extraction_and_accept`,
+   `test_action_items_ai_generate_preview`).
 
 ## Maturity
 

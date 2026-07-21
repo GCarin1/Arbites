@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-20
-**Version:** 0.8.1
+**Last updated:** 2026-07-21
+**Version:** 0.11.0
 
 ## Purpose
 
@@ -61,6 +61,12 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   de outra pasta sob `testcases/` via `POST /testcases/folders/move`,
   preservando toda a subárvore e reindexando cada `.md` afetado no novo
   caminho (IDs preservados).
+- The system shall oferecer no repositório de CTs um modo de seleção
+  múltipla com ações em lote (mudar status, mover de pasta, excluir para a
+  lixeira), executadas pelo cliente sobre os endpoints unitários, com
+  confirmação prévia (`ConfirmModal`) e resumo de sucesso/falha (toast
+  `X ok · Y falha(s)`); a lista de executions oferece exclusão em lote no
+  mesmo padrão (ver `executions`). Sem endpoint bulk no backend (N chamadas).
 - The system shall indexar e expor a data de criação (`created`) do CT na
   árvore e no detalhe.
 - The system shall aceitar `external_key` opcional no frontmatter do CT
@@ -80,6 +86,17 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   em `GET /testcases/{id}`), com picker na UI do CT restrito aos critérios
   da story vinculada; lista vazia limpa o vínculo (ver `requirements` para o
   parse dos critérios e `audit` para a cobertura de spec).
+- The system shall aceitar `quarantine: bool` no frontmatter do CT (toggle
+  na UI, indexado, exposto em `GET /testcases/{id}`); `false` não é gravado
+  no YAML. O detalhe do CT shall exibir um badge de `flaky` quando o
+  resultado alternou pass/fail nas últimas execuções (via `GET
+  /metrics/flaky`) e um badge de `quarentena` quando o CT está isolado (ver
+  `reporting` para o efeito no pass rate).
+- The system shall indexar `needs_rerun` do frontmatter do CT (bool exposto
+  em `GET /testcases/{id}`), aceitar o filtro `needs_rerun` em `GET
+  /testcases` e exibir o badge "precisa re-execução" no repositório e no
+  detalhe do CT (o flag é gerido pela sync de features — ver
+  `local-automation`).
 
 ### Event-driven
 
@@ -163,6 +180,24 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     persiste `story` + `criteria` no CT criado — verified by
     `backend/tests/test_ai_generate.py`
     (`test_generate_per_criterion_tags_and_accept_links`).
+
+14. [verified] O toggle de quarentena persiste `quarantine: true` no
+    frontmatter (e `false` remove a chave), indexa e volta como bool; o
+    badge flaky aparece para CT com resultado alternante — verified by
+    `backend/tests/test_testcases.py`
+    (`test_quarantine_toggle_persists_in_frontmatter`) + build + revisão
+    visual.
+
+15. [verified] `needs_rerun` é indexado e exposto como bool; o filtro
+    `GET /testcases?needs_rerun=true` lista só os marcados; badge no
+    repositório e no detalhe — verified by `backend/tests/test_testcases.py`
+    (`test_needs_rerun_filter_lists_only_flagged`) + build + revisão visual.
+
+16. [verified] Seleção múltipla no repositório aplica status/mover/excluir
+    em lote com confirmação e resumo X ok · Y falhas; executions têm
+    exclusão em lote no mesmo padrão — verified by build + revisão visual
+    (os endpoints unitários já são cobertos por
+    `backend/tests/test_testcases.py` e `backend/tests/test_executions.py`).
 
 ## Maturity
 

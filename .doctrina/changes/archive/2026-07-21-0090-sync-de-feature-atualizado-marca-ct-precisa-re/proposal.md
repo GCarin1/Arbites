@@ -1,6 +1,7 @@
 # Change 0090-sync-de-feature-atualizado-marca-ct-precisa-re — sync de feature atualizado marca CT precisa re-execucao
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** local-automation, testcases
@@ -28,9 +29,9 @@ re-executado após a mudança.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Apply de update marca needs_rerun; resultado novo limpa; filtro funciona — `backend/tests/test_feature_sync.py`.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Apply de update marca needs_rerun; resultado novo limpa; filtro funciona — `backend/tests/test_feature_sync.py`.
 
 ## Open questions
 

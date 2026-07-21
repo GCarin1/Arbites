@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
+import { SingleRefInput } from "./Autocomplete";
 import { DocBody } from "./ReadView";
 import { useToast } from "./Toast";
 import type {
@@ -7,7 +8,6 @@ import type {
   AiProvidersInfo,
   Criterion,
   GeneratedTestcase,
-  Requirement,
   ReviewResponse,
   TestCase,
 } from "../types";
@@ -840,18 +840,14 @@ function ReviewCard({
         <p className="muted">Nenhum test case no workspace para revisar.</p>
       ) : (
         <div className="step-row">
-          <select
-            value={ctId}
-            onChange={(e) => setCtId(e.target.value)}
-            style={{ maxWidth: 320, flex: "0 0 auto" }}
-            aria-label="Test case"
-          >
-            {testcases.map((tc) => (
-              <option key={tc.id} value={tc.id}>
-                {tc.id} — {tc.title}
-              </option>
-            ))}
-          </select>
+          <div style={{ maxWidth: 320, flex: "0 0 auto" }}>
+            <SingleRefInput
+              value={ctId}
+              onChange={setCtId}
+              kinds="testcase"
+              placeholder="CT-… (digite id ou título)"
+            />
+          </div>
           <button onClick={() => void doReview()} disabled={busy !== null}>
             {busy === "review" ? "Revisando…" : "Revisar"}
           </button>
@@ -929,8 +925,6 @@ interface PackPreview {
  */
 function ContextPackCard() {
   const { toast } = useToast();
-  const [epics, setEpics] = useState<Requirement[]>([]);
-  const [stories, setStories] = useState<Requirement[]>([]);
   const [squads, setSquads] = useState<string[]>([]);
   const [epic, setEpic] = useState("");
   const [story, setStory] = useState("");
@@ -944,8 +938,6 @@ function ContextPackCard() {
   const [layout, setLayout] = useState("agents-md"); // Pacote de Agente (0094)
 
   useEffect(() => {
-    api.requirements("?kind=epic").then(setEpics).catch(() => {});
-    api.requirements("?kind=story").then(setStories).catch(() => {});
     api.squads().then((d) => setSquads(d.squads)).catch(() => {});
   }, []);
 
@@ -1024,35 +1016,23 @@ function ContextPackCard() {
       <div className="field-grid">
         <div className="field col-4">
           <label htmlFor="cp-epic">Epic</label>
-          <input
+          <SingleRefInput
             id="cp-epic"
-            className="mono"
-            list="cp-epics"
             value={epic}
-            onChange={(e) => setEpic(e.target.value)}
-            placeholder="EP-… (digite para filtrar)"
+            onChange={setEpic}
+            kinds="requirement"
+            placeholder="EP-… (digite id ou título)"
           />
-          <datalist id="cp-epics">
-            {epics.map((e) => (
-              <option key={e.id} value={e.id}>{e.title}</option>
-            ))}
-          </datalist>
         </div>
         <div className="field col-4">
           <label htmlFor="cp-story">Story</label>
-          <input
+          <SingleRefInput
             id="cp-story"
-            className="mono"
-            list="cp-stories"
             value={story}
-            onChange={(e) => setStory(e.target.value)}
-            placeholder="ST-… (digite para filtrar)"
+            onChange={setStory}
+            kinds="requirement"
+            placeholder="ST-… (digite id ou título)"
           />
-          <datalist id="cp-stories">
-            {stories.map((s) => (
-              <option key={s.id} value={s.id}>{s.title}</option>
-            ))}
-          </datalist>
         </div>
         <div className="field col-4">
           <label htmlFor="cp-squad">Squad</label>

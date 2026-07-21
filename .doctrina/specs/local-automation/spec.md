@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
-**Last updated:** 2026-07-10
-**Version:** 0.7.0
+**Last updated:** 2026-07-21
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -93,6 +93,10 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   `error: "timeout"` e encerrar o subprocess.
 - When o run termina, the system shall parsear o JSON do Behave e popular
   os `results[]` com steps Gherkin e evidências.
+- When o usuário aplica "update" (re-base de steps) na sync de features,
+  the system shall marcar o CT com `needs_rerun: true` no frontmatter; when
+  um resultado novo do CT é registrado numa execution posterior (manual,
+  local ou CI), the system shall limpar o flag automaticamente.
 - When o usuário salva a configuração de targets pela UI, the system shall
   reescanear cada target salvo (mesmo comportamento de `POST
   /targets/{name}/scan`), populando cenários/warnings imediatamente.
@@ -198,6 +202,10 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
     `/runs/active` reflete o run e esvazia ao fim; progresso parcial
     aparece no stream e o JSON final reconcilia (behave real) — verified
     by `backend/tests/test_local_runs.py`.
+15. [verified] Apply de update marca `needs_rerun` no CT e um resultado
+    novo do CT limpa o flag — verified by
+    `backend/tests/test_feature_sync.py`
+    (`test_update_marks_needs_rerun_and_new_result_clears_it`).
 
 ## Maturity
 

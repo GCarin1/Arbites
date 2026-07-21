@@ -1,6 +1,7 @@
 import type {
   ActivityHeatmapData,
   AiProvidersInfo,
+  ExecutiveSummaryResult,
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
@@ -13,12 +14,14 @@ import type {
   EvidenceEntry,
   Meeting,
   MeetingSummaryResult,
+  MeetingActionItems,
   RiskMap,
   SavedDaily,
   TestCaseResult,
   TimelineEntry,
   Execution,
   ExecutionSummary,
+  ExecutionDiff,
   FlakyReport,
   GeneratePreview,
   HealthScore,
@@ -187,6 +190,10 @@ export const api = {
     }),
   closeExecution: (id: string) =>
     request<Execution>(`/executions/${id}/close`, { method: "POST" }),
+  executionsDiff: (a: string, b: string) =>
+    request<ExecutionDiff>(
+      `/executions/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
+    ),
 
   defects: (query = "") => request<Defect[]>(`/defects${query}`),
   defect: (id: string) => request<Defect>(`/defects/${id}`),
@@ -281,6 +288,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ provider: provider ?? null }),
     }),
+  meetingActionItems: (id: string) =>
+    request<MeetingActionItems>(`/meetings/${id}/action-items`),
+  generateMeetingActionItems: (id: string, provider?: string | null) =>
+    request<{ preview: boolean; id: string; action_items: string[] }>(
+      `/meetings/${id}/action-items/generate`,
+      { method: "POST", body: JSON.stringify({ provider: provider ?? null }) },
+    ),
+  acceptMeetingActionItems: (id: string, items: string[]) =>
+    request<{ created: string[]; converted: { id: string; title: string; status: string }[] }>(
+      `/meetings/${id}/action-items/accept`,
+      { method: "POST", body: JSON.stringify({ items }) },
+    ),
 
   squads: () => request<{ squads: string[] }>("/squads"),
   metricsSummary: (sprint: string, days: number, squad = "") =>
@@ -319,9 +338,15 @@ export const api = {
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +
         `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
     ),
-  exportUrl: (format: "md" | "pdf", sprint: string, squad = "") =>
+  exportUrl: (format: "md" | "pdf", sprint: string, squad = "", summary = "") =>
     `${BASE}/metrics/traceability/export?format=${format}` +
-    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
+    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}` +
+    (summary ? `&summary=${encodeURIComponent(summary)}` : ""),
+  executiveSummary: (sprint: string, squad = "", provider?: string | null) =>
+    request<ExecutiveSummaryResult>("/ai/executive-summary", {
+      method: "POST",
+      body: JSON.stringify({ sprint: sprint || null, squad: squad || null, provider: provider ?? null }),
+    }),
   evidenceFileUrl: (execId: string, ctId: string, index: number) =>
     `${BASE}/executions/${execId}/results/${ctId}/evidences/${index}/file`,
 

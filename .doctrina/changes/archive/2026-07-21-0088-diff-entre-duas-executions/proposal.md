@@ -1,6 +1,7 @@
 # Change 0088-diff-entre-duas-executions — diff entre duas executions
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** executions
@@ -26,10 +27,10 @@ consertado) hoje é olho a olho entre dois boards. SQL trivial sobre
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Diff classifica regressed/fixed/added/removed/unchanged corretamente — `backend/tests/test_executions.py`.
-- [ ] UI de comparação navegável — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Diff classifica regressed/fixed/added/removed/unchanged corretamente — `backend/tests/test_executions.py`.
+- [x] UI de comparação navegável — build + revisão visual.
 
 ## Open questions
 

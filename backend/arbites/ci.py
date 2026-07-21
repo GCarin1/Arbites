@@ -20,7 +20,7 @@ from typing import Any, Protocol
 
 from . import executions as exec_ops
 from .behave_json import BehaveJsonError, parse_behave_json
-from .indexer import reindex_file
+from .indexer import clear_needs_rerun, reindex_file
 from .workspace import Workspace
 
 KEYRING_SERVICE = "arbites-github"
@@ -263,6 +263,7 @@ class CIManager:
         execution["ci"]["artifact_id"] = artifact["id"]
 
         results_found = 0
+        recorded: set[str] = set()  # CTs com resultado novo (0090)
         with zipfile.ZipFile(io.BytesIO(blob)) as zf:
             json_names = [n for n in zf.namelist() if n.endswith(".json")]
             if not json_names:
@@ -292,6 +293,7 @@ class CIManager:
                 result["duration_seconds"] = scenario.duration_seconds
                 result["error"] = scenario.error
                 results_found += 1
+                recorded.add(ct_id)
             # screenshots publicados no artifact sob evidences/CT-XXXX/
             for name in zf.namelist():
                 parts = name.split("/")
@@ -307,4 +309,6 @@ class CIManager:
 
         path = exec_ops.save(self.ws, execution)
         reindex_file(self.ws, self.conn, path)
+        for ct_id in recorded:
+            clear_needs_rerun(self.ws, self.conn, ct_id)  # 0090
         return {"execution": execution, "results_collected": results_found}

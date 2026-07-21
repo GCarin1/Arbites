@@ -85,6 +85,8 @@ export interface TestCase {
   scenario_tag: string | null;
   squad: string | null;
   squad_effective: string | null;
+  quarantine?: boolean; // fora do pass rate quando true (0089)
+  needs_rerun?: boolean; // re-base de steps pendente de re-execução (0090)
   tags?: string[];
   criteria?: string[]; // EARS ids da story que este CT cobre (0092)
   body?: string;
@@ -183,6 +185,20 @@ export interface MeetingSummaryResult {
   action_items: string[];
 }
 
+export interface MeetingActionItems {
+  id: string;
+  deterministic: string[];
+  converted: { id: string; title: string; status: string }[];
+}
+
+export interface ExecutiveSummaryResult {
+  preview: boolean;
+  synthesis: string;
+  risks: string[];
+  recommendation: string;
+  context_markdown: string;
+}
+
 export interface TreeNode {
   name: string;
   path: string;
@@ -270,6 +286,27 @@ export interface ExecutionSummary {
   result_counts: Record<string, number>;
 }
 
+export interface ExecutionDiffEntry {
+  testcase_id: string;
+  title: string | null;
+  status_a: string | null;
+  status_b: string | null;
+}
+
+export type ExecutionDiffCategory =
+  | "regressed"
+  | "fixed"
+  | "added"
+  | "removed"
+  | "unchanged";
+
+export interface ExecutionDiff {
+  a: string;
+  b: string;
+  categories: Record<ExecutionDiffCategory, ExecutionDiffEntry[]>;
+  counts: Record<ExecutionDiffCategory, number>;
+}
+
 export interface Defect {
   id: string;
   title: string;
@@ -311,12 +348,18 @@ export interface MetricValue {
   threshold?: { warn?: number; bad?: number; direction?: string } | null;
 }
 
+export interface QuarantineSummary {
+  count: number;
+  testcases: { testcase_id: string; title: string | null }[];
+}
+
 export interface MetricsSummary {
   requirement_coverage: MetricValue;
   execution_coverage: MetricValue;
   pass_rate: MetricValue;
   blocked_rate: MetricValue;
   rework_rate: MetricValue;
+  quarantine?: QuarantineSummary;
 }
 
 export interface TrendPoint {

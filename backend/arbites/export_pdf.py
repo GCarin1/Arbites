@@ -19,7 +19,7 @@ COLUMNS = [
 ]
 
 
-def matrix_pdf(matrix: dict) -> bytes:
+def matrix_pdf(matrix: dict, summary: str | None = None) -> bytes:
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
@@ -29,6 +29,13 @@ def matrix_pdf(matrix: dict) -> bytes:
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(0, 6, _latin1(f"Sprint: {matrix['sprint_filter']}"),
                  new_x="LMARGIN", new_y="NEXT")
+    if summary and summary.strip():
+        # 0098: resumo executivo revisado como seção inicial
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 6, "Resumo executivo", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.multi_cell(0, 5, _latin1(summary.strip()))
     pdf.ln(2)
 
     pdf.set_font("Helvetica", "B", 8)

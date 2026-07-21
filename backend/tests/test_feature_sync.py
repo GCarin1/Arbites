@@ -173,3 +173,48 @@ def test_name_linked_ct_resolves_in_feature_run_selection(client, tmp_path):
     assert resp.status_code == 201
     ids = [r["testcase_id"] for r in resp.json()["execution"]["results"]]
     assert created[0] in ids  # o name-linked entrou na execution
+
+
+def test_update_marks_needs_rerun_and_new_result_clears_it(client, tmp_path):
+    """0090: apply de update (re-base de steps) marca needs_rerun no CT; um
+    resultado novo registrado numa execution posterior limpa o flag."""
+    repo = _repo(tmp_path)
+    _configure(client, repo)
+    created = client.post(
+        "/api/v1/automation/features-sync/apply",
+        json={"target": "web", "create": [
+            {"feature_path": "features/login.feature", "scenario_name": "sem tag ainda"}
+        ]},
+    ).json()["created"]
+    ct_id = created[0]
+    assert client.get(f"/api/v1/testcases/{ct_id}").json()["needs_rerun"] is False
+
+    # edita os steps do cenário e aplica o update
+    f = repo / "features" / "login.feature"
+    f.write_text(
+        f.read_text(encoding="utf-8").replace("When passo dois", "When passo MUDOU"),
+        encoding="utf-8",
+    )
+    client.get("/api/v1/automation/features-sync", params={"target": "web"})
+    client.post(
+        "/api/v1/automation/features-sync/apply",
+        json={"target": "web", "update": [ct_id]},
+    )
+    assert client.get(f"/api/v1/testcases/{ct_id}").json()["needs_rerun"] is True
+    text = (client.ws.root / client.get(f"/api/v1/testcases/{ct_id}").json()["path"]).read_text()
+    assert "needs_rerun: true" in text
+
+    # o filtro localiza o CT marcado
+    flagged = client.get("/api/v1/testcases", params={"needs_rerun": True}).json()
+    assert [t["id"] for t in flagged] == [ct_id]
+
+    # registrar um resultado novo do CT limpa o flag automaticamente
+    execution = client.post(
+        "/api/v1/executions", json={"name": "Regressão", "testcase_ids": [ct_id]}
+    ).json()
+    client.post(
+        f"/api/v1/executions/{execution['id']}/results/{ct_id}/status",
+        json={"status": "passed", "who": "carini"},
+    )
+    assert client.get(f"/api/v1/testcases/{ct_id}").json()["needs_rerun"] is False
+    assert client.get("/api/v1/testcases", params={"needs_rerun": True}).json() == []

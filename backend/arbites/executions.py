@@ -303,6 +303,34 @@ def unlink_defect(
         )
 
 
+# -- diff entre executions (change 0088) --------------------------------------
+
+# Ordenação de "qualidade" de um resultado, usada só para classificar a
+# transição de um CT entre duas executions (melhor → maior).
+_RESULT_RANK = {
+    "passed": 4,
+    "retest": 3,
+    "blocked": 2,
+    "failed": 1,
+    "in_progress": 0,
+    "pending": 0,
+}
+
+
+def diff_category(status_a: str, status_b: str) -> str:
+    """Classifica a transição de um CT presente nas duas executions.
+
+    - ``unchanged``: mesmo status nas duas.
+    - ``regressed``: status_b é pior que status_a (ex.: passed→failed/blocked).
+    - ``fixed``: status_b é melhor que status_a (ex.: failed→passed).
+    """
+    if status_a == status_b:
+        return "unchanged"
+    if _RESULT_RANK.get(status_b, 0) < _RESULT_RANK.get(status_a, 0):
+        return "regressed"
+    return "fixed"
+
+
 def close(execution: dict[str, Any], who: str) -> None:
     if execution["status"] == "closed":
         raise ExecutionError("execution_closed", f"{execution['id']} já está fechada", 409)

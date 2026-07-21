@@ -52,15 +52,27 @@ export function Automation({
   onChanged,
   onError,
   onNavigate,
+  innerTab,
+  onInnerTabChange,
 }: {
   onChanged: () => void;
   onError: (message: string) => void;
   onNavigate?: (id: string) => void;
+  // 0084: aba interna refletida no hash da URL (deep-link)
+  innerTab?: string;
+  onInnerTabChange?: (v: string) => void;
 }) {
   // Abas (0065/0070): Histórico = observabilidade (primeira e default) ·
   // Executar = operação · Configurar = setup (última). Sem auto-troca de
   // aba — o empty state do Histórico orienta o primeiro uso.
-  const [tab, setTab] = useState<"configurar" | "executar" | "historico">("historico");
+  const [localTab, setLocalTab] = useState<"configurar" | "executar" | "historico">("historico");
+  const tab = (onInnerTabChange
+    ? (["configurar", "executar", "historico"].includes(innerTab ?? "")
+        ? innerTab
+        : "historico")
+    : localTab) as "configurar" | "executar" | "historico";
+  const setTab = (v: "configurar" | "executar" | "historico") =>
+    onInnerTabChange ? onInnerTabChange(v) : setLocalTab(v);
   const [targets, setTargets] = useState<Target[]>([]);
   const [selection, setSelection] = useState("");
   const [tags, setTags] = useState("");

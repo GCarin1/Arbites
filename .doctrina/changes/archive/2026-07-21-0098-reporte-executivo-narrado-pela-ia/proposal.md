@@ -1,6 +1,7 @@
 # Change 0098-reporte-executivo-narrado-pela-ia — reporte executivo narrado pela IA
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** reporting
@@ -28,9 +29,9 @@ no índice.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Endpoint devolve resumo com os números injetados; export inclui a seção quando aceita — `backend/tests/test_reporting_summary.py` (MockTransport).
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Endpoint devolve resumo com os números injetados; export inclui a seção quando aceita — `backend/tests/test_reporting_summary.py` (MockTransport).
 
 ## Open questions
 

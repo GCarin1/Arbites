@@ -54,7 +54,7 @@ from .gherkin_scan import (
 )
 from .runner import RunManager
 from .xray_import import XrayImportError
-from .indexer import connect, reindex_file, reindex_full
+from .indexer import clear_needs_rerun, connect, reindex_file, reindex_full
 from .parser import parse_markdown
 from .watcher import start_watcher
 from .workspace import Workspace, slugify
@@ -123,6 +123,7 @@ class TestcaseUpdate(BaseModel):
     squad: str | None = None
     automation: AutomationRef | None = None
     criteria: list[str] | None = None
+    quarantine: bool | None = None
     body: str | None = None
 
 
@@ -403,6 +404,20 @@ class MeetingSummarizeIn(BaseModel):
     provider: str | None = None
 
 
+class MeetingActionItemsGenerateIn(BaseModel):
+    provider: str | None = None
+
+
+class MeetingActionItemsAcceptIn(BaseModel):
+    items: list[str]
+
+
+class ExecutiveSummaryIn(BaseModel):
+    provider: str | None = None
+    sprint: str | None = None
+    squad: str | None = None
+
+
 # Catálogo do .env do projeto de automação (doc de ajustes §1.5.1 etapa 5)
 ENV_CATALOG: list[dict[str, str]] = [
     {"section": "Credenciais de Teste", "key": "TEST_DOCUMENTO", "description": "Documento (CPF) utilizado para login nos testes"},
@@ -626,6 +641,8 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
     if not row:
         raise _error(404, "not_found", f"{entity_id} não encontrado")
     out = dict(row)
+    out["quarantine"] = bool(row["quarantine"])
+    out["needs_rerun"] = bool(row["needs_rerun"])
     out["tags"] = [
         r["tag"]
         for r in conn.execute(
@@ -967,6 +984,7 @@ def _register_routes(app: FastAPI) -> None:
         folder: str = "",
         squad: str = "",
         q: str = "",
+        needs_rerun: bool | None = None,
     ):
         sql, params = "SELECT DISTINCT t.* FROM testcases t", []
         if tag:
@@ -983,6 +1001,9 @@ def _register_routes(app: FastAPI) -> None:
             if value:
                 sql += f" AND t.{field} = ?"
                 params.append(value)
+        if needs_rerun is not None:
+            sql += " AND COALESCE(t.needs_rerun, 0) = ?"
+            params.append(1 if needs_rerun else 0)
         if folder:
             sql += " AND t.path LIKE ?"
             params.append(f"testcases/{folder.strip('/')}/%")
@@ -1119,6 +1140,9 @@ def _register_routes(app: FastAPI) -> None:
         if "criteria" in changes and not changes["criteria"]:
             meta.pop("criteria", None)  # lista vazia/None limpa o vínculo
             changes.pop("criteria")
+        if "quarantine" in changes and not changes["quarantine"]:
+            meta.pop("quarantine", None)  # false não polui o frontmatter
+            changes.pop("quarantine")
         meta.update(changes)
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
@@ -1236,6 +1260,60 @@ def _register_routes(app: FastAPI) -> None:
         _save_and_index(ws, conn, execution)
         return execution
 
+    @app.get(API_PREFIX + "/executions/diff")
+    async def diff_executions(request: Request, a: str, b: str):
+        """Compara os resultados por CT de duas executions (a → b).
+
+        Categorias: regressed / fixed / added (só em b) / removed (só em a) /
+        unchanged. Leitura pura da tabela `results` (registrada antes da rota
+        `/{exec_id}` para não ser capturada como path param)."""
+        conn = conn_of(request)
+        for eid in (a, b):
+            if not conn.execute(
+                "SELECT 1 FROM executions WHERE id = ?", (eid,)
+            ).fetchone():
+                raise _error(404, "not_found", f"{eid} não encontrada")
+
+        def _results(eid: str) -> dict[str, str]:
+            return {
+                row["testcase_id"]: row["status"]
+                for row in conn.execute(
+                    "SELECT testcase_id, status FROM results WHERE execution_id = ?",
+                    (eid,),
+                )
+            }
+
+        ra, rb = _results(a), _results(b)
+        ids = sorted(set(ra) | set(rb))
+        titles: dict[str, str] = {}
+        if ids:
+            placeholders = ",".join("?" * len(ids))
+            titles = {
+                row["id"]: row["title"]
+                for row in conn.execute(
+                    f"SELECT id, title FROM testcases WHERE id IN ({placeholders})",
+                    ids,
+                )
+            }
+        categories: dict[str, list] = {
+            k: [] for k in ("regressed", "fixed", "added", "removed", "unchanged")
+        }
+        for ct in ids:
+            entry = {"testcase_id": ct, "title": titles.get(ct)}
+            if ct in ra and ct in rb:
+                cat = exec_ops.diff_category(ra[ct], rb[ct])
+                categories[cat].append({**entry, "status_a": ra[ct], "status_b": rb[ct]})
+            elif ct in rb:
+                categories["added"].append({**entry, "status_a": None, "status_b": rb[ct]})
+            else:
+                categories["removed"].append({**entry, "status_a": ra[ct], "status_b": None})
+        return {
+            "a": a,
+            "b": b,
+            "categories": categories,
+            "counts": {k: len(v) for k, v in categories.items()},
+        }
+
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
         return exec_ops.load(ws_of(request), exec_id)
@@ -1278,6 +1356,7 @@ def _register_routes(app: FastAPI) -> None:
             execution, ct_id, payload.status, payload.who, payload.comment, payload.column
         )
         _save_and_index(ws, conn, execution)
+        clear_needs_rerun(ws, conn, ct_id)  # resultado novo → limpa re-execução (0090)
         return execution
 
     @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/steps/{step_index}")
@@ -1368,7 +1447,25 @@ def _register_routes(app: FastAPI) -> None:
             "rework_rate": metrics_ops.rework_rate(conn, s, d, sq),
         }
         thresholds = ws_of(request).config().get("metric_thresholds")
-        return metrics_ops.annotate_thresholds(summary, thresholds)
+        annotated = metrics_ops.annotate_thresholds(summary, thresholds)
+        # contagem SEMPRE visível de quarentenados (excluídos do pass rate)
+        annotated["quarantine"] = metrics_ops.quarantine(conn, sq)
+        return annotated
+
+    @app.post(API_PREFIX + "/ai/executive-summary")
+    async def ai_executive_summary(request: Request, payload: ExecutiveSummaryIn):
+        """0098: resumo executivo narrado pela IA a partir dos NÚMEROS já
+        apurados (preview editável, sem gravar). Sem provider → 409, e o
+        dashboard segue 100% funcional."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        context_md = metrics_ops.executive_context_markdown(
+            conn, payload.sprint or None, payload.squad or None
+        )
+        result = await asyncio.to_thread(
+            ai_ops.generate_executive_summary, provider, _with_memory(ws, context_md)
+        )
+        return {"preview": True, **result.model_dump(), "context_markdown": context_md}
 
     @app.get(API_PREFIX + "/metrics/trend")
     async def metrics_trend(request: Request, days: int = 7, sprint: str = "", squad: str = ""):
@@ -1500,14 +1597,15 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/metrics/traceability/export")
     async def metrics_traceability_export(
-        request: Request, format: str = "md", epic: str = "", sprint: str = "", squad: str = ""
+        request: Request, format: str = "md", epic: str = "", sprint: str = "",
+        squad: str = "", summary: str = "",
     ):
         matrix = metrics_ops.traceability(
             conn_of(request), epic or None, sprint or None, squad or None
         )
         if format == "md":
             return PlainTextResponse(
-                metrics_ops.matrix_markdown(matrix),
+                metrics_ops.matrix_markdown(matrix, summary or None),
                 media_type="text/markdown; charset=utf-8",
                 headers={"Content-Disposition": 'attachment; filename="matriz.md"'},
             )
@@ -1515,7 +1613,7 @@ def _register_routes(app: FastAPI) -> None:
             from .export_pdf import matrix_pdf
 
             return Response(
-                content=matrix_pdf(matrix),
+                content=matrix_pdf(matrix, summary or None),
                 media_type="application/pdf",
                 headers={"Content-Disposition": 'attachment; filename="matriz.pdf"'},
             )
@@ -1770,6 +1868,9 @@ def _register_routes(app: FastAPI) -> None:
                 str(automation.get("scenario_name", "")),
             )
             meta["updated"] = date.today().isoformat()
+            # re-base consciente de steps → o CT precisa ser re-executado (0090);
+            # o flag é limpo quando um resultado novo do CT é registrado
+            meta["needs_rerun"] = True
             _write_doc(ws.root / rel, meta, feature_sync_ops.scenario_body(
                 feat["feature_name"], sc, feat["language"]
             ))
@@ -2991,6 +3092,75 @@ def _register_routes(app: FastAPI) -> None:
             ai_ops.summarize_meeting, provider, _with_memory(ws, body)
         )
         return {"preview": True, "id": meeting_id, **result.model_dump()}
+
+    def _converted_todos(conn, meeting_id: str) -> list[dict]:
+        """Todos já criados a partir desta reunião (link no todo, 0097)."""
+        rows = conn.execute(
+            "SELECT id, title, status FROM todos"
+            " WHERE ',' || COALESCE(links, '') || ',' LIKE ?"
+            " ORDER BY id",
+            (f"%,{meeting_id},%",),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    @app.get(API_PREFIX + "/meetings/{meeting_id}/action-items")
+    async def meeting_action_items(request: Request, meeting_id: str):
+        """Preview determinístico (linhas `- [ ]`) + histórico dos afazeres
+        já convertidos. Funciona sem nenhum provider de IA (0097)."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        return {
+            "id": meeting_id,
+            "deterministic": daily_ops.extract_action_items(body),
+            "converted": _converted_todos(conn, meeting_id),
+        }
+
+    @app.post(API_PREFIX + "/meetings/{meeting_id}/action-items/generate")
+    async def meeting_action_items_generate(
+        request: Request, meeting_id: str, payload: MeetingActionItemsGenerateIn
+    ):
+        """Extração assistida por IA (preview), mesmo padrão da daily — usa o
+        `summarize_meeting` e devolve os action items para revisão."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        if not body.strip():
+            raise _error(422, "empty_meeting",
+                         "reunião sem descrição/transcrição para extrair")
+        result = await asyncio.to_thread(
+            ai_ops.summarize_meeting, provider, _with_memory(ws, body)
+        )
+        return {"preview": True, "id": meeting_id, "action_items": result.action_items}
+
+    @app.post(
+        API_PREFIX + "/meetings/{meeting_id}/action-items/accept", status_code=201
+    )
+    async def meeting_action_items_accept(
+        request: Request, meeting_id: str, payload: MeetingActionItemsAcceptIn
+    ):
+        """Cria um afazer por item selecionado, vinculado à reunião (0097)."""
+        ws, conn = ws_of(request), conn_of(request)
+        _find_path(conn, "meetings", meeting_id)  # 404 se a reunião não existe
+        created: list[str] = []
+        for title in payload.items:
+            title = title.strip()
+            if not title:
+                continue
+            todo_id = ws.next_id("todo")
+            meta = {
+                "id": todo_id,
+                "title": title,
+                "status": "open",
+                "links": [meeting_id],
+                "created": date.today().isoformat(),
+            }
+            path = ws.root / "todos" / f"{todo_id}-{slugify(title)}.md"
+            _write_doc(path, meta, "")
+            reindex_file(ws, conn, path)
+            created.append(todo_id)
+        return {"created": created, "converted": _converted_todos(conn, meeting_id)}
 
     # -- decisions / decisões arquiteturais (Memória Histórica) -------------
     # Ponteiro + metadados do TIME DE QA sobre o projeto sob teste — não é

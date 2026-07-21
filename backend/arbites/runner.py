@@ -22,7 +22,7 @@ from typing import Any
 
 from . import executions as exec_ops
 from .behave_json import BehaveJsonError, parse_behave_json
-from .indexer import reindex_file
+from .indexer import clear_needs_rerun, reindex_file
 from .workspace import Workspace
 
 DEFAULT_TIMEOUT_MINUTES = 30.0
@@ -277,6 +277,7 @@ class RunManager:
             exec_ops.set_result_status(execution, ct_id, status, "behave")
             path = exec_ops.save(self.ws, execution)
             reindex_file(self.ws, self.conn, path)
+            clear_needs_rerun(self.ws, self.conn, ct_id)  # 0090
             run.emit(f"[arbites] parcial: {ct_id} {status}")
         except Exception:
             pass  # parcial falhou → o JSON final cobre
@@ -292,6 +293,7 @@ class RunManager:
             execution = exec_ops.load(self.ws, run.exec_id)
         except exec_ops.ExecutionError:
             return
+        recorded: set[str] = set()  # CTs que receberam resultado neste run (0090)
         if result_json.exists():
             try:
                 results = parse_behave_json(
@@ -309,6 +311,7 @@ class RunManager:
                     )
                 except exec_ops.ExecutionError:
                     continue  # cenário de CT que não está nesta execution
+                recorded.add(ct_id)
                 result["steps"] = scenario.steps
                 result["duration_seconds"] = scenario.duration_seconds
                 result["error"] = scenario.error
@@ -328,6 +331,8 @@ class RunManager:
                     continue
         path = exec_ops.save(self.ws, execution)
         reindex_file(self.ws, self.conn, path)
+        for ct_id in recorded:
+            clear_needs_rerun(self.ws, self.conn, ct_id)  # 0090
 
     def _mark_pending(self, run: RunInfo, status: str, error: str) -> None:
         try:
