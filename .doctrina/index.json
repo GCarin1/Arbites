@@ -133,7 +133,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.8.0",
+        "version": "0.9.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
@@ -1611,6 +1611,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0099-local-automation-correcoes-de-execucao-injetar-o",
+        "title": "correções de execução da automação",
+        "path": ".doctrina/changes/archive/2026-07-21-0099-local-automation-correcoes-de-execucao-injetar-o",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -1637,6 +1650,12 @@
         "path": ".doctrina/skills/composite-score-sem-dado-nao-e-zero.md",
         "description": "Ao compor uma nota única (0-100) a partir de vários componentes com pesos, um componente sem dado suficiente deve virar `null` e ser excluído do cálculo (pesos restantes renormalizados) — nunca contar como 0.",
         "last_updated": "2026-07-12"
+      },
+      {
+        "id": "config-deriva-do-projeto-nao-fixa-campos",
+        "path": ".doctrina/skills/config-deriva-do-projeto-nao-fixa-campos.md",
+        "description": "Catálogos/formulários de configuração de um projeto-alvo devem ser DERIVADOS do próprio projeto (ex.: `.env`/`.env.example`), nunca uma lista fixa embutida de campos de um projeto específico.",
+        "last_updated": "2026-07-21"
       },
       {
         "id": "conteudo-longo-em-tabela-overflow",
@@ -1679,6 +1698,12 @@
         "path": ".doctrina/skills/entidade-so-com-crud-encaixado-precisa-de-view-propria.md",
         "description": "Uma entidade com API CRUD completa (GET/POST/PUT) mas cuja UNICA porta de entrada na UI é um modal aninhado dentro de outro fluxo (ex.: \"criar defeito a partir de um resultado de execução\") não tem gerenciamento de verdade — falta listar/editar/excluir fora daquele contexto específico.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "estado-ao-vivo-reconecta-no-remount",
+        "path": ".doctrina/skills/estado-ao-vivo-reconecta-no-remount.md",
+        "description": "Estado ao vivo (stream SSE de um run, progresso) não pode viver só no componente que desmonta ao trocar de aba — o servidor guarda o buffer e faz replay, então a UI deve reconectar ao (re)montar para não \"perder\" o que estava acontecendo.",
+        "last_updated": "2026-07-21"
       },
       {
         "id": "estados-de-feedback-nas-telas",
@@ -1817,6 +1842,12 @@
         "path": ".doctrina/skills/salvar-manual-feedback-e-reset-por-id.md",
         "description": "Botão de salvar manual sem estado de dirty/saving/saved parece \"não funcionar\" (salva mas nada muda na tela); e um efeito que reseta o campo a partir do valor do servidor (não do id do registro) reescreve o que o usuário digita quando há refresh de fundo.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "subprocess-injeta-env-do-projeto-alvo",
+        "path": ".doctrina/skills/subprocess-injeta-env-do-projeto-alvo.md",
+        "description": "Ao rodar um projeto-alvo externo por subprocess (Behave/WebDriver/CLI), o Arbites deve carregar e injetar o `.env` do projeto no ambiente do processo filho — nunca assumir que o processo pai já tem as variáveis.",
+        "last_updated": "2026-07-21"
       },
       {
         "id": "subprocess-python-windows-forca-pythonioencoding",

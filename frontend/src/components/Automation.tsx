@@ -96,10 +96,70 @@ export function Automation({
       .catch((e) => onError(e.message));
   }, [onError]);
 
+  // Abre o SSE do run e alimenta o terminal — reusado pelo disparo e pela
+  // reconexão ao voltar à aba (0099). O servidor faz replay do buffer, então
+  // reconectar restaura tudo o que já saiu.
+  const attachStream = useCallback(
+    (execId: string, toastOnDone: boolean) => {
+      sourceRef.current?.close();
+      const source = new EventSource(`${BASE}/runs/${execId}/stream`);
+      sourceRef.current = source;
+      source.onmessage = (event) => setLog((old) => [...old, event.data]);
+      source.addEventListener("done", (event) => {
+        const status = (event as MessageEvent).data as string;
+        setRun((old) => (old ? { ...old, status } : old));
+        if (toastOnDone) {
+          toast(
+            status === "done" ? `Run ${execId} concluído` : `Run ${execId}: ${status}`,
+            status === "done" ? "success" : "error",
+          );
+        }
+        source.close();
+        onChanged();
+        loadTargets();
+      });
+      source.onerror = () => source.close();
+    },
+    [onChanged, loadTargets, toast],
+  );
+
   useEffect(() => {
     loadTargets();
     return () => sourceRef.current?.close();
   }, [loadTargets]);
+
+  // 0099: ao (re)montar a aba, reconecta a um run ativo — o terminal não some
+  // mais quando você sai e volta enquanto um run está em andamento.
+  useEffect(() => {
+    let alive = true;
+    json<{ runs: { exec_id: string; target: string; status: string }[] }>(
+      `${BASE}/runs/active`,
+    )
+      .then((data) => {
+        if (!alive) return;
+        const active = data.runs[0];
+        if (!active) return;
+        setRun((old) =>
+          old && old.exec_id === active.exec_id
+            ? old
+            : {
+                exec_id: active.exec_id,
+                target: active.target,
+                status: active.status,
+                queued_at: "",
+                started_at: null,
+                finished_at: null,
+                log_lines: 0,
+              },
+        );
+        setLog([]);
+        attachStream(active.exec_id, false);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [attachStream]);
 
   // features + tags do target selecionado (dropdowns do comando behave)
   useEffect(() => {
@@ -148,25 +208,7 @@ export function Automation({
       setLog([]);
       setStartedExec(data.execution.id); // modal: "ver andamento" (0076)
       onChanged();
-      sourceRef.current?.close();
-      const source = new EventSource(`${BASE}/runs/${data.execution.id}/stream`);
-      sourceRef.current = source;
-      source.onmessage = (event) => setLog((old) => [...old, event.data]);
-      source.addEventListener("done", (event) => {
-        const status = (event as MessageEvent).data as string;
-        setRun((old) => (old ? { ...old, status } : old));
-        // indicador de sucesso/erro ao terminar (0076)
-        toast(
-          status === "done"
-            ? `Run ${data.execution.id} concluído`
-            : `Run ${data.execution.id}: ${status}`,
-          status === "done" ? "success" : "error",
-        );
-        source.close();
-        onChanged();
-        loadTargets();
-      });
-      source.onerror = () => source.close();
+      attachStream(data.execution.id, true);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
@@ -264,9 +306,35 @@ export function Automation({
           </div>
           <div className="field col-6">
             <label>Arquivos .feature (1..N, inclusive de features diferentes)</label>
+            {features.length > 0 && (
+              <div className="feature-picker-actions">
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => setSelFeatures(new Set(features.map((f) => f.path)))}
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  className="btn-sm"
+                  disabled={selFeatures.size === 0}
+                  onClick={() => setSelFeatures(new Set())}
+                >
+                  Limpar
+                </button>
+                <span className="caption muted">
+                  {selFeatures.size}/{features.length} selecionado(s)
+                </span>
+              </div>
+            )}
             <div className="feature-picker">
               {features.length === 0 ? (
-                <span className="caption muted">nenhum .feature no target</span>
+                <span className="caption muted">
+                  Nenhum <span className="mono">.feature</span> encontrado — confira o{" "}
+                  <span className="mono">features_glob</span> do target na aba
+                  Configurar (o padrão é <span className="mono">features/**/*.feature</span>).
+                </span>
               ) : (
                 features.map((f) => (
                   <label key={f.path} className="feature-pick caption">
@@ -334,7 +402,19 @@ export function Automation({
         {run && (
           <>
             <h4 className="section-title">
-              Run {run.exec_id} —{" "}
+              Run{" "}
+              {onNavigate ? (
+                <button
+                  className="linklike mono"
+                  onClick={() => onNavigate(run.exec_id)}
+                  title="Abrir o board (kanban) desta execução"
+                >
+                  {run.exec_id}
+                </button>
+              ) : (
+                run.exec_id
+              )}{" "}
+              —{" "}
               <span className={`status-dot dot-col-${run.status === "done" ? "passed" : run.status === "running" ? "in_progress" : "failed"}`}>
                 {run.status}
               </span>
@@ -1510,7 +1590,9 @@ function EnvCard({ target, onError }: { target: string; onError: (m: string) => 
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      json<{ catalog: CatalogEntry[] }>(`${BASE}/env/catalog`),
+      json<{ catalog: CatalogEntry[] }>(
+        `${BASE}/env/catalog?target=${encodeURIComponent(target)}`,
+      ),
       json<{ values: Record<string, string> }>(`${BASE}/targets/${target}/env`),
     ])
       .then(([c, e]) => {
@@ -1551,9 +1633,18 @@ function EnvCard({ target, onError }: { target: string; onError: (m: string) => 
       </div>
       {open && (
         <>
+          {catalog.length === 0 && (
+            <p className="caption muted">
+              Nenhuma variável documentada em <span className="mono">.env.example</span>{" "}
+              ou <span className="mono">.env</span> deste projeto. As variáveis são
+              lidas do próprio projeto — adicione um{" "}
+              <span className="mono">.env.example</span> no repositório para
+              documentá-las aqui.
+            </p>
+          )}
           {sections.map((section) => (
             <div key={section}>
-              <h4 className="section-title">{section}</h4>
+              {section && <h4 className="section-title">{section}</h4>}
               <div className="field-grid">
                 {catalog
                   .filter((c) => c.section === section)

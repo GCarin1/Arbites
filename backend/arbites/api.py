@@ -418,47 +418,56 @@ class ExecutiveSummaryIn(BaseModel):
     squad: str | None = None
 
 
-# Catálogo do .env do projeto de automação (doc de ajustes §1.5.1 etapa 5)
-ENV_CATALOG: list[dict[str, str]] = [
-    {"section": "Credenciais de Teste", "key": "TEST_DOCUMENTO", "description": "Documento (CPF) utilizado para login nos testes"},
-    {"section": "Credenciais de Teste", "key": "TEST_SENHA", "description": "Senha do usuário de teste"},
-    {"section": "URLs", "key": "BASE_URL", "description": "URL base da aplicação sob teste"},
-    {"section": "WebDriver Local", "key": "EDGE_DRIVER_PATH", "description": "Caminho personalizado para o msedgedriver (opcional)"},
-    {"section": "WebDriver Local", "key": "HEADLESS", "description": "Executar sem interface gráfica (true/false)"},
-    {"section": "WebDriver Manager", "key": "USE_WEBDRIVER_MANAGER", "description": "Se true, baixa o driver automaticamente via webdriver_manager"},
-    {"section": "WebDriver Manager", "key": "LOCAL_BROWSER", "description": "Navegador para execução local (edge, chrome)"},
-    {"section": "Timeouts", "key": "PAGE_LOAD_TIMEOUT", "description": "Timeout de carregamento de página (segundos)"},
-    {"section": "Timeouts", "key": "SCRIPT_TIMEOUT", "description": "Timeout de execução de scripts (segundos)"},
-    {"section": "Timeouts", "key": "ELEMENT_WAIT_TIMEOUT", "description": "Timeout de espera por elementos (segundos)"},
-    {"section": "BrowserStack — Ativação", "key": "USE_BROWSERSTACK", "description": "Ativar execução remota no BrowserStack (true/false)"},
-    {"section": "BrowserStack — Credenciais", "key": "BROWSERSTACK_USERNAME", "description": "Username da conta BrowserStack"},
-    {"section": "BrowserStack — Credenciais", "key": "BROWSERSTACK_ACCESS_KEY", "description": "Access Key da conta BrowserStack"},
-    {"section": "BrowserStack — Projeto", "key": "BROWSERSTACK_PROJECT_NAME", "description": "Nome do projeto no BrowserStack"},
-    {"section": "BrowserStack — Projeto", "key": "BROWSERSTACK_BUILD_NAME", "description": "Nome da build/execução"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_OS", "description": "Sistema operacional (Windows, OS X)"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_OS_VERSION", "description": "Versão do SO (11, 10, Ventura, etc.)"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_BROWSER", "description": "Navegador (Chrome, Firefox, Edge, Safari)"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_BROWSER_VERSION", "description": "Versão do navegador (latest, 120.0, etc.)"},
-    {"section": "BrowserStack — Local Testing", "key": "BROWSERSTACK_LOCAL", "description": "Testar URLs internas/localhost (true/false)"},
-    {"section": "Ambiente", "key": "ENVIRONMENT", "description": "Ambiente de execução (dev, staging, prod)"},
-    {"section": "Ambiente", "key": "DEBUG", "description": "Habilitar logs de debug (true/false)"},
-    {"section": "Logger", "key": "LOG_ENABLED", "description": "Habilitar/desabilitar logs (true/false)"},
-    {"section": "Logger", "key": "LOG_LEVEL", "description": "Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)"},
-    {"section": "Logger", "key": "LOG_SAVE_TO_FILE", "description": "Salvar logs em arquivo (true/false)"},
-    {"section": "Logger", "key": "LOG_SHOW_CONSOLE", "description": "Exibir logs no console (true/false)"},
-    {"section": "Logger", "key": "LOG_MAX_FILE_SIZE", "description": "Tamanho máximo do arquivo de log em bytes"},
-    {"section": "Logger", "key": "LOG_BACKUP_COUNT", "description": "Quantidade de arquivos de backup de log"},
-    {"section": "Análise de Logs com IA", "key": "AI_LOG_ANALYZER_ENABLED", "description": "Habilitar análise de logs com IA (true/false)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_API_KEY", "description": "Chave de API da OpenAI ou B3GPT"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_BASE_URL", "description": "URL base da API (vazio para OpenAI padrão)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_API_VERSION", "description": "Versão da API (necessário para B3GPT/Azure)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_MODEL", "description": "Modelo a ser utilizado (gpt-4o-mini, etc.)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_MAX_TOKENS", "description": "Máximo de tokens na resposta"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_TEMPERATURE", "description": "Temperatura (0.0 = preciso, 1.0 = criativo)"},
-    {"section": "Análise de Logs com IA", "key": "AI_ANALYZE_ON_FAILURE_ONLY", "description": "Analisar apenas em falhas (true/false)"},
-    {"section": "Análise de Logs com IA", "key": "AI_SAVE_ANALYSIS_TO_FILE", "description": "Salvar análises em arquivo (true/false)"},
-    {"section": "Análise de Logs com IA", "key": "AI_MAX_LOG_LINES", "description": "Máximo de linhas do log enviadas para análise"},
-]
+# Catálogo do .env: DERIVADO do próprio projeto-alvo (0099). O Arbites se
+# adapta a cada projeto — não impõe campos padrão de projeto nenhum. As chaves,
+# seções e descrições vêm do `.env.example` (preferido, documenta tudo) e do
+# `.env` do target. Regra de parse:
+#   - `# Seção` seguido de linha em branco  → cabeçalho de seção
+#   - `# descrição` logo acima de uma chave → descrição da chave
+#   - `KEY=valor  # descrição inline`        → descrição (tem prioridade)
+def derive_env_catalog(local_path: Path) -> list[dict[str, str]]:
+    catalog: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for filename in (".env.example", ".env"):
+        path = local_path / filename
+        try:
+            lines = path.read_text(encoding="utf-8-sig").splitlines()
+        except OSError:
+            continue
+        section = ""
+        pending_desc = ""
+        for i, raw in enumerate(lines):
+            stripped = raw.strip()
+            if not stripped:
+                pending_desc = ""
+                continue
+            if stripped.startswith("#"):
+                comment = stripped.lstrip("#").strip(" =-")
+                # comentário seguido de linha em branco → é seção
+                nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                if not nxt:
+                    section = comment
+                    pending_desc = ""
+                else:
+                    pending_desc = comment
+                continue
+            if "=" not in stripped:
+                continue
+            key_part, _, rest = stripped.partition("=")
+            key = key_part.strip()
+            if key.lower().startswith("export "):
+                key = key[len("export "):].strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            inline = rest.split("#", 1)[1].strip() if "#" in rest else ""
+            catalog.append({
+                "section": section,
+                "key": key,
+                "description": inline or pending_desc,
+            })
+            pending_desc = ""
+    return catalog
 
 # Formato canônico BDD (doc de ajustes §1.1) — steps extraídos de Given/When/Then
 DEFAULT_TC_BODY = """Feature: [Nome da Feature]
@@ -2003,8 +2012,20 @@ def _register_routes(app: FastAPI) -> None:
         return local / ".env"
 
     @app.get(API_PREFIX + "/env/catalog")
-    async def env_catalog(request: Request):
-        return {"catalog": ENV_CATALOG}
+    async def env_catalog(request: Request, target: str = ""):
+        """Catálogo de `.env` derivado do projeto-alvo (0099) — nunca campos
+        fixos. Sem target útil ou sem `.env`/`.env.example`, catálogo vazio."""
+        if not target:
+            return {"catalog": []}
+        ws = ws_of(request)
+        try:
+            cfg = _find_target(ws, target)
+        except HTTPException:
+            return {"catalog": []}
+        local = Path(str(cfg.get("local_path") or ""))
+        if not local.is_dir():
+            return {"catalog": []}
+        return {"catalog": derive_env_catalog(local)}
 
     @app.get(API_PREFIX + "/targets/{name}/env")
     async def get_target_env(request: Request, name: str):

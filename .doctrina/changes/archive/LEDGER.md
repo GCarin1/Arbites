@@ -101,3 +101,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-21 — 0082-pickers-canonicos-por-titulo-em-referencias-a — pickers canonicos por titulo em referencias a entidades (specs: design-system MODIFIED)
 - 2026-07-21 — 0083-acoes-em-lote-no-repositorio-de-cts-e-nas — acoes em lote no repositorio de CTs e nas executions (specs: testcases MODIFIED)
 - 2026-07-21 — 0084-aba-e-filtros-na-url-para-deep-link — aba e filtros na URL para deep-link (specs: design-system MODIFIED)
+- 2026-07-21 — 0099-local-automation-correcoes-de-execucao-injetar-o — correções de execução da automação (specs: local-automation MODIFIED)

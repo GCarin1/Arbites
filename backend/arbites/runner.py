@@ -27,6 +27,45 @@ from .workspace import Workspace
 
 DEFAULT_TIMEOUT_MINUTES = 30.0
 
+
+def load_env_file(path: Path) -> dict[str, str]:
+    """Lê um `.env` estilo dotenv (KEY=VALUE) num dict, ignorando comentários e
+    linhas em branco e removendo aspas do valor. Best-effort: um arquivo
+    ilegível devolve `{}` (0099 — o Arbites se adapta ao projeto)."""
+    values: dict[str, str] = {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return values
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        key = key.strip()
+        if key.lower().startswith("export "):
+            key = key[len("export "):].strip()
+        if key:
+            values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
+def build_run_env(
+    base_env: dict[str, str], local_path: Path, evidence_dir: Path
+) -> dict[str, str]:
+    """Ambiente do subprocess do run (0099): base + `.env` do projeto-alvo, com
+    as chaves de controle do Arbites reafirmadas por último (o `.env` do
+    projeto NUNCA sobrescreve `ARBITES_*`/`PYTHONIOENCODING`)."""
+    env = dict(base_env)
+    env.update(load_env_file(local_path / ".env"))
+    env["ARBITES_EVIDENCE_DIR"] = str(evidence_dir)
+    # o behave é Python: sem isto, no Windows o stdout sai no encoding do
+    # console (cp1252) e a decodificação UTF-8 do pump vira mojibake
+    # ("Cenário" → "Cen�rio") — quebrava o terminal ao vivo E o parse de
+    # progresso (0076)
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
 # Progresso ao vivo (mudança 0076) — parse best-effort do formato plain do
 # behave, EN e PT. A fonte OFICIAL é sempre o Cucumber JSON do fim do run
 # (_collect reconcilia incondicionalmente); o live só antecipa a UX.
@@ -192,13 +231,9 @@ class RunManager:
 
         import os
 
-        env = dict(os.environ)
-        env["ARBITES_EVIDENCE_DIR"] = str(evidence_dir)
-        # o behave é Python: sem isto, no Windows o stdout sai no encoding do
-        # console (cp1252) e a decodificação UTF-8 do pump vira mojibake
-        # ("Cenário" → "Cen�rio") — quebrava o terminal ao vivo E o parse de
-        # progresso (0076)
-        env["PYTHONIOENCODING"] = "utf-8"
+        # 0099: injeta o `.env` do projeto-alvo — sem isto o Behave/WebDriver
+        # não vê BASE_URL/LOCAL_BROWSER/credenciais e o browser abre sem destino.
+        env = build_run_env(dict(os.environ), local_path, evidence_dir)
         timeout = float(target.get("timeout_minutes") or DEFAULT_TIMEOUT_MINUTES) * 60
 
         proc = await asyncio.create_subprocess_exec(
