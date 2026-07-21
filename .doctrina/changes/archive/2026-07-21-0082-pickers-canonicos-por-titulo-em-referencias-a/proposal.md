@@ -1,6 +1,7 @@
 # Change 0082-pickers-canonicos-por-titulo-em-referencias-a — pickers canonicos por titulo em referencias a entidades
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** design-system
@@ -27,9 +28,9 @@ superior, mas não é usado em todo lugar.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Nenhuma referência a entidade via datalist-por-ID restante (grep); Context Pack e demais pontos usando SingleRefInput — build + revisão visual.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Nenhuma referência a entidade via datalist-por-ID restante (grep); Context Pack e demais pontos usando SingleRefInput — build + revisão visual.
 
 ## Open questions
 

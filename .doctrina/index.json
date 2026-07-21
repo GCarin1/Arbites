@@ -94,8 +94,8 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-16",
+        "version": "0.5.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
@@ -339,13 +339,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
-        "title": "pickers canonicos por titulo em referencias a entidades",
-        "path": ".doctrina/changes/0082-pickers-canonicos-por-titulo-em-referencias-a",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
       {
         "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
         "title": "acoes em lote no repositorio de CTs e nas executions",
@@ -1591,6 +1584,19 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "title": "pickers canonicos por titulo em referencias a entidades",
+        "path": ".doctrina/changes/archive/2026-07-21-0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]
