@@ -270,6 +270,27 @@ export interface ExecutionSummary {
   result_counts: Record<string, number>;
 }
 
+export interface ExecutionDiffEntry {
+  testcase_id: string;
+  title: string | null;
+  status_a: string | null;
+  status_b: string | null;
+}
+
+export type ExecutionDiffCategory =
+  | "regressed"
+  | "fixed"
+  | "added"
+  | "removed"
+  | "unchanged";
+
+export interface ExecutionDiff {
+  a: string;
+  b: string;
+  categories: Record<ExecutionDiffCategory, ExecutionDiffEntry[]>;
+  counts: Record<ExecutionDiffCategory, number>;
+}
+
 export interface Defect {
   id: string;
   title: string;

@@ -19,6 +19,7 @@ import type {
   TimelineEntry,
   Execution,
   ExecutionSummary,
+  ExecutionDiff,
   FlakyReport,
   GeneratePreview,
   HealthScore,
@@ -187,6 +188,10 @@ export const api = {
     }),
   closeExecution: (id: string) =>
     request<Execution>(`/executions/${id}/close`, { method: "POST" }),
+  executionsDiff: (a: string, b: string) =>
+    request<ExecutionDiff>(
+      `/executions/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
+    ),
 
   defects: (query = "") => request<Defect[]>(`/defects${query}`),
   defect: (id: string) => request<Defect>(`/defects/${id}`),

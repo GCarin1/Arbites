@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.13.0",
-  "last_updated": "2026-07-20",
+  "last_updated": "2026-07-21",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -102,8 +102,8 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-07-10",
+        "version": "0.6.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
@@ -357,13 +357,6 @@
         "id": "0084-aba-e-filtros-na-url-para-deep-link",
         "title": "aba e filtros na URL para deep-link",
         "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0088-diff-entre-duas-executions",
-        "title": "diff entre duas executions",
-        "path": ".doctrina/changes/0088-diff-entre-duas-executions",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1553,6 +1546,19 @@
         "specs_affected": [
           {
             "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0088-diff-entre-duas-executions",
+        "title": "diff entre duas executions",
+        "path": ".doctrina/changes/archive/2026-07-21-0088-diff-entre-duas-executions",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "executions",
             "operation": "MODIFIED"
           }
         ]

@@ -1236,6 +1236,60 @@ def _register_routes(app: FastAPI) -> None:
         _save_and_index(ws, conn, execution)
         return execution
 
+    @app.get(API_PREFIX + "/executions/diff")
+    async def diff_executions(request: Request, a: str, b: str):
+        """Compara os resultados por CT de duas executions (a → b).
+
+        Categorias: regressed / fixed / added (só em b) / removed (só em a) /
+        unchanged. Leitura pura da tabela `results` (registrada antes da rota
+        `/{exec_id}` para não ser capturada como path param)."""
+        conn = conn_of(request)
+        for eid in (a, b):
+            if not conn.execute(
+                "SELECT 1 FROM executions WHERE id = ?", (eid,)
+            ).fetchone():
+                raise _error(404, "not_found", f"{eid} não encontrada")
+
+        def _results(eid: str) -> dict[str, str]:
+            return {
+                row["testcase_id"]: row["status"]
+                for row in conn.execute(
+                    "SELECT testcase_id, status FROM results WHERE execution_id = ?",
+                    (eid,),
+                )
+            }
+
+        ra, rb = _results(a), _results(b)
+        ids = sorted(set(ra) | set(rb))
+        titles: dict[str, str] = {}
+        if ids:
+            placeholders = ",".join("?" * len(ids))
+            titles = {
+                row["id"]: row["title"]
+                for row in conn.execute(
+                    f"SELECT id, title FROM testcases WHERE id IN ({placeholders})",
+                    ids,
+                )
+            }
+        categories: dict[str, list] = {
+            k: [] for k in ("regressed", "fixed", "added", "removed", "unchanged")
+        }
+        for ct in ids:
+            entry = {"testcase_id": ct, "title": titles.get(ct)}
+            if ct in ra and ct in rb:
+                cat = exec_ops.diff_category(ra[ct], rb[ct])
+                categories[cat].append({**entry, "status_a": ra[ct], "status_b": rb[ct]})
+            elif ct in rb:
+                categories["added"].append({**entry, "status_a": None, "status_b": rb[ct]})
+            else:
+                categories["removed"].append({**entry, "status_a": ra[ct], "status_b": None})
+        return {
+            "a": a,
+            "b": b,
+            "categories": categories,
+            "counts": {k: len(v) for k, v in categories.items()},
+        }
+
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
         return exec_ops.load(ws_of(request), exec_id)

@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
-**Last updated:** 2026-07-10
-**Version:** 0.5.0
+**Last updated:** 2026-07-21
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -58,6 +58,12 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   um run automatizado (por cenário concluído, progresso ao vivo), com o
   estado final oficial vindo da reconciliação com o Cucumber JSON do fim
   do run.
+- The system shall expor `GET /executions/diff?a=&b=` comparando os
+  resultados por CT de duas executions e classificando cada CT em
+  `regressed` (b pior que a), `fixed` (b melhor que a), `added` (só em b),
+  `removed` (só em a) ou `unchanged`; a UI shall oferecer um modo
+  "Comparar" (selecionar duas executions) que abre o diff por categoria,
+  cada CT navegável.
 
 ### Event-driven
 
@@ -111,6 +117,10 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
    cenário e o JSON final reconcilia o estado oficial — verified by
    `backend/tests/test_local_runs.py`
    (`test_live_progress_reconciled_by_final_json`).
+8. [verified] O diff entre duas executions classifica cada CT na categoria
+   correta (regressed/fixed/added/removed/unchanged) — verified by
+   `backend/tests/test_executions.py`
+   (`test_diff_classifies_five_categories`).
 
 ## Maturity
 

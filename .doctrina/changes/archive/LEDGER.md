@@ -93,3 +93,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-20 — 0081-lixeira-listar-e-restaurar-itens-da-trash-pela — lixeira: listar e restaurar itens da trash pela UI (specs: workspace-core MODIFIED)
 - 2026-07-20 — 0085-testar-provider-de-ia-na-configuracao — testar provider de IA na configuracao (specs: ai-assist MODIFIED)
 - 2026-07-20 — 0096-resumo-de-falha-pos-run-pela-ia-com-defeito — resumo de falha pos-run pela IA com defeito draft (specs: ai-assist MODIFIED)
+- 2026-07-21 — 0088-diff-entre-duas-executions — diff entre duas executions (specs: executions MODIFIED)

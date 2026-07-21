@@ -551,6 +551,7 @@ export default function App() {
                     setExecCreating(true);
                   }}
                   onError={setError}
+                  onNavigate={navigateTo}
                 />
               </Suspense>
             )
