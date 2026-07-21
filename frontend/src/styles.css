@@ -2694,3 +2694,11 @@ button.link-chip-btn:disabled {
 .bulk-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .bulk-bar .spacer { flex: 1; }
 .repo-file > input[type="checkbox"] { margin: 0 0.3rem; }
+
+/* -- seletor de .feature: ações em massa (0099) ---------------------------- */
+.feature-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}

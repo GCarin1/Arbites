@@ -232,3 +232,48 @@ def test_live_progress_reconciled_by_final_json(auto_client):
     # o stream registrou parciais ao vivo (best-effort) antes do fim
     stream = auto_client.get(f"/api/v1/runs/{exec_id}/stream")
     assert "[arbites] parcial:" in stream.text
+
+
+# -- 0099: injeção do .env do projeto no ambiente do run ----------------------
+
+from arbites.runner import build_run_env, load_env_file  # noqa: E402
+
+
+def test_load_env_file_parses_and_ignores_noise(tmp_path):
+    p = tmp_path / ".env"
+    p.write_text(
+        "# comentário de topo\n"
+        'BASE_URL="https://app.test"\n'
+        "export LOCAL_BROWSER=chrome\n"
+        "VAZIO=\n"
+        "\n"
+        "linha inválida sem igual\n"
+        "HEADLESS='false'\n",
+        encoding="utf-8",
+    )
+    vals = load_env_file(p)
+    assert vals["BASE_URL"] == "https://app.test"
+    assert vals["LOCAL_BROWSER"] == "chrome"  # prefixo export removido
+    assert vals["VAZIO"] == ""
+    assert vals["HEADLESS"] == "false"
+    assert "linha inválida sem igual" not in vals
+
+
+def test_load_env_file_missing_is_empty(tmp_path):
+    assert load_env_file(tmp_path / "nao-existe.env") == {}
+
+
+def test_build_run_env_injects_project_env_but_arbites_keys_win(tmp_path):
+    (tmp_path / ".env").write_text(
+        "BASE_URL=https://app.test\n"
+        "ARBITES_EVIDENCE_DIR=/tentativa/de/sobrescrever\n"
+        "PYTHONIOENCODING=latin-1\n",
+        encoding="utf-8",
+    )
+    evidence = tmp_path / "ev"
+    env = build_run_env({"PATH": "/bin"}, tmp_path, evidence)
+    assert env["BASE_URL"] == "https://app.test"  # projeto injetado no subprocess
+    assert env["PATH"] == "/bin"  # base preservada
+    # o .env do projeto NUNCA sobrescreve as chaves de controle do Arbites
+    assert env["ARBITES_EVIDENCE_DIR"] == str(evidence)
+    assert env["PYTHONIOENCODING"] == "utf-8"
