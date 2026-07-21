@@ -1501,6 +1501,45 @@
         ]
       },
       {
+        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "title": "pickers canonicos por titulo em referencias a entidades",
+        "path": ".doctrina/changes/archive/2026-07-21-0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "title": "acoes em lote no repositorio de CTs e nas executions",
+        "path": ".doctrina/changes/archive/2026-07-21-0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0084-aba-e-filtros-na-url-para-deep-link",
+        "title": "aba e filtros na URL para deep-link",
+        "path": ".doctrina/changes/archive/2026-07-21-0084-aba-e-filtros-na-url-para-deep-link",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
         "id": "0088-diff-entre-duas-executions",
         "title": "diff entre duas executions",
         "path": ".doctrina/changes/archive/2026-07-21-0088-diff-entre-duas-executions",
@@ -1569,45 +1608,6 @@
         "specs_affected": [
           {
             "capability": "reporting",
-            "operation": "MODIFIED"
-          }
-        ]
-      },
-      {
-        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
-        "title": "pickers canonicos por titulo em referencias a entidades",
-        "path": ".doctrina/changes/archive/2026-07-21-0082-pickers-canonicos-por-titulo-em-referencias-a",
-        "status": "applied",
-        "applied": "2026-07-21",
-        "specs_affected": [
-          {
-            "capability": "design-system",
-            "operation": "MODIFIED"
-          }
-        ]
-      },
-      {
-        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
-        "title": "acoes em lote no repositorio de CTs e nas executions",
-        "path": ".doctrina/changes/archive/2026-07-21-0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
-        "status": "applied",
-        "applied": "2026-07-21",
-        "specs_affected": [
-          {
-            "capability": "testcases",
-            "operation": "MODIFIED"
-          }
-        ]
-      },
-      {
-        "id": "0084-aba-e-filtros-na-url-para-deep-link",
-        "title": "aba e filtros na URL para deep-link",
-        "path": ".doctrina/changes/archive/2026-07-21-0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "applied",
-        "applied": "2026-07-21",
-        "specs_affected": [
-          {
-            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]
