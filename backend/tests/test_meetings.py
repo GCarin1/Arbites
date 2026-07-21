@@ -110,3 +110,63 @@ def test_meetings_appear_in_daily_context(client):
     ctx = client.get(f"/api/v1/daily/{TODAY}/context").json()
     assert any(x["id"] == m["id"] for x in ctx["meetings"])
     assert "Reuniões do dia" in ctx["markdown"] and "Melhorar a automação." in ctx["markdown"]
+
+
+MEETING_BODY = (
+    "# Retro da sprint\n\n"
+    "Discutimos a regressão.\n\n"
+    "## Action items\n"
+    "- [ ] Abrir defeito do ambiente instável\n"
+    "- [ ] Revisar o smoke antes do full\n"
+    "- [x] Item já feito não conta\n"
+    "- linha comum não é action item\n"
+)
+
+
+def test_action_items_deterministic_extraction_and_accept(client):
+    """0097: linhas `- [ ]` viram preview; aceite cria afazeres vinculados à
+    reunião. O caminho determinístico não usa IA."""
+    m = client.post(
+        "/api/v1/meetings", json={"title": "Retro", "body": MEETING_BODY}
+    ).json()
+
+    preview = client.get(f"/api/v1/meetings/{m['id']}/action-items").json()
+    assert preview["deterministic"] == [
+        "Abrir defeito do ambiente instável",
+        "Revisar o smoke antes do full",
+    ]
+    assert preview["converted"] == []
+
+    accept = client.post(
+        f"/api/v1/meetings/{m['id']}/action-items/accept",
+        json={"items": preview["deterministic"]},
+    )
+    assert accept.status_code == 201
+    created = accept.json()["created"]
+    assert len(created) == 2
+
+    # cada afazer aponta de volta para a reunião (link no todo)
+    todo = client.get(f"/api/v1/todos/{created[0]}").json()
+    assert any(link["id"] == m["id"] for link in todo["links"])
+
+    # histórico dos já convertidos aparece no preview seguinte
+    after = client.get(f"/api/v1/meetings/{m['id']}/action-items").json()
+    assert sorted(t["id"] for t in after["converted"]) == sorted(created)
+
+
+def test_action_items_ai_generate_preview(client):
+    """0097: extração assistida por IA devolve preview (mesmo mock da daily)."""
+    m = client.post(
+        "/api/v1/meetings", json={"title": "Planning", "body": "Discussão longa."}
+    ).json()
+    resp = client.post(
+        f"/api/v1/meetings/{m['id']}/action-items/generate", json={}
+    ).json()
+    assert resp["preview"] is True
+    assert resp["action_items"] == SUMMARY["action_items"]
+    # aceite dos itens da IA também cria afazeres vinculados
+    accept = client.post(
+        f"/api/v1/meetings/{m['id']}/action-items/accept",
+        json={"items": resp["action_items"]},
+    ).json()
+    assert len(accept["created"]) == len(SUMMARY["action_items"])

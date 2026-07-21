@@ -144,8 +144,8 @@
         "id": "meetings",
         "path": ".doctrina/specs/meetings/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-07",
+        "version": "0.3.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`",
         "realizes": [
           "SC13"
@@ -357,13 +357,6 @@
         "id": "0084-aba-e-filtros-na-url-para-deep-link",
         "title": "aba e filtros na URL para deep-link",
         "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0097-action-items-de-reuniao-viram-afazeres",
-        "title": "action items de reuniao viram afazeres",
-        "path": ".doctrina/changes/0097-action-items-de-reuniao-viram-afazeres",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1579,6 +1572,19 @@
           },
           {
             "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0097-action-items-de-reuniao-viram-afazeres",
+        "title": "action items de reuniao viram afazeres",
+        "path": ".doctrina/changes/archive/2026-07-21-0097-action-items-de-reuniao-viram-afazeres",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "meetings",
             "operation": "MODIFIED"
           }
         ]

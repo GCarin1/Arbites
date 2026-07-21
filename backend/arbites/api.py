@@ -404,6 +404,14 @@ class MeetingSummarizeIn(BaseModel):
     provider: str | None = None
 
 
+class MeetingActionItemsGenerateIn(BaseModel):
+    provider: str | None = None
+
+
+class MeetingActionItemsAcceptIn(BaseModel):
+    items: list[str]
+
+
 # Catálogo do .env do projeto de automação (doc de ajustes §1.5.1 etapa 5)
 ENV_CATALOG: list[dict[str, str]] = [
     {"section": "Credenciais de Teste", "key": "TEST_DOCUMENTO", "description": "Documento (CPF) utilizado para login nos testes"},
@@ -3062,6 +3070,75 @@ def _register_routes(app: FastAPI) -> None:
             ai_ops.summarize_meeting, provider, _with_memory(ws, body)
         )
         return {"preview": True, "id": meeting_id, **result.model_dump()}
+
+    def _converted_todos(conn, meeting_id: str) -> list[dict]:
+        """Todos já criados a partir desta reunião (link no todo, 0097)."""
+        rows = conn.execute(
+            "SELECT id, title, status FROM todos"
+            " WHERE ',' || COALESCE(links, '') || ',' LIKE ?"
+            " ORDER BY id",
+            (f"%,{meeting_id},%",),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    @app.get(API_PREFIX + "/meetings/{meeting_id}/action-items")
+    async def meeting_action_items(request: Request, meeting_id: str):
+        """Preview determinístico (linhas `- [ ]`) + histórico dos afazeres
+        já convertidos. Funciona sem nenhum provider de IA (0097)."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        return {
+            "id": meeting_id,
+            "deterministic": daily_ops.extract_action_items(body),
+            "converted": _converted_todos(conn, meeting_id),
+        }
+
+    @app.post(API_PREFIX + "/meetings/{meeting_id}/action-items/generate")
+    async def meeting_action_items_generate(
+        request: Request, meeting_id: str, payload: MeetingActionItemsGenerateIn
+    ):
+        """Extração assistida por IA (preview), mesmo padrão da daily — usa o
+        `summarize_meeting` e devolve os action items para revisão."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        if not body.strip():
+            raise _error(422, "empty_meeting",
+                         "reunião sem descrição/transcrição para extrair")
+        result = await asyncio.to_thread(
+            ai_ops.summarize_meeting, provider, _with_memory(ws, body)
+        )
+        return {"preview": True, "id": meeting_id, "action_items": result.action_items}
+
+    @app.post(
+        API_PREFIX + "/meetings/{meeting_id}/action-items/accept", status_code=201
+    )
+    async def meeting_action_items_accept(
+        request: Request, meeting_id: str, payload: MeetingActionItemsAcceptIn
+    ):
+        """Cria um afazer por item selecionado, vinculado à reunião (0097)."""
+        ws, conn = ws_of(request), conn_of(request)
+        _find_path(conn, "meetings", meeting_id)  # 404 se a reunião não existe
+        created: list[str] = []
+        for title in payload.items:
+            title = title.strip()
+            if not title:
+                continue
+            todo_id = ws.next_id("todo")
+            meta = {
+                "id": todo_id,
+                "title": title,
+                "status": "open",
+                "links": [meeting_id],
+                "created": date.today().isoformat(),
+            }
+            path = ws.root / "todos" / f"{todo_id}-{slugify(title)}.md"
+            _write_doc(path, meta, "")
+            reindex_file(ws, conn, path)
+            created.append(todo_id)
+        return {"created": created, "converted": _converted_todos(conn, meeting_id)}
 
     # -- decisions / decisões arquiteturais (Memória Histórica) -------------
     # Ponteiro + metadados do TIME DE QA sobre o projeto sob teste — não é

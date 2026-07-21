@@ -185,6 +185,12 @@ export interface MeetingSummaryResult {
   action_items: string[];
 }
 
+export interface MeetingActionItems {
+  id: string;
+  deterministic: string[];
+  converted: { id: string; title: string; status: string }[];
+}
+
 export interface TreeNode {
   name: string;
   path: string;

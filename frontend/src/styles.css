@@ -2683,3 +2683,9 @@ button.link-chip-btn:disabled {
   border-color: color-mix(in srgb, var(--accent, #58a6ff) 45%, transparent);
   background: color-mix(in srgb, var(--accent, #58a6ff) 12%, transparent);
 }
+
+/* -- action items da reunião (0097) ---------------------------------------- */
+.action-items { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.ai-preview-list { list-style: none; margin: 0.25rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.ai-preview-list li { margin: 0; }
+.converted-items { margin-top: 0.5rem; }

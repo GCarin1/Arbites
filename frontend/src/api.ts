@@ -13,6 +13,7 @@ import type {
   EvidenceEntry,
   Meeting,
   MeetingSummaryResult,
+  MeetingActionItems,
   RiskMap,
   SavedDaily,
   TestCaseResult,
@@ -286,6 +287,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ provider: provider ?? null }),
     }),
+  meetingActionItems: (id: string) =>
+    request<MeetingActionItems>(`/meetings/${id}/action-items`),
+  generateMeetingActionItems: (id: string, provider?: string | null) =>
+    request<{ preview: boolean; id: string; action_items: string[] }>(
+      `/meetings/${id}/action-items/generate`,
+      { method: "POST", body: JSON.stringify({ provider: provider ?? null }) },
+    ),
+  acceptMeetingActionItems: (id: string, items: string[]) =>
+    request<{ created: string[]; converted: { id: string; title: string; status: string }[] }>(
+      `/meetings/${id}/action-items/accept`,
+      { method: "POST", body: JSON.stringify({ items }) },
+    ),
 
   squads: () => request<{ squads: string[] }>("/squads"),
   metricsSummary: (sprint: string, days: number, squad = "") =>

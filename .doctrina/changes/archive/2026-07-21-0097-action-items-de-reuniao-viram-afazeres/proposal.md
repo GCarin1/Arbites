@@ -1,6 +1,7 @@
 # Change 0097-action-items-de-reuniao-viram-afazeres — action items de reuniao viram afazeres
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-07-21
 - **Date:** 2026-07-19
 - **Owner:**
 - **Affects specs:** meetings
@@ -28,9 +29,9 @@ fica parada. Mesmo mecanismo, mesma UX, loop reunião→afazer fechado.
 
 ## Verification
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Linhas `- [ ]` viram preview; aceite cria todos vinculados; sem provider o fluxo determinístico funciona — `backend/tests/test_meetings.py`.
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Linhas `- [ ]` viram preview; aceite cria todos vinculados; sem provider o fluxo determinístico funciona — `backend/tests/test_meetings.py`.
 
 ## Open questions
 

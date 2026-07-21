@@ -190,6 +190,12 @@ function MeetingModal({
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // 0097: action items → afazeres
+  const [converted, setConverted] = useState<{ id: string; title: string; status: string }[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [aiItems, setAiItems] = useState<string[]>([]);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [working, setWorking] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -199,8 +205,75 @@ function MeetingModal({
         .meeting(meeting.id)
         .then((full) => setBody(full.body ?? ""))
         .catch(() => {});
+      api
+        .meetingActionItems(meeting.id)
+        .then((r) => setConverted(r.converted))
+        .catch(() => {});
     }
   }, [meeting]);
+
+  useEffect(() => {
+    api
+      .aiProviders()
+      .then((info) => setAiEnabled(!!info.default_provider))
+      .catch(() => setAiEnabled(false));
+  }, []);
+
+  // extração determinística ao vivo (linhas `- [ ]`), reflete o textarea sem
+  // depender de salvar nem de IA — a aba funciona 100% sem provider.
+  const alreadyTitles = new Set(converted.map((c) => c.title));
+  const deterministic = Array.from(
+    new Set(
+      body
+        .split("\n")
+        .map((l) => /^\s*[-*]\s*\[\s*\]\s+(.+?)\s*$/.exec(l)?.[1]?.trim())
+        .filter((x): x is string => !!x),
+    ),
+  );
+  const previewItems = Array.from(new Set([...deterministic, ...aiItems])).filter(
+    (t) => !alreadyTitles.has(t),
+  );
+
+  function toggleSel(item: string) {
+    setSelected((old) => {
+      const next = new Set(old);
+      if (next.has(item)) next.delete(item);
+      else next.add(item);
+      return next;
+    });
+  }
+
+  async function generateWithAi() {
+    if (!meeting) return;
+    setWorking(true);
+    try {
+      await api.updateMeeting(meeting.id, { body }); // sincroniza o corpo
+      const r = await api.generateMeetingActionItems(meeting.id);
+      setAiItems(r.action_items);
+      setSelected(new Set([...selected, ...r.action_items]));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function acceptSelected() {
+    if (!meeting || selected.size === 0) return;
+    setWorking(true);
+    try {
+      const r = await api.acceptMeetingActionItems(meeting.id, [...selected]);
+      setConverted(r.converted);
+      setSelected(new Set());
+      setAiItems([]);
+      toast(`${r.created.length} afazer(es) criado(s)`);
+      onSaved();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWorking(false);
+    }
+  }
 
   async function save(): Promise<Meeting | null> {
     const payload = { title: title.trim(), date: meetDate || null, body, summary: summary || null };
@@ -311,6 +384,64 @@ function MeetingModal({
           spellCheck={false}
         />
       </div>
+      {meeting ? (
+        <div className="modal-field action-items">
+          <div className="toolbar">
+            <label style={{ margin: 0 }}>Action items</label>
+            <span className="spacer" />
+            {aiEnabled && (
+              <button onClick={() => void generateWithAi()} disabled={working || !body.trim()}>
+                {working ? "…" : "Sugerir com IA"}
+              </button>
+            )}
+            <button
+              className="primary"
+              onClick={() => void acceptSelected()}
+              disabled={working || selected.size === 0}
+            >
+              Criar afazeres ({selected.size})
+            </button>
+          </div>
+          {previewItems.length === 0 ? (
+            <p className="caption muted">
+              Escreva itens como <span className="mono">- [ ] fazer X</span> na
+              descrição — eles aparecem aqui para virar afazeres.
+            </p>
+          ) : (
+            <ul className="ai-preview-list">
+              {previewItems.map((item) => (
+                <li key={item}>
+                  <label className="check-inline">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(item)}
+                      onChange={() => toggleSel(item)}
+                    />
+                    <span>{item}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {converted.length > 0 && (
+            <div className="converted-items">
+              <span className="caption muted">Já convertidos:</span>
+              <ul className="ai-preview-list">
+                {converted.map((c) => (
+                  <li key={c.id} className="caption">
+                    <span className="mono muted">{c.id}</span> {c.title}{" "}
+                    <span className={`status-dot dot-${c.status} caption`}>{c.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="caption muted">
+          Salve a reunião para extrair action items em afazeres.
+        </p>
+      )}
       </div>
     </Modal>
   );
