@@ -2676,3 +2676,10 @@ button.link-chip-btn:disabled {
   border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
+
+/* -- badge needs_rerun (0090) ---------------------------------------------- */
+.badge-rerun {
+  color: var(--accent, #58a6ff);
+  border-color: color-mix(in srgb, var(--accent, #58a6ff) 45%, transparent);
+  background: color-mix(in srgb, var(--accent, #58a6ff) 12%, transparent);
+}

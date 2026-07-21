@@ -62,10 +62,25 @@ export function TcRepository({
   const [fPriority, setFPriority] = useState("");
   const [fType, setFType] = useState("");
   const [fTag, setFTag] = useState("");
+  const [fRerun, setFRerun] = useState(false); // 0090: só CTs que precisam re-exec
   const [matchIds, setMatchIds] = useState<Set<string> | null>(null); // null = sem filtro
+  const [rerunIds, setRerunIds] = useState<Set<string>>(new Set()); // p/ badge
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const filterActive = !!(q.trim() || fStatus || fPriority || fType || fTag.trim());
+  // conjunto dos CTs marcados needs_rerun (badge no repositório, 0090) —
+  // recarrega quando a árvore muda (após apply de sync / novo resultado).
+  useEffect(() => {
+    let alive = true;
+    api
+      .testcases("?needs_rerun=true")
+      .then((rows) => alive && setRerunIds(new Set(rows.map((r) => r.id))))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [root]);
+
+  const filterActive = !!(q.trim() || fStatus || fPriority || fType || fTag.trim() || fRerun);
   useEffect(() => {
     if (!filterActive) {
       setMatchIds(null);
@@ -79,6 +94,7 @@ export function TcRepository({
       if (fPriority) params.set("priority", fPriority);
       if (fType) params.set("type", fType);
       if (fTag.trim()) params.set("tag", fTag.trim().replace(/^@/, ""));
+      if (fRerun) params.set("needs_rerun", "true");
       api
         .testcases(`?${params.toString()}`)
         .then((rows) => alive && setMatchIds(new Set(rows.map((r) => r.id))))
@@ -89,7 +105,7 @@ export function TcRepository({
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, fStatus, fPriority, fType, fTag, filterActive]);
+  }, [q, fStatus, fPriority, fType, fTag, fRerun, filterActive]);
 
   function toggle(path: string) {
     setCollapsed((old) => {
@@ -274,6 +290,14 @@ export function TcRepository({
               <span className="mono muted">{f.id ?? "?"}</span>
               <span className="repo-file-title">{f.title}</span>
             </button>
+            {f.id && rerunIds.has(f.id) && (
+              <span
+                className="badge badge-rerun caption"
+                title="Steps re-baseados na sync — precisa re-execução"
+              >
+                re-exec
+              </span>
+            )}
             {f.status && (
               <span className={`status-dot dot-${f.status} caption`}>{f.status}</span>
             )}
@@ -346,11 +370,20 @@ export function TcRepository({
           value={fTag}
           onChange={(e) => setFTag(e.target.value)}
         />
+        <label className="check-inline caption" title="Só CTs com re-execução pendente">
+          <input
+            type="checkbox"
+            checked={fRerun}
+            onChange={(e) => setFRerun(e.target.checked)}
+          />
+          <span>precisa re-exec</span>
+        </label>
         {filterActive && (
           <button
             className="btn-sm"
             onClick={() => {
               setQ(""); setFStatus(""); setFPriority(""); setFType(""); setFTag("");
+              setFRerun(false);
             }}
           >
             Limpar

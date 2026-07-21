@@ -188,3 +188,24 @@ def test_quarantine_toggle_persists_in_frontmatter(client):
     assert off["quarantine"] is False
     text = (client.ws.root / ct["path"]).read_text(encoding="utf-8")
     assert "quarantine" not in text  # false não polui o frontmatter
+
+
+def test_needs_rerun_filter_lists_only_flagged(client):
+    """0090: `GET /testcases?needs_rerun=true` lista só os CTs marcados; o
+    campo volta como bool no detalhe."""
+    plain = client.post("/api/v1/testcases", json={"title": "Estável"}).json()
+    flagged = client.post("/api/v1/testcases", json={"title": "Precisa rerun"}).json()
+
+    # marca via raw (o flag é gerido pelo sistema; aqui simulamos o estado)
+    raw = client.get(f"/api/v1/testcases/{flagged['id']}/raw").text
+    marked = raw.replace(f"id: {flagged['id']}", f"id: {flagged['id']}\nneeds_rerun: true")
+    client.put(f"/api/v1/testcases/{flagged['id']}/raw", json={"content": marked})
+
+    assert client.get(f"/api/v1/testcases/{flagged['id']}").json()["needs_rerun"] is True
+    assert client.get(f"/api/v1/testcases/{plain['id']}").json()["needs_rerun"] is False
+
+    only = client.get("/api/v1/testcases", params={"needs_rerun": True}).json()
+    assert [t["id"] for t in only] == [flagged["id"]]
+    none = client.get("/api/v1/testcases", params={"needs_rerun": False}).json()
+    assert flagged["id"] not in [t["id"] for t in none]
+    assert plain["id"] in [t["id"] for t in none]

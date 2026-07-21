@@ -86,6 +86,7 @@ export interface TestCase {
   squad: string | null;
   squad_effective: string | null;
   quarantine?: boolean; // fora do pass rate quando true (0089)
+  needs_rerun?: boolean; // re-base de steps pendente de re-execução (0090)
   tags?: string[];
   criteria?: string[]; // EARS ids da story que este CT cobre (0092)
   body?: string;

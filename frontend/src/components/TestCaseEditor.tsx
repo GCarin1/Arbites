@@ -173,6 +173,14 @@ export function TestCaseEditor({
                     quarentena
                   </span>
                 )}
+                {tc.needs_rerun && (
+                  <span
+                    className="badge badge-rerun"
+                    title="Steps re-baseados na sync — precisa re-execução"
+                  >
+                    precisa re-execução
+                  </span>
+                )}
               </span>
             }
             actions={

@@ -11,6 +11,8 @@ import os
 import re
 import sqlite3
 import time
+
+import frontmatter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,7 +46,8 @@ CREATE TABLE IF NOT EXISTS testcases(
   story_id TEXT, path TEXT, mtime REAL,
   automation_target TEXT, scenario_tag TEXT, external_key TEXT,
   squad TEXT, squad_effective TEXT, created TEXT,
-  feature_path TEXT, scenario_name TEXT, quarantine INTEGER DEFAULT 0);
+  feature_path TEXT, scenario_name TEXT, quarantine INTEGER DEFAULT 0,
+  needs_rerun INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS tc_tags(testcase_id TEXT, tag TEXT);
 CREATE TABLE IF NOT EXISTS criteria(
   story_id TEXT, ears_id TEXT, ord INTEGER, text TEXT, form TEXT,
@@ -117,6 +120,7 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE defects ADD COLUMN lesson_procedure TEXT",
         "ALTER TABLE defects ADD COLUMN lesson_antipattern TEXT",
         "ALTER TABLE testcases ADD COLUMN quarantine INTEGER DEFAULT 0",
+        "ALTER TABLE testcases ADD COLUMN needs_rerun INTEGER DEFAULT 0",
     ):
         try:
             conn.execute(ddl)
@@ -327,6 +331,27 @@ def reindex_file(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
             time.sleep(0.05 * (attempt + 1))
 
 
+def clear_needs_rerun(ws: Workspace, conn: sqlite3.Connection, ct_id: str) -> None:
+    """0090: registrar um resultado novo do CT limpa o flag `needs_rerun`
+    (frontmatter + índice). No-op se o CT não existe ou não estava marcado."""
+    row = conn.execute(
+        "SELECT path, needs_rerun FROM testcases WHERE id = ?", (ct_id,)
+    ).fetchone()
+    if not row or not row["needs_rerun"]:
+        return
+    path = ws.root / row["path"]
+    if not path.exists():
+        return
+    post = frontmatter.load(str(path))
+    if "needs_rerun" not in post.metadata:
+        conn.execute("UPDATE testcases SET needs_rerun = 0 WHERE id = ?", (ct_id,))
+        conn.commit()
+        return
+    post.metadata.pop("needs_rerun", None)
+    path.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+    reindex_file(ws, conn, path)
+
+
 def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> None:
     rel = ws.relpath(path)
     if rel.split("/", 1)[0] == "executions" and path.name == "execution.json":
@@ -483,8 +508,8 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
         "INSERT OR REPLACE INTO testcases"
         "(id, title, type, priority, status, story_id, path, mtime,"
         " automation_target, scenario_tag, external_key, squad, squad_effective, created,"
-        " feature_path, scenario_name, quarantine)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " feature_path, scenario_name, quarantine, needs_rerun)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             doc.id,
             str(doc.meta.get("title", "")),
@@ -503,6 +528,7 @@ def _insert_testcase(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None
             automation.get("feature_path") if isinstance(automation, dict) else None,
             automation.get("scenario_name") if isinstance(automation, dict) else None,
             1 if doc.meta.get("quarantine") else 0,
+            1 if doc.meta.get("needs_rerun") else 0,
         ),
     )
     for tag in _tags(doc):

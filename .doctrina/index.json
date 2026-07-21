@@ -133,8 +133,8 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.7.0",
-        "last_updated": "2026-07-10",
+        "version": "0.8.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
           "SC5"
@@ -215,7 +215,7 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.9.0",
+        "version": "0.10.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
@@ -357,13 +357,6 @@
         "id": "0084-aba-e-filtros-na-url-para-deep-link",
         "title": "aba e filtros na URL para deep-link",
         "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
-        "title": "sync de feature atualizado marca CT precisa re-execucao",
-        "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
         "status": "proposed",
         "opened": "2026-07-19"
       },
@@ -1565,6 +1558,23 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "title": "sync de feature atualizado marca CT precisa re-execucao",
+        "path": ".doctrina/changes/archive/2026-07-21-0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
             "operation": "MODIFIED"
           },
           {

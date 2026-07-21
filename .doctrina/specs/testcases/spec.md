@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-07-21
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -86,6 +86,11 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   resultado alternou pass/fail nas últimas execuções (via `GET
   /metrics/flaky`) e um badge de `quarentena` quando o CT está isolado (ver
   `reporting` para o efeito no pass rate).
+- The system shall indexar `needs_rerun` do frontmatter do CT (bool exposto
+  em `GET /testcases/{id}`), aceitar o filtro `needs_rerun` em `GET
+  /testcases` e exibir o badge "precisa re-execução" no repositório e no
+  detalhe do CT (o flag é gerido pela sync de features — ver
+  `local-automation`).
 
 ### Event-driven
 
@@ -176,6 +181,11 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     `backend/tests/test_testcases.py`
     (`test_quarantine_toggle_persists_in_frontmatter`) + build + revisão
     visual.
+
+15. [verified] `needs_rerun` é indexado e exposto como bool; o filtro
+    `GET /testcases?needs_rerun=true` lista só os marcados; badge no
+    repositório e no detalhe — verified by `backend/tests/test_testcases.py`
+    (`test_needs_rerun_filter_lists_only_flagged`) + build + revisão visual.
 
 ## Maturity
 

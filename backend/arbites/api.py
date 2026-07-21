@@ -54,7 +54,7 @@ from .gherkin_scan import (
 )
 from .runner import RunManager
 from .xray_import import XrayImportError
-from .indexer import connect, reindex_file, reindex_full
+from .indexer import clear_needs_rerun, connect, reindex_file, reindex_full
 from .parser import parse_markdown
 from .watcher import start_watcher
 from .workspace import Workspace, slugify
@@ -628,6 +628,7 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
         raise _error(404, "not_found", f"{entity_id} não encontrado")
     out = dict(row)
     out["quarantine"] = bool(row["quarantine"])
+    out["needs_rerun"] = bool(row["needs_rerun"])
     out["tags"] = [
         r["tag"]
         for r in conn.execute(
@@ -969,6 +970,7 @@ def _register_routes(app: FastAPI) -> None:
         folder: str = "",
         squad: str = "",
         q: str = "",
+        needs_rerun: bool | None = None,
     ):
         sql, params = "SELECT DISTINCT t.* FROM testcases t", []
         if tag:
@@ -985,6 +987,9 @@ def _register_routes(app: FastAPI) -> None:
             if value:
                 sql += f" AND t.{field} = ?"
                 params.append(value)
+        if needs_rerun is not None:
+            sql += " AND COALESCE(t.needs_rerun, 0) = ?"
+            params.append(1 if needs_rerun else 0)
         if folder:
             sql += " AND t.path LIKE ?"
             params.append(f"testcases/{folder.strip('/')}/%")
@@ -1337,6 +1342,7 @@ def _register_routes(app: FastAPI) -> None:
             execution, ct_id, payload.status, payload.who, payload.comment, payload.column
         )
         _save_and_index(ws, conn, execution)
+        clear_needs_rerun(ws, conn, ct_id)  # resultado novo → limpa re-execução (0090)
         return execution
 
     @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/steps/{step_index}")
@@ -1832,6 +1838,9 @@ def _register_routes(app: FastAPI) -> None:
                 str(automation.get("scenario_name", "")),
             )
             meta["updated"] = date.today().isoformat()
+            # re-base consciente de steps → o CT precisa ser re-executado (0090);
+            # o flag é limpo quando um resultado novo do CT é registrado
+            meta["needs_rerun"] = True
             _write_doc(ws.root / rel, meta, feature_sync_ops.scenario_body(
                 feat["feature_name"], sc, feat["language"]
             ))
