@@ -155,12 +155,52 @@ export function ExecutionsRepo({
   const [compareMode, setCompareMode] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [diff, setDiff] = useState<ExecutionDiff | null>(null);
+  // 0083: modo de seleção múltipla → exclusão em lote (endpoints unitários).
+  const [selMode, setSelMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { toast } = useToast();
 
   function toggleCompare() {
     setCompareMode((on) => !on);
     setPicked([]);
     setDiff(null);
+  }
+
+  function toggleSelMode() {
+    setSelMode((on) => !on);
+    setSelected(new Set());
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function runBulkDelete() {
+    const ids = [...selected];
+    setConfirmBulkDelete(false);
+    setBulkBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const id of ids) {
+      try {
+        await api.deleteExecution(id);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setBulkBusy(false);
+    toast(`${ok} excluída(s)${fail ? ` · ${fail} falha(s)` : ""}`);
+    setSelMode(false);
+    setSelected(new Set());
+    load();
   }
 
   function togglePick(id: string) {
@@ -225,9 +265,16 @@ export function ExecutionsRepo({
         <span className="spacer" />
         <div className="head-controls">
           <button
+            className={selMode ? "primary" : ""}
+            onClick={toggleSelMode}
+            disabled={items.length === 0 || compareMode}
+          >
+            {selMode ? "Cancelar seleção" : "Selecionar"}
+          </button>
+          <button
             className={compareMode ? "primary" : ""}
             onClick={toggleCompare}
-            disabled={items.length < 2}
+            disabled={items.length < 2 || selMode}
             title="Selecionar duas execuções para comparar os resultados"
           >
             {compareMode ? "Cancelar comparação" : "Comparar"}
@@ -252,6 +299,19 @@ export function ExecutionsRepo({
             onClick={() => void runDiff()}
           >
             Comparar selecionadas
+          </button>
+        </div>
+      )}
+      {selMode && (
+        <div className="card compare-bar bulk-bar">
+          <span className="caption">{selected.size} selecionada(s)</span>
+          <span className="spacer" />
+          <button
+            className="btn-sm danger"
+            disabled={selected.size === 0 || bulkBusy}
+            onClick={() => setConfirmBulkDelete(true)}
+          >
+            {bulkBusy ? "Excluindo…" : "Excluir selecionadas"}
           </button>
         </div>
       )}
@@ -294,16 +354,31 @@ export function ExecutionsRepo({
                         key={item.id}
                         className={
                           "repo-row repo-file" +
-                          (compareMode && picked.includes(item.id) ? " selected" : "")
+                          ((compareMode && picked.includes(item.id)) ||
+                          (selMode && selected.has(item.id))
+                            ? " selected"
+                            : "")
                         }
                       >
                         <span className="tree-prefix">
                           {childPrefix + (ii === list.length - 1 ? "└── " : "├── ")}
                         </span>
+                        {selMode && (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(item.id)}
+                            onChange={() => toggleSelected(item.id)}
+                            aria-label={`Selecionar ${item.id}`}
+                          />
+                        )}
                         <button
                           className="repo-file-main"
                           onClick={() =>
-                            compareMode ? togglePick(item.id) : onOpen(item.id)
+                            selMode
+                              ? toggleSelected(item.id)
+                              : compareMode
+                                ? togglePick(item.id)
+                                : onOpen(item.id)
                           }
                         >
                           {compareMode && (
@@ -354,6 +429,21 @@ export function ExecutionsRepo({
           danger
           onConfirm={() => void remove(deleting)}
           onCancel={() => setDeleting(null)}
+        />
+      )}
+      {confirmBulkDelete && (
+        <ConfirmModal
+          title="Excluir execuções em lote"
+          message={
+            <>
+              Mover <strong>{selected.size}</strong> execução
+              {selected.size === 1 ? "" : "ões"} e suas evidências para a lixeira?
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void runBulkDelete()}
+          onCancel={() => setConfirmBulkDelete(false)}
         />
       )}
       {diff && (

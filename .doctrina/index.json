@@ -215,7 +215,7 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
@@ -339,13 +339,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
-        "title": "acoes em lote no repositorio de CTs e nas executions",
-        "path": ".doctrina/changes/0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
       {
         "id": "0084-aba-e-filtros-na-url-para-deep-link",
         "title": "aba e filtros na URL para deep-link",
@@ -1597,6 +1590,19 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "title": "acoes em lote no repositorio de CTs e nas executions",
+        "path": ".doctrina/changes/archive/2026-07-21-0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "testcases",
             "operation": "MODIFIED"
           }
         ]

@@ -99,3 +99,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-21 — 0097-action-items-de-reuniao-viram-afazeres — action items de reuniao viram afazeres (specs: meetings MODIFIED)
 - 2026-07-21 — 0098-reporte-executivo-narrado-pela-ia — reporte executivo narrado pela IA (specs: reporting MODIFIED)
 - 2026-07-21 — 0082-pickers-canonicos-por-titulo-em-referencias-a — pickers canonicos por titulo em referencias a entidades (specs: design-system MODIFIED)
+- 2026-07-21 — 0083-acoes-em-lote-no-repositorio-de-cts-e-nas — acoes em lote no repositorio de CTs e nas executions (specs: testcases MODIFIED)

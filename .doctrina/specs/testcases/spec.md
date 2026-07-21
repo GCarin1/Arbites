@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-07-21
-**Version:** 0.10.0
+**Version:** 0.11.0
 
 ## Purpose
 
@@ -61,6 +61,12 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   de outra pasta sob `testcases/` via `POST /testcases/folders/move`,
   preservando toda a subárvore e reindexando cada `.md` afetado no novo
   caminho (IDs preservados).
+- The system shall oferecer no repositório de CTs um modo de seleção
+  múltipla com ações em lote (mudar status, mover de pasta, excluir para a
+  lixeira), executadas pelo cliente sobre os endpoints unitários, com
+  confirmação prévia (`ConfirmModal`) e resumo de sucesso/falha (toast
+  `X ok · Y falha(s)`); a lista de executions oferece exclusão em lote no
+  mesmo padrão (ver `executions`). Sem endpoint bulk no backend (N chamadas).
 - The system shall indexar e expor a data de criação (`created`) do CT na
   árvore e no detalhe.
 - The system shall aceitar `external_key` opcional no frontmatter do CT
@@ -186,6 +192,12 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     `GET /testcases?needs_rerun=true` lista só os marcados; badge no
     repositório e no detalhe — verified by `backend/tests/test_testcases.py`
     (`test_needs_rerun_filter_lists_only_flagged`) + build + revisão visual.
+
+16. [verified] Seleção múltipla no repositório aplica status/mover/excluir
+    em lote com confirmação e resumo X ok · Y falhas; executions têm
+    exclusão em lote no mesmo padrão — verified by build + revisão visual
+    (os endpoints unitários já são cobertos por
+    `backend/tests/test_testcases.py` e `backend/tests/test_executions.py`).
 
 ## Maturity
 
