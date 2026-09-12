@@ -98,6 +98,19 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 CREATE INDEX IF NOT EXISTS idx_attempts_email_at ON login_attempts(email, at);
 CREATE INDEX IF NOT EXISTS idx_attempts_ip_at ON login_attempts(ip, at);
 
+CREATE TABLE IF NOT EXISTS activity (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    user_id     INTEGER,
+    user_email  TEXT NOT NULL DEFAULT '',
+    method      TEXT NOT NULL,
+    path        TEXT NOT NULL,
+    status_code INTEGER NOT NULL,
+    ip          TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_activity_at ON activity(at);
+CREATE INDEX IF NOT EXISTS idx_activity_user ON activity(user_email, at);
+
 CREATE TABLE IF NOT EXISTS switches (
     name       TEXT PRIMARY KEY,
     enabled    INTEGER NOT NULL,
@@ -536,3 +549,65 @@ def set_switch(
     )
     conn.commit()
     return next(s for s in list_switches(conn) if s["name"] == name)
+
+
+# -- log de atividade -------------------------------------------------------
+#
+# Contínuo e imutável, ao lado das rodadas de auditoria de qualidade. Vive no
+# banco durável porque um reindex não pode apagar a prova de quem apagou o
+# quê, e não existe rota que o edite ou remova: registro que o próprio
+# suspeito apaga não prova nada.
+
+
+def record_activity(
+    conn: sqlite3.Connection,
+    user: dict[str, Any] | None,
+    method: str,
+    path: str,
+    status_code: int,
+    ip: str = "",
+) -> None:
+    conn.execute(
+        "INSERT INTO activity (at, user_id, user_email, method, path,"
+        " status_code, ip) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (_iso(_now()), (user or {}).get("id"), (user or {}).get("email", ""),
+         method, path, status_code, ip),
+    )
+    conn.commit()
+
+
+def list_activity(
+    conn: sqlite3.Connection,
+    limit: int = 100,
+    offset: int = 0,
+    user: str = "",
+    path: str = "",
+    date_from: str = "",
+    date_to: str = "",
+) -> list[dict[str, Any]]:
+    clauses, params = [], []
+    if user:
+        clauses.append("user_email = ? COLLATE NOCASE")
+        params.append(user.strip())
+    if path:
+        clauses.append("path LIKE ?")
+        params.append("%%%s%%" % path.strip())
+    if date_from:
+        clauses.append("at >= ?")
+        params.append(date_from)
+    if date_to:
+        # Data solta significa o dia inteiro, não o instante zero dele.
+        params.append(date_to if len(date_to) > 10 else date_to + "T23:59:59Z")
+        clauses.append("at <= ?")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    params.extend([max(1, min(limit, 500)), max(0, offset)])
+    rows = conn.execute(
+        "SELECT at, user_email, method, path, status_code, ip FROM activity"
+        + where + " ORDER BY at DESC, id DESC LIMIT ? OFFSET ?",
+        params,
+    ).fetchall()
+    return [
+        {"at": r["at"], "user_email": r["user_email"], "method": r["method"],
+         "path": r["path"], "status_code": r["status_code"], "ip": r["ip"]}
+        for r in rows
+    ]

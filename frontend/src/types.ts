@@ -34,6 +34,15 @@ export interface LoginAttempt {
   at: string;
 }
 
+export interface ActivityEntry {
+  at: string;
+  user_email: string;
+  method: string;
+  path: string;
+  status_code: number;
+  ip: string;
+}
+
 export interface AdminOverview {
   version: string;
   users: Record<UserStatus, number>;

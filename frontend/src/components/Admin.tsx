@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import type { AdminOverview, LoginAttempt, ManagedUser, Role, Switch } from "../types";
+import type {
+  ActivityEntry,
+  AdminOverview,
+  LoginAttempt,
+  ManagedUser,
+  Role,
+  Switch,
+} from "../types";
 import { useToast } from "./Toast";
 
-type Pane = "users" | "access" | "system";
+type Pane = "users" | "access" | "activity" | "system";
 
 const PANES: { key: Pane; label: string }[] = [
   { key: "users", label: "Usuários" },
   { key: "access", label: "Acessos" },
+  { key: "activity", label: "Atividade" },
   { key: "system", label: "Sistema" },
 ];
 
@@ -30,23 +38,28 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [attempts, setAttempts] = useState<LoginAttempt[]>([]);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [filterUser, setFilterUser] = useState("");
+  const [filterPath, setFilterPath] = useState("");
   const [pendingRole, setPendingRole] = useState<Record<number, Role>>({});
   const { toast } = useToast();
 
   const load = useCallback(async () => {
     try {
-      const [u, a, o] = await Promise.all([
+      const [u, a, o, act] = await Promise.all([
         api.adminUsers(),
         api.adminAccessLog(),
         api.adminOverview(),
+        api.adminActivity({ user: filterUser, path: filterPath }),
       ]);
       setUsers(u.users);
       setAttempts(a.attempts);
       setOverview(o);
+      setActivity(act.entries);
     } catch (err) {
       toast(err instanceof Error ? err.message : "falha ao carregar", "error");
     }
-  }, [toast]);
+  }, [toast, filterUser, filterPath]);
 
   useEffect(() => {
     void load();
@@ -326,6 +339,64 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
             </div>
           {attempts.length === 0 && (
             <p className="muted">Nenhuma tentativa registrada ainda.</p>
+          )}
+        </div>
+      )}
+
+      {pane === "activity" && (
+        <div className="card block">
+          <div className="card-head">
+            <h3>Quem fez o quê</h3>
+          </div>
+          <div className="field-grid">
+            <div className="field col-3">
+              <label htmlFor="act-user">Autor</label>
+              <input
+                id="act-user"
+                placeholder="e-mail exato"
+                value={filterUser}
+                onChange={(e) => setFilterUser(e.target.value)}
+              />
+            </div>
+            <div className="field col-3">
+              <label htmlFor="act-path">Caminho contém</label>
+              <input
+                id="act-path"
+                placeholder="/testcases"
+                value={filterPath}
+                onChange={(e) => setFilterPath(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table className="dense">
+              <thead>
+                <tr>
+                  <th>Quando</th>
+                  <th>Autor</th>
+                  <th>Ação</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activity.map((e, i) => (
+                  <tr key={`${e.at}-${i}`}>
+                    <td>{when(e.at)}</td>
+                    <td>{e.user_email}</td>
+                    <td className="mono">
+                      {e.method} {e.path}
+                    </td>
+                    <td className="mono">{e.ip || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {activity.length === 0 && (
+            <p className="muted">
+              Nenhuma escrita registrada com esses filtros. Leituras não entram
+              aqui, e tentativas recusadas também não.
+            </p>
           )}
         </div>
       )}

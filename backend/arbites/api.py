@@ -3638,7 +3638,18 @@ def _register_auth(app: FastAPI) -> None:
                     "message": "recurso desligado pelo administrador"
                                " (interruptor '%s')" % switch}},
             )
-        return await call_next(request)
+        response = await call_next(request)
+        # Log de atividade aqui, e nao rota a rota: uma rota de escrita nova
+        # entra no registro sozinha. Nada de corpo — caminho e metodo bastam,
+        # e o corpo levaria senha e token para um registro que ninguem apaga.
+        if (request.method not in ("GET", "HEAD", "OPTIONS")
+                and response.status_code < 400
+                and not path.startswith(API_PREFIX + "/auth/")):
+            auth_ops.record_activity(
+                request.app.state.auth, user, request.method, path,
+                response.status_code, client_ip(request),
+            )
+        return response
 
     @app.get(API_PREFIX + "/health")
     async def health():
@@ -3758,6 +3769,19 @@ def _register_auth(app: FastAPI) -> None:
         revoked = auth_ops.revoke_user_sessions(auth_of(request), target["id"])
         return {"revoked": revoked,
                 "user": auth_ops.get_user(auth_of(request), user_id)}
+
+    @app.get(API_PREFIX + "/admin/activity")
+    async def admin_activity(
+        request: Request,
+        limit: int = 100,
+        offset: int = 0,
+        user: str = "",
+        path: str = "",
+        date_from: str = "",
+        date_to: str = "",
+    ):
+        return {"entries": auth_ops.list_activity(
+            auth_of(request), limit, offset, user, path, date_from, date_to)}
 
     @app.get(API_PREFIX + "/admin/access-log")
     async def admin_access_log(request: Request, limit: int = 100, offset: int = 0):

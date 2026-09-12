@@ -1,4 +1,5 @@
 import type {
+  ActivityEntry,
   AdminOverview,
   LoginAttempt,
   ManagedUser,
@@ -111,6 +112,12 @@ export const api = {
       `/admin/access-log?limit=${limit}&offset=${offset}`,
     ),
   adminOverview: () => request<AdminOverview>("/admin/overview"),
+  adminActivity: (filters: { user?: string; path?: string } = {}) => {
+    const qs = new URLSearchParams({ limit: "200" });
+    if (filters.user) qs.set("user", filters.user);
+    if (filters.path) qs.set("path", filters.path);
+    return request<{ entries: ActivityEntry[] }>(`/admin/activity?${qs}`);
+  },
   adminApprove: (id: number, role: Role) =>
     request<{ user: ManagedUser }>(`/admin/users/${id}/approve`, {
       method: "POST",

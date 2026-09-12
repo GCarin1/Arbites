@@ -37,9 +37,9 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "last_updated": "2026-07-20",
-        "implementation": "verified"
+        "implementation": "verified — snapshot de qualidade (`backend/arbites/audit.py`) + log de atividade no gate (`backend/arbites/api.py`, `backend/arbites/auth.py`)"
       },
       {
         "id": "auth",
@@ -380,14 +380,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0103-log-central-de-atividade",
-        "title": "Log central de atividade",
-        "path": ".doctrina/changes/0103-log-central-de-atividade",
-        "status": "proposed",
-        "opened": "2026-09-12",
-        "lane": "product (uncertain; signals: requisito)"
-      },
       {
         "id": "0104-autoria-pelo-usuario-logado",
         "title": "Autoria pelo usuario logado",
@@ -1727,6 +1719,19 @@
           {
             "capability": "admin",
             "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0103-log-central-de-atividade",
+        "title": "Log central de atividade",
+        "path": ".doctrina/changes/archive/2026-09-12-0103-log-central-de-atividade",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
           }
         ]
       }
