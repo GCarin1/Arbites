@@ -109,3 +109,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-12 — 0104-autoria-pelo-usuario-logado — Autoria pelo usuario logado (specs: profile MODIFIED)
   - 2026-09-12 — 0105-empacotamento-docker-e-cloudflare-tunnel — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
 - 2026-09-12 — 0105-empacotamento-docker-e-cloudflare-tunnel — Empacotamento Docker e Cloudflare Tunnel
+  - 2026-09-12 — 0106-coexistencia-com-o-tunel-do-umbrel — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
+- 2026-09-12 — 0106-coexistencia-com-o-tunel-do-umbrel — Coexistencia com o tunel do Umbrel

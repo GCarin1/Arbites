@@ -1738,6 +1738,14 @@
         "status": "applied",
         "applied": "2026-09-12",
         "specs_affected": []
+      },
+      {
+        "id": "0106-coexistencia-com-o-tunel-do-umbrel",
+        "title": "Coexistencia com o tunel do Umbrel",
+        "path": ".doctrina/changes/archive/2026-09-12-0106-coexistencia-com-o-tunel-do-umbrel",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": []
       }
     ],
     "skills": [

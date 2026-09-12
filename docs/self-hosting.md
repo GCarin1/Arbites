@@ -1,8 +1,8 @@
 # Hospedar o Arbites num servidor próprio
 
-Guia para tirar o Arbites do `localhost` e colocá-lo num servidor de casa
-(UmbrelOS ou qualquer host com Docker), acessível pela internet por um
-Cloudflare Tunnel.
+Guia para tirar o Arbites do `localhost` e colocá-lo num servidor de casa,
+acessível pela internet por um Cloudflare Tunnel. Escrito para UmbrelOS
+convivendo com o BFFless, mas serve para qualquer host com Docker.
 
 Leia a seção **Backup** antes de convidar alguém: o `auth.db` é o único dado
 da instalação que não se reconstrói.
@@ -11,19 +11,49 @@ da instalação que não se reconstrói.
 
 ## 1. Arquitetura
 
+O Arbites reaproveita o **Cloudflare Tunnel que já roda no Umbrel** — o
+mesmo app da loja que expõe o BFFless. Um túnel só, um lugar só para olhar
+quando algo não responde.
+
 ```
-Internet → Cloudflare → cloudflared → http://arbites:8347
-                        (container)   └─ FastAPI serve a API e a SPA
-                                         na MESMA origem
+                            ┌─ arbites.seu.com  → umbrel.local:8347 → Arbites
+Internet → Cloudflare → cloudflared ─┤
+            (app do Umbrel)          └─ *.seu.com       → umbrel.local:5537 → BFFless
 ```
 
-Um container só. O FastAPI serve o build do React como estático, então a
-sessão vive num cookie `httpOnly` + `SameSite=Lax` — sem CORS, sem token no
-`localStorage`, sem nada legível a JavaScript.
+Um container para o Arbites. O FastAPI serve o build do React como estático,
+então a sessão vive num cookie `httpOnly` + `SameSite=Lax` — sem CORS, sem
+token no `localStorage`, sem nada legível a JavaScript.
 
-A porta 8347 **não** é publicada no host. A única entrada é o hostname do
-túnel; um `ports:` no compose abriria um caminho paralelo, sem o Cloudflare
-na frente.
+A porta 8347 é publicada no host: é assim que o `cloudflared` do Umbrel
+chega até ela, do mesmo jeito que chega no `5537` do BFFless. Isso também
+deixa o Arbites visível na LAN, e tudo bem — **o gate de sessão vale para
+qualquer entrada**. Quem chega pela rede local encontra a mesma tela de
+login que quem chega pela internet; é um caminho a mais para o mesmo
+porteiro, não um desvio dele.
+
+> Se você prefere que o Arbites seja inalcançável sem passar pela
+> Cloudflare, veja a **Alternativa** na seção 2.4: um túnel dedicado, sem
+> porta publicada. Custa um segundo token para administrar.
+
+### O wildcard do BFFless captura tudo — e como conviver com ele
+
+A [instalação do BFFless no Umbrel](https://docs.bffless.dev/deployment/umbrel/)
+registra dois routes apontando para `umbrel.local:5537`: o apex
+`seudominio.com` e o **wildcard `*.seudominio.com`**, mais um CNAME `*` no
+DNS. A própria documentação avisa que o domínio não serve para mais nada
+depois disso — o wildcard engole todos os subdomínios.
+
+Sem cuidado, `arbites.seudominio.com` cairia no BFFless.
+
+O desempate é a ordem dos routes: no painel Zero Trust os *Public Hostnames*
+são avaliados de cima para baixo, primeiro match vence. Basta o específico
+ficar **acima** do wildcard (a lista é reordenável arrastando). O passo a
+passo está em 2.2.
+
+Note que isto é sobre o **túnel** ser compartilhado, não o proxy: o
+`cloudflared` roteia por hostname sem tocar em nada da requisição. O proxy
+do BFFless continua fora do caminho, pelos motivos abaixo.
 
 ### Por que não passar pelo proxy do BFFless
 
@@ -42,7 +72,7 @@ autenticação do SuperTokens. Não funciona, por quatro motivos concretos:
    vivo e qualquer regressão de mais de um minuto seria cortada.
 4. **O alvo do proxy precisa ser HTTPS público.** A documentação bloqueia
    `localhost` e faixas privadas, e recusa `http://` para host não-interno —
-   que é exatamente a forma de `http://arbites:8347`.
+   que é exatamente a forma de `http://umbrel.local:8347`.
 
 O `cloudflared` não tem nenhuma dessas restrições: rotear para HTTP interno
 é literalmente a função dele. Os dois convivem no mesmo servidor, cada um
@@ -52,16 +82,24 @@ com seu hostname, sem acoplamento.
 
 ## 2. Subir
 
+Pressuposto: o app **Cloudflare Tunnel** do Umbrel já está instalado e
+funcionando (foi ele que você configurou ao subir o BFFless). Se ainda não
+estiver, siga os passos 2 a 4 da
+[instalação do BFFless](https://docs.bffless.dev/deployment/umbrel/) — a
+parte do túnel é a mesma.
+
 ### 2.1. Configuração
 
-Crie um `.env` ao lado do `docker-compose.yml`:
+Por SSH no Umbrel, clone o repositório e crie um `.env` ao lado do
+`docker-compose.yml`:
 
 ```dotenv
 ARBITES_ADMIN_EMAIL=voce@seudominio.com
 ARBITES_ADMIN_PASSWORD=uma-senha-longa-de-instalacao
 ARBITES_SIGNUP=on
-TUNNEL_TOKEN=<token do túnel, passo 2.2>
 ```
+
+Não há `TUNNEL_TOKEN` aqui: quem tem o token é o app do Umbrel.
 
 A senha de admin vem do ambiente, então ela é visível em `docker inspect` e
 no histórico do shell. Por isso a conta nasce com **troca obrigatória**: ela
@@ -69,27 +107,69 @@ serve para o primeiro login e nada mais. Depois de entrar e trocar, pode
 remover as duas variáveis — o bootstrap só roda quando não existe nenhum
 admin ativo.
 
-### 2.2. Túnel na Cloudflare
-
-No painel Zero Trust → **Networks → Tunnels → Create a tunnel**:
-
-1. Escolha *Cloudflared*, dê um nome, copie o **token** para o `.env`.
-2. Em **Public Hostnames**, adicione:
-   - Subdomain: `arbites` · Domain: o seu
-   - Service: **HTTP** → `arbites:8347`
-
-`arbites` é o nome do serviço no compose; os dois containers estão na mesma
-rede Docker, então o DNS interno resolve.
-
-### 2.3. Subir
+### 2.2. Subir o container
 
 ```bash
 docker compose up -d --build
 docker compose logs -f arbites   # deve dizer que criou o admin de bootstrap
 ```
 
+Confirme pela LAN antes de mexer na Cloudflare — separa um problema de
+container de um problema de rede:
+
+```bash
+curl http://umbrel.local:8347/api/v1/health
+# {"status":"ok","version":"..."}
+```
+
+`/api/v1/health` é a única rota da API que responde sem sessão; qualquer
+outra devolvendo `401` é sinal de que o gate está de pé, não de erro.
+
+### 2.3. Route no túnel — a ordem importa
+
+No painel Zero Trust → **Networks → Tunnels** → seu túnel → **Public
+Hostnames**:
+
+1. **Add a public hostname**
+   - Subdomain: `arbites` · Domain: o seu
+   - Service: **HTTP** → `umbrel.local:8347`
+2. **Arraste-o para o topo da lista**, acima do `*.seudominio.com` do
+   BFFless.
+
+A lista é avaliada de cima para baixo e o primeiro match vence. Se o
+wildcard ficar em cima, `arbites.seudominio.com` vai parar no BFFless e você
+verá a tela dele — é o sintoma exato desse erro de ordenação.
+
+Resultado esperado:
+
+| Ordem | Hostname | Serviço |
+|---|---|---|
+| 1 | `arbites.seudominio.com` | `HTTP umbrel.local:8347` |
+| 2 | `*.seudominio.com` | `HTTP umbrel.local:5537` |
+| 3 | `seudominio.com` | `HTTP umbrel.local:5537` |
+
+DNS: nada a fazer. O CNAME `*` que a instalação do BFFless criou já resolve
+`arbites.seudominio.com` para o mesmo túnel.
+
 Abra `https://arbites.seudominio.com`, entre com as credenciais do `.env`,
 troque a senha.
+
+### 2.4. Alternativa: túnel dedicado
+
+Se você quiser que o Arbites seja inalcançável sem passar pela Cloudflare —
+nem pela LAN —, crie um segundo túnel e deixe o `cloudflared` junto do
+Arbites. O rodapé do `docker-compose.yml` traz o bloco pronto: troque
+`ports` por `expose`, ponha os dois serviços numa rede comum, e cole o
+`TUNNEL_TOKEN` do túnel novo no `.env`.
+
+Aí o desempate contra o wildcard do BFFless acontece no **DNS**, não na
+ordem dos routes: ao criar o Public Hostname no túnel novo, a Cloudflare
+grava um CNAME explícito `arbites` → `<tunnel>.cfargotunnel.com`, e registro
+exato sempre vence wildcard. O BFFless nunca vê a requisição.
+
+O custo é administrar dois túneis e dois tokens, e o Arbites fica fora da UI
+do Umbrel (sobe sozinho pelo `restart: unless-stopped`, mas não aparece na
+lista de apps).
 
 ---
 
@@ -165,6 +245,15 @@ docker compose up -d --build          # atualizar depois de um git pull
 Arbites lê `CF-Connecting-IP` (e cai para `X-Forwarded-For`), então o IP que
 aparece nas abas Acessos e Atividade é o do visitante de verdade.
 
+**Abri `arbites.seudominio.com` e apareceu o BFFless.** O wildcard dele
+está acima do route do Arbites na lista de Public Hostnames. Arraste o
+específico para o topo; vale em segundos, sem reiniciar nada.
+
+**Erro 502 no hostname do Arbites.** O túnel chegou e o container não
+respondeu. Confira nesta ordem: `docker compose ps` (está de pé?),
+`curl http://umbrel.local:8347/api/v1/health` do próprio Umbrel (responde
+localmente?) e só então o route (`umbrel.local:8347`, HTTP, não HTTPS).
+
 **Perdi o acesso de admin.** Pare o container, defina
 `ARBITES_ADMIN_EMAIL`/`ARBITES_ADMIN_PASSWORD` com um e-mail que ainda não
 existe e suba: sem nenhum admin ativo o bootstrap roda de novo. Se ainda
@@ -179,14 +268,19 @@ servidor. O log de inicialização avisa em letras garrafais.
 
 ---
 
-## 6. Rodar sem túnel (rede local)
+## 6. Acesso pela rede local
 
-Publique a porta e acesse pelo IP da máquina:
+A porta 8347 é publicada no host, então `http://umbrel.local:8347` funciona
+de dentro da rede sem passar pela Cloudflare. É o caminho útil para testar a
+subida e para trabalhar se a internet cair.
 
-```yaml
-    ports: ["8347:8347"]
-```
+Duas consequências que valem estar claras:
 
-O cookie de sessão só recebe a flag `Secure` em HTTPS; em HTTP na rede local
-ele funciona, mas trafega em claro. Para uso só-LAN é aceitável; para
-qualquer coisa que atravesse a internet, use o túnel.
+- **O login vale igual.** O gate de sessão não sabe por onde a requisição
+  entrou; quem chega pela LAN vê a mesma tela e obedece aos mesmos papéis.
+- **O cookie trafega em claro.** A flag `Secure` só é aplicada em HTTPS. Na
+  LAN isso é aceitável; pela internet, sempre o túnel — que termina TLS na
+  borda da Cloudflare.
+
+Para fechar a LAN por completo, use o túnel dedicado da seção 2.4: sem
+`ports`, o container só é alcançável de dentro da rede Docker.
