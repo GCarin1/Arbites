@@ -1,8 +1,8 @@
 {
   "$schema_version": "0.1.0",
   "project": "Arbites",
-  "framework_version": "0.13.0",
-  "last_updated": "2026-07-21",
+  "framework_version": "0.16.0",
+  "last_updated": "2026-09-12",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -263,7 +263,8 @@
         "title": "Filesystem como fonte de verdade, SQLite como indice descartavel",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/indexer.py`, `backend/arbites/workspace.py`"
+        "landed": "2026-07-03 — `backend/arbites/indexer.py`, `backend/arbites/workspace.py`",
+        "summary": "O filesystem (Markdown/YAML/JSON/Gherkin em `workspace/`) é a única fonte"
       },
       {
         "id": "0002",
@@ -271,7 +272,8 @@
         "title": "ID no frontmatter, nome de arquivo livre",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/parser.py`"
+        "landed": "2026-07-03 — `backend/arbites/parser.py`",
+        "summary": "O ID canônico (`EP-0001`, `ST-0012`, `CT-0001`, …) vive no frontmatter do"
       },
       {
         "id": "0003",
@@ -279,7 +281,8 @@
         "title": "Vinculo CT-cenario por tag @CT-XXXX",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/gherkin_scan.py`"
+        "landed": "2026-07-04 — `backend/arbites/gherkin_scan.py`",
+        "summary": "O vínculo é a tag `@CT-XXXX` no cenário Gherkin."
       },
       {
         "id": "0004",
@@ -287,7 +290,8 @@
         "title": "Execucao local via subprocess direto na v1",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/runner.py`"
+        "landed": "2026-07-04 — `backend/arbites/runner.py`",
+        "summary": "Runs locais usam `subprocess` da stdlib (`asyncio.create_subprocess_exec`)"
       },
       {
         "id": "0005",
@@ -295,7 +299,8 @@
         "title": "Status de documento separado de status de resultado",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/executions.py`"
+        "landed": "2026-07-03 — `backend/arbites/executions.py`",
+        "summary": "Três máquinas de estado independentes: Test Case (documento:"
       },
       {
         "id": "0006",
@@ -303,7 +308,8 @@
         "title": "Coleta CI por artifact Cucumber JSON",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/ci.py`, `docs/examples/tests.yml`"
+        "landed": "2026-07-04 — `backend/arbites/ci.py`, `docs/examples/tests.yml`",
+        "summary": "A coleta de resultados de runs CI é feita por artifact: o workflow roda"
       },
       {
         "id": "0007",
@@ -311,7 +317,8 @@
         "title": "Jira fora de escopo, Xray como migracao pontual",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/xray_import.py`"
+        "landed": "2026-07-04 — `backend/arbites/xray_import.py`",
+        "summary": "Integração Jira: fora de escopo permanente."
       },
       {
         "id": "0008",
@@ -319,7 +326,8 @@
         "title": "PAT GitHub no keyring do OS",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/ci.py`"
+        "landed": "2026-07-04 — `backend/arbites/ci.py`",
+        "summary": "O PAT (fine-grained, escopo mínimo `actions:read+write` no repo do target)"
       },
       {
         "id": "0009",
@@ -327,7 +335,8 @@
         "title": "Frontend React SPA",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `frontend/src/App.tsx`"
+        "landed": "2026-07-03 — `frontend/src/App.tsx`",
+        "summary": "Frontend em React 18 + Vite + TypeScript, SPA servida como estático pelo"
       },
       {
         "id": "0010",
@@ -335,14 +344,15 @@
         "title": "Sprint e ambiente como texto livre na v1",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/executions.py`"
+        "landed": "2026-07-03 — `backend/arbites/executions.py`",
+        "summary": "`sprint` e `environment` são texto livre no `execution.json` na v1."
       }
     ],
     "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
-        "title": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
+        "title": "M0 - fundacao: workspace, parsers, reindex, API de requisitos/testcases, UI basica, README com passo a passo para executar o projeto",
         "path": ".doctrina/changes/archive/2026-07-03-0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
         "status": "applied",
         "applied": "2026-07-03",
@@ -367,7 +377,7 @@
       },
       {
         "id": "0002-m1-execucao-manual-executions-kanban-de-resultad",
-        "title": "0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "title": "M1 - execucao manual: executions, kanban de resultados, steps marcaveis, evidencias com hash, historico, defeitos minimos, fechamento",
         "path": ".doctrina/changes/archive/2026-07-03-0002-m1-execucao-manual-executions-kanban-de-resultad",
         "status": "applied",
         "applied": "2026-07-03",
@@ -384,7 +394,7 @@
       },
       {
         "id": "0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
-        "title": "0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
+        "title": "M1.5 - dashboard e rastreabilidade: 7 metricas, tendencia, matriz de rastreabilidade navegavel, export PDF e Markdown",
         "path": ".doctrina/changes/archive/2026-07-04-0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
         "status": "applied",
         "applied": "2026-07-04",
@@ -401,7 +411,7 @@
       },
       {
         "id": "0004-m2-migracao-xray-import-xml-com-preview-e-confir",
-        "title": "0004-m2-migracao-xray-import-xml-com-preview-e-confir",
+        "title": "M2 - migracao Xray: import XML com preview e confirmacao idempotente, export Markdown zip",
         "path": ".doctrina/changes/archive/2026-07-04-0004-m2-migracao-xray-import-xml-com-preview-e-confir",
         "status": "applied",
         "applied": "2026-07-04",
@@ -418,7 +428,7 @@
       },
       {
         "id": "0005-m3-automacao-local-targets-scan-de-features-gher",
-        "title": "0005-m3-automacao-local-targets-scan-de-features-gher",
+        "title": "M3 - automacao local: targets, scan de features Gherkin, runs Behave via subprocess com SSE, fila por target, timeout, parse do JSON, evidencias via hooks",
         "path": ".doctrina/changes/archive/2026-07-04-0005-m3-automacao-local-targets-scan-de-features-gher",
         "status": "applied",
         "applied": "2026-07-04",
@@ -435,7 +445,7 @@
       },
       {
         "id": "0006-m4-github-actions-workflow-dispatch-com-correlac",
-        "title": "0006-m4-github-actions-workflow-dispatch-com-correlac",
+        "title": "M4 - GitHub Actions: workflow_dispatch com correlacao de run, polling de status, coleta de artifact Cucumber JSON, PAT no keyring, tests.yml de exemplo",
         "path": ".doctrina/changes/archive/2026-07-04-0006-m4-github-actions-workflow-dispatch-com-correlac",
         "status": "applied",
         "applied": "2026-07-04",
