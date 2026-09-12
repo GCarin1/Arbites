@@ -1,6 +1,7 @@
 import type {
   SessionInfo,
   SessionUser,
+  Switch,
   ActivityHeatmapData,
   AiProvidersInfo,
   ExecutiveSummaryResult,
@@ -97,6 +98,12 @@ export const api = {
       body: JSON.stringify({ email, password, name }),
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+  switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+  setSwitch: (name: string, enabled: boolean) =>
+    request<{ switch: Switch }>(`/admin/switches/${name}`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ user: SessionUser }>("/auth/password", {
       method: "POST",

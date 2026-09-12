@@ -97,6 +97,13 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 );
 CREATE INDEX IF NOT EXISTS idx_attempts_email_at ON login_attempts(email, at);
 CREATE INDEX IF NOT EXISTS idx_attempts_ip_at ON login_attempts(ip, at);
+
+CREATE TABLE IF NOT EXISTS switches (
+    name       TEXT PRIMARY KEY,
+    enabled    INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL DEFAULT ''
+);
 """
 
 
@@ -456,3 +463,59 @@ def authenticate(
         raise AuthError(401, "invalid_credentials", "e-mail ou senha inválidos")
     record_attempt(conn, email, ip, True, user_agent)
     return _row_to_user(row)
+
+
+# -- interruptores de superfície --------------------------------------------
+
+# Cada entrada governa uma CAPACIDADE, não uma URL: quando uma rota nova faz
+# a mesma coisa, ela entra no interruptor existente em vez de escapar dele.
+SWITCHES: dict[str, str] = {
+    "local_runner": "Execução local de automação (subprocess no servidor)",
+    "filesystem_browse": "Navegação do filesystem do servidor",
+    "target_env": "Leitura e escrita do .env dos projetos-alvo",
+    "ai": "Chamadas aos providers de IA",
+    "xray_import": "Importação de XML do Xray",
+}
+
+
+def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Estado de todos os interruptores conhecidos. Ausente no banco = ligado:
+    o default preserva o comportamento da instalação local."""
+    stored = {
+        row["name"]: row
+        for row in conn.execute("SELECT * FROM switches").fetchall()
+    }
+    out = []
+    for name, label in SWITCHES.items():
+        row = stored.get(name)
+        out.append({
+            "name": name,
+            "label": label,
+            "enabled": bool(row["enabled"]) if row is not None else True,
+            "updated_at": row["updated_at"] if row is not None else None,
+            "updated_by": row["updated_by"] if row is not None else None,
+        })
+    return out
+
+
+def switch_enabled(conn: sqlite3.Connection, name: str) -> bool:
+    row = conn.execute(
+        "SELECT enabled FROM switches WHERE name = ?", (name,)
+    ).fetchone()
+    return True if row is None else bool(row["enabled"])
+
+
+def set_switch(
+    conn: sqlite3.Connection, name: str, enabled: bool, updated_by: str = ""
+) -> dict[str, Any]:
+    if name not in SWITCHES:
+        raise AuthError(404, "unknown_switch", "interruptor inexistente: %s" % name)
+    conn.execute(
+        "INSERT INTO switches (name, enabled, updated_at, updated_by)"
+        " VALUES (?, ?, ?, ?)"
+        " ON CONFLICT(name) DO UPDATE SET enabled = excluded.enabled,"
+        " updated_at = excluded.updated_at, updated_by = excluded.updated_by",
+        (name, int(enabled), _iso(_now()), updated_by),
+    )
+    conn.commit()
+    return next(s for s in list_switches(conn) if s["name"] == name)

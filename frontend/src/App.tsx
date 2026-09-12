@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
-import type { SessionUser, TreeNode, Warning, WorkspaceInfo } from "./types";
+import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
   import("./components/Home").then((m) => ({ default: m.Home }))
@@ -252,6 +252,7 @@ export default function App({
     });
   }, []);
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
+  const [switches, setSwitches] = useState<Switch[]>([]);
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
@@ -407,6 +408,24 @@ export default function App({
     },
   ];
 
+  // Uma aba so aparece quando o papel alcanca e o admin nao desligou. Sem
+  // isto a UI oferece caminhos que a API vai recusar com 403.
+  const isReachable = (key: Tab): boolean => {
+    const off = (name: string) =>
+      switches.some((s) => s.name === name && !s.enabled);
+    if (key === "migration") return user.role === "admin" && !off("xray_import");
+    if (key === "ia") return !off("ai");
+    if (key === "automation") return !off("local_runner") || user.role === "admin";
+    return true;
+  };
+
+  useEffect(() => {
+    api
+      .switches()
+      .then((r) => setSwitches(r.switches))
+      .catch(() => setSwitches([]));
+  }, []);
+
   return (
     <>
       <header className="app-header">
@@ -426,7 +445,7 @@ export default function App({
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
         <span className="session-identity" title={`${user.email} · ${user.role}`}>
-          {user.name || user.email}
+          {user.name || user.email} · {user.role}
         </span>
         <button onClick={onLogout}>Sair</button>
       </header>
@@ -457,7 +476,7 @@ export default function App({
                   <span>Acesso rápido</span>
                 </div>
                 {pins
-                  .filter((k) => NAV_BY_KEY[k])
+                  .filter((k) => NAV_BY_KEY[k] && isReachable(k))
                   .map((k) => (
                     <NavItem
                       key={`pin-${k}`}
@@ -485,7 +504,7 @@ export default function App({
                   </span>
                 </button>
                 {!collapsed.includes(group.title) &&
-                  group.keys.map((k) => (
+                  group.keys.filter(isReachable).map((k) => (
                     <NavItem
                       key={k}
                       item={NAV_BY_KEY[k]}

@@ -12,7 +12,7 @@
 **Implementation:** verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`
 **Realizes:** SC15
 **Last updated:** 2026-09-12
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -60,6 +60,10 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
   para o endereço do socket — a instância roda atrás de túnel/proxy.
 - The system shall registrar toda tentativa de autenticação (sucesso e
   falha) com e-mail informado, resultado, IP e user-agent.
+- The system shall atribuir a cada papel um alcance fixo — `viewer` só lê, `editor` lê e escreve os artefatos de QA (requisitos, casos de teste, execuções, defeitos, afazeres, reuniões, decisões, daily) e dispara execuções de alvos já configurados, e `admin` acumula tudo isso mais as superfícies governadas.
+- The system shall exigir papel `admin` nas superfícies governadas: `PUT /targets` (define o executável e o diretório do subprocess), `GET /automation/browse-features` (navega o filesystem do servidor), `GET|PUT /targets/{name}/env` e `GET /env/catalog` (segredos do projeto-alvo), `PUT /settings/github/token` e as chaves de IA, e `POST /import/xray` e `POST /import/xray/confirm`.
+- The system shall manter um registro de interruptores administráveis — `local_runner`, `filesystem_browse`, `target_env`, `ai` e `xray_import` — persistido no mesmo banco durável das contas, cada um ligado por padrão para não alterar em silêncio o comportamento da instalação local.
+- The system shall expor `GET /admin/switches` (estado de todos, legível por qualquer sessão para que a UI esconda o que está desligado) e `PUT /admin/switches/{name}` (apenas `admin`), registrando quem alterou e quando.
 
 ### Event-driven
 
@@ -79,6 +83,8 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 - When uma requisição chega com cookie de sessão expirado ou desconhecido,
   the system shall responder 401 com código `unauthenticated` e apagar o
   cookie.
+- When uma requisição de escrita (qualquer método que não seja GET, HEAD ou OPTIONS) chega de uma sessão com papel `viewer`, the system shall recusá-la com 403 e código `forbidden`, exceto a troca da própria senha e o logout.
+- When uma rota governada por um interruptor desligado é chamada, the system shall recusá-la com 403 e código `feature_disabled`, nomeando o interruptor responsável.
 
 ### State-driven
 
@@ -92,6 +98,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
   `GET /auth/me` ou `POST /auth/logout`, com código `password_change_required`.
 - While `ARBITES_SIGNUP` vale `off`, the system shall recusar
   `POST /auth/register` com 403 e código `signup_disabled`.
+- While o papel da sessão não alcança a rota, the system shall responder 403 com código `forbidden` — nunca 404, para não transformar autorização em adivinhação de rota.
 
 ### Unwanted-behavior (must-not)
 
@@ -110,6 +117,8 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
   lockout zera no último sucesso, nunca removendo linhas — "cinco falhas e
   então um acerto" é justamente a evidência que não pode sumir quando o
   atacante finalmente entra.
+- The system shall not permitir que `PUT /targets` seja alcançado por papel diferente de `admin`; um alvo define o binário e o diretório de trabalho de um subprocess, então configurá-lo equivale a executar código no servidor.
+- The system shall not deixar um interruptor desligado ser contornado por outra rota que faça a mesma coisa; o interruptor governa a capacidade, não a URL.
 
 ### Optional
 
@@ -140,6 +149,10 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
    rotas até ser feita — verified by `backend/tests/test_auth.py`.
 7. [verified] Apagar `index.db` e reindexar não afeta contas nem sessões;
    `auth.db` sobrevive intacto — verified by `backend/tests/test_auth.py`.
+8. [verified] Um `viewer` lê tudo por GET e recebe 403 `forbidden` em qualquer escrita, inclusive nas rotas que não existiam quando o papel foi criado — verified by `backend/tests/test_authorization.py`.
+9. [verified] Um `editor` cria artefatos e dispara um run local, mas recebe 403 em `PUT /targets`, no navegador de filesystem, no `.env` do alvo, no token do GitHub e no import Xray — verified by `backend/tests/test_authorization.py`.
+10. [verified] Desligar `local_runner` faz `POST /runs/local` responder 403 `feature_disabled` citando o interruptor, e religá-lo devolve a rota, sem reiniciar o processo — verified by `backend/tests/test_authorization.py`.
+11. [verified] Os interruptores nascem todos ligados, sobrevivem ao reinício do processo e só o `admin` os altera — verified by `backend/tests/test_authorization.py`.
 
 ## Maturity
 

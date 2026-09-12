@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import os
+import re
 import sqlite3
 import zipfile
 from contextlib import asynccontextmanager
@@ -1796,6 +1797,8 @@ def _register_routes(app: FastAPI) -> None:
     async def put_targets(request: Request, payload: AutomationTargetsIn):
         """Substitui `automation_targets` no arbites.yaml (mesmo padrão do
         PUT /ai/providers) — sem precisar abrir o YAML na mão."""
+        # Um alvo define o executavel e o cwd do subprocess: escrever aqui
+        # equivale a executar codigo no servidor (runner.py).
         ws, conn = ws_of(request), conn_of(request)
         runner: RunManager = request.app.state.runner
         import yaml as _yaml
@@ -2432,6 +2435,9 @@ def _register_routes(app: FastAPI) -> None:
         return ws.config().get("ai") or {"default_provider": None, "providers": []}
 
     def _ai_provider(request: Request, name: str | None):
+        # Ponto unico por onde toda chamada de IA passa: o interruptor fica
+        # aqui, e nao nas 7 rotas, para que uma rota nova ja nasca governada.
+        require_switch(request, "ai")
         ws = ws_of(request)
         config = _ai_config(ws)
         chosen = name or config.get("default_provider")
@@ -3432,6 +3438,10 @@ class PasswordIn(BaseModel):
     new_password: str
 
 
+class SwitchIn(BaseModel):
+    enabled: bool
+
+
 # Rotas que respondem sem sessao. Tudo o mais sob API_PREFIX exige cookie.
 _PUBLIC_PATHS = {
     API_PREFIX + "/auth/login",
@@ -3486,6 +3496,72 @@ def current_user(request: Request) -> dict[str, Any]:
     raise _error(401, "unauthenticated", "sessao necessaria")
 
 
+# Superficies governadas: papel exigido e interruptor, numa tabela unica e
+# auditavel. Fica no gate, e nao no corpo dos handlers, porque a validacao de
+# parametros do FastAPI roda antes do handler — um 422 na frente do 403
+# entregaria de graca a forma da rota a quem nao pode alcanca-la.
+#
+# (regex do caminho, metodos, papel exigido, interruptor)
+_GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
+    # Define o executavel e o cwd do subprocess: e o caminho real para
+    # executar codigo no servidor (runner.py).
+    (r"/targets$", {"PUT"}, "admin", None),
+    (r"/targets/[^/]+/env$", {"GET", "PUT"}, "admin", "target_env"),
+    (r"/env/catalog$", {"GET"}, "admin", "target_env"),
+    (r"/automation/browse-features$", {"GET"}, "admin", "filesystem_browse"),
+    (r"/settings/github/token$", {"PUT"}, "admin", None),
+    (r"/ai/providers$", {"PUT"}, "admin", None),
+    (r"/import/xray", {"POST"}, "admin", "xray_import"),
+    (r"/runs/local$", {"POST"}, None, "local_runner"),
+    (r"/admin/switches/", {"PUT"}, "admin", None),
+)
+
+_GOVERNED_COMPILED = tuple(
+    (re.compile("^" + API_PREFIX + pattern), methods, role, switch)
+    for pattern, methods, role, switch in _GOVERNED
+)
+
+
+def governed_for(path: str, method: str) -> tuple[str | None, str | None]:
+    """Papel e interruptor exigidos por este caminho, se houver."""
+    for matcher, methods, role, switch in _GOVERNED_COMPILED:
+        if method in methods and matcher.match(path):
+            return role, switch
+    return None, None
+
+
+# Escritas que um `viewer` pode fazer: as que agem sobre a propria conta.
+_VIEWER_WRITABLE = {
+    API_PREFIX + "/auth/password",
+    API_PREFIX + "/auth/logout",
+    API_PREFIX + "/auth/login",
+    API_PREFIX + "/auth/register",
+}
+
+
+def require_role(request: Request, *roles: str) -> dict[str, Any]:
+    """Exige um dos papeis. 403 e nao 404: esconder a existencia da rota nao
+    protege nada e transforma autorizacao em adivinhacao."""
+    user = current_user(request)
+    if user["role"] not in roles:
+        raise _error(
+            403, "forbidden",
+            "esta operacao exige papel %s" % " ou ".join(roles),
+        )
+    return user
+
+
+def require_switch(request: Request, name: str) -> None:
+    """Recusa a rota quando o admin desligou a capacidade correspondente."""
+    if not getattr(request.app.state, "auth_enabled", True):
+        return
+    if not auth_ops.switch_enabled(request.app.state.auth, name):
+        raise _error(
+            403, "feature_disabled",
+            "recurso desligado pelo administrador (interruptor '%s')" % name,
+        )
+
+
 def _register_auth(app: FastAPI) -> None:
     def auth_of(request: Request):
         return request.app.state.auth
@@ -3513,6 +3589,32 @@ def _register_auth(app: FastAPI) -> None:
                 status_code=403,
                 content={"error": {"code": "password_change_required",
                                    "message": "troque a senha antes de continuar"}},
+            )
+        # Recusa de escrita para `viewer` aqui, e nao rota a rota: uma rota
+        # nova nasce protegida sem ninguem precisar lembrar de anota-la.
+        if (user["role"] == "viewer"
+                and request.method not in ("GET", "HEAD", "OPTIONS")
+                and path not in _VIEWER_WRITABLE):
+            return JSONResponse(
+                status_code=403,
+                content={"error": {"code": "forbidden",
+                                   "message": "papel viewer nao pode escrever"}},
+            )
+        role, switch = governed_for(path, request.method)
+        if role is not None and user["role"] != role:
+            return JSONResponse(
+                status_code=403,
+                content={"error": {"code": "forbidden",
+                                   "message": "esta operacao exige papel %s" % role}},
+            )
+        if switch is not None and not auth_ops.switch_enabled(
+                request.app.state.auth, switch):
+            return JSONResponse(
+                status_code=403,
+                content={"error": {
+                    "code": "feature_disabled",
+                    "message": "recurso desligado pelo administrador"
+                               " (interruptor '%s')" % switch}},
             )
         return await call_next(request)
 
@@ -3563,6 +3665,18 @@ def _register_auth(app: FastAPI) -> None:
         return {"user": user, "auth_enabled": True,
                 "signup_enabled":
                     os.environ.get("ARBITES_SIGNUP", "on").strip().lower() != "off"}
+
+    @app.get(API_PREFIX + "/admin/switches")
+    async def get_switches(request: Request):
+        # Legivel por qualquer sessao: a UI precisa esconder o que esta
+        # desligado, e o estado de um interruptor nao e segredo.
+        return {"switches": auth_ops.list_switches(auth_of(request))}
+
+    @app.put(API_PREFIX + "/admin/switches/{name}")
+    async def put_switch(request: Request, name: str, payload: SwitchIn):
+        user = current_user(request)
+        return {"switch": auth_ops.set_switch(
+            auth_of(request), name, payload.enabled, user["email"])}
 
     @app.post(API_PREFIX + "/auth/password")
     async def change_password(request: Request, payload: PasswordIn):

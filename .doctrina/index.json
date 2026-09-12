@@ -34,7 +34,7 @@
         "id": "auth",
         "path": ".doctrina/specs/auth/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-09-12",
         "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
         "realizes": [
@@ -364,19 +364,11 @@
         "title": "Contas e sessoes em banco duravel separado do indice descartavel",
         "status": "accepted",
         "date": "2026-09-12",
-        "summary": "Contas, sessões e tentativas de login vivem num terceiro store: um SQLite",
-        "landed": "2026-09-12 — `backend/arbites/auth.py`, `backend/tests/test_auth.py`"
+        "landed": "2026-09-12 — `backend/arbites/auth.py`, `backend/tests/test_auth.py`",
+        "summary": "Contas, sessões e tentativas de login vivem num terceiro store: um SQLite"
       }
     ],
     "changes": [
-      {
-        "id": "0101-endurecimento-das-rotas-perigosas",
-        "title": "Endurecimento das rotas perigosas",
-        "path": ".doctrina/changes/0101-endurecimento-das-rotas-perigosas",
-        "status": "proposed",
-        "opened": "2026-09-12",
-        "lane": "runtime (confident; signals: runner, segredos) — opened anyway (--force)"
-      },
       {
         "id": "0102-painel-admin-de-usuarios-e-acessos",
         "title": "Painel admin de usuarios e acessos",
@@ -1706,6 +1698,19 @@
           {
             "capability": "auth",
             "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0101-endurecimento-das-rotas-perigosas",
+        "title": "Endurecimento das rotas perigosas",
+        "path": ".doctrina/changes/archive/2026-09-12-0101-endurecimento-das-rotas-perigosas",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
           }
         ]
       }

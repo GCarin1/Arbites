@@ -14,6 +14,14 @@ export interface SessionUser {
   last_login_at: string | null;
 }
 
+export interface Switch {
+  name: string;
+  label: string;
+  enabled: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
 export interface SessionInfo {
   user: SessionUser | null;
   auth_enabled: boolean;
