@@ -107,3 +107,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-12 — 0102-painel-admin-de-usuarios-e-acessos — Painel admin de usuarios e acessos (specs: admin ADDED)
 - 2026-09-12 — 0103-log-central-de-atividade — Log central de atividade (specs: audit MODIFIED)
 - 2026-09-12 — 0104-autoria-pelo-usuario-logado — Autoria pelo usuario logado (specs: profile MODIFIED)
+  - 2026-09-12 — 0105-empacotamento-docker-e-cloudflare-tunnel — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
+- 2026-09-12 — 0105-empacotamento-docker-e-cloudflare-tunnel — Empacotamento Docker e Cloudflare Tunnel

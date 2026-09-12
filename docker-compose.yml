@@ -1,0 +1,47 @@
+# Arbites atrás de um Cloudflare Tunnel, no mesmo host (UmbrelOS ou qualquer
+# Docker). O túnel fala com o container pela rede interna; a porta do Arbites
+# NÃO é publicada no host, então a única entrada é o hostname do túnel.
+#
+# Leia o docs/self-hosting.md antes de subir — sobretudo a parte de backup:
+# o .arbites/auth.db é o único dado da instalação que não se reconstrói.
+
+services:
+  arbites:
+    build: .
+    image: arbites:local
+    restart: unless-stopped
+    environment:
+      # Bootstrap do primeiro admin. A senha vem do ambiente, portanto é
+      # visível em `docker inspect` e no histórico do shell: a conta nasce
+      # com troca obrigatória e esta senha só serve para o primeiro login.
+      ARBITES_ADMIN_EMAIL: ${ARBITES_ADMIN_EMAIL:?defina no .env}
+      ARBITES_ADMIN_PASSWORD: ${ARBITES_ADMIN_PASSWORD:?defina no .env}
+      # "off" fecha o cadastro público; contas passam a ser criadas só pelo
+      # painel. Deixe "on" enquanto o time ainda está entrando.
+      ARBITES_SIGNUP: ${ARBITES_SIGNUP:-on}
+    volumes:
+      - arbites-data:/data
+      # Repositórios de automação, se houver: somente leitura, porque o
+      # Arbites não gerencia o repo do target — ele só roda o Behave dele.
+      # - /home/umbrel/repos:/repos:ro
+    networks: [arbites]
+    # Sem `ports:`. Publicar 8347 no host abriria um caminho paralelo ao
+    # túnel, sem o hostname e sem o Cloudflare na frente.
+    expose: ["8347"]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      # Token do túnel criado no painel da Cloudflare (Zero Trust → Networks
+      # → Tunnels). O hostname público aponta para http://arbites:8347.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina no .env}
+    depends_on: [arbites]
+    networks: [arbites]
+
+volumes:
+  arbites-data:
+
+networks:
+  arbites:

@@ -379,16 +379,7 @@
         "summary": "Contas, sessões e tentativas de login vivem num terceiro store: um SQLite"
       }
     ],
-    "changes": [
-      {
-        "id": "0105-empacotamento-docker-e-cloudflare-tunnel",
-        "title": "Empacotamento Docker e Cloudflare Tunnel",
-        "path": ".doctrina/changes/0105-empacotamento-docker-e-cloudflare-tunnel",
-        "status": "proposed",
-        "opened": "2026-09-12",
-        "lane": "product (confident; signals: build, documentar) — opened as chore"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1739,6 +1730,14 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0105-empacotamento-docker-e-cloudflare-tunnel",
+        "title": "Empacotamento Docker e Cloudflare Tunnel",
+        "path": ".doctrina/changes/archive/2026-09-12-0105-empacotamento-docker-e-cloudflare-tunnel",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": []
       }
     ],
     "skills": [
