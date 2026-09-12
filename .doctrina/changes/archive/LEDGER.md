@@ -104,3 +104,4 @@ One line per archived change, newest last. Appended by
 - 2026-07-21 — 0099-local-automation-correcoes-de-execucao-injetar-o — correções de execução da automação (specs: local-automation MODIFIED)
 - 2026-09-12 — 0100-autenticacao-de-sessao — Autenticacao de sessao (specs: auth ADDED)
 - 2026-09-12 — 0101-endurecimento-das-rotas-perigosas — Endurecimento das rotas perigosas (specs: auth MODIFIED)
+- 2026-09-12 — 0102-painel-admin-de-usuarios-e-acessos — Painel admin de usuarios e acessos (specs: admin ADDED)

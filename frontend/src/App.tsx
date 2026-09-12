@@ -67,6 +67,9 @@ const Meetings = lazy(() =>
 const Profile = lazy(() =>
   import("./components/Profile").then((m) => ({ default: m.Profile }))
 );
+const Admin = lazy(() =>
+  import("./components/Admin").then((m) => ({ default: m.Admin }))
+);
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette }))
 );
@@ -88,7 +91,8 @@ type Tab =
   | "ia"
   | "migration"
   | "problems"
-  | "profile";
+  | "profile"
+  | "admin";
 
 const NAV: { key: Tab; label: string }[] = [
   { key: "home", label: "Hoje" },
@@ -108,6 +112,7 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "migration", label: "Migração" },
   { key: "problems", label: "Problemas" },
   { key: "profile", label: "Perfil" },
+  { key: "admin", label: "Administração" },
 ];
 
 // -- deep-link por hash (0084): #/<aba>?filtro=valor, sem lib de router -----
@@ -136,7 +141,7 @@ const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
   { title: "Acompanhamento", keys: ["defects", "decisions", "audit", "memory", "todos", "dashboard", "daily", "meetings"] },
   { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
-  { title: "Suporte", keys: ["problems", "profile"] },
+  { title: "Suporte", keys: ["problems", "profile", "admin"] },
 ];
 
 const NAV_BY_KEY = Object.fromEntries(NAV.map((n) => [n.key, n])) as Record<
@@ -413,6 +418,7 @@ export default function App({
   const isReachable = (key: Tab): boolean => {
     const off = (name: string) =>
       switches.some((s) => s.name === name && !s.enabled);
+    if (key === "admin") return user.role === "admin";
     if (key === "migration") return user.role === "admin" && !off("xray_import");
     if (key === "ia") return !off("ai");
     if (key === "automation") return !off("local_runner") || user.role === "admin";
@@ -610,6 +616,10 @@ export default function App({
           ) : tab === "profile" ? (
             <Suspense fallback={<p className="empty">Carregando perfil…</p>}>
               <Profile onError={setError} />
+            </Suspense>
+          ) : tab === "admin" ? (
+            <Suspense fallback={<p className="empty">Carregando administração…</p>}>
+              <Admin currentUserId={user.id} />
             </Suspense>
           ) : tab === "migration" ? (
             <Suspense fallback={<p className="empty">Carregando migração…</p>}>

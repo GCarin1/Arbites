@@ -179,8 +179,25 @@ def get_user(conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
 
 
 def list_users(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rows = conn.execute("SELECT * FROM users ORDER BY created_at, id").fetchall()
-    return [_row_to_user(row) for row in rows]
+    """Contas com o número de sessões abertas — o painel precisa distinguir
+    "pode entrar" de "está dentro agora"."""
+    rows = conn.execute(
+        "SELECT u.*, (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id)"
+        " AS open_sessions FROM users u ORDER BY u.created_at, u.id"
+    ).fetchall()
+    out = []
+    for row in rows:
+        user = _row_to_user(row)
+        user["open_sessions"] = row["open_sessions"]
+        out.append(user)
+    return out
+
+
+def count_users_by_status(conn: sqlite3.Connection) -> dict[str, int]:
+    counts = {status: 0 for status in STATUSES}
+    for row in conn.execute("SELECT status, COUNT(*) c FROM users GROUP BY status"):
+        counts[row["status"]] = row["c"]
+    return counts
 
 
 def count_active_admins(conn: sqlite3.Connection, excluding: int | None = None) -> int:

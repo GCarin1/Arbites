@@ -22,6 +22,26 @@ export interface Switch {
   updated_by: string | null;
 }
 
+export interface ManagedUser extends SessionUser {
+  open_sessions: number;
+}
+
+export interface LoginAttempt {
+  email: string;
+  ip: string;
+  user_agent: string;
+  ok: boolean;
+  at: string;
+}
+
+export interface AdminOverview {
+  version: string;
+  users: Record<UserStatus, number>;
+  index: { last_reindex: string | null; last_reindex_seconds: string | null };
+  trash_items: number;
+  switches: Switch[];
+}
+
 export interface SessionInfo {
   user: SessionUser | null;
   auth_enabled: boolean;

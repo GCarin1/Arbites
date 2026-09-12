@@ -12,6 +12,17 @@
     },
     "specs": [
       {
+        "id": "admin",
+        "path": ".doctrina/specs/admin/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-09-12",
+        "implementation": "verified — `backend/arbites/api.py` (rotas /admin/*), `frontend/src/components/Admin.tsx`",
+        "realizes": [
+          "SC16"
+        ]
+      },
+      {
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
@@ -369,14 +380,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0102-painel-admin-de-usuarios-e-acessos",
-        "title": "Painel admin de usuarios e acessos",
-        "path": ".doctrina/changes/0102-painel-admin-de-usuarios-e-acessos",
-        "status": "proposed",
-        "opened": "2026-09-12",
-        "lane": "runtime (confident; signals: log) — opened anyway (--force)"
-      },
       {
         "id": "0103-log-central-de-atividade",
         "title": "Log central de atividade",
@@ -1711,6 +1714,19 @@
           {
             "capability": "auth",
             "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0102-painel-admin-de-usuarios-e-acessos",
+        "title": "Painel admin de usuarios e acessos",
+        "path": ".doctrina/changes/archive/2026-09-12-0102-painel-admin-de-usuarios-e-acessos",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "admin",
+            "operation": "ADDED"
           }
         ]
       }

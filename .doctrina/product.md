@@ -117,6 +117,9 @@ Out of scope (deferred or rejected):
   de cadastro, ter o acesso liberado por um admin e entrar; sem sessão
   válida nenhuma rota da API responde e nenhuma tentativa de login some do
   registro. (M14)
+- [SC16] Como admin, ver a fila de cadastros pendentes e liberar um acesso;
+  ver quem entrou, de onde e quando, incluindo as tentativas que falharam;
+  e desligar uma superfície perigosa sem reiniciar o processo. (M14)
 
 ## Delivery order (walking skeleton)
 

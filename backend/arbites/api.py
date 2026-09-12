@@ -3441,6 +3441,18 @@ class PasswordIn(BaseModel):
 class SwitchIn(BaseModel):
     enabled: bool
 
+class ApproveIn(BaseModel):
+    role: str = "viewer"
+
+
+class RoleIn(BaseModel):
+    role: str
+
+
+class ResetIn(BaseModel):
+    password: str
+
+
 
 # Rotas que respondem sem sessao. Tudo o mais sob API_PREFIX exige cookie.
 _PUBLIC_PATHS = {
@@ -3513,7 +3525,11 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     (r"/ai/providers$", {"PUT"}, "admin", None),
     (r"/import/xray", {"POST"}, "admin", "xray_import"),
     (r"/runs/local$", {"POST"}, None, "local_runner"),
-    (r"/admin/switches/", {"PUT"}, "admin", None),
+    # O painel inteiro, e nao rota a rota: uma rota /admin/ nova ja nasce
+    # restrita. GET /admin/switches e a excecao deliberada — a UI precisa
+    # saber o que esconder, e o estado de um interruptor nao e segredo.
+    (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),
+    (r"/admin/switches$", {"PUT"}, "admin", None),
 )
 
 _GOVERNED_COMPILED = tuple(
@@ -3565,6 +3581,12 @@ def require_switch(request: Request, name: str) -> None:
 def _register_auth(app: FastAPI) -> None:
     def auth_of(request: Request):
         return request.app.state.auth
+
+    def ws_of(request: Request) -> Workspace:
+        return request.app.state.ws
+
+    def conn_of(request: Request) -> sqlite3.Connection:
+        return request.app.state.conn
 
     @app.middleware("http")
     async def _session_gate(request: Request, call_next):
@@ -3665,6 +3687,105 @@ def _register_auth(app: FastAPI) -> None:
         return {"user": user, "auth_enabled": True,
                 "signup_enabled":
                     os.environ.get("ARBITES_SIGNUP", "on").strip().lower() != "off"}
+
+
+    # -- painel de administracao (capability admin) -------------------------
+
+    def _target_user(request: Request, user_id: int) -> dict[str, Any]:
+        """Alvo de uma acao de governo, ja recusando acao sobre si mesmo.
+
+        A saida de um admin e decisao de outro admin: sem isto, um clique
+        errado tranca a instancia com um admin desativado por ele mesmo.
+        """
+        target = auth_ops.get_user(auth_of(request), user_id)
+        if target is None:
+            raise _error(404, "user_not_found", "conta inexistente")
+        if target["id"] == current_user(request)["id"]:
+            raise _error(
+                403, "self_demotion",
+                "um admin nao altera o proprio papel nem o proprio status",
+            )
+        return target
+
+    @app.get(API_PREFIX + "/admin/users")
+    async def admin_list_users(request: Request):
+        return {"users": auth_ops.list_users(auth_of(request))}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/approve")
+    async def admin_approve(request: Request, user_id: int, payload: ApproveIn):
+        target = _target_user(request, user_id)
+        conn = auth_of(request)
+        # Papel escolhido na propria aprovacao: exigir uma segunda acao so
+        # criaria uma janela em que a conta ja entra com o papel errado.
+        if payload.role != target["role"]:
+            auth_ops.set_role(conn, user_id, payload.role)
+        return {"user": auth_ops.set_status(conn, user_id, "active")}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/reject")
+    async def admin_reject(request: Request, user_id: int):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_status(auth_of(request), user_id, "rejected")}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/disable")
+    async def admin_disable(request: Request, user_id: int):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_status(auth_of(request), user_id, "disabled")}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/enable")
+    async def admin_enable(request: Request, user_id: int):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_status(auth_of(request), user_id, "active")}
+
+    @app.put(API_PREFIX + "/admin/users/{user_id}/role")
+    async def admin_set_role(request: Request, user_id: int, payload: RoleIn):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_role(auth_of(request), user_id, payload.role)}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/password")
+    async def admin_reset_password(request: Request, user_id: int, payload: ResetIn):
+        _target_user(request, user_id)
+        conn = auth_of(request)
+        # Temporaria por construcao: quem definiu a senha conhece o valor,
+        # entao ela so serve para um login.
+        auth_ops.set_password(conn, user_id, payload.password, must_change=True)
+        return {"user": auth_ops.get_user(conn, user_id)}
+
+    @app.delete(API_PREFIX + "/admin/users/{user_id}/sessions")
+    async def admin_revoke_sessions(request: Request, user_id: int):
+        target = _target_user(request, user_id)
+        # Derrubar quem esta dentro e barrar quem quer entrar sao decisoes
+        # separadas: o status da conta nao muda aqui.
+        revoked = auth_ops.revoke_user_sessions(auth_of(request), target["id"])
+        return {"revoked": revoked,
+                "user": auth_ops.get_user(auth_of(request), user_id)}
+
+    @app.get(API_PREFIX + "/admin/access-log")
+    async def admin_access_log(request: Request, limit: int = 100, offset: int = 0):
+        return {"attempts": auth_ops.list_attempts(auth_of(request), limit, offset)}
+
+    @app.get(API_PREFIX + "/admin/overview")
+    async def admin_overview(request: Request):
+        conn = conn_of(request)
+        ws = ws_of(request)
+        meta = {
+            row["key"]: row["value"]
+            for row in conn.execute("SELECT key, value FROM index_meta")
+        }
+        trash = ws.arbites_dir / "trash"
+        trash_items = (
+            len([p for p in trash.iterdir() if not p.name.endswith(".arbtrash")])
+            if trash.is_dir() else 0
+        )
+        return {
+            "version": __version__,
+            "users": auth_ops.count_users_by_status(auth_of(request)),
+            "index": {
+                "last_reindex": meta.get("last_reindex"),
+                "last_reindex_seconds": meta.get("last_reindex_seconds"),
+            },
+            "trash_items": trash_items,
+            "switches": auth_ops.list_switches(auth_of(request)),
+        }
 
     @app.get(API_PREFIX + "/admin/switches")
     async def get_switches(request: Request):

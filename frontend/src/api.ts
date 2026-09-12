@@ -1,4 +1,8 @@
 import type {
+  AdminOverview,
+  LoginAttempt,
+  ManagedUser,
+  Role,
   SessionInfo,
   SessionUser,
   Switch,
@@ -99,6 +103,40 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- painel de administração (capability admin) --------------------------
+  adminUsers: () => request<{ users: ManagedUser[] }>("/admin/users"),
+  adminAccessLog: (limit = 100, offset = 0) =>
+    request<{ attempts: LoginAttempt[] }>(
+      `/admin/access-log?limit=${limit}&offset=${offset}`,
+    ),
+  adminOverview: () => request<AdminOverview>("/admin/overview"),
+  adminApprove: (id: number, role: Role) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    }),
+  adminReject: (id: number) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/reject`, { method: "POST" }),
+  adminDisable: (id: number) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/disable`, { method: "POST" }),
+  adminEnable: (id: number) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/enable`, { method: "POST" }),
+  adminSetRole: (id: number, role: Role) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/role`, {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    }),
+  adminResetPassword: (id: number, password: string) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/password`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
+  adminRevokeSessions: (id: number) =>
+    request<{ revoked: number; user: ManagedUser }>(
+      `/admin/users/${id}/sessions`,
+      { method: "DELETE" },
+    ),
   setSwitch: (name: string, enabled: boolean) =>
     request<{ switch: Switch }>(`/admin/switches/${name}`, {
       method: "PUT",
