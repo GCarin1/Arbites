@@ -10,6 +10,8 @@ from arbites.api import create_app
 from arbites.ci import TokenStore
 from arbites.workspace import Workspace
 
+from conftest import login_admin
+
 
 class FakeTokenStore(TokenStore):
     def __init__(self):
@@ -30,6 +32,7 @@ def token_client(tmp_path):
     app = create_app(ws.root, watch=False, token_store=store,
                      github_client=object())
     with TestClient(app) as client:
+        login_admin(client)
         client.store = store
         client.ws = ws
         yield client

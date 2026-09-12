@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 
 from . import __version__
 from . import agent_pack as agent_pack_ops
+from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
@@ -505,8 +506,11 @@ def create_app(
     token_store: TokenStore | None = None,
     ai_key_store: AIKeyStore | None = None,
     ai_transport=None,
+    auth_enabled: bool | None = None,
 ) -> FastAPI:
     ws = Workspace(workspace_root or os.environ.get("ARBITES_WORKSPACE", "workspace"))
+    if auth_enabled is None:
+        auth_enabled = os.environ.get("ARBITES_AUTH", "on").strip().lower() != "off"
     tokens = token_store or TokenStore()
     github = github_client or HttpxGitHub(tokens)
     ai_keys = ai_key_store or AIKeyStore()
@@ -523,6 +527,22 @@ def create_app(
         app.state.ci = CIManager(ws, app.state.conn, github, tokens)
         app.state.ai_keys = ai_keys
         app.state.ai_transport = ai_transport
+        # Banco de contas: conexao propria e duravel, jamais a do indice
+        # descartavel (ADR 0011).
+        app.state.auth = auth_ops.connect_auth(ws)
+        app.state.auth_enabled = auth_enabled
+        if auth_enabled:
+            created = auth_ops.bootstrap_admin(app.state.auth)
+            if created is not None:
+                log.warning(
+                    "conta admin de bootstrap criada para %s — troque a senha"
+                    " no primeiro login", created["email"],
+                )
+        else:
+            log.warning(
+                "ARBITES_AUTH=off — a API esta SEM autenticacao. Nao exponha"
+                " esta instancia fora de uma rede confiavel.",
+            )
         observer = None
         if watch:
             watch_conn = connect(ws)
@@ -533,6 +553,7 @@ def create_app(
         if observer is not None:
             observer.stop()
         app.state.conn.close()
+        app.state.auth.close()
 
     app = FastAPI(title="Arbites", version=__version__, lifespan=lifespan)
 
@@ -571,6 +592,14 @@ def create_app(
             content={"error": {"code": exc.code, "message": exc.message}},
         )
 
+    @app.exception_handler(auth_ops.AuthError)
+    async def _auth_error(request: Request, exc: auth_ops.AuthError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    _register_auth(app)
     _register_routes(app)
     _mount_frontend(app)
     return app
@@ -3381,6 +3410,177 @@ def _register_routes(app: FastAPI) -> None:
         wanted = [k for k in kinds.split(",") if k] or None
         return memory_ops.timeline_years(conn_of(request), wanted)
 
+
+
+# ---------------------------------------------------------------------------
+# Autenticacao (capability auth) — rotas /auth/* e o gate de sessao
+
+
+class RegisterIn(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class PasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+# Rotas que respondem sem sessao. Tudo o mais sob API_PREFIX exige cookie.
+_PUBLIC_PATHS = {
+    API_PREFIX + "/auth/login",
+    API_PREFIX + "/auth/register",
+    API_PREFIX + "/auth/me",
+    API_PREFIX + "/health",
+}
+
+# Com must_change_password a sessao existe mas so serve para trocar a senha.
+_PASSWORD_CHANGE_PATHS = {
+    API_PREFIX + "/auth/password",
+    API_PREFIX + "/auth/logout",
+    API_PREFIX + "/auth/me",
+}
+
+
+def client_ip(request: Request) -> str:
+    """IP real atras de tunel/proxy: Cloudflare primeiro, depois o primeiro
+    salto do X-Forwarded-For, e so entao o socket (que seria sempre o proxy)."""
+    cf = request.headers.get("cf-connecting-ip", "").strip()
+    if cf:
+        return cf
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded.strip():
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def _set_session_cookie(response: Response, request: Request, token: str) -> None:
+    response.set_cookie(
+        auth_ops.SESSION_COOKIE,
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+        max_age=int(auth_ops.ABSOLUTE_TIMEOUT.total_seconds()),
+    )
+
+
+def current_user(request: Request) -> dict[str, Any]:
+    """Usuario da sessao. Fora do gate (ARBITES_AUTH=off) devolve um
+    operador local sintetico, para que o resto do codigo nao precise de
+    ramificacao."""
+    user = getattr(request.state, "user", None)
+    if user is not None:
+        return user
+    if not getattr(request.app.state, "auth_enabled", True):
+        return {"id": 0, "email": "local", "name": "local", "role": "admin",
+                "status": "active", "must_change_password": False,
+                "created_at": None, "last_login_at": None}
+    raise _error(401, "unauthenticated", "sessao necessaria")
+
+
+def _register_auth(app: FastAPI) -> None:
+    def auth_of(request: Request):
+        return request.app.state.auth
+
+    @app.middleware("http")
+    async def _session_gate(request: Request, call_next):
+        path = request.url.path
+        if not path.startswith(API_PREFIX) or not request.app.state.auth_enabled:
+            return await call_next(request)
+        raw = request.cookies.get(auth_ops.SESSION_COOKIE)
+        user = auth_ops.resolve_session(request.app.state.auth, raw)
+        request.state.user = user
+        if path in _PUBLIC_PATHS:
+            return await call_next(request)
+        if user is None:
+            response = JSONResponse(
+                status_code=401,
+                content={"error": {"code": "unauthenticated",
+                                   "message": "sessao necessaria"}},
+            )
+            response.delete_cookie(auth_ops.SESSION_COOKIE, path="/")
+            return response
+        if user["must_change_password"] and path not in _PASSWORD_CHANGE_PATHS:
+            return JSONResponse(
+                status_code=403,
+                content={"error": {"code": "password_change_required",
+                                   "message": "troque a senha antes de continuar"}},
+            )
+        return await call_next(request)
+
+    @app.get(API_PREFIX + "/health")
+    async def health():
+        return {"status": "ok", "version": __version__}
+
+    @app.post(API_PREFIX + "/auth/register", status_code=201)
+    async def register(request: Request, payload: RegisterIn):
+        if os.environ.get("ARBITES_SIGNUP", "on").strip().lower() == "off":
+            raise _error(403, "signup_disabled", "cadastro fechado nesta instancia")
+        user = auth_ops.create_user(
+            auth_of(request), payload.email, payload.password, payload.name,
+            role="viewer", status="pending",
+        )
+        # Nasce pendente: nenhuma sessao aqui, de proposito.
+        return {"user": user, "message": "cadastro recebido; aguarde a liberacao"}
+
+    @app.post(API_PREFIX + "/auth/login")
+    async def login(request: Request, payload: LoginIn):
+        conn = auth_of(request)
+        user = auth_ops.authenticate(
+            conn, payload.email, payload.password, client_ip(request),
+            request.headers.get("user-agent", ""),
+        )
+        token = auth_ops.open_session(
+            conn, user["id"], client_ip(request),
+            request.headers.get("user-agent", ""),
+        )
+        response = JSONResponse({"user": auth_ops.get_user(conn, user["id"])})
+        _set_session_cookie(response, request, token)
+        return response
+
+    @app.post(API_PREFIX + "/auth/logout")
+    async def logout(request: Request):
+        auth_ops.revoke_session(
+            auth_of(request), request.cookies.get(auth_ops.SESSION_COOKIE)
+        )
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(auth_ops.SESSION_COOKIE, path="/")
+        return response
+
+    @app.get(API_PREFIX + "/auth/me")
+    async def me(request: Request):
+        if not request.app.state.auth_enabled:
+            return {"user": current_user(request), "auth_enabled": False}
+        user = getattr(request.state, "user", None)
+        return {"user": user, "auth_enabled": True,
+                "signup_enabled":
+                    os.environ.get("ARBITES_SIGNUP", "on").strip().lower() != "off"}
+
+    @app.post(API_PREFIX + "/auth/password")
+    async def change_password(request: Request, payload: PasswordIn):
+        conn = auth_of(request)
+        user = current_user(request)
+        row = auth_ops.get_user_by_email(conn, user["email"])
+        if not auth_ops.verify_password(row["password_hash"], payload.current_password):
+            raise _error(401, "invalid_credentials", "senha atual incorreta")
+        auth_ops.set_password(conn, user["id"], payload.new_password)
+        # set_password derruba todas as sessoes; quem trocou recebe uma nova
+        # (rotacao) para nao ser deslogado pelo proprio acerto.
+        token = auth_ops.open_session(
+            conn, user["id"], client_ip(request),
+            request.headers.get("user-agent", ""),
+        )
+        response = JSONResponse({"user": auth_ops.get_user(conn, user["id"])})
+        _set_session_cookie(response, request, token)
+        return response
 
 def _mount_frontend(app: FastAPI) -> None:
     """Serve o build da SPA (frontend/dist) como estático — um comando sobe tudo."""

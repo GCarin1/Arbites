@@ -16,6 +16,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 TC_BODY = "## Passos\n\n1. x\n\n## Resultado esperado\n\nok\n"
 
 GENERATED = {
@@ -123,6 +125,7 @@ def memory_client(tmp_path):
         github_client=object(),
     )
     with TestClient(app) as c:
+        login_admin(c)
         c.ws = ws
         c.requests = requests
         yield c
@@ -163,6 +166,7 @@ def review_client(tmp_path):
         github_client=object(),
     )
     with TestClient(app) as c:
+        login_admin(c)
         c.ws = ws
         c.requests = requests
         yield c

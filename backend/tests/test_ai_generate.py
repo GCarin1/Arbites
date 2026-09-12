@@ -16,6 +16,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 STORY_BODY = (
     "## Resumo\n\nComo usuário cadastrado, quero autenticar com e-mail e senha.\n\n"
     "## Critérios de aceite\n\n"
@@ -105,6 +107,7 @@ def _make_client(tmp_path, content: str):
 @pytest.fixture()
 def ai_client(tmp_path):
     with _make_client(tmp_path, json.dumps(GENERATED, ensure_ascii=False)) as client:
+        login_admin(client)
         yield client
 
 
@@ -161,6 +164,7 @@ def test_accept_reject_item_by_item(ai_client):
 def test_output_outside_schema_is_rejected_without_writes(tmp_path):
     bad = json.dumps({"testcases": [{"title": "sem passos"}]})  # falta campo obrigatório
     with _make_client(tmp_path, bad) as client:
+        login_admin(client)
         story = client.post(
             "/api/v1/requirements",
             json={"kind": "story", "title": "S", "body": STORY_BODY},
@@ -177,6 +181,7 @@ def test_output_outside_schema_is_rejected_without_writes(tmp_path):
 
 def test_non_json_output_is_clear_error(tmp_path):
     with _make_client(tmp_path, "Desculpe, não posso ajudar com isso.") as client:
+        login_admin(client)
         story = client.post(
             "/api/v1/requirements",
             json={"kind": "story", "title": "S", "body": STORY_BODY},

@@ -12,6 +12,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 TODAY = date.today().isoformat()
 
 SUMMARY = {
@@ -56,6 +58,7 @@ def client(tmp_path):
                      ai_transport=_transport(json.dumps(SUMMARY, ensure_ascii=False)),
                      github_client=object())
     with TestClient(app) as c:
+        login_admin(c)
         c.ws = ws
         yield c
 

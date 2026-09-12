@@ -12,6 +12,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 ANALYSIS = {
     "summary": "O login falhou por timeout na chamada de autenticação.",
     "probable_cause": "Serviço de auth indisponível ou lento.",
@@ -76,6 +78,7 @@ def _failed_execution(c):
 
 def test_analyze_run_returns_summary_and_defect_draft(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         ct, ex = _failed_execution(c)
         r = c.post(f"/api/v1/ai/analyze-run/{ex['id']}", json={})
         assert r.status_code == 200, r.text
@@ -90,6 +93,7 @@ def test_analyze_run_returns_summary_and_defect_draft(tmp_path):
 
 def test_accept_draft_creates_linked_defect(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         ct, ex = _failed_execution(c)
         draft = c.post(f"/api/v1/ai/analyze-run/{ex['id']}", json={}).json()["defect"]
         created = c.post("/api/v1/defects", json={
@@ -102,6 +106,7 @@ def test_accept_draft_creates_linked_defect(tmp_path):
 
 def test_analyze_run_without_failures_is_422(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         ct = c.post("/api/v1/testcases", json={"title": "Passa"}).json()
         ex = c.post(
             "/api/v1/executions", json={"name": "R", "testcase_ids": [ct["id"]]}
@@ -115,4 +120,5 @@ def test_analyze_run_without_failures_is_422(tmp_path):
 
 def test_analyze_run_unknown_execution_is_404(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         assert c.post("/api/v1/ai/analyze-run/EXEC-9999", json={}).status_code == 404

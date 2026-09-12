@@ -9,6 +9,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 
 class FakeAIKeyStore(AIKeyStore):
     def __init__(self):
@@ -59,6 +61,7 @@ def _client(tmp_path):
 
 def test_saved_provider_with_valid_key_is_ok(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         r = c.post("/api/v1/ai/providers/test", json={"name": "cloud"})
         assert r.status_code == 200
         assert r.json() == {"ok": True, "error": None}
@@ -66,6 +69,7 @@ def test_saved_provider_with_valid_key_is_ok(tmp_path):
 
 def test_inline_provider_invalid_key_reports_error(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         r = c.post("/api/v1/ai/providers/test", json={
             "kind": "openai_compatible", "model": "gpt",
             "base_url": "https://api.example.com/v1", "key": "sk-bad",
@@ -77,6 +81,7 @@ def test_inline_provider_invalid_key_reports_error(tmp_path):
 
 def test_inline_provider_valid_key_is_ok(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         r = c.post("/api/v1/ai/providers/test", json={
             "kind": "openai_compatible", "model": "gpt",
             "base_url": "https://api.example.com/v1", "key": "sk-valid",
@@ -86,11 +91,13 @@ def test_inline_provider_valid_key_is_ok(tmp_path):
 
 def test_test_without_name_or_kind_is_422(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         r = c.post("/api/v1/ai/providers/test", json={})
         assert r.status_code == 422
 
 
 def test_unknown_saved_provider_is_404(tmp_path):
     with _client(tmp_path) as c:
+        login_admin(c)
         r = c.post("/api/v1/ai/providers/test", json={"name": "nope"})
         assert r.status_code == 404

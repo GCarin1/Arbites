@@ -14,6 +14,8 @@ from arbites.api import create_app
 from arbites.indexer import connect
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 GENERATED = {
     "testcases": [
         {
@@ -146,6 +148,7 @@ def lessons_client(tmp_path):
         github_client=object(),
     )
     with TestClient(app) as c:
+        login_admin(c)
         c.ws = ws
         c.requests = requests
         yield c
@@ -300,6 +303,7 @@ def test_ai_structure_lesson_endpoint_is_preview(tmp_path):
         github_client=object(),
     )
     with TestClient(app) as c:
+        login_admin(c)
         d = c.post(
             "/api/v1/defects",
             json={"title": "Token não expira", "root_cause": "comparação ingênua"},

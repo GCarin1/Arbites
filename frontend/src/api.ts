@@ -1,4 +1,6 @@
 import type {
+  SessionInfo,
+  SessionUser,
   ActivityHeatmapData,
   AiProvidersInfo,
   ExecutiveSummaryResult,
@@ -43,11 +45,25 @@ import type {
 
 const BASE = "/api/v1";
 
+// Assinantes avisados quando o backend recusa a sessao: o AuthGate devolve a
+// SPA para a tela de login sem depender de cada tela tratar o 401.
+const unauthenticatedListeners = new Set<() => void>();
+
+export function onUnauthenticated(listener: () => void): () => void {
+  unauthenticatedListeners.add(listener);
+  return () => unauthenticatedListeners.delete(listener);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(BASE + path, {
     headers: { "Content-Type": "application/json" },
+    // A sessao e um cookie httpOnly: sem isto ele nao acompanha o fetch.
+    credentials: "same-origin",
     ...init,
   });
+  if (resp.status === 401 && !path.startsWith("/auth/")) {
+    for (const listener of unauthenticatedListeners) listener();
+  }
   if (!resp.ok) {
     let message = `${resp.status} ${resp.statusText}`;
     try {
@@ -68,6 +84,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // -- sessao (capability auth) --------------------------------------------
+  me: () => request<SessionInfo>("/auth/me"),
+  login: (email: string, password: string) =>
+    request<{ user: SessionUser }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  register: (email: string, password: string, name: string) =>
+    request<{ user: SessionUser; message: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }),
+  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ user: SessionUser }>("/auth/password", {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    }),
+
   workspace: () => request<WorkspaceInfo>("/workspace"),
   reindex: () => request<unknown>("/workspace/reindex", { method: "POST" }),
   warnings: () => request<Warning[]>("/warnings"),

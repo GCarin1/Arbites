@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
-import type { TreeNode, Warning, WorkspaceInfo } from "./types";
+import type { SessionUser, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
   import("./components/Home").then((m) => ({ default: m.Home }))
@@ -196,7 +196,13 @@ function NavItem({
   );
 }
 
-export default function App() {
+export default function App({
+  user,
+  onLogout,
+}: {
+  user: SessionUser;
+  onLogout: () => void;
+}) {
   const initialHash = parseHash();
   const [tab, setTab] = useState<Tab>(initialHash.tab);
   // filtros de alto valor serializados no hash (0084); a URL é a fonte da
@@ -419,6 +425,10 @@ export default function App() {
         <button onClick={() => void reindex()} disabled={reindexing}>
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
+        <span className="session-identity" title={`${user.email} · ${user.role}`}>
+          {user.name || user.email}
+        </span>
+        <button onClick={onLogout}>Sair</button>
       </header>
       {cmdkOpen && (
         <Suspense fallback={null}>

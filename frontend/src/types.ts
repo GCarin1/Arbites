@@ -1,3 +1,25 @@
+// -- sessao (capability auth) ------------------------------------------------
+
+export type Role = "admin" | "editor" | "viewer";
+export type UserStatus = "pending" | "active" | "disabled" | "rejected";
+
+export interface SessionUser {
+  id: number;
+  email: string;
+  name: string;
+  role: Role;
+  status: UserStatus;
+  must_change_password: boolean;
+  created_at: string | null;
+  last_login_at: string | null;
+}
+
+export interface SessionInfo {
+  user: SessionUser | null;
+  auth_enabled: boolean;
+  signup_enabled?: boolean;
+}
+
 export interface WorkspaceInfo {
   config: {
     workspace?: { name?: string; id_prefixes?: Record<string, string> };

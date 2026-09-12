@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import make_md
+from conftest import login_admin, make_md
 from fastapi.testclient import TestClient
 
 from arbites.api import create_app
@@ -65,6 +65,7 @@ def auto_client(tmp_path):
     ws = _make_ws(tmp_path)
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         yield client
 
@@ -127,6 +128,7 @@ def test_timeout_marks_pending_as_blocked(tmp_path):
     ws = _make_ws(tmp_path, timeout_minutes=0.05)  # 3 s
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         resp = client.post(
             "/api/v1/runs/local",
@@ -167,6 +169,7 @@ def test_run_whole_feature_without_any_ct_tag_does_not_422(tmp_path):
     )
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         resp = client.post(
             "/api/v1/runs/local",

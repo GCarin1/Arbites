@@ -12,6 +12,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 EXEC_SUMMARY = {
     "synthesis": "Qualidade estável, pass rate abaixo da meta.",
     "risks": ["Defeito crítico aberto", "Cobertura de execução parcial"],
@@ -63,6 +65,7 @@ def _make_client(tmp_path, with_ai: bool):
 @pytest.fixture()
 def client(tmp_path):
     with _make_client(tmp_path, with_ai=True) as c:
+        login_admin(c)
         yield c
 
 
@@ -124,6 +127,7 @@ def test_executive_summary_injects_real_numbers_and_export_includes_it(client):
 def test_executive_summary_without_provider_is_409(tmp_path):
     """Sem provider, o endpoint recusa (409) e o dashboard segue funcional."""
     with _make_client(tmp_path, with_ai=False) as c:
+        login_admin(c)
         _seed(c)
         resp = c.post("/api/v1/ai/executive-summary", json={})
         assert resp.status_code == 409 and resp.json()["error"]["code"] == "ai_disabled"

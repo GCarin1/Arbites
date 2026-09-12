@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 import pytest
 import yaml
-from conftest import make_md
+from conftest import login_admin, make_md
 from fastapi.testclient import TestClient
 
 from arbites.api import create_app
@@ -170,6 +170,7 @@ def ci_client(tmp_path):
     app = create_app(ws.root, watch=False,
                      github_client=fake, token_store=FakeTokenStore())
     with TestClient(app) as client:
+        login_admin(client)
         client.fake = fake
         client.ws = ws
         yield client

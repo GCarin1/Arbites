@@ -2702,3 +2702,88 @@ button.link-chip-btn:disabled {
   gap: 0.5rem;
   margin-bottom: 0.4rem;
 }
+
+/* ============================================================================
+   Login e troca de senha (capability auth)
+   Tela fora do AppShell: sem header nem sidebar, o cartão centrado é a única
+   superfície. Reusa .card, .field e button.primary do design-system.
+   ========================================================================== */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s3);
+  background: var(--bg);
+  color: var(--text);
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+}
+.login-brand h1 {
+  margin: 0;
+  font-size: var(--fs-h1);
+  letter-spacing: -0.01em;
+}
+.login-brand p {
+  margin: 4px 0 0;
+}
+.login-title {
+  margin: 0;
+  font-size: var(--fs-h3);
+  padding-top: var(--s1);
+  border-top: 1px solid var(--border);
+}
+.login-hint {
+  font-size: var(--fs-caption);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.login-error,
+.login-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-card);
+  font-size: var(--fs-caption);
+  border: 1px solid;
+}
+.login-error {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(248, 81, 73, 0.1);
+}
+.login-notice {
+  color: var(--success);
+  border-color: var(--success);
+  background: rgba(63, 185, 80, 0.1);
+}
+.login-submit {
+  width: 100%;
+  justify-content: center;
+}
+.login-switch {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: var(--fs-caption);
+  padding: 0;
+  height: auto;
+}
+.login-switch:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+/* Identidade da sessão no header (capability auth). */
+.session-identity {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

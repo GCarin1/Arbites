@@ -11,6 +11,8 @@ from arbites.ai import AIKeyStore
 from arbites.api import create_app
 from arbites.workspace import DEFAULT_CONFIG, Workspace
 
+from conftest import login_admin
+
 GENERATED = {"testcases": [{"title": "X", "passos": ["p"], "resultado_esperado": "ok"}]}
 
 
@@ -56,6 +58,7 @@ def rig(tmp_path):
     app = create_app(ws.root, watch=False, ai_key_store=FakeAIKeyStore(),
                      ai_transport=transport, github_client=object())
     with TestClient(app) as c:
+        login_admin(c)
         c.ws = ws
         yield c, transport
 
