@@ -68,7 +68,8 @@ def test_profile_template_and_roundtrip(rig):
     prof = client.get("/api/v1/profile").json()
     assert "Preferências & Estilo" in prof["memory"]
     assert "Contexto Ativo" in prof["memory"]
-    assert (client.ws.root / "profile.md").exists()
+    # O perfil e por conta desde o 0104: `profiles/<slug-do-e-mail>.md`.
+    assert list((client.ws.root / "profiles").glob("*.md"))
 
     saved = client.put(
         "/api/v1/profile",

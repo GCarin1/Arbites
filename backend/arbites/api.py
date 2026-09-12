@@ -152,6 +152,8 @@ class ExecutionCreate(BaseModel):
     environment: str | None = None
     squad: str | None = None
     testcase_ids: list[str]
+    # Mantido por compatibilidade de contrato; o valor e ignorado — a
+    # autoria vem da sessao (capability profile).
     owner: str = "local"
 
 
@@ -703,6 +705,16 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
 # Rotas
 
 
+def author_of(request: Request) -> str:
+    """Quem assina o que esta sendo escrito. Vem SEMPRE da sessao: aceitar
+    autoria do corpo faria dela um campo que qualquer um preenche com o nome
+    de qualquer um."""
+    if not getattr(request.app.state, "auth_enabled", True):
+        return "local"
+    user = getattr(request.state, "user", None)
+    return (user or {}).get("email", "local")
+
+
 def _register_routes(app: FastAPI) -> None:
     def ws_of(request: Request) -> Workspace:
         return request.app.state.ws
@@ -848,6 +860,7 @@ def _register_routes(app: FastAPI) -> None:
             "external_key": payload.external_key,
             "tags": payload.tags,
             "created": date.today().isoformat(),
+            "created_by": author_of(request),
         }
         if payload.squad:
             meta["squad"] = payload.squad
@@ -1076,6 +1089,7 @@ def _register_routes(app: FastAPI) -> None:
             "story": payload.story,
             "created": today,
             "updated": today,
+            "created_by": author_of(request),
         }
         if payload.squad:
             meta["squad"] = payload.squad
@@ -1293,8 +1307,8 @@ def _register_routes(app: FastAPI) -> None:
             doc = parse_markdown(ws.root / row["path"])
             testcases.append({"id": ct_id, "steps": doc.steps})
         execution = exec_ops.create(
-            ws, payload.name, payload.owner, payload.sprint, payload.environment,
-            testcases, squad=payload.squad,
+            ws, payload.name, author_of(request), payload.sprint,
+            payload.environment, testcases, squad=payload.squad,
         )
         _save_and_index(ws, conn, execution)
         return execution
@@ -1502,7 +1516,7 @@ def _register_routes(app: FastAPI) -> None:
             conn, payload.sprint or None, payload.squad or None
         )
         result = await asyncio.to_thread(
-            ai_ops.generate_executive_summary, provider, _with_memory(ws, context_md)
+            ai_ops.generate_executive_summary, provider, _with_memory(request, context_md)
         )
         return {"preview": True, **result.model_dump(), "context_markdown": context_md}
 
@@ -2352,40 +2366,71 @@ def _register_routes(app: FastAPI) -> None:
 
     # -- perfil / memória de longo prazo (doc §2) ---------------------------
 
-    def _profile_path(ws: Workspace) -> Path:
+    def _legacy_profile_path(ws: Workspace) -> Path:
         return ws.root / "profile.md"
 
-    def _load_profile(ws: Workspace) -> tuple[str, str]:
-        path = _profile_path(ws)
-        if not path.exists():
+    def _profile_path(request: Request) -> Path:
+        """Perfil da conta logada.
+
+        A memoria de longo prazo entra em TODA chamada de IA; compartilhar o
+        arquivo faria a IA responder a um QA com o contexto de outro. Sem
+        autenticacao (instalacao de uma pessoa so) segue o arquivo da raiz.
+        """
+        ws = ws_of(request)
+        if not getattr(request.app.state, "auth_enabled", True):
+            return _legacy_profile_path(ws)
+        user = current_user(request)
+        return ws.root / "profiles" / f"{slugify(user['email'])}.md"
+
+    def _seed_profile(request: Request, path: Path) -> None:
+        """Primeira leitura de uma conta: template, ou o `profile.md` da raiz
+        para a conta de menor id — que e, por construcao, o usuario unico que
+        existia antes de a instancia virar multiusuario."""
+        legacy = _legacy_profile_path(ws_of(request))
+        inherits = False
+        if getattr(request.app.state, "auth_enabled", True) and legacy.exists():
+            first = request.app.state.auth.execute(
+                "SELECT MIN(id) AS id FROM users"
+            ).fetchone()
+            inherits = first is not None and first["id"] == current_user(request)["id"]
+        if inherits:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(legacy.read_text(encoding="utf-8"), encoding="utf-8")
+            legacy.unlink()  # herdado uma unica vez
+        else:
             _write_doc(path, {"name": ""}, PROFILE_TEMPLATE)
+
+    def _load_profile(request: Request) -> tuple[str, str]:
+        ws = ws_of(request)
+        path = _profile_path(request)
+        if not path.exists():
+            _seed_profile(request, path)
         meta, body = _load_doc(ws, ws.relpath(path))
         return str(meta.get("name") or ""), body
 
     @app.get(API_PREFIX + "/profile")
     async def get_profile(request: Request):
-        name, memory = _load_profile(ws_of(request))
+        name, memory = _load_profile(request)
         return {"name": name, "memory": memory}
 
     @app.put(API_PREFIX + "/profile")
     async def put_profile(request: Request, payload: ProfileIn):
-        ws = ws_of(request)
-        name, memory = _load_profile(ws)
+        name, memory = _load_profile(request)
         if payload.name is not None:
             name = payload.name
         if payload.memory is not None:
             memory = payload.memory
-        _write_doc(_profile_path(ws), {"name": name or None}, memory)
+        _write_doc(_profile_path(request), {"name": name or None}, memory)
         return {"name": name, "memory": memory}
 
-    def _with_memory(ws: Workspace, user_text: str) -> str:
+    def _with_memory(request: Request, user_text: str) -> str:
         """Prefixa o conteúdo do usuário com a memória de longo prazo (doc §2).
 
         Injetado em TODA chamada de IA, independente do provider. Memória
         vazia/template intocado → sem bloco (prompt limpo).
         """
         try:
-            _, memory = _load_profile(ws)
+            _, memory = _load_profile(request)
         except OSError:
             return user_text
         stripped = memory.strip()
@@ -2396,14 +2441,14 @@ def _register_routes(app: FastAPI) -> None:
             f"{stripped}\n\n---\n\n{user_text}"
         )
 
-    def _with_project_recap(conn: sqlite3.Connection, ws: Workspace, user_text: str) -> str:
+    def _with_project_recap(request: Request, conn: sqlite3.Connection, user_text: str) -> str:
         """Empilha o recap de decisões/lições recentes (Memória Histórica do
         Projeto) sobre a memória de longo prazo do usuário — a IA "lembra"
         do que já aconteceu no projeto, não só do que o usuário escreveu no
         perfil."""
         recap = memory_ops.recent_recap(conn)
         text = f"{recap}\n\n---\n\n{user_text}" if recap else user_text
-        return _with_memory(ws, text)
+        return _with_memory(request, text)
 
     def _log_agent_event(
         ws: Workspace, conn: sqlite3.Connection, action: str,
@@ -2571,7 +2616,7 @@ def _register_routes(app: FastAPI) -> None:
                 )
                 gen = await asyncio.to_thread(
                     ai_ops.generate_testcases, provider,
-                    _with_project_recap(conn, ws, focus), lessons,
+                    _with_project_recap(request, conn, focus), lessons,
                 )
                 for it in gen.testcases:
                     items.append({
@@ -2587,7 +2632,7 @@ def _register_routes(app: FastAPI) -> None:
                     "lessons_used": lessons_used}
 
         generated = await asyncio.to_thread(
-            ai_ops.generate_testcases, provider, _with_project_recap(conn, ws, source), lessons
+            ai_ops.generate_testcases, provider, _with_project_recap(request, conn, source), lessons
         )
         _log_agent_event(
             ws, conn, "generate_testcases", source_id, source_title,
@@ -2612,7 +2657,7 @@ def _register_routes(app: FastAPI) -> None:
         ]
         similar = ai_ops.find_similar(conn, row["title"], tags, exclude_id=ct_id)
         result = await asyncio.to_thread(
-            ai_ops.review_testcase, provider, _with_project_recap(conn, ws, ct_md), similar
+            ai_ops.review_testcase, provider, _with_project_recap(request, conn, ct_md), similar
         )
         _log_agent_event(
             ws, conn, "review_testcase", ct_id, row["title"] if row else None,
@@ -2689,7 +2734,7 @@ def _register_routes(app: FastAPI) -> None:
             "SELECT title FROM testcases WHERE id = ?", (ct_id,)
         ).fetchone()
         generated = await asyncio.to_thread(
-            ai_ops.negative_cases, provider, _with_memory(ws, ct_md)
+            ai_ops.negative_cases, provider, _with_memory(request, ct_md)
         )
         _log_agent_event(
             ws, conn, "negative_cases", ct_id, row["title"] if row else None,
@@ -2737,7 +2782,7 @@ def _register_routes(app: FastAPI) -> None:
 
         prov = _ai_provider(request, provider or None)
         conversion = await asyncio.to_thread(
-            ai_ops.convert_import, prov, name, _with_memory(ws, text)
+            ai_ops.convert_import, prov, name, _with_memory(request, text)
         )
         return {
             "preview": True,  # nada gravado; aceite = POST /testcases por item
@@ -2788,6 +2833,7 @@ def _register_routes(app: FastAPI) -> None:
             "execution": payload.execution,
             "external_key": payload.external_key,
             "opened": date.today().isoformat(),
+            "created_by": author_of(request),
             "root_cause": payload.root_cause,
             "fix": payload.fix,
             "prevention": payload.prevention,
@@ -3046,7 +3092,7 @@ def _register_routes(app: FastAPI) -> None:
         ctx = daily_ops.build_context(ws, conn, _check_date(day))
         markdown = daily_ops.context_markdown(ctx)
         digest = await asyncio.to_thread(
-            ai_ops.generate_daily, provider, _with_memory(ws, markdown)
+            ai_ops.generate_daily, provider, _with_memory(request, markdown)
         )
         return {"preview": True, "date": day, **digest.model_dump(), "context_markdown": markdown}
 
@@ -3145,7 +3191,7 @@ def _register_routes(app: FastAPI) -> None:
         if not body.strip():
             raise _error(422, "empty_meeting", "reunião sem descrição/transcrição para resumir")
         result = await asyncio.to_thread(
-            ai_ops.summarize_meeting, provider, _with_memory(ws, body)
+            ai_ops.summarize_meeting, provider, _with_memory(request, body)
         )
         return {"preview": True, "id": meeting_id, **result.model_dump()}
 
@@ -3186,7 +3232,7 @@ def _register_routes(app: FastAPI) -> None:
             raise _error(422, "empty_meeting",
                          "reunião sem descrição/transcrição para extrair")
         result = await asyncio.to_thread(
-            ai_ops.summarize_meeting, provider, _with_memory(ws, body)
+            ai_ops.summarize_meeting, provider, _with_memory(request, body)
         )
         return {"preview": True, "id": meeting_id, "action_items": result.action_items}
 

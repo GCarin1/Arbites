@@ -177,9 +177,9 @@
         "id": "profile",
         "path": ".doctrina/specs/profile/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-09",
-        "implementation": "verified — M13 (backend/arbites/api.py; frontend Profile.tsx). Memória injetada nos 5 usos de IA",
+        "implementation": "verified — perfil por conta e autoria pela sessão (`backend/arbites/api.py`)",
         "realizes": [
           "SC14"
         ]
@@ -380,14 +380,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0104-autoria-pelo-usuario-logado",
-        "title": "Autoria pelo usuario logado",
-        "path": ".doctrina/changes/0104-autoria-pelo-usuario-logado",
-        "status": "proposed",
-        "opened": "2026-09-12",
-        "lane": "product (uncertain)"
-      },
       {
         "id": "0105-empacotamento-docker-e-cloudflare-tunnel",
         "title": "Empacotamento Docker e Cloudflare Tunnel",
@@ -1731,6 +1723,19 @@
         "specs_affected": [
           {
             "capability": "audit",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0104-autoria-pelo-usuario-logado",
+        "title": "Autoria pelo usuario logado",
+        "path": ".doctrina/changes/archive/2026-09-12-0104-autoria-pelo-usuario-logado",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "profile",
             "operation": "MODIFIED"
           }
         ]
