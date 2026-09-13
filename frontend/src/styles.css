@@ -345,6 +345,51 @@ textarea.raw {
   flex: 1;
 }
 
+/* Menu de ações (change 0131): recolhe o que é destrutivo sem escondê-lo. */
+.overflow-menu {
+  position: relative;
+  display: inline-flex;
+}
+.overflow-trigger {
+  padding: 0 var(--s1h);
+  font-size: var(--fs-h3);
+  line-height: 1;
+  color: var(--text-muted);
+}
+.overflow-trigger:hover:not(:disabled) {
+  color: var(--text);
+}
+.overflow-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s0) 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.overflow-dropdown button {
+  text-align: left;
+  justify-content: flex-start;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 6px var(--s2);
+  color: var(--text);
+  height: auto;
+}
+.overflow-dropdown button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.overflow-dropdown button.danger {
+  color: var(--danger);
+}
+
 /* Ação de manutenção na barra superior (change 0130): presente e a um
    clique, sem a aparência de ação de trabalho que disputava atenção com a
    busca em toda tela. */
@@ -1086,6 +1131,10 @@ button.nav-group-title:hover {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--s2);
   margin-bottom: var(--s3);
+  /* Cada campo pela PRÓPRIA altura (change 0131). Esticando, um caminho de
+     arquivo de duas linhas fazia os três campos vazios ao lado ocuparem
+     139px cada, com o travessão flutuando no meio do nada. */
+  align-items: start;
 }
 .read-field {
   display: flex;
@@ -1109,7 +1158,7 @@ button.nav-group-title:hover {
   color: var(--text);
   min-height: 21px;
 }
-.read-value.empty {
+.read-value.read-empty {
   color: var(--text-subtle);
 }
 @media (max-width: 720px) {

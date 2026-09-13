@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.11.1",
+        "version": "0.12.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2085,6 +2085,19 @@
         "id": "0130-cabecalho-caminho-disco-reindexar",
         "title": "cabecalho com caminho do disco e reindexar competindo, e botao orfao acima do titulo em execucoes",
         "path": ".doctrina/changes/archive/2026-09-13-0130-cabecalho-caminho-disco-reindexar",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0131-tela-detalhe-mostra-campo",
+        "title": "tela de detalhe mostra campo vazio com o mesmo peso do preenchido e a acao destrutiva com o mesmo destaque da principal",
+        "path": ".doctrina/changes/archive/2026-09-13-0131-tela-detalhe-mostra-campo",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [

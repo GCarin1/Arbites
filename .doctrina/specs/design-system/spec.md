@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.11.1
+**Version:** 0.12.0
 
 ## Purpose
 
@@ -89,6 +89,8 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall agrupar o menu lateral apenas onde o grupo esclarece — sem cabeçalho para grupo de um item só — e ancorar no rodapé, separado por régua, o que é de manutenção e não de trabalho do dia.
 - The system shall reservar a barra superior para identidade, busca e conta, mantendo informação de instalação e ação de manutenção acessíveis sem ocupar espaço permanente nela.
 - The system shall posicionar as ações de uma tela dentro do cabeçalho dela, nunca antes do título da página.
+- The system shall dimensionar cada campo de metadado pelo próprio conteúdo, sem esticá-lo até a altura do campo mais alto da mesma linha.
+- The system shall separar a ação destrutiva da ação principal numa tela de detalhe, recolhendo-a num menu de ações em vez de deixá-la a um erro de mira.
 
 ### Event-driven
 
@@ -166,6 +168,8 @@ e prova a sua fatia, citando o teste/artefato. -->
 16. [verified] Nenhuma tela sai do alcance na reorganização: o que deixa o menu lateral continua acessível pelo menu da conta e pelo endereço direto — verified by `frontend/src/App.tsx`.
 17. [verified] A barra superior não exibe caminho de disco nem ação de manutenção como botão de destaque, e ambos continuam alcançáveis — verified by `frontend/src/App.tsx`.
 18. [verified] Nenhuma tela tem controle renderizado antes do título da página — verified by `frontend/src/App.tsx`.
+19. [verified] Um campo de metadado vazio ocupa a altura de uma linha, e não a do campo mais alto ao lado dele — verified by `frontend/src/styles.css`.
+20. [verified] A ação destrutiva de uma tela de detalhe fica num menu de ações, alcançável pelo teclado e fechando com Esc — verified by `frontend/src/components/OverflowMenu.tsx`.
 
 ## Maturity
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { SingleRefInput } from "./Autocomplete";
 import { ConfirmModal } from "./Modal";
+import { OverflowMenu } from "./OverflowMenu";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import { useToast } from "./Toast";
 import type {
@@ -301,9 +302,24 @@ export function TestCaseEditor({
                 <button className="primary" onClick={() => setEditing(true)}>
                   Editar
                 </button>
-                <button className="danger" onClick={() => setConfirmDelete(true)}>
-                  Excluir
-                </button>
+                {/* Excluir sai de perto de Editar (change 0131): apagar o
+                    trabalho não deve estar a um erro de mira da ação que se
+                    usa todo dia. Continua a dois cliques, com a mesma
+                    confirmação. */}
+                <OverflowMenu label={`Mais ações para ${tc.id}`}>
+                  {(fechar) => (
+                    <button
+                      className="danger"
+                      role="menuitem"
+                      onClick={() => {
+                        fechar();
+                        setConfirmDelete(true);
+                      }}
+                    >
+                      Excluir test case
+                    </button>
+                  )}
+                </OverflowMenu>
               </>
             }
           >

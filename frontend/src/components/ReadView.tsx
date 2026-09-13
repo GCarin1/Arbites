@@ -50,7 +50,10 @@ export function ReadField({
   return (
     <div className={`read-field ${wide ? "wide" : ""}`}>
       <span className="read-label">{label}</span>
-      <span className={`read-value ${empty ? "empty" : ""} ${mono ? "mono" : ""}`}>
+      {/* `read-empty`, não `empty`: a classe global de ESTADO vazio traz
+          `padding: 48px 24px; text-align: center`, e o campo herdava isso —
+          o travessão ficava centralizado num bloco de 117px (change 0131). */}
+      <span className={`read-value ${empty ? "read-empty" : ""} ${mono ? "mono" : ""}`}>
         {empty ? "—" : value}
       </span>
     </div>
