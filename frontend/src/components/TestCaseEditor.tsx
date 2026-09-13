@@ -4,7 +4,120 @@ import { SingleRefInput } from "./Autocomplete";
 import { ConfirmModal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import { useToast } from "./Toast";
-import type { Criterion, TestCase, TestCaseResult } from "../types";
+import type {
+  Criterion,
+  TestCase,
+  TestCaseResult,
+  TestCaseVersion,
+} from "../types";
+
+/**
+ * Versões do caso no git do workspace (change 0112): o histórico do arquivo,
+ * a comparação com o que está em disco hoje e a volta atrás — no próprio
+ * caso, que é onde a pergunta "o que mudou aqui?" aparece.
+ */
+function VersionHistory({
+  id,
+  onRestored,
+  onError,
+}: {
+  id: string;
+  onRestored: () => void;
+  onError: (message: string) => void;
+}) {
+  const [versions, setVersions] = useState<TestCaseVersion[]>([]);
+  const [openSha, setOpenSha] = useState<string | null>(null);
+  const [diff, setDiff] = useState<string>("");
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  const reload = useCallback(() => {
+    api
+      .testcaseVersions(id)
+      .then((r) => setVersions(r.versions))
+      // sem git no host o histórico é vazio, não é erro (change 0112)
+      .catch(() => setVersions([]));
+  }, [id]);
+
+  useEffect(() => {
+    setOpenSha(null);
+    setDiff("");
+    reload();
+  }, [reload]);
+
+  async function compare(sha: string) {
+    if (openSha === sha) {
+      setOpenSha(null);
+      return;
+    }
+    setOpenSha(sha);
+    setDiff("");
+    try {
+      // sem `b`: compara com a árvore de trabalho, que é o "hoje" do arquivo
+      setDiff(await api.testcaseVersionDiff(id, sha));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function restore(sha: string) {
+    setRestoring(sha);
+    try {
+      await api.restoreTestcaseVersion(id, sha);
+      setOpenSha(null);
+      reload();
+      onRestored();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRestoring(null);
+    }
+  }
+
+  if (versions.length === 0) return null;
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-head">
+        <h3>Versões</h3>
+        <span className="spacer" />
+        <span className="caption muted">
+          {versions.length} versã{versions.length === 1 ? "o" : "es"} no git do
+          workspace
+        </span>
+      </div>
+      <ul className="version-list">
+        {versions.map((v, i) => (
+          <li key={v.sha} className="version-row">
+            <div className="version-line">
+              <span className="mono caption">{v.short}</span>
+              <span className="version-message">{v.message}</span>
+              <span className="spacer" />
+              <span className="caption muted">
+                {v.author} · {v.at.slice(0, 16).replace("T", " ")}
+              </span>
+              <button onClick={() => void compare(v.sha)}>
+                {openSha === v.sha ? "Fechar" : "Comparar com a atual"}
+              </button>
+              {i > 0 && (
+                <button
+                  onClick={() => void restore(v.sha)}
+                  disabled={restoring !== null}
+                >
+                  {restoring === v.sha ? "Restaurando…" : "Restaurar"}
+                </button>
+              )}
+            </div>
+            {openSha === v.sha && (
+              <pre className="version-diff">
+                {diff || "sem diferença para o arquivo atual"}
+              </pre>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export function TestCaseEditor({
   id,
@@ -281,6 +394,14 @@ export function TestCaseEditor({
               </div>
             </div>
           )}
+          <VersionHistory
+            id={id}
+            onRestored={() => {
+              void load();
+              onChanged();
+            }}
+            onError={setError}
+          />
         </>
       ) : (
         <>

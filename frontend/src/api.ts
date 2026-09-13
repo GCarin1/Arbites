@@ -26,6 +26,7 @@ import type {
   RiskMap,
   SavedDaily,
   TestCaseResult,
+  TestCaseVersion,
   TimelineEntry,
   Execution,
   ExecutionSummary,
@@ -193,6 +194,17 @@ export const api = {
   deleteTestcase: (id: string) =>
     request<void>(`/testcases/${id}`, { method: "DELETE" }),
   testcaseRaw: (id: string) => request<string>(`/testcases/${id}/raw`),
+
+  // -- versões do caso de teste (change 0112) ------------------------------
+  testcaseVersions: (id: string) =>
+    request<{ versions: TestCaseVersion[] }>(`/testcases/${id}/versions`),
+  testcaseVersionDiff: (id: string, a: string, b = "") =>
+    request<string>(
+      `/testcases/${id}/versions/diff?a=${encodeURIComponent(a)}` +
+        (b ? `&b=${encodeURIComponent(b)}` : ""),
+    ),
+  restoreTestcaseVersion: (id: string, sha: string) =>
+    request<TestCase>(`/testcases/${id}/versions/${sha}/restore`, { method: "POST" }),
   moveTestcase: (id: string, folder: string) =>
     request<TestCase>(`/testcases/${id}/move`, {
       method: "POST",

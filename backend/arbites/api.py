@@ -38,6 +38,7 @@ from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
+from . import versioning
 from . import project_memory as memory_ops
 from . import risk_map as risk_map_ops
 from . import metrics as metrics_ops
@@ -1118,6 +1119,11 @@ def _register_routes(app: FastAPI) -> None:
         path = target_dir / f"{new_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body if payload.body is not None else DEFAULT_TC_BODY)
         reindex_file(ws, conn, path)
+        # Um commit por ACAO (change 0112), nao por gravacao — e nunca
+        # derrubando a escrita do usuario se o git falhar.
+        versioning.commit_paths(
+            ws, [path], f"cria {new_id}: {payload.title}", author_of(request)
+        )
         return _tc_out(conn, ws, new_id)
 
     # -- repositório de pastas (doc de ajustes §1.1) ------------------------
@@ -1214,6 +1220,10 @@ def _register_routes(app: FastAPI) -> None:
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
+        versioning.commit_paths(
+            ws, [ws.root / rel],
+            f"edita {entity_id}: {meta.get('title') or rel}", author_of(request),
+        )
         return _tc_out(conn, ws, entity_id)
 
     @app.delete(API_PREFIX + "/testcases/{entity_id}", status_code=204)
@@ -1223,6 +1233,11 @@ def _register_routes(app: FastAPI) -> None:
         path = ws.root / rel
         ws.trash(path)
         reindex_file(ws, conn, path)
+        # O arquivo foi para a lixeira, nao para o vazio: o commit registra
+        # que saiu, e o historico continua servindo para recupera-lo.
+        versioning.commit_paths(
+            ws, [path], f"exclui {entity_id}", author_of(request)
+        )
 
     @app.get(API_PREFIX + "/testcases/{entity_id}/raw", response_class=PlainTextResponse)
     async def get_testcase_raw(request: Request, entity_id: str):
@@ -1253,6 +1268,10 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "testcases", entity_id)
         (ws.root / rel).write_text(payload.content, encoding="utf-8")
         reindex_file(ws, conn, ws.root / rel)
+        versioning.commit_paths(
+            ws, [ws.root / rel], f"edita {entity_id} (markdown cru)",
+            author_of(request),
+        )
         return _tc_out(conn, ws, entity_id)
 
     @app.post(API_PREFIX + "/testcases/{entity_id}/move")
@@ -1269,6 +1288,62 @@ def _register_routes(app: FastAPI) -> None:
             src.rename(dest)
             reindex_file(ws, conn, src)   # remove o caminho antigo do índice
             reindex_file(ws, conn, dest)  # indexa o novo
+            # As duas pontas no MESMO commit: e o que faz o `--follow` do
+            # historico enxergar a mudanca de pasta como renomeacao.
+            versioning.commit_paths(
+                ws, [src, dest],
+                f"move {entity_id} para {payload.folder or 'testcases/'}",
+                author_of(request),
+            )
+        return _tc_out(conn, ws, entity_id)
+
+    # -- versões do caso de teste (change 0112) ----------------------------
+
+    def _tc_rel(request: Request, entity_id: str) -> str:
+        return _find_path(conn_of(request), "testcases", entity_id)
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions")
+    async def list_versions(request: Request, entity_id: str, limit: int = 50):
+        """Antes de responder, recolhe o que foi editado por fora: quem
+        mexeu no arquivo no Obsidian tambem merece aparecer no historico."""
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        versioning.commit_external_edits(ws, rel)
+        return {"versions": versioning.history(ws, rel, limit=limit)}
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions/diff",
+             response_class=PlainTextResponse)
+    async def diff_versions(request: Request, entity_id: str, a: str, b: str = ""):
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            return versioning.diff(ws, rel, a, b or None)
+        except versioning.GitUnavailable as exc:
+            raise _error(422, "git_failed", str(exc)) from None
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions/{sha}",
+             response_class=PlainTextResponse)
+    async def version_content(request: Request, entity_id: str, sha: str):
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            return versioning.content_at(ws, sha, rel)
+        except versioning.GitUnavailable:
+            raise _error(404, "version_not_found",
+                         f"{sha} nao tem este arquivo") from None
+
+    @app.post(API_PREFIX + "/testcases/{entity_id}/versions/{sha}/restore")
+    async def restore_version(request: Request, entity_id: str, sha: str):
+        """Restaurar grava um commit NOVO: o historico entre a versao
+        restaurada e hoje continua la para quem for entender por que."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            versioning.restore(ws, sha, rel, author_of(request))
+        except versioning.GitUnavailable:
+            raise _error(404, "version_not_found",
+                         f"{sha} nao tem este arquivo") from None
+        reindex_file(ws, conn, ws.root / rel)
         return _tc_out(conn, ws, entity_id)
 
     # -- executions (M1) ---------------------------------------------------

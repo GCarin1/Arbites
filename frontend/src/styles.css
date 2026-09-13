@@ -1300,6 +1300,43 @@ table.dense tbody tr:hover td {
 .exec-seg.col-retest { background: var(--retest); }
 .exec-seg.col-passed { background: var(--success); }
 
+/* Versões do caso de teste no git do workspace (change 0112). */
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.version-row {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+}
+.version-row:first-child {
+  border-top: none;
+}
+.version-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+.version-message {
+  font-size: var(--fs-body);
+}
+.version-diff {
+  margin: var(--s1) 0 0;
+  padding: var(--s1);
+  max-height: 320px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  white-space: pre;
+}
+
 /* Cabeçalho do ciclo (change 0111): a barra empilhada com os contadores
    grandes por status e a situação do prazo — o número e a leitura dele no
    mesmo lugar, no padrão do Xray. */

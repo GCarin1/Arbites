@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-21
-**Version:** 0.11.0
+**Last updated:** 2026-09-13
+**Version:** 0.12.0
 
 ## Purpose
 
@@ -97,6 +97,10 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   /testcases` e exibir o badge "precisa re-execução" no repositório e no
   detalhe do CT (o flag é gerido pela sync de features — ver
   `local-automation`).
+- The system shall manter o workspace como repositório git, criando-o com `git init` e um `.gitignore` do índice descartável na primeira escrita quando ainda não existir `.git/`.
+- The system shall gravar um commit por AÇÃO semântica da interface — criar, editar, mover e excluir um caso de teste —, com mensagem descrevendo a ação e autor vindo da sessão, nunca um commit por gravação de arquivo.
+- The system shall expor `GET /testcases/{id}/versions` (histórico do arquivo), `GET /testcases/{id}/versions/{sha}` (o conteúdo naquele commit), `GET /testcases/{id}/versions/diff?a=&b=` (comparação unificada) e `POST /testcases/{id}/versions/{sha}/restore` (restauração).
+- The system shall apresentar o histórico numa aba do próprio caso de teste, com a versão escolhida comparável à atual e restaurável dali.
 
 ### Event-driven
 
@@ -109,6 +113,8 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   (recursivamente) para dentro de outra pasta, the system shall abrir um
   modal de confirmação informando quantos CTs serão movidos junto, e só
   mover após confirmação explícita.
+- When um arquivo do workspace é alterado por fora da interface e existe alteração não commitada, the system shall registrá-la como commit de autoria externa antes de responder o histórico, para que a edição no Obsidian não suma do registro.
+- When uma versão anterior é restaurada, the system shall gravar a restauração como um commit NOVO, preservando o histórico em vez de reescrevê-lo.
 
 ### State-driven
 
@@ -128,6 +134,8 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall not aceitar mover uma pasta para dentro dela mesma ou de
   uma pasta descendente (422); nem sobrescrever uma pasta existente com o
   mesmo nome no destino (409).
+- The system shall not versionar o índice descartável, a lixeira nem os segredos do workspace; o que o `.gitignore` cobre não entra em commit nenhum.
+- The system shall not falhar uma operação de caso de teste porque o git falhou ou não está instalado; o versionamento é registro, e registro que derruba a escrita do usuário é pior do que registro nenhum.
 
 ### Optional
 
@@ -198,6 +206,9 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     exclusão em lote no mesmo padrão — verified by build + revisão visual
     (os endpoints unitários já são cobertos por
     `backend/tests/test_testcases.py` e `backend/tests/test_executions.py`).
+17. [verified] Criar, editar e mover um caso de teste gera um commit por ação, com a mensagem da ação e o e-mail da sessão como autor, e o índice descartável fica fora do repositório — verified by `backend/tests/test_versioning.py`.
+18. [verified] O histórico de um caso lista suas versões, a comparação entre duas mostra a linha alterada e restaurar uma versão anterior devolve o conteúdo gravando um commit novo — verified by `backend/tests/test_versioning.py`.
+19. [verified] Uma edição feita por fora da interface entra no histórico como commit de autoria externa, e um workspace onde o git não funciona continua aceitando criar e editar casos — verified by `backend/tests/test_versioning.py`.
 
 ## Maturity
 

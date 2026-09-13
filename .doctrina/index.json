@@ -226,8 +226,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.11.0",
-        "last_updated": "2026-07-21",
+        "version": "0.12.0",
+        "last_updated": "2026-09-13",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -388,14 +388,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0112-versionamento-dos-casos-de-teste-com-git-no",
-        "title": "Versionamento dos casos de teste com git no workspace",
-        "path": ".doctrina/changes/0112-versionamento-dos-casos-de-teste-com-git-no",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
       {
         "id": "0113-tela-de-execucao-guiada-em-tres-paineis",
         "title": "Tela de execucao guiada em tres paineis",
@@ -1868,6 +1860,19 @@
         "specs_affected": [
           {
             "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0112-versionamento-dos-casos-de-teste-com-git-no",
+        "title": "Versionamento dos casos de teste com git no workspace",
+        "path": ".doctrina/changes/archive/2026-09-13-0112-versionamento-dos-casos-de-teste-com-git-no",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
             "operation": "MODIFIED"
           }
         ]

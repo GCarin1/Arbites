@@ -301,6 +301,16 @@ export interface EvidenceEntry {
   note: string | null;
 }
 
+/** Uma versão do arquivo do caso de teste no git do workspace (change 0112). */
+export interface TestCaseVersion {
+  sha: string;
+  short: string;
+  author: string;
+  email: string;
+  at: string;
+  message: string;
+}
+
 export interface ResultEntry {
   testcase_id: string;
   status: string;
