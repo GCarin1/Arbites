@@ -9,6 +9,7 @@ import type {
   Role,
   Switch,
 } from "../types";
+import { EmptyState, NoMatches } from "./EmptyState";
 import { TabBar } from "./TabBar";
 import { useToast } from "./Toast";
 
@@ -109,10 +110,10 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
               <h3>Aguardando liberação</h3>
             </div>
             {pending.length === 0 ? (
-              <p className="muted">
-                Nenhum cadastro aguardando. Contas novas aparecem aqui antes de
-                conseguirem entrar.
-              </p>
+              <EmptyState compact icon="profile" title="Nenhum cadastro aguardando">
+                Quem se cadastra entra nesta fila e não consegue entrar até
+                alguém liberar. Ao liberar, você escolhe o papel da conta.
+              </EmptyState>
             ) : (
               <div className="table-wrap">
                 <table className="dense stack-narrow">
@@ -340,7 +341,10 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
           </table>
             </div>
           {attempts.length === 0 && (
-            <p className="muted">Nenhuma tentativa registrada ainda.</p>
+            <EmptyState compact icon="audit" title="Nenhuma tentativa de acesso registrada">
+              Cada login, aceito ou recusado, aparece aqui com horário, IP e
+              navegador. Vazio é a boa notícia num ambiente recém-instalado.
+            </EmptyState>
           )}
         </div>
       )}
@@ -394,12 +398,21 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
               </tbody>
             </table>
           </div>
-          {activity.length === 0 && (
-            <p className="muted">
-              Nenhuma escrita registrada com esses filtros. Leituras não entram
-              aqui, e tentativas recusadas também não.
-            </p>
-          )}
+          {activity.length === 0 &&
+            (filterUser || filterPath ? (
+              <NoMatches
+                what="escritas"
+                onClear={() => {
+                  setFilterUser("");
+                  setFilterPath("");
+                }}
+              />
+            ) : (
+              <EmptyState compact icon="audit" title="Nenhuma escrita registrada">
+                Toda alteração passa por aqui com autor, rota e horário.
+                Leituras não entram, e tentativas recusadas também não.
+              </EmptyState>
+            ))}
         </div>
       )}
 

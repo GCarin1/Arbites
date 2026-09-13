@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.16.0",
+        "version": "0.17.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -392,8 +392,8 @@
         "title": "Modulo desligavel e tela mais caminhos de API, bloqueado nas tres camadas",
         "status": "accepted",
         "date": "2026-09-13",
-        "summary": "Um modulo e uma tela do produto mais os caminhos de API que so ela usa.",
-        "landed": "2026-09-13 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `frontend/src/App.tsx`, `backend/tests/test_authorization.py`"
+        "landed": "2026-09-13 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `frontend/src/App.tsx`, `backend/tests/test_authorization.py`",
+        "summary": "Um modulo e uma tela do produto mais os caminhos de API que so ela usa."
       }
     ],
     "changes": [],
@@ -2263,6 +2263,19 @@
         "specs_affected": [
           {
             "capability": "admin",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0144-estado-vazio-segue-padrao",
+        "title": "estado vazio nao segue o padrao das ferramentas de gestao: paragrafo apagado sem titulo nem acao, sem distinguir nunca-teve-nada de filtro-nao-achou, e em cartao de altura fixa que deixa area morta",
+        "path": ".doctrina/changes/archive/2026-09-13-0144-estado-vazio-segue-padrao",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]

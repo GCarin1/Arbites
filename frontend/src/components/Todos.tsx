@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { LinksInput, MentionTextarea } from "./Autocomplete";
+import { EmptyState } from "./EmptyState";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
 import { useToast } from "./Toast";
@@ -178,13 +179,14 @@ export function Todos({
       )}
 
       {items.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-title">Nenhum afazer</div>
-          <div className="empty-body">
-            Crie afazeres com prazo, status e links para CTs, execuções ou stories.
-            Expanda para ver a descrição; impedimentos (blocked) entram na daily.
-          </div>
-        </div>
+        <EmptyState
+          icon="todos"
+          title="Nada a fazer por enquanto"
+          action={{ label: "Novo afazer", onClick: () => setEditing("new") }}
+        >
+          Um afazer tem prazo, status e links para casos, execuções ou
+          stories. O que estiver marcado como impedimento entra na daily.
+        </EmptyState>
       ) : (
         <>
           {active.length > 0 && <TodoTable rows={active} {...rowProps} />}

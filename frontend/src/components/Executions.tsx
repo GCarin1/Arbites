@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
+import { EmptyState } from "./EmptyState";
 import { FilePicker } from "./FilePicker";
 import { ConfirmModal, Modal } from "./Modal";
 import { useToast } from "./Toast";
@@ -245,7 +246,17 @@ export function ExecutionsList({
           </button>
         );
       })}
-      {items.length === 0 && <p className="muted">Nenhuma execução ainda.</p>}
+      {items.length === 0 && (
+        <EmptyState
+          compact
+          icon="executions"
+          title="Nenhuma execução ainda"
+          action={{ label: "Nova execução", onClick: onNew }}
+        >
+          Uma execução é o ciclo de teste: escolhe os casos, define o período
+          e acompanha o quadro até fechar.
+        </EmptyState>
+      )}
     </div>
   );
 }
@@ -445,12 +456,15 @@ export function ExecutionsRepo({
 
       <div className="repo-tree card">
         {items.length === 0 ? (
-          <div className="empty-state" style={{ border: "none" }}>
-            <div className="empty-title">Nenhuma execução</div>
-            <div className="empty-body">
-              Crie uma execução para registrar resultados no kanban.
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="executions"
+            title="Nenhuma execução ainda"
+            action={{ label: "Nova execução", onClick: onNew }}
+          >
+            Uma execução é o ciclo de teste: escolhe os casos, define o
+            período e acompanha o quadro coluna a coluna até fechar.
+          </EmptyState>
         ) : (
           years.map((year, yi) => {
             const isCollapsed = collapsed.has(year);
@@ -1379,7 +1393,7 @@ export function ResultPanel({
           </div>
         ))
       ) : (
-        <p className="muted">Nenhum defeito vinculado.</p>
+        <p className="muted">Nenhum defeito vinculado a este resultado.</p>
       )}
       {!closed && (
         <div className="toolbar">

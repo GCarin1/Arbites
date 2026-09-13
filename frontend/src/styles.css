@@ -1397,6 +1397,9 @@ table.dense tbody tr:hover td {
   padding: var(--s6) var(--s3);
   text-align: center;
 }
+/* Estado vazio no padrão das ferramentas de gestão (change 0144): marca
+   visual, título, corpo e AÇÃO. A altura é do conteúdo — um cartão de
+   400 px com três palavras no meio não é respiro, é área morta. */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1404,11 +1407,34 @@ table.dense tbody tr:hover td {
   justify-content: center;
   gap: var(--s1);
   text-align: center;
-  padding: var(--s6) var(--s3);
+  padding: var(--s4) var(--s3);
   border: 1px dashed var(--border);
   border-radius: var(--r-card);
   background: var(--surface);
   color: var(--text-muted);
+}
+/* dentro de um card que já tem borda e respiro: sem moldura dupla */
+.empty-state.empty-compact {
+  border: none;
+  background: none;
+  padding: var(--s3) var(--s1);
+}
+/* A marca visual é o que separa "vazio" de "ainda carregando": sem ela as
+   duas telas são a mesma. Discreta de propósito — ela orienta, não ilustra. */
+.empty-art {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-subtle);
+  margin-bottom: 2px;
+}
+.empty-art .nav-icon {
+  width: 20px;
+  height: 20px;
 }
 .empty-state .empty-title {
   font-size: var(--fs-h3);
@@ -1418,6 +1444,14 @@ table.dense tbody tr:hover td {
 .empty-state .empty-body {
   font-size: var(--fs-body);
   max-width: 420px;
+}
+/* A ação é o ponto do estado vazio: um vazio sem saída é um beco. */
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s1);
+  margin-top: var(--s1);
 }
 
 /* Interruptor de módulo/superfície (change 0143). Um `switch` mostra o
@@ -2830,6 +2864,12 @@ a {
   top: 0;
   max-height: calc(100vh - var(--h-header) - 160px);
   overflow-y: auto;
+}
+/* O piso de 320 px existe para a árvore não pular de altura enquanto
+   carrega. Com um ESTADO VAZIO dentro, ele vira área morta: um quadro alto
+   com um parágrafo no meio (0144). A altura passa a ser do conteúdo. */
+.repo-tree:has(> .empty-state) {
+  min-height: 0;
 }
 .tc-panel-title {
   font-weight: 600;
