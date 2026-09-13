@@ -113,7 +113,7 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.9.3",
+        "version": "0.9.4",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -1989,6 +1989,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0123-upload-simultaneo-evidencia-responde",
+        "title": "upload simultaneo de evidencia responde 201 mas perde parte dos registros no execution.json",
+        "path": ".doctrina/changes/archive/2026-09-13-0123-upload-simultaneo-evidencia-responde",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2027,6 +2040,12 @@
         "path": ".doctrina/skills/conteudo-longo-em-tabela-overflow.md",
         "description": "Conteúdo longo dentro de tabela auto-layout com overflow-x cresce lateralmente; use overflow-wrap para zerar a min-content e forçar quebra para baixo.",
         "last_updated": "2026-07-07"
+      },
+      {
+        "id": "criterio-de-isolamento-precisa-de-identidade-colidente",
+        "path": ".doctrina/skills/criterio-de-isolamento-precisa-de-identidade-colidente.md",
+        "description": "Critério que prova isolamento entre contas com dois valores obviamente diferentes não prova nada — ele tem de usar duas identidades que COLIDEM na função que deriva a chave (slug, hash curto, normalização).",
+        "last_updated": "2026-09-13"
       },
       {
         "id": "default-por-tipo-de-provider",
@@ -2249,12 +2268,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "criterio-de-isolamento-precisa-de-identidade-colidente",
-        "path": ".doctrina/skills/criterio-de-isolamento-precisa-de-identidade-colidente.md",
-        "description": "Critério que prova isolamento entre contas com dois valores obviamente diferentes não prova nada — ele tem de usar duas identidades que COLIDEM na função que deriva a chave (slug, hash curto, normalização).",
-        "last_updated": "2026-09-13"
       }
     ],
     "contracts": [

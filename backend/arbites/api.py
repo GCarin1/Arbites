@@ -1603,8 +1603,13 @@ def _register_routes(app: FastAPI) -> None:
         # Sem `who` no form (change 0115): quem anexou a evidencia e quem
         # esta logado, e nao quem o cliente disser que e.
         ws, conn = ws_of(request), conn_of(request)
-        execution = exec_ops.load(ws, exec_id)
+        # O arquivo e lido ANTES de carregar a execution (change 0123): um
+        # upload grande vai para disco e o `read` suspende a requisicao. Com
+        # a suspensao no meio do ciclo carregar-alterar-gravar, dois uploads
+        # simultaneos partiam do mesmo estado e o ultimo apagava o registro
+        # do primeiro — com 201 nos dois e os dois arquivos ja no disco.
         content = await file.read()
+        execution = exec_ops.load(ws, exec_id)
         evidence = exec_ops.add_evidence(
             ws,
             execution,

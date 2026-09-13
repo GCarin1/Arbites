@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-09-13
-**Version:** 0.9.3
+**Version:** 0.9.4
 
 ## Purpose
 
@@ -104,6 +104,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall not substituir o Kanban pelo modo guiado; os dois modos leem e escrevem a mesma execution e a escolha é de quem executa.
 - The system shall not aceitar `who` no corpo dessas rotas; um cliente que envie o campo recebe 422, porque ignorá-lo em silêncio deixa no contrato uma promessa que o servidor não cumpre.
 - The system shall not apurar o progresso do ciclo por `status` enquanto o quadro conta por coluna; a coluna é o que o time olha e move, e duas contagens da mesma pergunta divergem no primeiro caso arrastado.
+- The system shall not suspender a requisição entre carregar a execution e gravá-la; um upload concorrente que aguarde no meio desse trecho faz a última gravação apagar o registro das anteriores.
 
 ### Optional
 
@@ -148,6 +149,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 16. [verified] Abrir um ciclo resolve os títulos dos seus casos com uma única leitura da lista de casos, e o número de requisições não cresce com o tamanho do ciclo — verified by `frontend/src/components/ExecutionGuided.tsx` + `backend/tests/test_executions_guided.py`.
 17. [verified] A lista de ciclos devolve o período de cada um, e um ciclo com prazo vencido é distinguível de um no prazo sem abrir nenhum dos dois — verified by `backend/tests/test_execution_cycle.py`.
 18. [verified] Um caso arrastado para uma coluna diferente do seu status é contado na coluna em que está, e o progresso do ciclo bate com o que o quadro mostra — verified by `backend/tests/test_execution_cycle.py`.
+19. [verified] Seis evidências enviadas ao mesmo tempo para o mesmo resultado são todas registradas no `execution.json`, com um arquivo em disco para cada — verified by `backend/tests/test_executions_concurrency.py`.
 
 ## Maturity
 
