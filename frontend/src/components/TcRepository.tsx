@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { FilePicker } from "./FilePicker";
+import { EmptyState, NoMatches } from "./EmptyState";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
 import { useToast } from "./Toast";
@@ -402,6 +404,12 @@ export function TcRepository({
 
   const empty = root.dirs.length === 0 && root.files.length === 0;
 
+  // a mesma limpeza serve à barra e ao estado vazio de filtro (0144)
+  function limparFiltros() {
+    setQ(""); setFStatus(""); setFPriority(""); setFType(""); setFTag("");
+    setFRerun(false);
+  }
+
   return (
     <div className="repo">
       <div className="page-head">
@@ -511,13 +519,7 @@ export function TcRepository({
           <span>precisa re-exec</span>
         </label>
         {filterActive && (
-          <button
-            className="btn-sm"
-            onClick={() => {
-              setQ(""); setFStatus(""); setFPriority(""); setFType(""); setFTag("");
-              setFRerun(false);
-            }}
-          >
+          <button className="btn-sm" onClick={limparFiltros}>
             Limpar
           </button>
         )}
@@ -541,20 +543,20 @@ export function TcRepository({
         }}
       >
         {empty ? (
-          <div className="empty-state" style={{ border: "none" }}>
-            <div className="empty-title">Repositório vazio</div>
-            <div className="empty-body">
-              Crie pastas para organizar e test cases em formato BDD
-              (Given / When / Then). Arraste CTs entre pastas.
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="testcases"
+            title="Nenhum caso de teste ainda"
+            action={{ label: "Novo test case", onClick: onNew }}
+            secondary={{ label: "Nova pasta", onClick: () => setCreatingFolder(root.path) }}
+          >
+            Os casos ficam em pastas, escritos em BDD (Given / When / Then).
+            Arraste um caso para mudá-lo de pasta a qualquer momento.
+          </EmptyState>
         ) : matchIds && matchIds.size === 0 ? (
-          <div className="empty-state" style={{ border: "none" }}>
-            <div className="empty-title">Nenhum caso de teste casa com o filtro</div>
-            <div className="empty-body">
-              Ajuste a busca ou limpe os filtros para ver a árvore completa.
-            </div>
-          </div>
+          // vazio de FILTRO é outro vazio: a saída é limpar, nunca criar —
+          // senão a pessoa cria um caso que já existe, só estava escondido
+          <NoMatches what="casos de teste" onClear={limparFiltros} />
         ) : (
           renderChildren(root, "")
         )}
@@ -925,11 +927,12 @@ function AiImportModal({
       </p>
       <div className="modal-field">
         <label>Arquivo</label>
-        <input
-          type="file"
+        <FilePicker
           accept=".txt,.md,.xml"
           disabled={busy}
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          label="Escolher arquivo"
+          showName={false}
+          onPick={(files) => setFile(files?.[0] ?? null)}
         />
         <div className="toolbar" style={{ marginTop: 8 }}>
           <button className="primary" disabled={!file || busy} onClick={() => void upload()}>

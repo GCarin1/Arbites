@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.13.0
+**Version:** 0.17.0
 
 ## Purpose
 
@@ -94,10 +94,17 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall manter a ação destrutiva de uma linha de tabela num menu de ações, para que ela não compita com o conteúdo nem estique a altura da linha.
 - The system shall impedir que identificador de artefato quebre em mais de uma linha em qualquer listagem.
 - The system shall manter a caixa de marcar junto do seu rótulo, sem esticar o par pela largura disponível.
+- The system shall dar rolagem horizontal a uma faixa de abas que nao cabe na largura disponivel, com sinal visivel do lado que ainda esconde aba e a aba ativa trazida ao campo de visao na troca, em vez de cortar a ultima aba na borda do quadro.
+- The system shall impedir que os rotulos de uma linha de arvore se desenhem uns sobre os outros quando falta largura — so o elemento que recorta com reticencias cede espaco, e em tela estreita os metadados descem para uma segunda linha em vez de espremer o titulo.
+- The system shall oferecer a escolha de arquivo pelo mesmo botao dos demais controles, com o nome do arquivo escolhido visivel e a possibilidade de reescolher o mesmo arquivo, sem expor o controle nativo do sistema operacional em nenhuma tela.
+- The system shall manter o texto de um passo de execucao numa faixa propria em tela estreita, com as acoes e o status do passo na faixa seguinte, em vez de espremer o texto numa coluna ao lado dos botoes e deixar o status orfao numa terceira linha.
+- The system shall montar todo estado vazio de lista de trabalho com marca visual, titulo da situacao, uma ou duas linhas dizendo o que mora ali, e a acao que resolve o vazio quando existe um proximo passo obvio, com a altura dada pelo conteudo.
+- The system shall distinguir a lista que nunca teve item da lista cujo filtro nao alcancou nenhum, oferecendo criar no primeiro caso e limpar o filtro no segundo, para que ninguem crie um item que ja existe escondido pelo recorte.
 
 ### Event-driven
 
 - When um caso muda de coluna, the system shall anunciar a mudança numa região viva, para que quem usa leitor de tela saiba o que aconteceu em vez de perceber o card sumir.
+- When uma requisição falha antes de obter resposta do servidor, the system shall informar que não foi possível falar com o servidor, em português e indicando o que verificar, em vez de repassar a mensagem interna do navegador.
 
 ### State-driven
 
@@ -175,6 +182,12 @@ e prova a sua fatia, citando o teste/artefato. -->
 20. [verified] A ação destrutiva de uma tela de detalhe fica num menu de ações, alcançável pelo teclado e fechando com Esc — verified by `frontend/src/components/OverflowMenu.tsx`.
 21. [verified] A linha de uma tabela densa não é esticada pelas suas ações, e o identificador nela cabe numa linha só — verified by `frontend/src/styles.css` + `frontend/src/components/Defects.tsx`.
 22. [verified] A caixa de marcar de um filtro fica ao lado do seu rótulo — verified by `frontend/src/styles.css`.
+23. [verified] Uma falha de rede produz mensagem em português distinguindo "o servidor não respondeu" de uma recusa do servidor, em toda chamada — inclusive nos envios de arquivo — verified by `frontend/src/api.ts`.
+24. [verified] Em 390 px a faixa de abas da tela de IA rola dentro de si — a caixa da aba "Configuracao" fica inteira apos rolar e a faixa exibe sombra no lado com aba escondida — e em 1440 px a mesma faixa nao rola nem exibe sombra — verified by `frontend/src/components/TabBar.tsx` + `frontend/src/styles.css`.
+25. [unverified] Em 390 px nenhuma caixa de texto de uma linha das arvores de requisitos e de execucoes se sobrepoe a vizinha, o identificador aparece inteiro, e em 1440 px cada item continua numa linha so — verified by `frontend/src/styles.css`.
+26. [unverified] Nenhuma tela exibe o controle de arquivo nativo — os quatro pontos de envio passam pelo botao do sistema, mostram o nome escolhido e aceitam reescolher o mesmo arquivo — verified by `frontend/src/components/FilePicker.tsx`.
+27. [unverified] Em 390 px a linha de um passo de execucao cai em duas faixas (numero e texto; acoes e status) e em 1440 px continua numa faixa so — verified by `frontend/src/styles.css` + `frontend/src/components/Executions.tsx`.
+28. [unverified] Num workspace novo as telas de test cases, requisitos, execucoes, defeitos e afazeres mostram estado vazio com marca, titulo, corpo e ao menos uma acao; com filtro que nao casa aparece o vazio de filtro, cuja acao e limpar — verified by `frontend/src/components/EmptyState.tsx` + `frontend/src/styles.css`.
 
 ## Maturity
 

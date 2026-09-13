@@ -3871,9 +3871,20 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     (r"/admin/switches$", {"PUT"}, "admin", None),
 )
 
+# Cada MÓDULO (ADR 0014) governa os caminhos que só ele usa, em todos os
+# métodos. Gerado do registro em vez de escrito à mão: módulo novo nasce
+# bloqueável sem ninguém lembrar de vir aqui — e, mais importante, o que a UI
+# esconde e o que o servidor recusa saem da MESMA lista, então não têm como
+# divergir.
+_MODULE_GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = tuple(
+    (re.escape(path), {"GET", "POST", "PUT", "PATCH", "DELETE"}, None, name)
+    for name, spec in auth_ops.MODULES.items()
+    for path in spec["paths"]
+)
+
 _GOVERNED_COMPILED = tuple(
     (re.compile("^" + API_PREFIX + pattern), methods, role, switch)
-    for pattern, methods, role, switch in _GOVERNED
+    for pattern, methods, role, switch in _GOVERNED + _MODULE_GOVERNED
 )
 
 

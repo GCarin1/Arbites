@@ -17,6 +17,10 @@ export interface SessionUser {
 export interface Switch {
   name: string;
   label: string;
+  /** "surface" governa uma CAPACIDADE técnica; "module", uma TELA (ADR 0014). */
+  kind: "surface" | "module";
+  /** Aba que o módulo possui — só em `kind: "module"`. */
+  tab: string | null;
   enabled: boolean;
   updated_at: string | null;
   updated_by: string | null;

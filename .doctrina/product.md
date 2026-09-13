@@ -71,10 +71,14 @@ Out of scope (deferred or rejected):
   sistema corporativo via `external_key`).
 - Cadastro de sprints/releases (texto livre na v1).
 - Execução distribuída / agentes remotos.
-- Integração Jira (permanente — descomissionada), Confluence (link
-  manual) e Businessmap (**abandonada** pela ADR 0012 — foi especificada e
-  nunca construída; o vínculo com o sistema corporativo continua sendo o
-  `external_key`).
+- Confluence (link manual).
+- **Integração externa voltou ao escopo pela ADR 0015**, que supersede em
+  parte a 0007 (Jira fora de escopo permanente) e a 0012 (Businessmap
+  abandonado). O critério deixou de ser a ferramenta e passou a ser a
+  porta: adaptador declara o que consegue representar, o agente (MCP) é a
+  ponte dos fluxos com humano no meio, e o vínculo externo mora no
+  frontmatter. Continua fora: replicar workflow, permissão ou hierarquia do
+  sistema corporativo.
 - Edição de feature files pela plataforma (repo de automação é read-only).
 - Telemetria de qualquer tipo.
 

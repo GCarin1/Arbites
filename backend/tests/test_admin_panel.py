@@ -258,7 +258,9 @@ def test_overview_traz_contas_indice_lixeira_e_versao(client):
     assert overview["index"]["last_reindex"] is not None
     assert overview["trash_items"] == 0
     assert overview["version"]
-    assert len(overview["switches"]) == len(auth_ops.SWITCHES)
+    assert len(overview["switches"]) == len(auth_ops.SWITCHES) + len(
+        auth_ops.MODULES
+    )
 
 
 def test_overview_conta_a_lixeira(client):

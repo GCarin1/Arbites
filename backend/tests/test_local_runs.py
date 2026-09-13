@@ -142,6 +142,26 @@ def test_timeout_marks_pending_as_blocked(tmp_path):
         assert result["error"] == "timeout"
 
 
+def test_cenario_morto_no_meio_nao_vira_passed(tmp_path):
+    """Bug real (mudança 0137): o cenário lento ainda estava no `Quando`
+    quando o timeout matou o processo. O fecho do progresso ao vivo tratava
+    "não vi falha" como aprovação e gravava `passed` — verde num caso que
+    nunca chegou ao fim. Um cenário interrompido não tem resultado."""
+    ws = _make_ws(tmp_path, timeout_minutes=0.05)  # 3 s, o cenário dorme 30 s
+    app = create_app(ws.root, watch=False)
+    with TestClient(app) as client:
+        login_admin(client)
+        resp = client.post(
+            "/api/v1/runs/local",
+            json={"target": "frontend-web", "testcase_ids": ["CT-9003"]},
+        )
+        exec_id = resp.json()["execution"]["id"]
+        _wait_run(client, exec_id, expect="timeout", timeout_s=60)
+        result = client.get(f"/api/v1/executions/{exec_id}").json()["results"][0]
+        assert result["status"] != "passed", "cenário morto no meio não passou"
+        assert result["executed_by"] != "behave" or result["status"] == "blocked"
+
+
 def test_selection_by_tags_resolves_cts(auto_client):
     resp = auto_client.post(
         "/api/v1/runs/local",

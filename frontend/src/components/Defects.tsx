@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { OverflowMenu } from "./OverflowMenu";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
+import { EmptyState, NoMatches } from "./EmptyState";
 import { ConfirmModal, Modal } from "./Modal";
 import { useToast } from "./Toast";
 import type { Defect } from "../types";
@@ -136,13 +137,26 @@ export function Defects({
       </div>
 
       {visible.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-title">Nenhum defeito</div>
-          <div className="empty-body">
-            Registre defeitos aqui, ou crie um a partir de um resultado
-            "failed" numa execução — os dois caminhos levam ao mesmo lugar.
-          </div>
-        </div>
+        items.length > 0 ? (
+          // há defeitos, o filtro é que não alcança nenhum (0144)
+          <NoMatches
+            what="defeitos"
+            onClear={() => {
+              setSeverityFilter("");
+              setLessonOnly(false);
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon="defects"
+            title="Nenhum defeito registrado"
+            action={{ label: "Novo defeito", onClick: () => setEditing("new") }}
+          >
+            Registre aqui, ou crie a partir de um resultado "failed" numa
+            execução — os dois caminhos levam ao mesmo lugar, e o defeito
+            criado pela execução já nasce ligado ao caso e ao ciclo.
+          </EmptyState>
+        )
       ) : (
         <div className="table-wrap">
           <table className="dense">

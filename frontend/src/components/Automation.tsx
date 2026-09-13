@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchOuAvisar } from "../api";
 import { Modal } from "./Modal";
+import { TabBar } from "./TabBar";
 import { useToast } from "./Toast";
 
 const BASE = "/api/v1";
@@ -39,7 +41,7 @@ interface RunSnapshot {
 }
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, {
+  const resp = await fetchOuAvisar(url, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
@@ -47,6 +49,15 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   if (!resp.ok) throw new Error(data?.error?.message ?? `${resp.status}`);
   return data as T;
 }
+
+type AutoTab = "configurar" | "executar" | "historico";
+
+// Histórico = observabilidade (default) · Executar = operação · Configurar = setup
+const AUTO_TABS: readonly (readonly [AutoTab, string])[] = [
+  ["historico", "Histórico"],
+  ["executar", "Executar"],
+  ["configurar", "Configurar"],
+];
 
 export function Automation({
   onChanged,
@@ -231,25 +242,12 @@ export function Automation({
       <div className="page-head">
         <h1 className="page-title">Automação</h1>
         <span className="spacer" />
-        <div className="tab-bar" role="tablist">
-          {(
-            [
-              ["historico", "Histórico"],
-              ["executar", "Executar"],
-              ["configurar", "Configurar"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={tab === key}
-              className={`tab-btn ${tab === key ? "active" : ""}`}
-              onClick={() => setTab(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          tabs={AUTO_TABS}
+          value={tab}
+          onChange={setTab}
+          label="Seções da automação"
+        />
       </div>
 
       {tab === "configurar" && (

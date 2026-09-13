@@ -1,0 +1,24 @@
+# Dependências para RODAR A SUÍTE. O produto não precisa de nenhuma delas —
+# o que ele precisa está em `requirements.txt`.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+#
+# Elas não estavam declaradas em lugar nenhum e o gate passava porque a
+# máquina as tinha por acaso; num container novo, cinco testes reprovavam
+# sem que ninguém tivesse mexido em nada (change 0141).
+
+# o runner do gate (`doctrina verify` chama `python -m pytest backend/tests`)
+pytest>=8.0
+
+# `test_local_runs.py` roda behave DE VERDADE contra
+# `backend/tests/fixtures/behave_repo` — não é mock. VERSÃO FIXADA de
+# propósito: o formato do stream `plain` muda entre versões, e o parser de
+# progresso ao vivo (`arbites/runner.py`) lê esse stream. Subir esta versão é
+# uma decisão consciente, com a suíte de `test_local_runs.py` na mão.
+behave==1.3.3
+
+# `test_ai_optional.py` grava a chave do provider no keyring do SO (ADR 0008).
+# Container sem Secret Service não tem backend nenhum e o `keyring` levanta
+# `NoKeyringError`; este pacote dá um backend de arquivo, suficiente para o
+# teste provar que a chave NÃO vai para o YAML.
+keyrings.alt>=5.0

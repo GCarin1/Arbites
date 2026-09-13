@@ -88,6 +88,9 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* cor CHAPADA (não um box-shadow): entra em gradiente, para marcar a
+     borda de um bloco que ainda esconde conteúdo rolável (0135) */
+  --shadow-edge: rgba(0, 0, 0, 0.70);
 }
 
 /* Tema claro (change 0128). O escuro continua sendo o padrão do produto e a
@@ -122,6 +125,7 @@
      no claro, e sombra pesada sobre branco suja a tela. */
   --shadow-card: 0 1px 0 rgba(31, 35, 40, 0.06);
   --shadow-pop: 0 8px 24px rgba(31, 35, 40, 0.14);
+  --shadow-edge: rgba(31, 35, 40, 0.38);
 }
 
 /* As três densidades (change 0126). Só o fator muda: tudo que respira lê
@@ -776,6 +780,45 @@ button.nav-group-title:hover {
   min-width: 140px;
 }
 
+/* Par de controles que é UM campo (0139). Duas caixas soltas no cabeçalho
+   não dizem que são as duas pontas do mesmo intervalo — e, ao quebrar
+   linha, apareciam em linhas diferentes e com larguras diferentes, uma de
+   cada lado de um botão. O grupo tem rótulo, não se parte na quebra, e as
+   pontas dividem a largura por igual. */
+.field-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  flex: 0 1 auto;
+  min-width: 0;
+  /* se nem encolhendo couber, o grupo quebra DENTRO de si — o rótulo em
+     cima, o par embaixo — em vez de transbordar a tela */
+  flex-wrap: wrap;
+}
+.field-group-label {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.field-group-sep {
+  color: var(--text-subtle);
+  flex: 0 0 auto;
+}
+/* as duas pontas do mesmo intervalo têm o mesmo tamanho — a regra de
+   `min-width: 140px` do cabeçalho de página as deixava com 231 e 195. O
+   `:not()` repetido é para bater a especificidade daquela regra, não
+   enfeite: sem ele o mínimo de 140 px continua valendo e o grupo transborda
+   a tela estreita em vez de encolher. */
+.page-head .head-controls .field-group input:not([type="checkbox"]):not([type="radio"]),
+.field-group input,
+.field-group select {
+  width: auto;
+  /* piso real de uma caixa de data: dd/mm/aaaa mais o ícone do seletor */
+  min-width: 118px;
+  flex: 1 1 0;
+}
+
 .section-title {
   font-size: var(--fs-caption);
   text-transform: uppercase;
@@ -811,6 +854,18 @@ button.nav-group-title:hover {
   align-items: center;
   gap: var(--s2);
   margin-bottom: var(--s2);
+  /* quebra em vez de espremer: dois seletores a 96 px viram "Últimos 1…" e
+     "Toda ativ…", e o rótulo pela metade não é rótulo (0138) */
+  flex-wrap: wrap;
+}
+/* O `width: 100%` do estilo base do controle só era inofensivo porque o
+   flex encolhia; com quebra de linha ele passa a valer e cada seletor toma
+   a linha inteira, inclusive no desktop. O controle no cabeçalho de card
+   tem a largura do que ele diz — mesma regra do cabeçalho de página. */
+.card-head select,
+.card-head input:not([type="checkbox"]):not([type="radio"]) {
+  width: auto;
+  max-width: 100%;
 }
 .card-head h3 {
   font-size: var(--fs-h3);
@@ -1342,6 +1397,9 @@ table.dense tbody tr:hover td {
   padding: var(--s6) var(--s3);
   text-align: center;
 }
+/* Estado vazio no padrão das ferramentas de gestão (change 0144): marca
+   visual, título, corpo e AÇÃO. A altura é do conteúdo — um cartão de
+   400 px com três palavras no meio não é respiro, é área morta. */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1349,11 +1407,34 @@ table.dense tbody tr:hover td {
   justify-content: center;
   gap: var(--s1);
   text-align: center;
-  padding: var(--s6) var(--s3);
+  padding: var(--s4) var(--s3);
   border: 1px dashed var(--border);
   border-radius: var(--r-card);
   background: var(--surface);
   color: var(--text-muted);
+}
+/* dentro de um card que já tem borda e respiro: sem moldura dupla */
+.empty-state.empty-compact {
+  border: none;
+  background: none;
+  padding: var(--s3) var(--s1);
+}
+/* A marca visual é o que separa "vazio" de "ainda carregando": sem ela as
+   duas telas são a mesma. Discreta de propósito — ela orienta, não ilustra. */
+.empty-art {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-subtle);
+  margin-bottom: 2px;
+}
+.empty-art .nav-icon {
+  width: 20px;
+  height: 20px;
 }
 .empty-state .empty-title {
   font-size: var(--fs-h3);
@@ -1363,6 +1444,93 @@ table.dense tbody tr:hover td {
 .empty-state .empty-body {
   font-size: var(--fs-body);
   max-width: 420px;
+}
+/* A ação é o ponto do estado vazio: um vazio sem saída é um beco. */
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s1);
+  margin-top: var(--s1);
+}
+
+/* Interruptor de módulo/superfície (change 0143). Um `switch` mostra o
+   ESTADO; o botão "Desligar" que havia antes mostrava a AÇÃO, e para saber
+   se a feature estava ligada era preciso ler o rótulo ao contrário. */
+.switch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1h);
+  border-bottom: 1px solid var(--border);
+}
+.switch-row:last-child {
+  border-bottom: none;
+}
+.switch-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  width: auto;
+}
+.switch-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.switch-state {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex: 0 0 auto;
+}
+/* o controle nativo desenhado como chave: `appearance: none` e uma pista
+   com o botão deslizando dentro dela */
+input.toggle[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 40px;
+  height: 24px;
+  flex: 0 0 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+input.toggle[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.12s, background 0.12s;
+}
+input.toggle[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+input.toggle[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+input.toggle[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .error-banner {
@@ -1769,9 +1937,16 @@ table.dense tbody tr:hover td {
 }
 
 /* ------------------------------------------------- Activity heatmap */
-/* Preenche a largura do card: colunas flexíveis (flex:1) e células que
-   escalam por aspect-ratio — card maior = quadrados maiores. */
+/* Preenche a largura do card: colunas flexíveis e células que escalam por
+   aspect-ratio — card maior = quadrados maiores.
+   Com um PISO (0138): `flex: 1 0 var(--heat-cell)` cresce como antes e
+   para de encolher. Sem o piso, 53 colunas em 292 px davam célula de
+   2,0 × 2,0 px — uma tira de poeira que não comunica nada, e uma grade de
+   38 px de altura ao lado de uma coluna de dias de 140 px, que por isso
+   nunca alinhava. Com piso, o que não cabe ROLA (`.heatmap-main.scroll-x`),
+   como no GitHub no celular. */
 .heatmap {
+  --heat-cell: 10px;
   display: flex;
   gap: 8px;
   width: 100%;
@@ -1786,11 +1961,15 @@ table.dense tbody tr:hover td {
 }
 .heatmap-weekday {
   flex: 1;
-  min-height: 12px;
+  /* sem `min-height`: ele empurrava a coluna de dias para 140 px enquanto a
+     grade tinha 38, e aí nenhum rótulo batia com a sua linha. Quem manda na
+     altura da linha é a célula; o rótulo divide o que sobrou. */
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   font-size: 10px;
+  line-height: 1;
   color: var(--text-muted);
   min-width: 26px;
 }
@@ -1799,6 +1978,7 @@ table.dense tbody tr:hover td {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  --scroll-x-bg: var(--surface);
 }
 .heatmap-months {
   display: flex;
@@ -1806,7 +1986,7 @@ table.dense tbody tr:hover td {
   height: 20px;
 }
 .heatmap-month {
-  flex: 1;
+  flex: 1 0 var(--heat-cell);
   min-width: 0;
   font-size: 10px;
   color: var(--text-muted);
@@ -1819,7 +1999,7 @@ table.dense tbody tr:hover td {
   width: 100%;
 }
 .heatmap-col {
-  flex: 1;
+  flex: 1 0 var(--heat-cell);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2235,9 +2415,41 @@ table.dense tbody tr:hover td {
   flex: 1;
   min-width: 160px;
 }
+.step-text {
+  flex: 1;
+  min-width: 0;
+}
+.step-num,
+.step-status {
+  flex: 0 0 auto;
+}
 .step-actions {
   display: flex;
   gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* Escolher arquivo com a cara do sistema, não a do sistema operacional
+   (0140). O `input[type=file]` continua sendo quem recebe o arquivo — só
+   não é ele que aparece: `.sr-only` o mantém no fluxo de acessibilidade e o
+   botão o aciona. */
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-width: 0;
+}
+/* `.sr-only` zera o padding, mas `input[type=file]` o repõe com mais peso
+   de seletor — e com `box-sizing: border-box` o campo "escondido" ficava
+   com 20 px de caixa, empurrando o botão ao lado. */
+.file-picker input[type="file"] {
+  padding: 0;
+}
+.file-picker-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .step-actions button {
   height: 28px;
@@ -2572,10 +2784,32 @@ a {
 }
 
 /* -------------------------------------------- Abas de seção (0065) */
+/* Rolagem de lado COM SINAL DE BORDA (0135, virou utilitário em 0138).
+   O sinal de que há mais conteúdo é a sombra: dois pares de gradientes, o
+   "tapa-buraco" preso ao CONTEÚDO (`local`) e a sombra presa à CAIXA
+   (`scroll`). Rolado até a ponta, o tapa-buraco cobre a sombra daquele
+   lado; no meio da rolagem as duas aparecem; quando tudo cabe, nenhuma.
+   Sem medição por JavaScript.
+   `--scroll-x-bg` é a cor de trás do bloco — quem usar sobre outra
+   superfície troca o token em vez de reescrever as cinco camadas. */
+.scroll-x {
+  --scroll-x-bg: var(--bg);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  background:
+    linear-gradient(to right, var(--scroll-x-bg) 70%, transparent) left / 26px 100% no-repeat local,
+    linear-gradient(to left, var(--scroll-x-bg) 70%, transparent) right / 26px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--shadow-edge), transparent) left / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--shadow-edge), transparent) right / 14px 100% no-repeat scroll,
+    var(--scroll-x-bg);
+}
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
 .tab-bar {
   display: flex;
   gap: 2px;
-  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-control);
   padding: 2px;
@@ -2586,6 +2820,9 @@ a {
   height: 30px;
   padding: 0 14px;
   color: var(--text-muted);
+  /* aba não encolhe: rótulo pela metade não é rótulo — quem não cabe rola */
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .tab-btn.active {
   background: var(--surface-hover);
@@ -2627,6 +2864,12 @@ a {
   top: 0;
   max-height: calc(100vh - var(--h-header) - 160px);
   overflow-y: auto;
+}
+/* O piso de 320 px existe para a árvore não pular de altura enquanto
+   carrega. Com um ESTADO VAZIO dentro, ele vira área morta: um quadro alto
+   com um parágrafo no meio (0144). A altura passa a ser do conteúdo. */
+.repo-tree:has(> .empty-state) {
+  min-height: 0;
 }
 .tc-panel-title {
   font-weight: 600;
@@ -2729,6 +2972,22 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Quem NÃO recorta, NÃO encolhe (0136).
+   `.repo-row` é um flex de irmãos soltos — selo de cobertura, selo de
+   status, data, ações. Nenhum declarava `flex-shrink`, então faltando
+   largura o navegador encolhia TODOS por igual; só o título sabe ceder
+   (tem `min-width: 0` + reticências), os outros têm `nowrap` e nenhum
+   recorte, então o texto saía da caixa e era DESENHADO POR CIMA do
+   vizinho — `ST-0001` em cima de "sem cobertura" em cima de "active".
+   Aqui só `.repo-file-main` cede; o resto guarda o seu tamanho. */
+.repo-row > *:not(.repo-file-main) {
+  flex: 0 0 auto;
+}
+/* o identificador dentro do botão também não encolhe: ele é o que
+   identifica a linha, e `CT-0…` não identifica nada */
+.repo-file-main > .mono {
+  flex: 0 0 auto;
 }
 .repo-file.dragging {
   opacity: 0.4;
@@ -3513,9 +3772,143 @@ button.link-chip-btn:disabled {
   .repo-row {
     gap: 4px;
     padding: 1px 4px;
+    /* Com a sobreposição resolvida, os metadados ainda espremiam o título
+       até `Lo…`. Em tela estreita a linha vira DUAS, e em DUAS mesmo — não
+       em quantas o conteúdo pedir. A quebra é explícita: um item vazio de
+       largura total entre a identidade e o resto, posicionado por `order`.
+       Assim a primeira linha é sempre conector + id + título e a segunda é
+       sempre o resto, por mais selo que a linha ganhe depois. Nada é
+       escondido — o que não cabe desce. */
+    flex-wrap: wrap;
+    row-gap: 2px;
+    align-items: baseline;
+  }
+  .repo-row > .tree-prefix,
+  .repo-row > .expand-btn,
+  .repo-row > input[type="checkbox"],
+  .repo-row > .repo-file-main,
+  .repo-row > .repo-folder-name {
+    order: 1;
+  }
+  .repo-row::after {
+    content: "";
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+  }
+  .repo-row > * {
+    order: 3;
   }
   .repo-file-main {
     gap: 6px;
+    flex: 1 1 auto;
+  }
+  /* ação de linha não depende de hover num aparelho sem cursor, e segue o
+     resto dos metadados em vez de ser empurrada para a direita — empurrada,
+     ela não cabia e virava uma TERCEIRA linha */
+  .repo-row .repo-actions {
+    opacity: 1;
+  }
+
+  /* A linha do passo vira DUAS faixas (0140): número + texto em cima,
+     ações + status embaixo. Espremido numa faixa só, "Abrir a tela de
+     login" caía numa coluna de ~90 px e virava três linhas ao lado dos
+     botões, com o `pending` órfão numa quarta. O passo é o que se lê para
+     executar; os botões são a ação sobre ele. A quebra é explícita, como na
+     linha de árvore, para o status nunca se soltar das ações que o mudam. */
+  .step-row::after {
+    content: "";
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+  }
+  .step-row > .step-num,
+  .step-row > .step-text {
+    order: 1;
+  }
+  .step-row > * {
+    order: 3;
+  }
+  .step-text {
+    flex: 1 1 auto;
+  }
+
+  /* Tabela densa vira LISTA DE CARTÕES em tela estreita (0142).
+     `.table-wrap` rola de lado, então numa tabela de ~700 px a última
+     coluna — a das AÇÕES — nunca aparecia sem rolar, e as ações de liberar
+     e desativar conta pareciam não existir. Cada linha vira um cartão, cada
+     célula carrega o rótulo da sua coluna (`data-label`) e as ações caem no
+     pé do cartão. Opt-in por classe: tabela que ninguém rotulou continua
+     tabela. */
+  .table-wrap:has(> .stack-narrow) {
+    overflow-x: visible;
+    border: none;
+    background: none;
+  }
+  table.dense.stack-narrow,
+  table.dense.stack-narrow tbody,
+  table.dense.stack-narrow tr,
+  table.dense.stack-narrow td {
+    display: block;
+  }
+  table.dense.stack-narrow thead {
+    /* o rótulo de cada coluna passa a viajar com a célula */
+    display: none;
+  }
+  table.dense.stack-narrow tr {
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    padding: var(--s1h);
+    margin-bottom: var(--s1h);
+  }
+  /* GRID, não flex: a célula de conta tem nome + `<br>` + e-mail, e no flex
+     cada um vira um item próprio — o e-mail saía da caixa numa terceira
+     coluna. No grid, todo o conteúdo inline contíguo vira UM item anônimo e
+     quebra linha como texto normal. */
+  table.dense.stack-narrow td {
+    border-bottom: none;
+    padding: 3px 0;
+    display: grid;
+    grid-template-columns: 34% minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--s1);
+  }
+  /* o `<span>` do e-mail é um ELEMENTO, então vira item próprio do grid e
+     caía na coluna do rótulo; preso à coluna 2, ele desce como segunda
+     linha do valor, que é o que a tabela larga já mostra */
+  table.dense.stack-narrow td > * {
+    grid-column: 2;
+  }
+  table.dense.stack-narrow td::before {
+    content: attr(data-label);
+    grid-column: 1;
+    color: var(--text-muted);
+    font-size: var(--fs-caption);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  /* célula de ações: sem rótulo, ocupando a largura, botões quebrando */
+  table.dense.stack-narrow td[data-label=""] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: var(--s1);
+    margin-top: 2px;
+    border-top: 1px solid var(--border);
+  }
+  table.dense.stack-narrow td[data-label=""]::before {
+    content: none;
+  }
+  /* controle dentro do cartão tem a largura da sua coluna, não a da tela */
+  table.dense.stack-narrow td select,
+  table.dense.stack-narrow td input {
+    width: 100%;
+    min-width: 0;
+  }
+  /* célula sem conteúdo não vira linha de cartão vazia */
+  table.dense.stack-narrow td:empty {
+    display: none;
   }
 
   /* o menu da conta não pode sangrar pela direita */

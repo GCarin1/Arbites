@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
+import { EmptyState } from "./EmptyState";
+import { FilePicker } from "./FilePicker";
 import { ConfirmModal, Modal } from "./Modal";
 import { useToast } from "./Toast";
 import type {
@@ -244,7 +246,17 @@ export function ExecutionsList({
           </button>
         );
       })}
-      {items.length === 0 && <p className="muted">Nenhuma execução ainda.</p>}
+      {items.length === 0 && (
+        <EmptyState
+          compact
+          icon="executions"
+          title="Nenhuma execução ainda"
+          action={{ label: "Nova execução", onClick: onNew }}
+        >
+          Uma execução é o ciclo de teste: escolhe os casos, define o período
+          e acompanha o quadro até fechar.
+        </EmptyState>
+      )}
     </div>
   );
 }
@@ -444,12 +456,15 @@ export function ExecutionsRepo({
 
       <div className="repo-tree card">
         {items.length === 0 ? (
-          <div className="empty-state" style={{ border: "none" }}>
-            <div className="empty-title">Nenhuma execução</div>
-            <div className="empty-body">
-              Crie uma execução para registrar resultados no kanban.
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="executions"
+            title="Nenhuma execução ainda"
+            action={{ label: "Nova execução", onClick: onNew }}
+          >
+            Uma execução é o ciclo de teste: escolhe os casos, define o
+            período e acompanha o quadro coluna a coluna até fechar.
+          </EmptyState>
         ) : (
           years.map((year, yi) => {
             const isCollapsed = collapsed.has(year);
@@ -904,24 +919,34 @@ export function ExecutionBoard({
         </h1>
         <span className="spacer" />
         <div className="head-controls">
-          <span className="caption">
-            {execution.sprint ?? "—"} · {execution.environment ?? "—"}
+          {/* `— · —` não informava nada: ausência de rótulo se mostra não
+              mostrando (0139). Com um só preenchido, mostra-se aquele. */}
+          {(execution.sprint || execution.environment) && (
+            <span className="caption">
+              {[execution.sprint, execution.environment].filter(Boolean).join(" · ")}
+            </span>
+          )}
+          {/* O período mora no ciclo (ADR 0013); `sprint` ficou só como rótulo.
+              As duas pontas são UM campo: soltas e sem rótulo, ninguém sabia
+              que aquelas duas caixas eram início e fim do mesmo intervalo. */}
+          <span className="field-group">
+            <span className="field-group-label">Período</span>
+            <input
+              type="date"
+              aria-label="Início do ciclo"
+              value={execution.starts_on ?? ""}
+              disabled={closed}
+              onChange={(e) => void savePeriod({ starts_on: e.target.value || null })}
+            />
+            <span aria-hidden="true" className="field-group-sep">→</span>
+            <input
+              type="date"
+              aria-label="Fim do ciclo"
+              value={execution.ends_on ?? ""}
+              disabled={closed}
+              onChange={(e) => void savePeriod({ ends_on: e.target.value || null })}
+            />
           </span>
-          {/* O período mora no ciclo (ADR 0013); `sprint` ficou só como rótulo. */}
-          <input
-            type="date"
-            aria-label="Início do ciclo"
-            value={execution.starts_on ?? ""}
-            disabled={closed}
-            onChange={(e) => void savePeriod({ starts_on: e.target.value || null })}
-          />
-          <input
-            type="date"
-            aria-label="Fim do ciclo"
-            value={execution.ends_on ?? ""}
-            disabled={closed}
-            onChange={(e) => void savePeriod({ ends_on: e.target.value || null })}
-          />
           {squadsInExec.length > 0 && (
             <select
               value={squadFilter}
@@ -1287,8 +1312,10 @@ export function ResultPanel({
       {result.steps.length === 0 && <p className="muted">CT sem passos estruturados.</p>}
       {result.steps.map((step) => (
         <div key={step.index} className="step-row">
-          <span className={`status-dot dot-step-${step.status} mono`}>{step.index}.</span>
-          <span style={{ flex: 1 }}>{step.text}</span>
+          <span className={`status-dot dot-step-${step.status} mono step-num`}>
+            {step.index}.
+          </span>
+          <span className="step-text">{step.text}</span>
           {!closed && (
             <span className="step-actions">
               <button onClick={() => void markStep(step.index, "passed")}>pass</button>
@@ -1296,7 +1323,7 @@ export function ResultPanel({
               <button onClick={() => void markStep(step.index, "blocked")}>block</button>
             </span>
           )}
-          <span className="muted">{step.status}</span>
+          <span className="muted step-status">{step.status}</span>
         </div>
       ))}
 
@@ -1325,7 +1352,7 @@ export function ResultPanel({
             onChange={(e) => setNote(e.target.value)}
             style={{ maxWidth: 280 }}
           />
-          <input type="file" onChange={(e) => void upload(e.target.files)} />
+          <FilePicker label="Anexar evidência" onPick={(files) => void upload(files)} />
         </div>
       )}
 
@@ -1366,7 +1393,7 @@ export function ResultPanel({
           </div>
         ))
       ) : (
-        <p className="muted">Nenhum defeito vinculado.</p>
+        <p className="muted">Nenhum defeito vinculado a este resultado.</p>
       )}
       {!closed && (
         <div className="toolbar">

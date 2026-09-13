@@ -15,7 +15,7 @@
         "id": "admin",
         "path": ".doctrina/specs/admin/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.3.0",
         "last_updated": "2026-09-12",
         "implementation": "verified — `backend/arbites/api.py` (rotas /admin/*), `frontend/src/components/Admin.tsx`",
         "realizes": [
@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.13.0",
+        "version": "0.17.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -113,7 +113,7 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.9.4",
+        "version": "0.10.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -144,7 +144,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -185,7 +185,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.14.0",
+        "version": "0.15.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -385,9 +385,76 @@
         "supersedes": "0010",
         "landed": "2026-09-13 — `backend/arbites/executions.py`, `backend/arbites/api.py`, `backend/tests/test_execution_cycle.py`",
         "summary": "O ciclo é a execution, não uma entidade nova."
+      },
+      {
+        "id": "0014",
+        "path": ".doctrina/decisions/0014-modulo-desligavel-e-tela-mais-caminhos-de-api-bloqueado-nas-tres-camadas.md",
+        "title": "Modulo desligavel e tela mais caminhos de API, bloqueado nas tres camadas",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "landed": "2026-09-13 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `frontend/src/App.tsx`, `backend/tests/test_authorization.py`",
+        "summary": "Um modulo e uma tela do produto mais os caminhos de API que so ela usa."
+      },
+      {
+        "id": "0015",
+        "path": ".doctrina/decisions/0015-integracao-externa-por-porta-com-capacidades-agente-como-ponte-e-identidade-como-alicerce.md",
+        "title": "Integracao externa por porta com capacidades, agente como ponte e identidade como alicerce",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "supersedes": "0007 (parcialmente), 0012 (parcialmente)",
+        "summary": "Integracao externa volta ao escopo, com quatro regras."
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0145-identidade-externa-frontmatter-vinculo",
+        "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
+        "path": ".doctrina/changes/0145-identidade-externa-frontmatter-vinculo",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0146-servidor-mcp-local-expondo",
+        "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
+        "path": ".doctrina/changes/0146-servidor-mcp-local-expondo",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0147-ferramentas-mcp-escrita-preview",
+        "title": "ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo",
+        "path": ".doctrina/changes/0147-ferramentas-mcp-escrita-preview",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0148-intercambio-arquivo-csv-cucumber",
+        "title": "intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API",
+        "path": ".doctrina/changes/0148-intercambio-arquivo-csv-cucumber",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0149-pagina-mcp-aba-ia",
+        "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
+        "path": ".doctrina/changes/0149-pagina-mcp-aba-ia",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0150-conector-deterministico-volume-recorrencia",
+        "title": "conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item",
+        "path": ".doctrina/changes/0150-conector-deterministico-volume-recorrencia",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -2132,6 +2199,144 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0134-falha-rede-fetch-chega",
+        "title": "falha de rede no fetch chega a tela como Failed to fetch em ingles sem dizer o que fazer",
+        "path": ".doctrina/changes/archive/2026-09-13-0134-falha-rede-fetch-chega",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0135-barra-sub-abas-ia-transborda",
+        "title": "barra de sub-abas da IA transborda a viewport em 390px: a aba Configuracao fica cortada na borda direita sem nenhum sinal de rolagem",
+        "path": ".doctrina/changes/archive/2026-09-13-0135-barra-sub-abas-ia-transborda",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0136-linha-arvore-requisitos-execucoes",
+        "title": "linha de arvore de requisitos e de execucoes desenha os rotulos uns por cima dos outros em 390px: id, cobertura, status e data se sobrepoem porque o flex encolhe todos abaixo do proprio texto",
+        "path": ".doctrina/changes/archive/2026-09-13-0136-linha-arvore-requisitos-execucoes",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0137-cenario-interrompido-timeout-cancelamento",
+        "title": "cenario interrompido por timeout ou cancelamento e gravado como passed porque o fecho do progresso ao vivo trata ausencia de falha como aprovacao",
+        "path": ".doctrina/changes/archive/2026-09-13-0137-cenario-interrompido-timeout-cancelamento",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0138-heatmap-atividade-fica-ilegivel",
+        "title": "heatmap de atividade fica ilegivel em 390px: celula de 2 pixels numa grade de 38px de altura contra coluna de dias de 140px, rotulos de mes amontoados e seletores do cabecalho cortados a 96px",
+        "path": ".doctrina/changes/archive/2026-09-13-0138-heatmap-atividade-fica-ilegivel",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0139-periodo-ciclo-cabecalho-execucao",
+        "title": "periodo do ciclo no cabecalho da execucao e duas caixas de data sem rotulo e de larguras diferentes, precedidas de um traco solto quando sprint e ambiente estao vazios",
+        "path": ".doctrina/changes/archive/2026-09-13-0139-periodo-ciclo-cabecalho-execucao",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0140-passos-modal-resultado-desalinhados",
+        "title": "passos do modal de resultado desalinhados em 390px: o texto do passo espremido em tres linhas ao lado dos botoes e o status solto na linha seguinte, e o envio de evidencia mostra o input de arquivo cru do sistema",
+        "path": ".doctrina/changes/archive/2026-09-13-0140-passos-modal-resultado-desalinhados",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0141-dependencias-teste-backend-declaradas",
+        "title": "dependencias de teste do backend nao declaradas: behave e um backend de keyring fazem parte do gate mas nao estao em nenhum requirements, entao um container novo reprova cinco testes",
+        "path": ".doctrina/changes/archive/2026-09-13-0141-dependencias-teste-backend-declaradas",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": []
+      },
+      {
+        "id": "0142-abas-admin-cabem-px",
+        "title": "abas do admin nao cabem em 390px e geram rolagem lateral da pagina inteira, e as tabelas densas do admin escondem a coluna de acoes, o que faz as acoes de liberar e desativar cadastro parecerem inexistentes",
+        "path": ".doctrina/changes/archive/2026-09-13-0142-abas-admin-cabem-px",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "admin",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0143-interruptor-modulo-produto-desliga",
+        "title": "interruptor por modulo do produto que desliga a feature de verdade: some do menu, recusa o deep link e bloqueia os caminhos de API do modulo, em vez de apenas exibir um status de desativado",
+        "path": ".doctrina/changes/archive/2026-09-13-0143-interruptor-modulo-produto-desliga",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "admin",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0144-estado-vazio-segue-padrao",
+        "title": "estado vazio nao segue o padrao das ferramentas de gestao: paragrafo apagado sem titulo nem acao, sem distinguir nunca-teve-nada de filtro-nao-achou, e em cartao de altura fixa que deixa area morta",
+        "path": ".doctrina/changes/archive/2026-09-13-0144-estado-vazio-segue-padrao",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2158,6 +2363,12 @@
         "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
         "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "cenario-interrompido-nao-tem-resultado",
+        "path": ".doctrina/skills/cenario-interrompido-nao-tem-resultado.md",
+        "description": "Progresso ao vivo deduz o status pela AUSÊNCIA de falha — o que só vale para cenário que chegou ao fim. Ao fechar um parcial depois de matar o processo (timeout/cancelamento), o cenário aberto vira `passed` sem nunca ter terminado. Quem interrompe precisa dizer que interrompeu.",
+        "last_updated": "2026-09-13"
       },
       {
         "id": "composite-score-sem-dado-nao-e-zero",

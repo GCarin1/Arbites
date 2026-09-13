@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { EmptyState, NoMatches } from "./EmptyState";
 import { ConfirmModal, Modal } from "./Modal";
 import { DetailCard, DocBody, ReadField } from "./ReadView";
 import { Story360 } from "./Story360";
@@ -89,7 +90,11 @@ export function RequirementsList({
           ))}
         </>
       )}
-      {items.length === 0 && <p className="muted">Nenhum requisito ainda.</p>}
+      {items.length === 0 && (
+        <EmptyState compact icon="requirements" title="Nenhum requisito ainda">
+          Epics e stories criados aparecem aqui.
+        </EmptyState>
+      )}
     </div>
   );
 }
@@ -297,13 +302,20 @@ export function ReqRepository({
 
       <div className="repo-tree card">
         {items.length === 0 ? (
-          <div className="empty-state" style={{ border: "none" }}>
-            <div className="empty-title">Nenhum requisito</div>
-            <div className="empty-body">
-              Crie epics e stories. Arraste uma story para outro epic para
-              reassociá-la.
-            </div>
-          </div>
+          <EmptyState
+            compact
+            icon="requirements"
+            title="Nenhum requisito ainda"
+            action={{ label: "Nova story", onClick: () => setCreating("story") }}
+            secondary={{ label: "Novo epic", onClick: () => setCreating("epic") }}
+          >
+            A story é o que os casos de teste cobrem, e o epic é a pasta dela.
+            Arraste uma story para outro epic para reassociá-la.
+          </EmptyState>
+        ) : allStories.length > 0 && stories.length === 0 ? (
+          // o filtro de cobertura escondeu tudo: criar mais story não é a
+          // saída — a saída é voltar a ver as que existem (0144)
+          <NoMatches what="stories" onClear={() => setCovFilter("all")} />
         ) : (
           <>
             {epics.map((epic, ei) => {
