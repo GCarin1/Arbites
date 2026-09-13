@@ -1,8 +1,8 @@
 # Spec — local-automation
 
 **Capability:** local-automation
-**Status:** active
-**Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC5
 **Last updated:** 2026-07-21
 **Version:** 0.10.0

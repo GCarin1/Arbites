@@ -2787,3 +2787,12 @@ button.link-chip-btn:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Capability congelada (ADR 0012): presente e funcional, mas fora do foco.
+   Discreta em vez de escondida — quem usa continua achando. */
+.nav-item.frozen {
+  opacity: 0.62;
+}
+.nav-item.frozen:hover {
+  opacity: 1;
+}

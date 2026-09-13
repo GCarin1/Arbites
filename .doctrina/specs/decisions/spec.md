@@ -1,8 +1,8 @@
 # Spec — decisions
 
 **Capability:** decisions
-**Status:** active
-**Implementation:** verified — M14 (backend/arbites/indexer.py, backend/arbites/api.py, frontend/src/components/Decisions.tsx)
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** n/a — capability nova (Memória Histórica do Projeto), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-11
 **Version:** 0.1.1

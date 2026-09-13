@@ -137,11 +137,21 @@ function buildHash(tab: Tab, params: Record<string, string>): string {
 }
 
 // Agrupamento semântico do menu (doc de ajustes §3)
+// Agrupamento por foco (ADR 0012). "Mais" reúne o que foi congelado: as
+// telas continuam funcionando e o dado continua lá, mas saem do caminho de
+// quem usa o produto para o que ele é — repositório, ciclo e execução.
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
-  { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["defects", "decisions", "audit", "memory", "todos", "dashboard", "daily", "meetings"] },
-  { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
+  { title: "Testes", keys: ["requirements", "testcases", "executions"] },
+  { title: "Acompanhamento", keys: ["defects", "dashboard", "todos", "audit"] },
+  { title: "Ferramentas", keys: ["ia"] },
+  { title: "Mais", keys: ["decisions", "memory", "daily", "meetings", "automation", "migration"] },
   { title: "Suporte", keys: ["problems", "profile", "admin"] },
+];
+
+// Capabilities congeladas: o grupo "Mais" nasce recolhido, e cada item leva
+// a marca para que ninguém confunda "está aqui" com "é para usar".
+const FROZEN_TABS: Tab[] = [
+  "decisions", "memory", "daily", "meetings", "automation", "migration",
 ];
 
 const NAV_BY_KEY = Object.fromEntries(NAV.map((n) => [n.key, n])) as Record<
@@ -166,6 +176,7 @@ function NavItem({
   pinned,
   onTogglePin,
   live = false,
+  frozen = false,
 }: {
   item: { key: Tab; label: string };
   tab: Tab;
@@ -175,11 +186,20 @@ function NavItem({
   onTogglePin: () => void;
   // indicador "algo executando" (0076): dot pulsante no item
   live?: boolean;
+  // capability congelada (ADR 0012): funciona, mas não recebe investimento
+  frozen?: boolean;
 }) {
   return (
     <div className={`nav-row ${tab === item.key ? "active" : ""}`}>
       <button
-        className={`nav-item ${tab === item.key ? "active" : ""}`}
+        className={`nav-item ${tab === item.key ? "active" : ""} ${
+          frozen ? "frozen" : ""
+        }`}
+        title={
+          frozen
+            ? "Congelada: continua funcionando, mas fora do foco do produto"
+            : undefined
+        }
         onClick={() => setTab(item.key)}
         aria-current={tab === item.key ? "page" : undefined}
       >
@@ -275,7 +295,7 @@ export default function App({
   const [creatingCt, setCreatingCt] = useState(false);
   const [pins, setPins] = useState<Tab[]>(() => loadJson<Tab[]>("arbites.pins", []));
   const [collapsed, setCollapsed] = useState<string[]>(() =>
-    loadJson<string[]>("arbites.navCollapsed", []),
+    loadJson<string[]>("arbites.navCollapsed", ["Mais"]),
   );
 
   function togglePin(key: Tab) {
@@ -520,6 +540,7 @@ export default function App({
                       pinned={pins.includes(k)}
                       onTogglePin={() => togglePin(k)}
                       live={k === "automation" && activeRuns > 0}
+                      frozen={FROZEN_TABS.includes(k)}
                     />
                   ))}
               </div>

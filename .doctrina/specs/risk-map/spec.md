@@ -1,8 +1,8 @@
 # Spec — risk-map
 
 **Capability:** risk-map
-**Status:** active
-**Implementation:** verified
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** n/a — capability nova (Mapa de Risco), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-12
 **Version:** 0.1.1

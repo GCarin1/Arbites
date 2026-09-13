@@ -2424,6 +2424,70 @@ def _register_routes(app: FastAPI) -> None:
         meta, body = _load_doc(ws, ws.relpath(path))
         return str(meta.get("name") or ""), body
 
+
+    # Assinatura de bytes, nao a extensao: um .png pode ser qualquer coisa, e
+    # o avatar e servido de volta para o navegador.
+    _IMAGE_SIGNATURES = (
+        (bytes.fromhex("89504e470d0a1a0a"), "png"),
+        (bytes.fromhex("ffd8ff"), "jpg"),
+    )
+    _AVATAR_MAX_BYTES = 1024 * 1024
+
+    def _sniff_image(blob: bytes) -> str | None:
+        for magic, ext in _IMAGE_SIGNATURES:
+            if blob.startswith(magic):
+                return ext
+        if blob[:4] == b"RIFF" and blob[8:12] == b"WEBP":
+            return "webp"
+        return None
+
+    def _avatar_dir(request: Request) -> Path:
+        return ws_of(request).root / "profiles" / "avatars"
+
+    def _avatar_slug(request: Request) -> str:
+        if not getattr(request.app.state, "auth_enabled", True):
+            return "local"
+        return slugify(current_user(request)["email"])
+
+    def _find_avatar(request: Request) -> Path | None:
+        slug = _avatar_slug(request)
+        for candidate in _avatar_dir(request).glob(f"{slug}.*"):
+            if candidate.is_file():
+                return candidate
+        return None
+
+    @app.get(API_PREFIX + "/profile/avatar")
+    async def get_avatar(request: Request):
+        path = _find_avatar(request)
+        if path is None:
+            # Sem imagem nao e erro: o cliente desenha o identicon.
+            raise _error(404, "no_avatar", "esta conta nao tem imagem")
+        return FileResponse(str(path))
+
+    @app.put(API_PREFIX + "/profile/avatar")
+    async def put_avatar(request: Request, file: UploadFile = File(...)):
+        blob = await file.read()
+        if len(blob) > _AVATAR_MAX_BYTES:
+            raise _error(422, "avatar_too_large",
+                         "a imagem precisa ter no maximo 1 MB")
+        ext = _sniff_image(blob)
+        if ext is None:
+            raise _error(422, "invalid_image",
+                         "envie um PNG, JPEG ou WebP")
+        directory = _avatar_dir(request)
+        directory.mkdir(parents=True, exist_ok=True)
+        for old in directory.glob(f"{_avatar_slug(request)}.*"):
+            old.unlink()
+        (directory / f"{_avatar_slug(request)}.{ext}").write_bytes(blob)
+        return {"ok": True, "format": ext}
+
+    @app.delete(API_PREFIX + "/profile/avatar", status_code=204)
+    async def delete_avatar(request: Request):
+        path = _find_avatar(request)
+        if path is not None:
+            path.unlink()
+        return Response(status_code=204)
+
     @app.get(API_PREFIX + "/profile")
     async def get_profile(request: Request):
         name, memory = _load_profile(request)

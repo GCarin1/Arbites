@@ -1,8 +1,8 @@
 # Spec — project-memory
 
 **Capability:** project-memory
-**Status:** active
-**Implementation:** verified
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** n/a — capability nova (Memória Histórica do Projeto e para a IA), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-19
 **Version:** 0.3.0
