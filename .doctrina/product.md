@@ -12,6 +12,14 @@ a aprovação?", "qual a cobertura e o pass rate da sprint?". Tudo que existe
 na interface existe no disco — a UI é uma visualização da estrutura real de
 arquivos.
 
+**Foco ativo (ADR 0012).** O produto é um repositório versionado de casos de
+teste, com ciclo, execução e IA como ajuda. As capabilities fora desse
+recorte — reuniões, daily, decisões, memória de projeto, mapa de risco,
+migração Xray e as duas de automação — estão **congeladas**: funcionam,
+continuam no gate de testes e mantêm os dados de quem já as usou, mas saíram
+da navegação principal e não recebem investimento novo. Congelado não é
+removido; descongelar é um ADR.
+
 ## Problem
 
 O fluxo corporativo atual (Miro → Confluence → Figma → Jira Cloud → Xray)
@@ -24,7 +32,7 @@ milestones onde cada um é usável sozinho.
 
 ## Target users
 
-- O próprio autor (QA na B3), usuário único da v1: gerencia casos de teste
+- O próprio autor (QA), primeiro usuário: gerencia casos de teste
   manuais e automatizados (Selenium + Behave) e reporta para gestão.
 - Secundariamente, a gestão/chefia como consumidora dos reportes (matriz de
   rastreabilidade, dashboard exportado em PDF/Markdown).
@@ -64,8 +72,9 @@ Out of scope (deferred or rejected):
 - Cadastro de sprints/releases (texto livre na v1).
 - Execução distribuída / agentes remotos.
 - Integração Jira (permanente — descomissionada), Confluence (link
-  manual), Businessmap (adiada para M6, especificar quando a migração
-  corporativa se concretizar).
+  manual) e Businessmap (**abandonada** pela ADR 0012 — foi especificada e
+  nunca construída; o vínculo com o sistema corporativo continua sendo o
+  `external_key`).
 - Edição de feature files pela plataforma (repo de automação é read-only).
 - Telemetria de qualquer tipo.
 
@@ -85,21 +94,20 @@ Out of scope (deferred or rejected):
   anexadas e um defeito vinculado, sem tocar em outro sistema. (M1)
 - [SC3] Gerar um reporte de sprint apresentável a um gestor em menos de 1
   minuto, com drill-down até o arquivo de evidência. (M1.5)
-- [SC4] Migrar a base real do Xray da B3 para um workspace local antes do
+- [SC4] Migrar a base real do Xray para um workspace local antes do
   descomissionamento. (M2)
 - [SC5] Disparar a automação real de frontend pela UI, ver o log ao vivo e
-  a execution populada com steps Gherkin e screenshots de falha. (M3)
+  a execution populada com steps Gherkin e screenshots de falha. (M3 —
+  **entregue; área congelada pela ADR 0012**)
 - [SC6] Disparar o workflow real no GitHub pela UI, acompanhar os steps e
-  obter uma execution idêntica à de um run local. (M4)
+  obter uma execution idêntica à de um run local. (M4 — **entregue; área
+  congelada pela ADR 0012**)
 - [SC7] Gerar CTs a partir de uma story real com LM Studio local e com um
   provider cloud, aceitando/rejeitando item a item. (M5)
 - [SC8] Reindex completo em menos de 5 segundos para 2.000 CTs.
 - [SC9] Marcar squad em epic/story, CT e execução (CT herda da story), e
   filtrar dashboard e board por squad, com as 7 métricas recalculadas sobre
   o subconjunto do squad. (M7)
-- [SC10] Vincular requisitos/defeitos a cards do Businessmap por chave
-  externa e importar cards como requisitos-espelho (import pontual análogo
-  ao Xray), quando a migração corporativa concretizar. (M6 — gated)
 - [SC11] Manter uma lista de afazeres (todos) com datas, status (incl.
   impedimento) e links para CT/execução/story, persistida em arquivo e
   consultável por período/histórico. (M10)

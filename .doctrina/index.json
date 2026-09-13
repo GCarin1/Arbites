@@ -377,9 +377,66 @@
         "date": "2026-09-12",
         "landed": "2026-09-12 — `backend/arbites/auth.py`, `backend/tests/test_auth.py`",
         "summary": "Contas, sessões e tentativas de login vivem num terceiro store: um SQLite"
+      },
+      {
+        "id": "0012",
+        "path": ".doctrina/decisions/0012-foco-em-repositorio-versionado-ciclo-e-execucao-periferia-congelada.md",
+        "title": "Foco em repositorio versionado ciclo e execucao periferia congelada",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "summary": "O escopo ativo do Arbites passa a ser:"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0109-refoco-do-produto-e-congelamento-da-periferia",
+        "title": "Refoco do produto e congelamento da periferia",
+        "path": ".doctrina/changes/0109-refoco-do-produto-e-congelamento-da-periferia",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (confident; signals: registrar)"
+      },
+      {
+        "id": "0110-navegacao-e-identidade-no-padrao-github",
+        "title": "Navegacao e identidade no padrao GitHub",
+        "path": ".doctrina/changes/0110-navegacao-e-identidade-no-padrao-github",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (confident; signals: para que)"
+      },
+      {
+        "id": "0111-execution-como-ciclo-de-teste",
+        "title": "Execution como ciclo de teste",
+        "path": ".doctrina/changes/0111-execution-como-ciclo-de-teste",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0112-versionamento-dos-casos-de-teste-com-git-no",
+        "title": "Versionamento dos casos de teste com git no workspace",
+        "path": ".doctrina/changes/0112-versionamento-dos-casos-de-teste-com-git-no",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0113-tela-de-execucao-guiada-em-tres-paineis",
+        "title": "Tela de execucao guiada em tres paineis",
+        "path": ".doctrina/changes/0113-tela-de-execucao-guiada-em-tres-paineis",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
+        "title": "Dashboard com KPIs e o que precisa de atencao",
+        "path": ".doctrina/changes/0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain; signals: para que)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
