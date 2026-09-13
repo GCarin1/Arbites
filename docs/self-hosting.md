@@ -38,7 +38,7 @@ porteiro, não um desvio dele.
 
 > Se você prefere que o Arbites seja inalcançável sem passar pela
 > Cloudflare, veja a seção **2.4** (mesmo túnel, sem porta publicada) ou a
-> **2.5** (túnel dedicado, com um segundo token).
+> **2.6** (túnel dedicado, com um segundo token).
 
 ### O wildcard do BFFless captura tudo — e como conviver com ele
 
@@ -131,6 +131,10 @@ outra devolvendo `401` é sinal de que o gate está de pé, não de erro.
 
 ### 2.3. Route no túnel — a ordem importa
 
+> **Sem domínio?** Esta seção precisa de um domínio na sua conta Cloudflare
+> (é o que dá nome ao hostname). Se você não tem um, pule para a **§2.5**:
+> o túnel funciona no modo de rede privada, sem domínio nenhum.
+
 No painel Zero Trust → **Networks → Tunnels** → seu túnel → **Public
 Hostnames**:
 
@@ -193,6 +197,10 @@ networks:
 
 O route no painel passa a apontar para `http://arbites:8347`.
 
+Atenção: esta variante **não** combina com a rota privada da §2.5. Sem
+porta publicada no host, não há IP:porta na sua rede para a rota privada
+alcançar — só o nome do container, que o WARP não resolve.
+
 Fica melhor que o caminho padrão — mesmo túnel, sem exposição na LAN — ao
 custo de depender de um nome de rede interno do Umbrel, que pode mudar entre
 versões. Por isso o padrão do repositório continua sendo a porta publicada:
@@ -200,7 +208,51 @@ funciona sem saber nada sobre a topologia interna do Umbrel. Se esta variante
 parar de funcionar depois de uma atualização, o sintoma é 502 no hostname, e
 voltar para `ports` resolve.
 
-### 2.5. Alternativa: túnel dedicado
+### 2.5. Sem domínio: rota privada + WARP
+
+Route com hostname exige um domínio na sua conta Cloudflare. Se você ainda
+não tem um — ou não quer ter —, o túnel funciona no outro modo: em vez de
+publicar um endereço, ele **estende a sua rede local**. De qualquer lugar,
+`http://<ip-do-umbrel>:8347` responde como se você estivesse em casa.
+
+Descubra o IP do Umbrel na LAN:
+
+```bash
+hostname -I | awk '{print $1}'    # ex.: 192.168.1.42
+```
+
+No painel do túnel → **Add route** → **Private network**, informe
+`192.168.1.42/32` (só o Umbrel) ou a faixa inteira da sua rede.
+
+Depois, em **Zero Trust → Settings → WARP Client**:
+
+1. **Device enrollment** — crie uma regra de quem pode entrar (o mais
+   simples é *Emails* com os endereços do time).
+2. **Split Tunnels** — este é o passo que faz todo mundo tropeçar. O WARP
+   vem configurado para **excluir** faixas privadas (`192.168.0.0/16`,
+   `10.0.0.0/8`), ou seja, ele ignora exatamente o endereço que você quer
+   alcançar. Remova a faixa do seu Umbrel da lista de exclusão.
+
+Instale o **Cloudflare One Client (WARP)** em cada dispositivo, faça login
+com o nome da sua organização, e abra `http://192.168.1.42:8347`.
+
+Duas consequências para decidir com consciência:
+
+- **Cada pessoa precisa do WARP instalado e logado.** Não dá para mandar um
+  link e a pessoa abrir no navegador; isso só com domínio.
+- **O tráfego é HTTP dentro do túnel.** Não há TLS ponta a ponta como no
+  modo com hostname, então o cookie de sessão não recebe a flag `Secure`.
+  A conexão até a borda da Cloudflare é criptografada pelo WARP; o trecho
+  final, não. Aceitável para um time pequeno; para acesso amplo, use
+  hostname com domínio.
+
+> **Não use *quick tunnel* (`trycloudflare.com`) para esta aplicação.** É o
+> outro modo sem domínio, mas a documentação da Cloudflare lista "no
+> Server-Sent Events support" entre as limitações — e o log ao vivo da
+> automação é SSE. Some a isso a URL que muda a cada reinício e a ausência
+> de SLA.
+
+### 2.6. Alternativa: túnel dedicado
 
 Se você quiser que o Arbites seja inalcançável sem passar pela Cloudflare —
 nem pela LAN —, crie um segundo túnel e deixe o `cloudflared` junto do
@@ -336,5 +388,5 @@ Duas consequências que valem estar claras:
   borda da Cloudflare.
 
 Para fechar a LAN por completo, use a seção 2.4 (entrar na rede do túnel
-do Umbrel) ou a 2.5 (túnel dedicado). Em ambas o container deixa de ter
+do Umbrel) ou a 2.6 (túnel dedicado). Em ambas o container deixa de ter
 porta publicada e só é alcançável de dentro do Docker.

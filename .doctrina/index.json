@@ -1759,6 +1759,14 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0108-caminho-sem-dominio-no-guia",
+        "title": "Caminho sem dominio no guia",
+        "path": ".doctrina/changes/archive/2026-09-13-0108-caminho-sem-dominio-no-guia",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": []
       }
     ],
     "skills": [

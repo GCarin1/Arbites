@@ -112,3 +112,5 @@ One line per archived change, newest last. Appended by
   - 2026-09-12 — 0106-coexistencia-com-o-tunel-do-umbrel — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
 - 2026-09-12 — 0106-coexistencia-com-o-tunel-do-umbrel — Coexistencia com o tunel do Umbrel
 - 2026-09-13 — 0107-keepalive-no-sse-atras-do-tunel — Keepalive no SSE atras do tunel (specs: local-automation MODIFIED)
+  - 2026-09-13 — 0108-caminho-sem-dominio-no-guia — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
+- 2026-09-13 — 0108-caminho-sem-dominio-no-guia — Caminho sem dominio no guia
