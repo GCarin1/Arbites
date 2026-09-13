@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -83,6 +83,8 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall guardar a densidade escolhida no navegador de quem escolheu, por ser preferência de leitura de uma pessoa num aparelho, e não configuração do workspace.
 - The system shall tornar cada card do quadro alcançável e operável por teclado — foco, abrir o resultado e mover entre colunas —, sem depender de arrastar.
 - The system shall identificar cada card e cada coluna do quadro para tecnologia assistiva, dizendo de que caso se trata e em que coluna ele está.
+- The system shall derivar toda cor exibida — inclusive a de gráfico, grade, eixo e dica de valor — dos tokens em tempo de execução, admitindo valor escrito apenas como último recurso caso a leitura do token falhe.
+- The system shall oferecer tema claro além do escuro, com a escolha guardada no navegador de quem escolheu e aplicada antes da primeira pintura.
 
 ### Event-driven
 
@@ -91,6 +93,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 ### State-driven
 
 - While a gaveta de navegação está aberta, the system shall impedir a rolagem do conteúdo atrás dela e devolver o foco ao controle que a abriu quando ela fechar.
+- While a pessoa não tiver escolhido um tema, the system shall seguir a preferência declarada pelo sistema operacional dela.
 
 ### Unwanted-behavior (must-not)
 
@@ -101,6 +104,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall not servir uma interface reduzida em funcionalidade na tela estreita; o que muda é a forma, e nenhuma tela deixa de ser alcançável.
 - The system shall not deixar a densidade compacta reduzir um alvo interativo abaixo do mínimo de toque quando o ponteiro for grosseiro.
 - The system shall not oferecer no quadro nenhuma ação que exista apenas como arrastar; arrastar com precisão é o gesto que exclui quem tem limitação motora.
+- The system shall not trocar o tema escuro por claro como padrão do produto; a escolha é de quem lê, e o escuro continua sendo o ponto de partida.
 
 ## Acceptance criteria
 
@@ -151,6 +155,8 @@ e prova a sua fatia, citando o teste/artefato. -->
 10. [verified] A escala de espaçamento cobre os degraus usados pela interface, e a densidade escolhida sobrevive ao recarregamento da página — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
 11. [verified] Um card do quadro recebe foco pelo teclado, abre o resultado por Enter e muda de coluna por atalho, com o mesmo efeito de arrastá-lo — verified by `frontend/src/components/Executions.tsx`.
 12. [verified] Card e coluna se identificam para tecnologia assistiva e a mudança de coluna é anunciada numa região viva — verified by `frontend/src/components/Executions.tsx`.
+13. [verified] Grade, eixos, dica de valor e barras do gráfico acompanham o tema porque vêm dos tokens, e não de cor decidida no componente — verified by `frontend/src/components/Dashboard.tsx`.
+14. [verified] O tema claro muda fundo, superfície, borda e texto mantendo os estados distinguíveis, e a escolha sobrevive ao recarregamento — verified by `frontend/src/styles.css` + `frontend/src/theme.ts`.
 
 ## Maturity
 

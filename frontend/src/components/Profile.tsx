@@ -8,6 +8,13 @@ import {
   saveDensity,
   type Density,
 } from "../density";
+import {
+  THEMES,
+  THEME_LABELS,
+  loadTheme,
+  saveTheme,
+  type Theme,
+} from "../theme";
 import { api } from "../api";
 import type { SessionUser } from "../types";
 
@@ -38,6 +45,7 @@ export function Profile({
   const fileInput = useRef<HTMLInputElement>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [density, setDensity] = useState<Density>(loadDensity);
+  const [theme, setTheme] = useState<Theme>(loadTheme);
   const [name, setName] = useState("");
   const [memory, setMemory] = useState("");
   const [saving, setSaving] = useState(false);
@@ -174,6 +182,36 @@ export function Profile({
               }}
             >
               {DENSITY_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card block">
+        <div className="card-head">
+          <h3>Tema</h3>
+          <span className="spacer" />
+          <span className="caption muted">
+            vale neste navegador, como a densidade
+          </span>
+        </div>
+        <p className="caption muted" style={{ marginBottom: "var(--s1)" }}>
+          O escuro é o padrão do produto. O claro existe para quem lê em sala
+          clara ou projeta a tela numa reunião.
+        </p>
+        <div className="toolbar" role="radiogroup" aria-label="Tema">
+          {THEMES.map((option) => (
+            <button
+              key={option}
+              className={option === theme ? "primary" : ""}
+              role="radio"
+              aria-checked={option === theme}
+              onClick={() => {
+                setTheme(option);
+                saveTheme(option);
+              }}
+            >
+              {THEME_LABELS[option]}
             </button>
           ))}
         </div>

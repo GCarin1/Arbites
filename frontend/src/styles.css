@@ -90,6 +90,40 @@
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
+/* Tema claro (change 0128). O escuro continua sendo o padrão do produto e a
+   identidade dele; esta é a variante para quem lê em sala clara ou projeta a
+   tela numa reunião. Mesma estrutura, mesmos papéis de cor — só os valores
+   mudam, e os estados continuam distinguíveis entre si. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --surface-2: #eef1f4;
+  --surface-hover: #eaeef2;
+  --border: #d0d7de;
+  --border-strong: #8c959f;
+
+  --text: #1f2328;
+  --text-muted: #656d76;
+  --text-subtle: #8c959f;
+
+  --primary: #0969da;
+  --primary-hover: #0550ae;
+  --primary-contrast: #ffffff;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+  --danger-hover: #a40e26;
+  --retest: #8250df;
+
+  --selected: rgba(9, 105, 218, 0.1);
+  --selected-border: rgba(9, 105, 218, 0.45);
+
+  /* Sombra mais fraca: o contraste que a sombra dá no escuro vem da borda
+     no claro, e sombra pesada sobre branco suja a tela. */
+  --shadow-card: 0 1px 0 rgba(31, 35, 40, 0.06);
+  --shadow-pop: 0 8px 24px rgba(31, 35, 40, 0.14);
+}
+
 /* As três densidades (change 0126). Só o fator muda: tudo que respira lê
    `--row-pad-y`, `--row-gap` e `--h-control`, então nenhum componente
    precisa saber que a densidade existe. */

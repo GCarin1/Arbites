@@ -1476,7 +1476,7 @@ function CIPanel({
               href={status.workflow.html_url}
               target="_blank"
               rel="noreferrer"
-              style={{ color: "#2f81f7" }}
+              style={{ color: "var(--primary)" }}
             >
               abrir no GitHub
             </a>

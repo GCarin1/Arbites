@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api";
+import { token } from "../theme";
 import type {
   AutomationReport,
   DashboardOverview,
@@ -25,6 +26,33 @@ import type {
   TraceabilityMatrix,
   TrendPoint,
 } from "../types";
+
+/**
+ * As cores do gráfico vêm dos mesmos tokens que o resto da interface, e são
+ * relidas quando o tema troca — a biblioteca de gráfico recebe cor como
+ * valor, não como variável CSS, então alguém precisa fazer a ponte.
+ */
+function useChartColors() {
+  const ler = () => ({
+    border: token("--border", "#30363d"),
+    muted: token("--text-muted", "#8b949e"),
+    surface: token("--surface", "#161b22"),
+    text: token("--text", "#e6edf3"),
+    success: token("--success", "#3fb950"),
+    danger: token("--danger", "#f85149"),
+    warning: token("--warning", "#d29922"),
+  });
+  const [cores, setCores] = useState(ler);
+  useEffect(() => {
+    const observador = new MutationObserver(() => setCores(ler()));
+    observador.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observador.disconnect();
+  }, []);
+  return cores;
+}
 
 export function Dashboard({
   onError,
@@ -54,6 +82,7 @@ export function Dashboard({
   const [autoEnv, setAutoEnv] = useState("");
   const [health, setHealth] = useState<HealthScore | null>(null);
   const [riskMap, setRiskMap] = useState<RiskMap | null>(null);
+  const chart = useChartColors();
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   // 0098: resumo executivo narrado pela IA (preview editável → export)
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -238,17 +267,20 @@ export function Dashboard({
       <div className="chart-card" style={{ width: "100%", height: 260 }}>
         <ResponsiveContainer>
           <BarChart data={trend} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
-            <CartesianGrid stroke="#30363d" vertical={false} />
-            <XAxis dataKey="day" stroke="#8b949e" fontSize={11} tickFormatter={(d: string) => d.slice(5)} />
-            <YAxis stroke="#8b949e" fontSize={11} allowDecimals={false} />
+            {/* Cor sempre de token (change 0128): cravada no código, a grade
+                cinza-escura sumiria sobre fundo branco e o texto claro
+                desapareceria na dica de valor do tema claro. */}
+            <CartesianGrid stroke={chart.border} vertical={false} />
+            <XAxis dataKey="day" stroke={chart.muted} fontSize={11} tickFormatter={(d: string) => d.slice(5)} />
+            <YAxis stroke={chart.muted} fontSize={11} allowDecimals={false} />
             <Tooltip
-              contentStyle={{ background: "#161b22", border: "1px solid #30363d" }}
-              labelStyle={{ color: "#e6edf3" }}
+              contentStyle={{ background: chart.surface, border: `1px solid ${chart.border}` }}
+              labelStyle={{ color: chart.text }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="passed" stackId="a" fill="#238636" name="passed" />
-            <Bar dataKey="failed" stackId="a" fill="#da3633" name="failed" />
-            <Bar dataKey="blocked" stackId="a" fill="#d29922" name="blocked" />
+            <Bar dataKey="passed" stackId="a" fill={chart.success} name="passed" />
+            <Bar dataKey="failed" stackId="a" fill={chart.danger} name="failed" />
+            <Bar dataKey="blocked" stackId="a" fill={chart.warning} name="blocked" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -1099,7 +1131,7 @@ function StoryRow({
                     <a
                       key={i}
                       className="mono"
-                      style={{ display: "block", color: "#2f81f7" }}
+                      style={{ display: "block", color: "var(--primary)" }}
                       href={api.evidenceFileUrl(evidenceOf.id, tc.id, i)}
                       download
                     >
