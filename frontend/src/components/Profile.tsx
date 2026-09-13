@@ -15,13 +15,13 @@ import {
   saveTheme,
   type Theme,
 } from "../theme";
-import { api } from "../api";
+import { api, fetchOuAvisar } from "../api";
 import type { SessionUser } from "../types";
 
 const BASE = "/api/v1";
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, {
+  const resp = await fetchOuAvisar(url, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });

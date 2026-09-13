@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.13.0
+**Version:** 0.13.1
 
 ## Purpose
 
@@ -98,6 +98,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 ### Event-driven
 
 - When um caso muda de coluna, the system shall anunciar a mudança numa região viva, para que quem usa leitor de tela saiba o que aconteceu em vez de perceber o card sumir.
+- When uma requisição falha antes de obter resposta do servidor, the system shall informar que não foi possível falar com o servidor, em português e indicando o que verificar, em vez de repassar a mensagem interna do navegador.
 
 ### State-driven
 
@@ -175,6 +176,7 @@ e prova a sua fatia, citando o teste/artefato. -->
 20. [verified] A ação destrutiva de uma tela de detalhe fica num menu de ações, alcançável pelo teclado e fechando com Esc — verified by `frontend/src/components/OverflowMenu.tsx`.
 21. [verified] A linha de uma tabela densa não é esticada pelas suas ações, e o identificador nela cabe numa linha só — verified by `frontend/src/styles.css` + `frontend/src/components/Defects.tsx`.
 22. [verified] A caixa de marcar de um filtro fica ao lado do seu rótulo — verified by `frontend/src/styles.css`.
+23. [verified] Uma falha de rede produz mensagem em português distinguindo "o servidor não respondeu" de uma recusa do servidor, em toda chamada — inclusive nos envios de arquivo — verified by `frontend/src/api.ts`.
 
 ## Maturity
 

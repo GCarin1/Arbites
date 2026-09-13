@@ -61,8 +61,35 @@ export function onUnauthenticated(listener: () => void): () => void {
   return () => unauthenticatedListeners.delete(listener);
 }
 
+/**
+ * Mensagem de falha de REDE (change 0134).
+ *
+ * Quando a requisição não chega a ter resposta, o `fetch` rejeita com a
+ * mensagem interna do navegador — "Failed to fetch". Repassada crua, ela
+ * aparece em inglês na caixa de erro do login e fica indistinguível de
+ * "a senha está errada": a pessoa troca a senha, desconfia da conta, e o
+ * problema era o servidor não ter respondido.
+ */
+const SEM_RESPOSTA =
+  "Não foi possível falar com o servidor. Verifique se o Arbites está no ar " +
+  "e se este aparelho alcança o endereço dele.";
+
+/** Envolve um `fetch` para separar "não respondeu" de "respondeu e recusou". */
+export async function fetchOuAvisar(
+  input: RequestInfo,
+  init?: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    // O navegador não conta o motivo (é de propósito, por privacidade);
+    // o que dá para afirmar é que resposta não houve.
+    throw new Error(SEM_RESPOSTA);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(BASE + path, {
+  const resp = await fetchOuAvisar(BASE + path, {
     headers: { "Content-Type": "application/json" },
     // A sessao e um cookie httpOnly: sem isto ele nao acompanha o fetch.
     credentials: "same-origin",
@@ -213,7 +240,7 @@ export const api = {
   aiImportFile: async (file: File): Promise<GeneratePreview & { folder: string }> => {
     const form = new FormData();
     form.append("file", file);
-    const resp = await fetch(`${BASE}/import/ai`, { method: "POST", body: form });
+    const resp = await fetchOuAvisar(`${BASE}/import/ai`, { method: "POST", body: form });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data?.error?.message ?? `${resp.status}`);
     return data;
@@ -278,7 +305,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     if (note) form.append("note", note);
-    const resp = await fetch(`${BASE}/executions/${execId}/results/${ctId}/evidences`, {
+    const resp = await fetchOuAvisar(`${BASE}/executions/${execId}/results/${ctId}/evidences`, {
       method: "POST",
       body: form, // sem Content-Type manual: o browser define o boundary
     });
@@ -338,7 +365,7 @@ export const api = {
   putAvatar: async (file: File): Promise<{ ok: boolean; format: string }> => {
     const form = new FormData();
     form.append("file", file);
-    const resp = await fetch(`${BASE}/profile/avatar`, {
+    const resp = await fetchOuAvisar(`${BASE}/profile/avatar`, {
       method: "PUT",
       credentials: "same-origin",
       body: form,

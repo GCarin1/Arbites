@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.13.0",
+        "version": "0.13.1",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2129,6 +2129,19 @@
         "specs_affected": [
           {
             "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0134-falha-rede-fetch-chega",
+        "title": "falha de rede no fetch chega a tela como Failed to fetch em ingles sem dizer o que fazer",
+        "path": ".doctrina/changes/archive/2026-09-13-0134-falha-rede-fetch-chega",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]

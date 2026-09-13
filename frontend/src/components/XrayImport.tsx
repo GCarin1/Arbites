@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fetchOuAvisar } from "../api";
 
 const BASE = "/api/v1";
 
@@ -29,7 +30,7 @@ async function postXml<T>(url: string, file: File, extra?: Record<string, string
   const form = new FormData();
   form.append("file", file);
   for (const [key, value] of Object.entries(extra ?? {})) form.append(key, value);
-  const resp = await fetch(url, { method: "POST", body: form });
+  const resp = await fetchOuAvisar(url, { method: "POST", body: form });
   const data = await resp.json();
   if (!resp.ok) throw new Error(data?.error?.message ?? `${resp.status}`);
   return data as T;

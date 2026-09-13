@@ -139,3 +139,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0131-tela-detalhe-mostra-campo — tela de detalhe mostra campo vazio com o mesmo peso do preenchido e a acao destrutiva com o mesmo destaque da principal (specs: design-system MODIFIED)
 - 2026-09-13 — 0132-acoes-empilhadas-linha-tabela — acoes empilhadas na linha da tabela inflam a altura e a acao destrutiva fica o elemento mais chamativo (specs: design-system MODIFIED)
 - 2026-09-13 — 0133-rotulo-licao-aprendida-tela — rotulo licao aprendida na tela de defeitos e lido como algo de pessoas em vez de causa raiz correcao e prevencao (specs: defects MODIFIED)
+- 2026-09-13 — 0134-falha-rede-fetch-chega — falha de rede no fetch chega a tela como Failed to fetch em ingles sem dizer o que fazer (specs: design-system MODIFIED)

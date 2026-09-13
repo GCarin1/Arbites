@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchOuAvisar } from "../api";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
 
@@ -39,7 +40,7 @@ interface RunSnapshot {
 }
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, {
+  const resp = await fetchOuAvisar(url, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
