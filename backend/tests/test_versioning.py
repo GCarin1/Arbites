@@ -282,3 +282,63 @@ def test_falha_do_git_nao_derruba_a_operacao_do_usuario(ws, monkeypatch):
             "/api/v1/testcases", json={"title": "Login", "body": TC_BODY}
         )
         assert criado.status_code == 201
+
+
+# -- Ações em lote também são ações (change 0121) ------------------------
+
+
+def _pendencias(ws):
+    return [l for l in git(ws, "status", "--porcelain", "testcases").splitlines() if l]
+
+
+def test_excluir_pasta_grava_commit_e_nao_deixa_pendencia(client):
+    """Antes: excluir uma pasta deixava os casos apagados na árvore e
+    presentes no histórico, para sempre — nenhuma ação futura os recolhe,
+    porque a recuperação de edição externa só olha o arquivo cujo histórico
+    está sendo pedido, e esses saíram do índice."""
+    client.post("/api/v1/testcases/folders", json={"path": "regressao"})
+    for i in range(2):
+        client.post("/api/v1/testcases",
+                    json={"title": f"T{i}", "body": TC_BODY, "folder": "regressao"})
+
+    assert client.delete("/api/v1/testcases/folders?path=regressao").status_code == 204
+
+    assert "exclui a pasta regressao (2 casos)" in subjects(client.ws)
+    assert _pendencias(client.ws) == []
+
+
+def test_mover_pasta_grava_commit_e_preserva_o_historico_do_caso(client):
+    client.post("/api/v1/testcases/folders", json={"path": "origem"})
+    ct = client.post("/api/v1/testcases",
+                     json={"title": "Login", "body": TC_BODY,
+                           "folder": "origem"}).json()
+    client.post("/api/v1/testcases/folders", json={"path": "destino"})
+
+    movida = client.post("/api/v1/testcases/folders/move",
+                         json={"path": "origem", "dest": "destino"})
+    assert movida.status_code == 200, movida.text
+
+    assert any(m.startswith("move a pasta testcases/origem") for m in subjects(client.ws))
+    assert _pendencias(client.ws) == []
+    # as duas pontas no mesmo commit: o --follow enxerga a renomeação
+    versoes = client.get(f"/api/v1/testcases/{ct['id']}/versions").json()["versions"]
+    assert f"cria {ct['id']}: Login" in [v["message"] for v in versoes]
+
+
+def test_restaurar_da_lixeira_grava_o_commit_da_volta(client):
+    """Restaurar é o desfazer de uma exclusão que foi registrada; deixá-lo
+    de fora quebraria o par."""
+    ct = client.post("/api/v1/testcases",
+                     json={"title": "Login", "body": TC_BODY}).json()
+    client.delete(f"/api/v1/testcases/{ct['id']}")
+    lixeira = client.get("/api/v1/trash").json()
+    nome = lixeira[0]["name"]
+
+    assert client.post(f"/api/v1/trash/{nome}/restore").status_code == 200
+
+    mensagens = subjects(client.ws)
+    assert any(m.startswith("restaura ") for m in mensagens)
+    assert _pendencias(client.ws) == []
+    # histórico contínuo: a criação, a exclusão e a volta
+    versoes = client.get(f"/api/v1/testcases/{ct['id']}/versions").json()["versions"]
+    assert f"cria {ct['id']}: Login" in [v["message"] for v in versoes]

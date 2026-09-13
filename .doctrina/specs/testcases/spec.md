@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-09-13
-**Version:** 0.13.0
+**Version:** 0.14.0
 
 ## Purpose
 
@@ -103,6 +103,7 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall apresentar o histórico numa aba do próprio caso de teste, com a versão escolhida comparável à atual e restaurável dali.
 - The system shall serializar as operações de git do workspace numa fila única por processo, para que duas escritas simultâneas esperem em vez de disputar o lock do repositório.
 - The system shall executar as operações de git fora do laço de eventos, como já faz com as demais chamadas bloqueantes.
+- The system shall gravar um commit também nas três ações que movem uma pasta inteira de casos de uma vez — excluir pasta, mover pasta e restaurar da lixeira —, com a mesma regra de um commit por ação e autor da sessão.
 
 ### Event-driven
 
@@ -139,6 +140,7 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   mesmo nome no destino (409).
 - The system shall not versionar o índice descartável, a lixeira nem os segredos do workspace; o que o `.gitignore` cobre não entra em commit nenhum.
 - The system shall not falhar uma operação de caso de teste porque o git falhou ou não está instalado; o versionamento é registro, e registro que derruba a escrita do usuário é pior do que registro nenhum.
+- The system shall not deixar no repositório do workspace arquivo de caso de teste apagado ou criado por uma ação da interface sem o commit correspondente; um histórico que afirma o que a árvore de trabalho desmente não serve para comparar nem para restaurar.
 
 ### Optional
 
@@ -214,6 +216,8 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 19. [verified] Uma edição feita por fora da interface entra no histórico como commit de autoria externa, e um workspace onde o git não funciona continua aceitando criar e editar casos — verified by `backend/tests/test_versioning.py`.
 20. [verified] Doze gravações simultâneas geram doze commits e não deixam nenhum arquivo fora do histórico — verified by `backend/tests/test_versioning.py`.
 21. [verified] Um commit impedido por falha do git deixa aviso no log com a ação que se perdeu, e a operação do usuário continua respondendo normalmente — verified by `backend/tests/test_versioning.py`.
+22. [verified] Excluir e mover uma pasta com casos deixa um commit por ação e o repositório sem pendência, e o histórico de um caso sobrevive à mudança de pasta feita pela pasta inteira — verified by `backend/tests/test_versioning.py`.
+23. [verified] Restaurar da lixeira grava o commit da volta, e o caso restaurado volta a ter histórico contínuo — verified by `backend/tests/test_versioning.py`.
 
 ## Maturity
 

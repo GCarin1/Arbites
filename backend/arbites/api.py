@@ -801,6 +801,19 @@ def _register_routes(app: FastAPI) -> None:
                     reindex_file(ws, conn, p)
         else:
             reindex_file(ws, conn, restored)
+        # Restaurar e o desfazer de uma exclusao que foi registrada: deixa-lo
+        # de fora quebraria o par (change 0121). So casos de teste entram —
+        # o versionamento tem esse escopo desde a 0112.
+        de_volta = [
+            p for p in (restored.rglob("*.md") if restored.is_dir() else [restored])
+            if p.suffix == ".md" and ws.relpath(p).startswith("testcases/")
+        ]
+        if de_volta:
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, de_volta, f"restaura {ws.relpath(restored)} da lixeira",
+                author_of(request),
+            )
         return {"restored": ws.relpath(restored)}
 
     @app.delete(API_PREFIX + "/trash")
@@ -1167,6 +1180,15 @@ def _register_routes(app: FastAPI) -> None:
         ws.trash(target)  # move a pasta inteira p/ a lixeira
         for md in affected:
             reindex_file(ws, conn, md)  # não existe mais → remove do índice
+        # Uma acao em lote e uma acao (change 0121): sem este commit os
+        # casos ficariam apagados na arvore e presentes no historico, e
+        # nenhuma acao futura os recolheria.
+        if affected:
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, affected, f"exclui a pasta {path or 'testcases/'}"
+                f" ({len(affected)} casos)", author_of(request),
+            )
         return None
 
     @app.post(API_PREFIX + "/testcases/folders/move")
@@ -1192,8 +1214,18 @@ def _register_routes(app: FastAPI) -> None:
         src.rename(dest)
         for old_md in affected:
             reindex_file(ws, conn, old_md)  # caminho antigo não existe mais → remove
-        for new_md in dest.rglob("*.md"):
+        movidos = list(dest.rglob("*.md"))
+        for new_md in movidos:
             reindex_file(ws, conn, new_md)  # indexa no caminho novo
+        # As duas pontas no MESMO commit, como no move de um caso: e o que
+        # faz o `--follow` enxergar a mudanca de pasta como renomeacao.
+        if affected or movidos:
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, affected + movidos,
+                f"move a pasta {ws.relpath(src)} para {ws.relpath(dest)}",
+                author_of(request),
+            )
         return {"path": ws.relpath(dest)}
 
     @app.get(API_PREFIX + "/testcases/{entity_id}")

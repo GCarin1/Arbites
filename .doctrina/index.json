@@ -226,7 +226,7 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.13.0",
+        "version": "0.14.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
@@ -1955,6 +1955,19 @@
         "id": "0120-versionamento-serializado-observavel-commit",
         "title": "versionamento serializado e observavel: commit fora do event loop e falha registrada em vez de perdida",
         "path": ".doctrina/changes/archive/2026-09-13-0120-versionamento-serializado-observavel-commit",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0121-excluir-mover-pasta-restaurar",
+        "title": "excluir mover pasta e restaurar da lixeira nao entram no versionamento e deixam o repositorio permanentemente sujo",
+        "path": ".doctrina/changes/archive/2026-09-13-0121-excluir-mover-pasta-restaurar",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [

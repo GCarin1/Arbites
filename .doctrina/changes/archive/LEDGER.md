@@ -126,3 +126,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0118-lista-ciclos-mostra-prazo — lista de ciclos nao mostra prazo nem o vocabulario do ciclo, entao saber qual esta atrasado exige abrir um por um (specs: executions MODIFIED)
 - 2026-09-13 — 0119-e-mails-diferentes-colidem-mesmo — e-mails diferentes colidem no mesmo slug e duas contas passam a compartilhar perfil memoria de IA e avatar (specs: profile MODIFIED)
 - 2026-09-13 — 0120-versionamento-serializado-observavel-commit — versionamento serializado e observavel: commit fora do event loop e falha registrada em vez de perdida (specs: testcases MODIFIED)
+- 2026-09-13 — 0121-excluir-mover-pasta-restaurar — excluir mover pasta e restaurar da lixeira nao entram no versionamento e deixam o repositorio permanentemente sujo (specs: testcases MODIFIED)
