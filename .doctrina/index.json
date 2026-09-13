@@ -394,9 +394,67 @@
         "date": "2026-09-13",
         "landed": "2026-09-13 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `frontend/src/App.tsx`, `backend/tests/test_authorization.py`",
         "summary": "Um modulo e uma tela do produto mais os caminhos de API que so ela usa."
+      },
+      {
+        "id": "0015",
+        "path": ".doctrina/decisions/0015-integracao-externa-por-porta-com-capacidades-agente-como-ponte-e-identidade-como-alicerce.md",
+        "title": "Integracao externa por porta com capacidades, agente como ponte e identidade como alicerce",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "supersedes": "0007 (parcialmente), 0012 (parcialmente)",
+        "summary": "Integracao externa volta ao escopo, com quatro regras."
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0145-identidade-externa-frontmatter-vinculo",
+        "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
+        "path": ".doctrina/changes/0145-identidade-externa-frontmatter-vinculo",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0146-servidor-mcp-local-expondo",
+        "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
+        "path": ".doctrina/changes/0146-servidor-mcp-local-expondo",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0147-ferramentas-mcp-escrita-preview",
+        "title": "ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo",
+        "path": ".doctrina/changes/0147-ferramentas-mcp-escrita-preview",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0148-intercambio-arquivo-csv-cucumber",
+        "title": "intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API",
+        "path": ".doctrina/changes/0148-intercambio-arquivo-csv-cucumber",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0149-pagina-mcp-aba-ia",
+        "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
+        "path": ".doctrina/changes/0149-pagina-mcp-aba-ia",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0150-conector-deterministico-volume-recorrencia",
+        "title": "conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item",
+        "path": ".doctrina/changes/0150-conector-deterministico-volume-recorrencia",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
