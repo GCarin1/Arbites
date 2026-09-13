@@ -50,8 +50,10 @@ def test_artifacts_listing_and_download(client, target):
 
 
 def test_env_editor_preserves_comments_and_unknown_lines(client, target):
-    catalog = client.get("/api/v1/env/catalog").json()["catalog"]
+    # 0099: o catálogo deriva do .env/.env.example do próprio target
+    catalog = client.get("/api/v1/env/catalog", params={"target": "web"}).json()["catalog"]
     assert any(v["key"] == "BASE_URL" for v in catalog)
+    assert any(v["key"] == "HEADLESS" for v in catalog)
     env = client.get("/api/v1/targets/web/env").json()
     assert env["values"]["BASE_URL"] == "http://old"
 

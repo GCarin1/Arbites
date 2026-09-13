@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
-**Last updated:** 2026-07-16
-**Version:** 0.4.0
+**Last updated:** 2026-07-21
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -62,6 +62,18 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   ações rápidas (novo CT, nova execução, reindex); e orientação espacial
   (breadcrumbs nos back-bars das áreas profundas, largura de leitura
   limitada via `.content-narrow`).
+- The system shall usar `SingleRefInput` (busca por id E título via `GET
+  /search`) em todo campo que referencia uma entidade existente
+  (epic/story/CT/execution/defeito); `<datalist>` fica restrito a valores
+  livres que não são entidades (ex.: squad) e `<select>` a conjuntos fixos
+  de valores (status/prioridade/tipo). Nenhuma referência a entidade casa
+  só por ID.
+- The system shall refletir a aba ativa e os filtros de alto valor
+  (squad do dashboard, filtro de status do repositório de CTs, período/ano
+  da Memória, aba interna da Automação) num hash de URL restaurável
+  (`#/<aba>?filtro=valor`), sem lib de router: `App.tsx` lê o hash no load,
+  o escreve ao trocar aba/filtro e responde a `hashchange` (back/forward do
+  navegador); o deep-link é compartilhável.
 
 ### Unwanted-behavior (must-not)
 
@@ -101,6 +113,18 @@ e prova a sua fatia, citando o teste/artefato. -->
    nos back-bars) e a leitura tem largura limitada em telas grandes —
    verified by `frontend/src/components/CommandPalette.tsx`,
    `frontend/src/App.tsx` (listener Ctrl+K + breadcrumbs) e build limpo.
+5. [verified] Campos de referência a entidade usam `SingleRefInput`
+   (id + título) em todas as telas — o Context Pack (epic/story) e o picker
+   de CT da revisão por IA deixaram de usar `<datalist>`/`<select>` por ID;
+   squad segue em `<datalist>` (valor livre) — verified by
+   `frontend/src/components/AiAssist.tsx`, grep sem datalist-por-entidade e
+   `npm run build` limpo.
+6. [verified] Abrir uma URL com hash restaura a aba e os filtros
+   serializados (dashboard squad, status do repositório, ano da Memória,
+   aba da Automação); trocar aba/filtro atualiza o hash e back/forward do
+   navegador navegam — verified by `frontend/src/App.tsx` (parse/serialize +
+   listener `hashchange`), os filtros controlados nos componentes e
+   `npm run build` limpo.
 
 ## Maturity
 

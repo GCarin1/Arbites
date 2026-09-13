@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import make_md
+from conftest import login_admin, make_md
 from fastapi.testclient import TestClient
 
 from arbites.api import create_app
@@ -70,6 +70,7 @@ def auto_client(auto_ws):
     ws, repo = auto_ws
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         client.repo = repo
         yield client

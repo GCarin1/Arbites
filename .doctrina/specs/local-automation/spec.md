@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
-**Last updated:** 2026-07-10
-**Version:** 0.7.0
+**Last updated:** 2026-07-21
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -81,6 +81,10 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   subprocess do Behave — sem isso, no Windows o stream sai no encoding do
   console e acentos viram mojibake (quebrando terminal ao vivo e o parse
   de progresso).
+- The system shall carregar o `.env` do `local_path` do target e mesclá-lo no ambiente do subprocess do run — os valores do projeto ficam disponíveis ao Behave/WebDriver, sem sobrescrever `ARBITES_*` nem `PYTHONIOENCODING`.
+- The system shall derivar o catálogo de `.env` (`GET /env/catalog?target=`) das chaves, seções e comentários do próprio `.env`/`.env.example` do target, sem lista fixa embutida; sem target ou sem arquivo, o catálogo é vazio e o usuário adiciona chaves livres.
+- The UI shall tornar o `EXEC-XXXX` do painel de run navegável para o board da execution e oferecer selecionar-todos/limpar no seletor de arquivos `.feature`.
+- The system shall emitir um comentário SSE de keepalive a cada 15 segundos de silêncio no stream do run, para que um proxy no caminho não derrube por ociosidade uma conexão cujo run ainda está vivo.
 
 ### Event-driven
 
@@ -93,6 +97,10 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   `error: "timeout"` e encerrar o subprocess.
 - When o run termina, the system shall parsear o JSON do Behave e popular
   os `results[]` com steps Gherkin e evidências.
+- When o usuário aplica "update" (re-base de steps) na sync de features,
+  the system shall marcar o CT com `needs_rerun: true` no frontmatter; when
+  um resultado novo do CT é registrado numa execution posterior (manual,
+  local ou CI), the system shall limpar o flag automaticamente.
 - When o usuário salva a configuração de targets pela UI, the system shall
   reescanear cada target salvo (mesmo comportamento de `POST
   /targets/{name}/scan`), populando cenários/warnings imediatamente.
@@ -108,6 +116,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - When o behave emite progresso (stream plain, EN/PT), the system shall
   persistir resultados parciais por cenário concluído (best-effort), com o
   Cucumber JSON final SEMPRE reconciliando o estado oficial.
+- When a aba de automação é reaberta com um run ativo, the system shall reconectar ao stream do run e restaurar o terminal a partir do replay do buffer do servidor.
 
 ### State-driven
 
@@ -135,6 +144,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - The system shall not usar fontes divergentes para o preview de features e
   para a operação (dropdown/run) da mesma lista — o que o browse mostra é
   o que o dropdown oferece.
+- The system shall not emitir o keepalive como evento de dados; ele é um comentário SSE (linha iniciada por `:`), invisível ao `EventSource` e ao terminal da UI.
 
 ### Optional
 
@@ -198,6 +208,14 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
     `/runs/active` reflete o run e esvazia ao fim; progresso parcial
     aparece no stream e o JSON final reconcilia (behave real) — verified
     by `backend/tests/test_local_runs.py`.
+15. [verified] Apply de update marca `needs_rerun` no CT e um resultado
+    novo do CT limpa o flag — verified by
+    `backend/tests/test_feature_sync.py`
+    (`test_update_marks_needs_rerun_and_new_result_clears_it`).
+16. [verified] O run injeta o `.env` do target no ambiente do subprocess (project vars disponíveis; `ARBITES_*`/`PYTHONIOENCODING` preservados) — verified by `backend/tests/test_local_runs.py`.
+17. [verified] `GET /env/catalog` deriva chaves/seções do `.env`/`.env.example` do target e não expõe campos fixos de outro projeto — verified by `backend/tests/test_automation_targets_config.py`.
+18. [verified] Terminal reconecta ao voltar à aba; `EXEC-` navega ao board; seletor de `.feature` tem selecionar-todos/limpar — verified by `frontend/src/components/Automation.tsx` + `npm run build` limpo + revisão visual.
+19. [verified] Um run que fica em silêncio além do intervalo de keepalive continua recebendo bytes no stream, e o que chega no período é comentário — nenhuma linha nova aparece no terminal — verified by `backend/tests/test_local_runs.py`.
 
 ## Maturity
 

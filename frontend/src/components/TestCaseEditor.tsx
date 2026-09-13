@@ -24,6 +24,7 @@ export function TestCaseEditor({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [history, setHistory] = useState<TestCaseResult[]>([]);
   const [storyCriteria, setStoryCriteria] = useState<Criterion[]>([]); // 0092
+  const [isFlaky, setIsFlaky] = useState(false); // 0089: alternância recente
   const { toast } = useToast();
 
   // critérios EARS da story vinculada (para o picker de vínculo criteria↔CT)
@@ -49,6 +50,10 @@ export function TestCaseEditor({
       .testcaseResults(id)
       .then(setHistory)
       .catch(() => {});
+    api
+      .metricsFlaky(5)
+      .then((f) => setIsFlaky(f.testcases.some((t) => t.testcase_id === id)))
+      .catch(() => setIsFlaky(false));
     return api
       .testcase(id)
       .then(setTc)
@@ -93,6 +98,7 @@ export function TestCaseEditor({
           status: tc.status,
           story: tc.story_id || null,
           squad: tc.squad || null,
+          quarantine: tc.quarantine ?? false,
           tags: tc.tags ?? [],
           criteria: tc.criteria ?? [],
           body: tc.body ?? "",
@@ -148,7 +154,35 @@ export function TestCaseEditor({
           <DetailCard
             id={tc.id}
             title={tc.title}
-            status={<span className={`status-dot dot-${tc.status}`}>{tc.status}</span>}
+            status={
+              <span className="tc-badges">
+                <span className={`status-dot dot-${tc.status}`}>{tc.status}</span>
+                {isFlaky && (
+                  <span
+                    className="badge badge-flaky"
+                    title="Resultado alternou pass/fail nas últimas execuções"
+                  >
+                    flaky
+                  </span>
+                )}
+                {tc.quarantine && (
+                  <span
+                    className="badge badge-quarantine"
+                    title="Em quarentena — fora do pass rate e da cobertura"
+                  >
+                    quarentena
+                  </span>
+                )}
+                {tc.needs_rerun && (
+                  <span
+                    className="badge badge-rerun"
+                    title="Steps re-baseados na sync — precisa re-execução"
+                  >
+                    precisa re-execução
+                  </span>
+                )}
+              </span>
+            }
             actions={
               <>
                 <button className="primary" onClick={() => setEditing(true)}>
@@ -332,6 +366,17 @@ export function TestCaseEditor({
                 value={tc.squad ?? ""}
                 onChange={(e) => set("squad", e.target.value || null)}
               />
+            </div>
+            <div className="field">
+              <label>Quarentena</label>
+              <label className="check-inline">
+                <input
+                  type="checkbox"
+                  checked={tc.quarantine ?? false}
+                  onChange={(e) => set("quarantine", e.target.checked)}
+                />
+                <span>Excluir do pass rate e da cobertura (contado no dashboard)</span>
+              </label>
             </div>
             {storyCriteria.length > 0 && (
               <div className="field wide">

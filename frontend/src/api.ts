@@ -1,6 +1,15 @@
 import type {
+  ActivityEntry,
+  AdminOverview,
+  LoginAttempt,
+  ManagedUser,
+  Role,
+  SessionInfo,
+  SessionUser,
+  Switch,
   ActivityHeatmapData,
   AiProvidersInfo,
+  ExecutiveSummaryResult,
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
@@ -13,12 +22,14 @@ import type {
   EvidenceEntry,
   Meeting,
   MeetingSummaryResult,
+  MeetingActionItems,
   RiskMap,
   SavedDaily,
   TestCaseResult,
   TimelineEntry,
   Execution,
   ExecutionSummary,
+  ExecutionDiff,
   FlakyReport,
   GeneratePreview,
   HealthScore,
@@ -40,11 +51,25 @@ import type {
 
 const BASE = "/api/v1";
 
+// Assinantes avisados quando o backend recusa a sessao: o AuthGate devolve a
+// SPA para a tela de login sem depender de cada tela tratar o 401.
+const unauthenticatedListeners = new Set<() => void>();
+
+export function onUnauthenticated(listener: () => void): () => void {
+  unauthenticatedListeners.add(listener);
+  return () => unauthenticatedListeners.delete(listener);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(BASE + path, {
     headers: { "Content-Type": "application/json" },
+    // A sessao e um cookie httpOnly: sem isto ele nao acompanha o fetch.
+    credentials: "same-origin",
     ...init,
   });
+  if (resp.status === 401 && !path.startsWith("/auth/")) {
+    for (const listener of unauthenticatedListeners) listener();
+  }
   if (!resp.ok) {
     let message = `${resp.status} ${resp.statusText}`;
     try {
@@ -65,6 +90,74 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // -- sessao (capability auth) --------------------------------------------
+  me: () => request<SessionInfo>("/auth/me"),
+  login: (email: string, password: string) =>
+    request<{ user: SessionUser }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  register: (email: string, password: string, name: string) =>
+    request<{ user: SessionUser; message: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }),
+  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+  switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- painel de administração (capability admin) --------------------------
+  adminUsers: () => request<{ users: ManagedUser[] }>("/admin/users"),
+  adminAccessLog: (limit = 100, offset = 0) =>
+    request<{ attempts: LoginAttempt[] }>(
+      `/admin/access-log?limit=${limit}&offset=${offset}`,
+    ),
+  adminOverview: () => request<AdminOverview>("/admin/overview"),
+  adminActivity: (filters: { user?: string; path?: string } = {}) => {
+    const qs = new URLSearchParams({ limit: "200" });
+    if (filters.user) qs.set("user", filters.user);
+    if (filters.path) qs.set("path", filters.path);
+    return request<{ entries: ActivityEntry[] }>(`/admin/activity?${qs}`);
+  },
+  adminApprove: (id: number, role: Role) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    }),
+  adminReject: (id: number) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/reject`, { method: "POST" }),
+  adminDisable: (id: number) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/disable`, { method: "POST" }),
+  adminEnable: (id: number) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/enable`, { method: "POST" }),
+  adminSetRole: (id: number, role: Role) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/role`, {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    }),
+  adminResetPassword: (id: number, password: string) =>
+    request<{ user: ManagedUser }>(`/admin/users/${id}/password`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
+  adminRevokeSessions: (id: number) =>
+    request<{ revoked: number; user: ManagedUser }>(
+      `/admin/users/${id}/sessions`,
+      { method: "DELETE" },
+    ),
+  setSwitch: (name: string, enabled: boolean) =>
+    request<{ switch: Switch }>(`/admin/switches/${name}`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ user: SessionUser }>("/auth/password", {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    }),
+
   workspace: () => request<WorkspaceInfo>("/workspace"),
   reindex: () => request<unknown>("/workspace/reindex", { method: "POST" }),
   warnings: () => request<Warning[]>("/warnings"),
@@ -187,6 +280,10 @@ export const api = {
     }),
   closeExecution: (id: string) =>
     request<Execution>(`/executions/${id}/close`, { method: "POST" }),
+  executionsDiff: (a: string, b: string) =>
+    request<ExecutionDiff>(
+      `/executions/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
+    ),
 
   defects: (query = "") => request<Defect[]>(`/defects${query}`),
   defect: (id: string) => request<Defect>(`/defects/${id}`),
@@ -281,6 +378,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ provider: provider ?? null }),
     }),
+  meetingActionItems: (id: string) =>
+    request<MeetingActionItems>(`/meetings/${id}/action-items`),
+  generateMeetingActionItems: (id: string, provider?: string | null) =>
+    request<{ preview: boolean; id: string; action_items: string[] }>(
+      `/meetings/${id}/action-items/generate`,
+      { method: "POST", body: JSON.stringify({ provider: provider ?? null }) },
+    ),
+  acceptMeetingActionItems: (id: string, items: string[]) =>
+    request<{ created: string[]; converted: { id: string; title: string; status: string }[] }>(
+      `/meetings/${id}/action-items/accept`,
+      { method: "POST", body: JSON.stringify({ items }) },
+    ),
 
   squads: () => request<{ squads: string[] }>("/squads"),
   metricsSummary: (sprint: string, days: number, squad = "") =>
@@ -319,9 +428,15 @@ export const api = {
       `/metrics/traceability?epic=${encodeURIComponent(epic)}` +
         `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
     ),
-  exportUrl: (format: "md" | "pdf", sprint: string, squad = "") =>
+  exportUrl: (format: "md" | "pdf", sprint: string, squad = "", summary = "") =>
     `${BASE}/metrics/traceability/export?format=${format}` +
-    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}`,
+    `&sprint=${encodeURIComponent(sprint)}&squad=${encodeURIComponent(squad)}` +
+    (summary ? `&summary=${encodeURIComponent(summary)}` : ""),
+  executiveSummary: (sprint: string, squad = "", provider?: string | null) =>
+    request<ExecutiveSummaryResult>("/ai/executive-summary", {
+      method: "POST",
+      body: JSON.stringify({ sprint: sprint || null, squad: squad || null, provider: provider ?? null }),
+    }),
   evidenceFileUrl: (execId: string, ctId: string, index: number) =>
     `${BASE}/executions/${execId}/results/${ctId}/evidences/${index}/file`,
 

@@ -1,6 +1,6 @@
 """Critérios de aceite da spec workspace-core (SC1)."""
 
-from conftest import make_md
+from conftest import login_admin, make_md
 
 
 def test_get_workspace_returns_config_and_index_status(client):
@@ -40,6 +40,7 @@ def test_delete_index_db_and_reindex_loses_nothing(ws):
 
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.post("/api/v1/requirements", json={"kind": "epic", "title": "Autenticação"})
         client.post("/api/v1/testcases", json={"title": "Login válido"})
     # app encerrado (conexão fechada): simula perda total do índice

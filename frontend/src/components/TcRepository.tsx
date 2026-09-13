@@ -32,6 +32,8 @@ export function TcRepository({
   onError,
   onNew,
   extraActions,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   root: TreeNode;
   onOpen: (id: string) => void;
@@ -39,6 +41,9 @@ export function TcRepository({
   onError: (message: string) => void;
   onNew: () => void;
   extraActions?: React.ReactNode;
+  // 0084: filtro de status refletido no hash da URL quando controlado
+  statusFilter?: string;
+  onStatusFilterChange?: (v: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -58,14 +63,40 @@ export function TcRepository({
   // árvore só exibe os IDs que casaram — uma fonte só, sem reimplementar a
   // lógica de filtro no cliente.
   const [q, setQ] = useState("");
-  const [fStatus, setFStatus] = useState("");
+  const [localStatus, setLocalStatus] = useState("");
+  const fStatus = onStatusFilterChange ? (statusFilter ?? "") : localStatus;
+  const setFStatus = onStatusFilterChange ?? setLocalStatus;
   const [fPriority, setFPriority] = useState("");
   const [fType, setFType] = useState("");
   const [fTag, setFTag] = useState("");
+  const [fRerun, setFRerun] = useState(false); // 0090: só CTs que precisam re-exec
   const [matchIds, setMatchIds] = useState<Set<string> | null>(null); // null = sem filtro
+  const [rerunIds, setRerunIds] = useState<Set<string>>(new Set()); // p/ badge
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 0083: modo de seleção múltipla + ações em lote (cliente sobre endpoints
+  // unitários — sem endpoint bulk no backend).
+  const [selMode, setSelMode] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkFolder, setBulkFolder] = useState("");
+  const [confirmBulk, setConfirmBulk] = useState<"delete" | "status" | "move" | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const { toast } = useToast();
 
-  const filterActive = !!(q.trim() || fStatus || fPriority || fType || fTag.trim());
+  // conjunto dos CTs marcados needs_rerun (badge no repositório, 0090) —
+  // recarrega quando a árvore muda (após apply de sync / novo resultado).
+  useEffect(() => {
+    let alive = true;
+    api
+      .testcases("?needs_rerun=true")
+      .then((rows) => alive && setRerunIds(new Set(rows.map((r) => r.id))))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [root]);
+
+  const filterActive = !!(q.trim() || fStatus || fPriority || fType || fTag.trim() || fRerun);
   useEffect(() => {
     if (!filterActive) {
       setMatchIds(null);
@@ -79,6 +110,7 @@ export function TcRepository({
       if (fPriority) params.set("priority", fPriority);
       if (fType) params.set("type", fType);
       if (fTag.trim()) params.set("tag", fTag.trim().replace(/^@/, ""));
+      if (fRerun) params.set("needs_rerun", "true");
       api
         .testcases(`?${params.toString()}`)
         .then((rows) => alive && setMatchIds(new Set(rows.map((r) => r.id))))
@@ -89,7 +121,7 @@ export function TcRepository({
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, fStatus, fPriority, fType, fTag, filterActive]);
+  }, [q, fStatus, fPriority, fType, fTag, fRerun, filterActive]);
 
   function toggle(path: string) {
     setCollapsed((old) => {
@@ -103,6 +135,55 @@ export function TcRepository({
   // caminho relativo a testcases/ (a API de pastas/move usa esse formato)
   function relFolder(path: string): string {
     return path.replace(/^testcases\/?/, "");
+  }
+
+  // -- seleção múltipla / ações em lote (0083) ------------------------------
+  function exitSelMode() {
+    setSelMode(false);
+    setPicked(new Set());
+    setConfirmBulk(null);
+    setBulkStatus("");
+    setBulkFolder("");
+  }
+
+  function togglePick(id: string) {
+    setPicked((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // todas as pastas da árvore (para o destino do "mover em lote")
+  function collectFolders(node: TreeNode, acc: string[] = []): string[] {
+    for (const d of node.dirs) {
+      acc.push(d.path);
+      collectFolders(d, acc);
+    }
+    return acc;
+  }
+
+  async function runBulk(kind: "delete" | "status" | "move") {
+    const ids = [...picked];
+    setConfirmBulk(null);
+    setBulkBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const id of ids) {
+      try {
+        if (kind === "delete") await api.deleteTestcase(id);
+        else if (kind === "status") await api.updateTestcase(id, { status: bulkStatus });
+        else await api.moveTestcase(id, relFolder(bulkFolder));
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setBulkBusy(false);
+    toast(`${ok} ok${fail ? ` · ${fail} falha(s)` : ""}`);
+    exitSelMode();
+    onChanged();
   }
 
   async function moveTo(destFolderPath: string) {
@@ -252,8 +333,8 @@ export function TcRepository({
             key={f.path}
             className={`repo-row repo-file ${
               drag?.kind === "ct" && drag.id === f.id ? "dragging" : ""
-            } ${selectedId === f.id ? "selected" : ""}`}
-            draggable={!!f.id}
+            } ${selectedId === f.id || (selMode && f.id && picked.has(f.id)) ? "selected" : ""}`}
+            draggable={!!f.id && !selMode}
             onDragStart={(e) => {
               e.stopPropagation();
               if (f.id) setDrag({ kind: "ct", id: f.id });
@@ -264,16 +345,35 @@ export function TcRepository({
             }}
           >
             <span className="tree-prefix">{prefix + branch}</span>
+            {selMode && (
+              <input
+                type="checkbox"
+                checked={!!f.id && picked.has(f.id)}
+                disabled={!f.id}
+                onChange={() => f.id && togglePick(f.id)}
+                aria-label={`Selecionar ${f.id ?? ""}`}
+              />
+            )}
             <button
               className="repo-file-main"
-              onClick={() => f.id && setSelectedId(f.id)}
-              onDoubleClick={() => f.id && onOpen(f.id)}
+              onClick={() =>
+                f.id && (selMode ? togglePick(f.id) : setSelectedId(f.id))
+              }
+              onDoubleClick={() => f.id && !selMode && onOpen(f.id)}
               disabled={!f.id}
               title={`${f.path} — clique: detalhes · duplo clique: editor`}
             >
               <span className="mono muted">{f.id ?? "?"}</span>
               <span className="repo-file-title">{f.title}</span>
             </button>
+            {f.id && rerunIds.has(f.id) && (
+              <span
+                className="badge badge-rerun caption"
+                title="Steps re-baseados na sync — precisa re-execução"
+              >
+                re-exec
+              </span>
+            )}
             {f.status && (
               <span className={`status-dot dot-${f.status} caption`}>{f.status}</span>
             )}
@@ -307,6 +407,12 @@ export function TcRepository({
         <span className="spacer" />
         <div className="head-controls">
           {extraActions}
+          <button
+            className={selMode ? "primary" : ""}
+            onClick={() => (selMode ? exitSelMode() : setSelMode(true))}
+          >
+            {selMode ? "Cancelar seleção" : "Selecionar"}
+          </button>
           <button onClick={() => setImporting(true)}>Importar com IA</button>
           <button onClick={() => setCreatingFolder(root.path)}>Nova pasta</button>
           <button className="primary" onClick={onNew}>
@@ -314,6 +420,54 @@ export function TcRepository({
           </button>
         </div>
       </div>
+      {selMode && (
+        <div className="card compare-bar bulk-bar">
+          <span className="caption">{picked.size} selecionado(s)</span>
+          <span className="spacer" />
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value)}
+            aria-label="Novo status"
+          >
+            <option value="">Status…</option>
+            {["draft", "ready", "deprecated"].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <button
+            className="btn-sm"
+            disabled={picked.size === 0 || !bulkStatus}
+            onClick={() => setConfirmBulk("status")}
+          >
+            Aplicar status
+          </button>
+          <select
+            value={bulkFolder}
+            onChange={(e) => setBulkFolder(e.target.value)}
+            aria-label="Pasta destino"
+          >
+            <option value="">Mover para…</option>
+            <option value="testcases">/ (raiz)</option>
+            {collectFolders(root).map((p) => (
+              <option key={p} value={p}>{relFolder(p) || "/"}</option>
+            ))}
+          </select>
+          <button
+            className="btn-sm"
+            disabled={picked.size === 0 || !bulkFolder}
+            onClick={() => setConfirmBulk("move")}
+          >
+            Mover
+          </button>
+          <button
+            className="btn-sm danger"
+            disabled={picked.size === 0}
+            onClick={() => setConfirmBulk("delete")}
+          >
+            Excluir
+          </button>
+        </div>
+      )}
 
       <div className="tc-filter-bar block">
         <input
@@ -346,11 +500,20 @@ export function TcRepository({
           value={fTag}
           onChange={(e) => setFTag(e.target.value)}
         />
+        <label className="check-inline caption" title="Só CTs com re-execução pendente">
+          <input
+            type="checkbox"
+            checked={fRerun}
+            onChange={(e) => setFRerun(e.target.checked)}
+          />
+          <span>precisa re-exec</span>
+        </label>
         {filterActive && (
           <button
             className="btn-sm"
             onClick={() => {
               setQ(""); setFStatus(""); setFPriority(""); setFType(""); setFTag("");
+              setFRerun(false);
             }}
           >
             Limpar
@@ -472,6 +635,41 @@ export function TcRepository({
             void doMoveFolder(p.srcPath, p.destPath);
           }}
           onCancel={() => setPendingFolderMove(null)}
+        />
+      )}
+      {confirmBulk && (
+        <ConfirmModal
+          title={
+            confirmBulk === "delete"
+              ? "Excluir em lote"
+              : confirmBulk === "status"
+                ? "Mudar status em lote"
+                : "Mover em lote"
+          }
+          message={
+            confirmBulk === "delete" ? (
+              <>
+                Mover <strong>{picked.size}</strong> caso
+                {picked.size === 1 ? "" : "s"} de teste para a lixeira?
+              </>
+            ) : confirmBulk === "status" ? (
+              <>
+                Mudar o status de <strong>{picked.size}</strong> caso
+                {picked.size === 1 ? "" : "s"} para{" "}
+                <span className="mono">{bulkStatus}</span>?
+              </>
+            ) : (
+              <>
+                Mover <strong>{picked.size}</strong> caso
+                {picked.size === 1 ? "" : "s"} para{" "}
+                <span className="mono">{relFolder(bulkFolder) || "/"}</span>?
+              </>
+            )
+          }
+          confirmLabel={bulkBusy ? "Aplicando…" : "Confirmar"}
+          danger={confirmBulk === "delete"}
+          onConfirm={() => void runBulk(confirmBulk)}
+          onCancel={() => setConfirmBulk(null)}
         />
       )}
     </div>

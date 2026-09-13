@@ -8,6 +8,10 @@ os arquivos são editáveis no Obsidian sem conversão.
 Cadeia de rastreabilidade: `Epic → Story → Test Case → Execution →
 Evidência → Defeito`.
 
+Roda no seu notebook sem nenhuma configuração. Para colocá-lo num servidor
+do time — com login, contas e painel de administração —, veja
+[docs/self-hosting.md](docs/self-hosting.md).
+
 ## Pré-requisitos
 
 - Python 3.12+

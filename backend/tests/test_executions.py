@@ -231,3 +231,59 @@ def test_delete_execution_with_active_run_is_409(client):
 
 def test_delete_unknown_execution_404(client):
     assert client.delete("/api/v1/executions/EXEC-9999").status_code == 404
+
+
+def _set(client, exec_id, ct_id, status):
+    return client.post(
+        f"/api/v1/executions/{exec_id}/results/{ct_id}/status",
+        json={"status": status, "who": "carini"},
+    )
+
+
+def test_diff_classifies_five_categories(client):
+    """0088: diff entre duas executions classifica cada CT na categoria certa."""
+    reg = make_ct(client, "Regride")
+    fix = make_ct(client, "Conserta")
+    same = make_ct(client, "Estável")
+    only_a = make_ct(client, "Sai")   # removed (só em a)
+    only_b = make_ct(client, "Entra")  # added (só em b)
+
+    ea = make_exec(client, name="A", ct_ids=[reg["id"], fix["id"], same["id"], only_a["id"]])
+    eb = make_exec(client, name="B", ct_ids=[reg["id"], fix["id"], same["id"], only_b["id"]])
+
+    # execution A
+    _set(client, ea["id"], reg["id"], "passed")
+    _set(client, ea["id"], fix["id"], "failed")
+    _set(client, ea["id"], same["id"], "passed")
+    _set(client, ea["id"], only_a["id"], "passed")
+    # execution B
+    _set(client, eb["id"], reg["id"], "failed")   # passed → failed = regressed
+    _set(client, eb["id"], fix["id"], "passed")   # failed → passed = fixed
+    _set(client, eb["id"], same["id"], "passed")  # passed → passed = unchanged
+    _set(client, eb["id"], only_b["id"], "passed")
+
+    diff = client.get(f"/api/v1/executions/diff?a={ea['id']}&b={eb['id']}").json()
+    cats = diff["categories"]
+    assert [c["testcase_id"] for c in cats["regressed"]] == [reg["id"]]
+    assert [c["testcase_id"] for c in cats["fixed"]] == [fix["id"]]
+    assert [c["testcase_id"] for c in cats["unchanged"]] == [same["id"]]
+    assert [c["testcase_id"] for c in cats["removed"]] == [only_a["id"]]
+    assert [c["testcase_id"] for c in cats["added"]] == [only_b["id"]]
+    # os dois status vêm no payload de unchanged
+    assert cats["unchanged"][0]["status_a"] == "passed"
+    assert cats["unchanged"][0]["status_b"] == "passed"
+    assert cats["regressed"][0]["status_a"] == "passed"
+    assert cats["regressed"][0]["status_b"] == "failed"
+    assert cats["added"][0]["status_a"] is None
+    assert cats["removed"][0]["status_b"] is None
+    assert diff["counts"] == {
+        "regressed": 1, "fixed": 1, "added": 1, "removed": 1, "unchanged": 1
+    }
+    # títulos presentes para navegação
+    assert cats["regressed"][0]["title"] == "Regride"
+
+
+def test_diff_unknown_execution_404(client):
+    ct = make_ct(client, "Algum")
+    ea = make_exec(client, name="A", ct_ids=[ct["id"]])
+    assert client.get(f"/api/v1/executions/diff?a={ea['id']}&b=EXEC-9999").status_code == 404

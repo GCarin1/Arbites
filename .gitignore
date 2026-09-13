@@ -10,3 +10,6 @@ frontend/dist/
 
 # Workspace local de desenvolvimento (dados do usuário, não do produto)
 backend/workspace/
+
+# Configuração da instância hospedada (segredos)
+.env

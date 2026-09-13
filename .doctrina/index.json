@@ -1,8 +1,8 @@
 {
   "$schema_version": "0.1.0",
   "project": "Arbites",
-  "framework_version": "0.13.0",
-  "last_updated": "2026-07-20",
+  "framework_version": "0.16.0",
+  "last_updated": "2026-09-13",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -11,6 +11,17 @@
       "last_updated": "2026-07-03"
     },
     "specs": [
+      {
+        "id": "admin",
+        "path": ".doctrina/specs/admin/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-09-12",
+        "implementation": "verified — `backend/arbites/api.py` (rotas /admin/*), `frontend/src/components/Admin.tsx`",
+        "realizes": [
+          "SC16"
+        ]
+      },
       {
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
@@ -26,9 +37,20 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "last_updated": "2026-07-20",
-        "implementation": "verified"
+        "implementation": "verified — snapshot de qualidade (`backend/arbites/audit.py`) + log de atividade no gate (`backend/arbites/api.py`, `backend/arbites/auth.py`)"
+      },
+      {
+        "id": "auth",
+        "path": ".doctrina/specs/auth/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-09-12",
+        "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
+        "realizes": [
+          "SC15"
+        ]
       },
       {
         "id": "businessmap",
@@ -94,16 +116,16 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-16",
+        "version": "0.6.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-07-10",
+        "version": "0.6.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
@@ -133,8 +155,8 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.7.0",
-        "last_updated": "2026-07-10",
+        "version": "0.10.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
           "SC5"
@@ -144,8 +166,8 @@
         "id": "meetings",
         "path": ".doctrina/specs/meetings/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-07",
+        "version": "0.3.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`",
         "realizes": [
           "SC13"
@@ -155,9 +177,9 @@
         "id": "profile",
         "path": ".doctrina/specs/profile/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-07-09",
-        "implementation": "verified — M13 (backend/arbites/api.py; frontend Profile.tsx). Memória injetada nos 5 usos de IA",
+        "implementation": "verified — perfil por conta e autoria pela sessão (`backend/arbites/api.py`)",
         "realizes": [
           "SC14"
         ]
@@ -174,8 +196,8 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.11.0",
-        "last_updated": "2026-07-10",
+        "version": "0.13.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
@@ -215,8 +237,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.8.1",
-        "last_updated": "2026-07-20",
+        "version": "0.11.0",
+        "last_updated": "2026-07-21",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -263,7 +285,8 @@
         "title": "Filesystem como fonte de verdade, SQLite como indice descartavel",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/indexer.py`, `backend/arbites/workspace.py`"
+        "landed": "2026-07-03 — `backend/arbites/indexer.py`, `backend/arbites/workspace.py`",
+        "summary": "O filesystem (Markdown/YAML/JSON/Gherkin em `workspace/`) é a única fonte"
       },
       {
         "id": "0002",
@@ -271,7 +294,8 @@
         "title": "ID no frontmatter, nome de arquivo livre",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/parser.py`"
+        "landed": "2026-07-03 — `backend/arbites/parser.py`",
+        "summary": "O ID canônico (`EP-0001`, `ST-0012`, `CT-0001`, …) vive no frontmatter do"
       },
       {
         "id": "0003",
@@ -279,7 +303,8 @@
         "title": "Vinculo CT-cenario por tag @CT-XXXX",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/gherkin_scan.py`"
+        "landed": "2026-07-04 — `backend/arbites/gherkin_scan.py`",
+        "summary": "O vínculo é a tag `@CT-XXXX` no cenário Gherkin."
       },
       {
         "id": "0004",
@@ -287,7 +312,8 @@
         "title": "Execucao local via subprocess direto na v1",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/runner.py`"
+        "landed": "2026-07-04 — `backend/arbites/runner.py`",
+        "summary": "Runs locais usam `subprocess` da stdlib (`asyncio.create_subprocess_exec`)"
       },
       {
         "id": "0005",
@@ -295,7 +321,8 @@
         "title": "Status de documento separado de status de resultado",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/executions.py`"
+        "landed": "2026-07-03 — `backend/arbites/executions.py`",
+        "summary": "Três máquinas de estado independentes: Test Case (documento:"
       },
       {
         "id": "0006",
@@ -303,7 +330,8 @@
         "title": "Coleta CI por artifact Cucumber JSON",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/ci.py`, `docs/examples/tests.yml`"
+        "landed": "2026-07-04 — `backend/arbites/ci.py`, `docs/examples/tests.yml`",
+        "summary": "A coleta de resultados de runs CI é feita por artifact: o workflow roda"
       },
       {
         "id": "0007",
@@ -311,7 +339,8 @@
         "title": "Jira fora de escopo, Xray como migracao pontual",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/xray_import.py`"
+        "landed": "2026-07-04 — `backend/arbites/xray_import.py`",
+        "summary": "Integração Jira: fora de escopo permanente."
       },
       {
         "id": "0008",
@@ -319,7 +348,8 @@
         "title": "PAT GitHub no keyring do OS",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-04 — `backend/arbites/ci.py`"
+        "landed": "2026-07-04 — `backend/arbites/ci.py`",
+        "summary": "O PAT (fine-grained, escopo mínimo `actions:read+write` no repo do target)"
       },
       {
         "id": "0009",
@@ -327,7 +357,8 @@
         "title": "Frontend React SPA",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `frontend/src/App.tsx`"
+        "landed": "2026-07-03 — `frontend/src/App.tsx`",
+        "summary": "Frontend em React 18 + Vite + TypeScript, SPA servida como estático pelo"
       },
       {
         "id": "0010",
@@ -335,71 +366,24 @@
         "title": "Sprint e ambiente como texto livre na v1",
         "status": "accepted",
         "date": "2026-07-03",
-        "landed": "2026-07-03 — `backend/arbites/executions.py`"
+        "landed": "2026-07-03 — `backend/arbites/executions.py`",
+        "summary": "`sprint` e `environment` são texto livre no `execution.json` na v1."
+      },
+      {
+        "id": "0011",
+        "path": ".doctrina/decisions/0011-contas-e-sessoes-em-banco-duravel-separado-do-indice-descartavel.md",
+        "title": "Contas e sessoes em banco duravel separado do indice descartavel",
+        "status": "accepted",
+        "date": "2026-09-12",
+        "landed": "2026-09-12 — `backend/arbites/auth.py`, `backend/tests/test_auth.py`",
+        "summary": "Contas, sessões e tentativas de login vivem num terceiro store: um SQLite"
       }
     ],
-    "changes": [
-      {
-        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
-        "title": "pickers canonicos por titulo em referencias a entidades",
-        "path": ".doctrina/changes/0082-pickers-canonicos-por-titulo-em-referencias-a",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
-        "title": "acoes em lote no repositorio de CTs e nas executions",
-        "path": ".doctrina/changes/0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0084-aba-e-filtros-na-url-para-deep-link",
-        "title": "aba e filtros na URL para deep-link",
-        "path": ".doctrina/changes/0084-aba-e-filtros-na-url-para-deep-link",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0088-diff-entre-duas-executions",
-        "title": "diff entre duas executions",
-        "path": ".doctrina/changes/0088-diff-entre-duas-executions",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
-        "title": "flaky visivel no CT e quarentena fora do pass rate",
-        "path": ".doctrina/changes/0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
-        "title": "sync de feature atualizado marca CT precisa re-execucao",
-        "path": ".doctrina/changes/0090-sync-de-feature-atualizado-marca-ct-precisa-re",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0097-action-items-de-reuniao-viram-afazeres",
-        "title": "action items de reuniao viram afazeres",
-        "path": ".doctrina/changes/0097-action-items-de-reuniao-viram-afazeres",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      },
-      {
-        "id": "0098-reporte-executivo-narrado-pela-ia",
-        "title": "reporte executivo narrado pela IA",
-        "path": ".doctrina/changes/0098-reporte-executivo-narrado-pela-ia",
-        "status": "proposed",
-        "opened": "2026-07-19"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
-        "title": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
+        "title": "M0 - fundacao: workspace, parsers, reindex, API de requisitos/testcases, UI basica, README com passo a passo para executar o projeto",
         "path": ".doctrina/changes/archive/2026-07-03-0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
         "status": "applied",
         "applied": "2026-07-03",
@@ -424,7 +408,7 @@
       },
       {
         "id": "0002-m1-execucao-manual-executions-kanban-de-resultad",
-        "title": "0002-m1-execucao-manual-executions-kanban-de-resultad",
+        "title": "M1 - execucao manual: executions, kanban de resultados, steps marcaveis, evidencias com hash, historico, defeitos minimos, fechamento",
         "path": ".doctrina/changes/archive/2026-07-03-0002-m1-execucao-manual-executions-kanban-de-resultad",
         "status": "applied",
         "applied": "2026-07-03",
@@ -441,7 +425,7 @@
       },
       {
         "id": "0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
-        "title": "0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
+        "title": "M1.5 - dashboard e rastreabilidade: 7 metricas, tendencia, matriz de rastreabilidade navegavel, export PDF e Markdown",
         "path": ".doctrina/changes/archive/2026-07-04-0003-m1-5-dashboard-e-rastreabilidade-7-metricas-tend",
         "status": "applied",
         "applied": "2026-07-04",
@@ -458,7 +442,7 @@
       },
       {
         "id": "0004-m2-migracao-xray-import-xml-com-preview-e-confir",
-        "title": "0004-m2-migracao-xray-import-xml-com-preview-e-confir",
+        "title": "M2 - migracao Xray: import XML com preview e confirmacao idempotente, export Markdown zip",
         "path": ".doctrina/changes/archive/2026-07-04-0004-m2-migracao-xray-import-xml-com-preview-e-confir",
         "status": "applied",
         "applied": "2026-07-04",
@@ -475,7 +459,7 @@
       },
       {
         "id": "0005-m3-automacao-local-targets-scan-de-features-gher",
-        "title": "0005-m3-automacao-local-targets-scan-de-features-gher",
+        "title": "M3 - automacao local: targets, scan de features Gherkin, runs Behave via subprocess com SSE, fila por target, timeout, parse do JSON, evidencias via hooks",
         "path": ".doctrina/changes/archive/2026-07-04-0005-m3-automacao-local-targets-scan-de-features-gher",
         "status": "applied",
         "applied": "2026-07-04",
@@ -492,7 +476,7 @@
       },
       {
         "id": "0006-m4-github-actions-workflow-dispatch-com-correlac",
-        "title": "0006-m4-github-actions-workflow-dispatch-com-correlac",
+        "title": "M4 - GitHub Actions: workflow_dispatch com correlacao de run, polling de status, coleta de artifact Cucumber JSON, PAT no keyring, tests.yml de exemplo",
         "path": ".doctrina/changes/archive/2026-07-04-0006-m4-github-actions-workflow-dispatch-com-correlac",
         "status": "applied",
         "applied": "2026-07-04",
@@ -1556,6 +1540,233 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "title": "pickers canonicos por titulo em referencias a entidades",
+        "path": ".doctrina/changes/archive/2026-07-21-0082-pickers-canonicos-por-titulo-em-referencias-a",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "title": "acoes em lote no repositorio de CTs e nas executions",
+        "path": ".doctrina/changes/archive/2026-07-21-0083-acoes-em-lote-no-repositorio-de-cts-e-nas",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0084-aba-e-filtros-na-url-para-deep-link",
+        "title": "aba e filtros na URL para deep-link",
+        "path": ".doctrina/changes/archive/2026-07-21-0084-aba-e-filtros-na-url-para-deep-link",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0088-diff-entre-duas-executions",
+        "title": "diff entre duas executions",
+        "path": ".doctrina/changes/archive/2026-07-21-0088-diff-entre-duas-executions",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "title": "flaky visivel no CT e quarentena fora do pass rate",
+        "path": ".doctrina/changes/archive/2026-07-21-0089-flaky-visivel-no-ct-e-quarentena-fora-do-pass",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "title": "sync de feature atualizado marca CT precisa re-execucao",
+        "path": ".doctrina/changes/archive/2026-07-21-0090-sync-de-feature-atualizado-marca-ct-precisa-re",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          },
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0097-action-items-de-reuniao-viram-afazeres",
+        "title": "action items de reuniao viram afazeres",
+        "path": ".doctrina/changes/archive/2026-07-21-0097-action-items-de-reuniao-viram-afazeres",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "meetings",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0098-reporte-executivo-narrado-pela-ia",
+        "title": "reporte executivo narrado pela IA",
+        "path": ".doctrina/changes/archive/2026-07-21-0098-reporte-executivo-narrado-pela-ia",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0099-local-automation-correcoes-de-execucao-injetar-o",
+        "title": "correções de execução da automação",
+        "path": ".doctrina/changes/archive/2026-07-21-0099-local-automation-correcoes-de-execucao-injetar-o",
+        "status": "applied",
+        "applied": "2026-07-21",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0100-autenticacao-de-sessao",
+        "title": "Autenticacao de sessao",
+        "path": ".doctrina/changes/archive/2026-09-12-0100-autenticacao-de-sessao",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0101-endurecimento-das-rotas-perigosas",
+        "title": "Endurecimento das rotas perigosas",
+        "path": ".doctrina/changes/archive/2026-09-12-0101-endurecimento-das-rotas-perigosas",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0102-painel-admin-de-usuarios-e-acessos",
+        "title": "Painel admin de usuarios e acessos",
+        "path": ".doctrina/changes/archive/2026-09-12-0102-painel-admin-de-usuarios-e-acessos",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "admin",
+            "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0103-log-central-de-atividade",
+        "title": "Log central de atividade",
+        "path": ".doctrina/changes/archive/2026-09-12-0103-log-central-de-atividade",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0104-autoria-pelo-usuario-logado",
+        "title": "Autoria pelo usuario logado",
+        "path": ".doctrina/changes/archive/2026-09-12-0104-autoria-pelo-usuario-logado",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": [
+          {
+            "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0105-empacotamento-docker-e-cloudflare-tunnel",
+        "title": "Empacotamento Docker e Cloudflare Tunnel",
+        "path": ".doctrina/changes/archive/2026-09-12-0105-empacotamento-docker-e-cloudflare-tunnel",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": []
+      },
+      {
+        "id": "0106-coexistencia-com-o-tunel-do-umbrel",
+        "title": "Coexistencia com o tunel do Umbrel",
+        "path": ".doctrina/changes/archive/2026-09-12-0106-coexistencia-com-o-tunel-do-umbrel",
+        "status": "applied",
+        "applied": "2026-09-12",
+        "specs_affected": []
+      },
+      {
+        "id": "0107-keepalive-no-sse-atras-do-tunel",
+        "title": "Keepalive no SSE atras do tunel",
+        "path": ".doctrina/changes/archive/2026-09-13-0107-keepalive-no-sse-atras-do-tunel",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0108-caminho-sem-dominio-no-guia",
+        "title": "Caminho sem dominio no guia",
+        "path": ".doctrina/changes/archive/2026-09-13-0108-caminho-sem-dominio-no-guia",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": []
       }
     ],
     "skills": [
@@ -1582,6 +1793,12 @@
         "path": ".doctrina/skills/composite-score-sem-dado-nao-e-zero.md",
         "description": "Ao compor uma nota única (0-100) a partir de vários componentes com pesos, um componente sem dado suficiente deve virar `null` e ser excluído do cálculo (pesos restantes renormalizados) — nunca contar como 0.",
         "last_updated": "2026-07-12"
+      },
+      {
+        "id": "config-deriva-do-projeto-nao-fixa-campos",
+        "path": ".doctrina/skills/config-deriva-do-projeto-nao-fixa-campos.md",
+        "description": "Catálogos/formulários de configuração de um projeto-alvo devem ser DERIVADOS do próprio projeto (ex.: `.env`/`.env.example`), nunca uma lista fixa embutida de campos de um projeto específico.",
+        "last_updated": "2026-07-21"
       },
       {
         "id": "conteudo-longo-em-tabela-overflow",
@@ -1624,6 +1841,12 @@
         "path": ".doctrina/skills/entidade-so-com-crud-encaixado-precisa-de-view-propria.md",
         "description": "Uma entidade com API CRUD completa (GET/POST/PUT) mas cuja UNICA porta de entrada na UI é um modal aninhado dentro de outro fluxo (ex.: \"criar defeito a partir de um resultado de execução\") não tem gerenciamento de verdade — falta listar/editar/excluir fora daquele contexto específico.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "estado-ao-vivo-reconecta-no-remount",
+        "path": ".doctrina/skills/estado-ao-vivo-reconecta-no-remount.md",
+        "description": "Estado ao vivo (stream SSE de um run, progresso) não pode viver só no componente que desmonta ao trocar de aba — o servidor guarda o buffer e faz replay, então a UI deve reconectar ao (re)montar para não \"perder\" o que estava acontecendo.",
+        "last_updated": "2026-07-21"
       },
       {
         "id": "estados-de-feedback-nas-telas",
@@ -1762,6 +1985,12 @@
         "path": ".doctrina/skills/salvar-manual-feedback-e-reset-por-id.md",
         "description": "Botão de salvar manual sem estado de dirty/saving/saved parece \"não funcionar\" (salva mas nada muda na tela); e um efeito que reseta o campo a partir do valor do servidor (não do id do registro) reescreve o que o usuário digita quando há refresh de fundo.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "subprocess-injeta-env-do-projeto-alvo",
+        "path": ".doctrina/skills/subprocess-injeta-env-do-projeto-alvo.md",
+        "description": "Ao rodar um projeto-alvo externo por subprocess (Behave/WebDriver/CLI), o Arbites deve carregar e injetar o `.env` do projeto no ambiente do processo filho — nunca assumir que o processo pai já tem as variáveis.",
+        "last_updated": "2026-07-21"
       },
       {
         "id": "subprocess-python-windows-forca-pythonioencoding",

@@ -49,11 +49,16 @@ In scope:
 - IA opcional (geração/revisão de CTs, casos negativos), sempre com
   preview antes de gravar; providers OpenAI-compatíveis + Anthropic +
   Gemini.
+- Autenticação de sessão e contas com papéis (`admin`/`editor`/`viewer`)
+  sobre um único workspace compartilhado, para que a instância possa rodar
+  num servidor próprio do time em vez de só no notebook do QA.
 
 Out of scope (deferred or rejected):
 
-- Multiusuário, autenticação, permissões (single-user local; colaboração =
-  git no workspace).
+- Multi-tenancy: workspace isolado por usuário, organizações, cobrança. O
+  workspace é um só e todos os aprovados enxergam o mesmo conteúdo.
+- Federação de identidade (SSO/OIDC/LDAP): as contas são locais à
+  instância.
 - Bug tracker completo (defeito é ponteiro + metadados; o bug real vive no
   sistema corporativo via `external_key`).
 - Cadastro de sprints/releases (texto livre na v1).
@@ -108,6 +113,13 @@ Out of scope (deferred or rejected):
 - [SC14] Perfil do usuário com nome e memória de longo prazo em Markdown
   (Preferências & Estilo / Contexto Ativo), editável na UI e injetada como
   contexto em toda interação com IA, independente do provider. (M13)
+- [SC15] Subir a instância num servidor próprio, criar uma conta pela tela
+  de cadastro, ter o acesso liberado por um admin e entrar; sem sessão
+  válida nenhuma rota da API responde e nenhuma tentativa de login some do
+  registro. (M14)
+- [SC16] Como admin, ver a fila de cadastros pendentes e liberar um acesso;
+  ver quem entrou, de onde e quando, incluindo as tentativas que falharam;
+  e desligar uma superfície perigosa sem reiniciar o processo. (M14)
 
 ## Delivery order (walking skeleton)
 
@@ -137,5 +149,8 @@ Depth before breadth — o esqueleto é o M0 de ponta a ponta:
     da daily; action items viram todos (com confirmação).
 14. M12 — Reuniões: tema + descrição/transcrição; resumo executivo da IA que
     entra na digestão da daily.
+15. M14 — Instância compartilhada: autenticação de sessão, contas com
+    aprovação, painel admin (usuários, acessos, atividade) e empacotamento
+    para servidor próprio.
 
 Nada do milestone N+1 começa antes do N fechar (lição do Probatio).

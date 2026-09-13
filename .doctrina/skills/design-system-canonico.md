@@ -26,6 +26,14 @@ nova/alterada segue — sem estilo ad-hoc.
    `.btn-secondary`. No máximo **1 `primary` por bloco**.
 2. **Input/select/textarea — seletor de elemento.** Altura `--h-control`,
    focus/disabled já consistentes. Não estilizar à mão.
+2b. **Referência a entidade — `SingleRefInput` (busca id E título).**
+   Todo campo que aponta para uma entidade existente (epic/story/CT/
+   execution/defeito) usa `SingleRefInput` (de `Autocomplete.tsx`,
+   `kinds="requirement|testcase|execution|defect|..."`) — nunca
+   `<datalist>` casando por ID nem `<select>` cru sobre a lista de
+   entidades. `<datalist>` fica RESTRITO a valores livres que não são
+   entidades (ex.: squad). `<select>` fica para conjuntos fixos de valores
+   (status/prioridade/tipo). Change 0082.
 3. **Card — superfície compartilhada.** Fundo/borda/raio/padding (`--s2`)/
    sombra vivem numa ÚNICA regra CSS de `.card` (compartilhada por
    `.metric-card`/`.chart-card`/`.todo-card`); a variante só declara o que a
@@ -60,6 +68,9 @@ nova/alterada segue — sem estilo ad-hoc.
   `style={{ marginBottom: 16 }}` em vez de `.block`.
 - Cor como único sinal de status (sem `status-dot` + texto) — falha de
   acessibilidade.
+- `<datalist>` casando por ID ou `<select>` cru sobre entidades para
+  referenciar um card (epic/story/CT/execution/defeito) — quem não decora o
+  ID não acha; use `SingleRefInput` (busca id + título).
 - Montar uma barra de abas própria em vez de `.tab-bar`/`.tab-btn`.
 - Mais de um `button.primary` competindo no mesmo bloco.
 - Número mágico de espaçamento em vez de token `--sN`.

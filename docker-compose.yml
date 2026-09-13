@@ -1,0 +1,59 @@
+# Arbites num UmbrelOS que já roda o Cloudflare Tunnel (o app da loja, o
+# mesmo que expõe o BFFless). O túnel é compartilhado: este stack só publica
+# a porta no host, e o route específico é criado no painel da Cloudflare.
+#
+# Leia o docs/self-hosting.md antes de subir — sobretudo a ordem dos routes
+# (o BFFless registra um wildcard que captura todos os subdomínios) e a
+# parte de backup: o .arbites/auth.db é o único dado que não se reconstrói.
+
+services:
+  arbites:
+    build: .
+    image: arbites:local
+    restart: unless-stopped
+    environment:
+      # Bootstrap do primeiro admin. A senha vem do ambiente, portanto é
+      # visível em `docker inspect` e no histórico do shell: a conta nasce
+      # com troca obrigatória e esta senha só serve para o primeiro login.
+      ARBITES_ADMIN_EMAIL: ${ARBITES_ADMIN_EMAIL:?defina no .env}
+      ARBITES_ADMIN_PASSWORD: ${ARBITES_ADMIN_PASSWORD:?defina no .env}
+      # "off" fecha o cadastro público; contas passam a ser criadas só pelo
+      # painel. Deixe "on" enquanto o time ainda está entrando.
+      ARBITES_SIGNUP: ${ARBITES_SIGNUP:-on}
+    volumes:
+      - arbites-data:/data
+      # Repositórios de automação, se houver: somente leitura, porque o
+      # Arbites não gerencia o repo do target — ele só roda o Behave dele.
+      # - /home/umbrel/repos:/repos:ro
+    ports:
+      # É por aqui que o cloudflared do Umbrel chega, do mesmo jeito que ele
+      # chega no BFFless em umbrel.local:5537. A porta também fica visível na
+      # LAN — e tudo bem: o gate de sessão vale para qualquer entrada, então
+      # quem chega pela rede local encontra a mesma tela de login. É um
+      # caminho a mais para o mesmo porteiro, não um desvio dele.
+      - "8347:8347"
+
+volumes:
+  arbites-data:
+
+# Variante — sem publicar a porta, entrando na rede do cloudflared do Umbrel
+# (ele alcança containers pelo nome, não só por host:porta). Troque `ports`
+# por `expose: ["8347"]`, fixe `container_name: arbites` e entre na rede
+# externa do túnel; o route passa a apontar para http://arbites:8347.
+# O comando que descobre o nome da rede está na §2.4 do docs/self-hosting.md.
+#
+# Alternativa — túnel dedicado, sem depender do app do Umbrel:
+# troque o bloco `ports` acima por `expose: ["8347"]`, ponha os dois
+# serviços numa rede comum e acrescente:
+#
+#   cloudflared:
+#     image: cloudflare/cloudflared:latest
+#     restart: unless-stopped
+#     command: tunnel --no-autoupdate run
+#     environment:
+#       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina no .env}
+#     depends_on: [arbites]
+#
+# Aí o desempate contra o wildcard do BFFless acontece no DNS (registro
+# exato vence wildcard) em vez de na ordem dos routes. Ver a seção
+# "Alternativa" no docs/self-hosting.md.

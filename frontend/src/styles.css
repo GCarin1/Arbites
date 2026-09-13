@@ -2625,3 +2625,165 @@ button.link-chip-btn:disabled {
     max-width: 1600px;
   }
 }
+
+/* -- diff entre executions (0088) ------------------------------------------ */
+.compare-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 0.75rem;
+}
+.compare-bar .spacer { flex: 1; }
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #58a6ff);
+  cursor: pointer;
+}
+.linklike:hover { text-decoration: underline; }
+.exec-diff { display: flex; flex-direction: column; gap: 1rem; }
+.diff-cat { border-left: 3px solid var(--border); padding-left: 0.75rem; }
+.diff-regressed { border-left-color: var(--danger); }
+.diff-fixed { border-left-color: var(--success); }
+.diff-added { border-left-color: var(--accent, #58a6ff); }
+.diff-removed { border-left-color: var(--text-muted); }
+.diff-unchanged { border-left-color: var(--border); }
+.diff-cat-title { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.diff-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.diff-row { display: flex; align-items: baseline; gap: 0.6rem; }
+.diff-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* -- badges flaky / quarentena (0089) -------------------------------------- */
+.tc-badges { display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+.badge-flaky {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+.badge-quarantine {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* -- badge needs_rerun (0090) ---------------------------------------------- */
+.badge-rerun {
+  color: var(--accent, #58a6ff);
+  border-color: color-mix(in srgb, var(--accent, #58a6ff) 45%, transparent);
+  background: color-mix(in srgb, var(--accent, #58a6ff) 12%, transparent);
+}
+
+/* -- action items da reunião (0097) ---------------------------------------- */
+.action-items { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.ai-preview-list { list-style: none; margin: 0.25rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.ai-preview-list li { margin: 0; }
+.converted-items { margin-top: 0.5rem; }
+
+/* -- barra de ações em lote (0083) ----------------------------------------- */
+.bulk-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.bulk-bar .spacer { flex: 1; }
+.repo-file > input[type="checkbox"] { margin: 0 0.3rem; }
+
+/* -- seletor de .feature: ações em massa (0099) ---------------------------- */
+.feature-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+/* ============================================================================
+   Login e troca de senha (capability auth)
+   Tela fora do AppShell: sem header nem sidebar, o cartão centrado é a única
+   superfície. Reusa .card, .field e button.primary do design-system.
+   ========================================================================== */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s3);
+  background: var(--bg);
+  color: var(--text);
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+}
+.login-brand h1 {
+  margin: 0;
+  font-size: var(--fs-h1);
+  letter-spacing: -0.01em;
+}
+.login-brand p {
+  margin: 4px 0 0;
+}
+.login-title {
+  margin: 0;
+  font-size: var(--fs-h3);
+  padding-top: var(--s1);
+  border-top: 1px solid var(--border);
+}
+.login-hint {
+  font-size: var(--fs-caption);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.login-error,
+.login-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-card);
+  font-size: var(--fs-caption);
+  border: 1px solid;
+}
+.login-error {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(248, 81, 73, 0.1);
+}
+.login-notice {
+  color: var(--success);
+  border-color: var(--success);
+  background: rgba(63, 185, 80, 0.1);
+}
+.login-submit {
+  width: 100%;
+  justify-content: center;
+}
+.login-switch {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: var(--fs-caption);
+  padding: 0;
+  height: auto;
+}
+.login-switch:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+/* Identidade da sessão no header (capability auth). */
+.session-identity {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

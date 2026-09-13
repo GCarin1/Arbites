@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
-import type { TreeNode, Warning, WorkspaceInfo } from "./types";
+import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
   import("./components/Home").then((m) => ({ default: m.Home }))
@@ -67,6 +67,9 @@ const Meetings = lazy(() =>
 const Profile = lazy(() =>
   import("./components/Profile").then((m) => ({ default: m.Profile }))
 );
+const Admin = lazy(() =>
+  import("./components/Admin").then((m) => ({ default: m.Admin }))
+);
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette }))
 );
@@ -88,7 +91,8 @@ type Tab =
   | "ia"
   | "migration"
   | "problems"
-  | "profile";
+  | "profile"
+  | "admin";
 
 const NAV: { key: Tab; label: string }[] = [
   { key: "home", label: "Hoje" },
@@ -108,14 +112,36 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "migration", label: "Migração" },
   { key: "problems", label: "Problemas" },
   { key: "profile", label: "Perfil" },
+  { key: "admin", label: "Administração" },
 ];
+
+// -- deep-link por hash (0084): #/<aba>?filtro=valor, sem lib de router -----
+const TAB_KEYS = NAV.map((n) => n.key) as Tab[];
+
+function parseHash(): { tab: Tab; params: Record<string, string> } {
+  const raw = window.location.hash.replace(/^#\/?/, "");
+  const [tabPart, queryPart] = raw.split("?");
+  const tab = (TAB_KEYS as string[]).includes(tabPart) ? (tabPart as Tab) : "home";
+  const params: Record<string, string> = {};
+  if (queryPart) {
+    for (const [k, v] of new URLSearchParams(queryPart)) params[k] = v;
+  }
+  return { tab, params };
+}
+
+function buildHash(tab: Tab, params: Record<string, string>): string {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v),
+  ).toString();
+  return `#/${tab}${qs ? `?${qs}` : ""}`;
+}
 
 // Agrupamento semântico do menu (doc de ajustes §3)
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Planejamento", keys: ["requirements", "testcases", "executions"] },
   { title: "Acompanhamento", keys: ["defects", "decisions", "audit", "memory", "todos", "dashboard", "daily", "meetings"] },
   { title: "Ferramentas", keys: ["automation", "ia", "migration"] },
-  { title: "Suporte", keys: ["problems", "profile"] },
+  { title: "Suporte", keys: ["problems", "profile", "admin"] },
 ];
 
 const NAV_BY_KEY = Object.fromEntries(NAV.map((n) => [n.key, n])) as Record<
@@ -175,9 +201,63 @@ function NavItem({
   );
 }
 
-export default function App() {
-  const [tab, setTab] = useState<Tab>("home");
+export default function App({
+  user,
+  onLogout,
+}: {
+  user: SessionUser;
+  onLogout: () => void;
+}) {
+  const initialHash = parseHash();
+  const [tab, setTab] = useState<Tab>(initialHash.tab);
+  // filtros de alto valor serializados no hash (0084); a URL é a fonte da
+  // verdade desses filtros — back/forward e deep-link "grátis".
+  const [hashParams, setHashParams] = useState<Record<string, string>>(
+    initialHash.params,
+  );
+  const applyingHash = useRef(false);
+
+  // escreve o hash quando aba/filtros mudam (a menos que a mudança tenha vindo
+  // de um hashchange — evita loop)
+  useEffect(() => {
+    const next = buildHash(tab, hashParams);
+    if (applyingHash.current) {
+      applyingHash.current = false;
+      return;
+    }
+    if (`#${window.location.hash.replace(/^#/, "")}` !== next) {
+      window.location.hash = next;
+    }
+  }, [tab, hashParams]);
+
+  // back/forward do navegador → restaura aba + filtros
+  useEffect(() => {
+    function onHash() {
+      const parsed = parseHash();
+      applyingHash.current = true;
+      setTab(parsed.tab);
+      setHashParams(parsed.params);
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  // troca de aba pelo menu limpa os filtros do hash (filtros são por-aba)
+  const selectTab = useCallback((key: Tab) => {
+    setTab(key);
+    setHashParams({});
+  }, []);
+
+  const setHashParam = useCallback((key: string, value: string) => {
+    setHashParams((old) => {
+      const next = { ...old };
+      if (value) next[key] = value;
+      else delete next[key];
+      return next;
+    });
+  }, []);
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
+  const [switches, setSwitches] = useState<Switch[]>([]);
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
@@ -333,6 +413,25 @@ export default function App() {
     },
   ];
 
+  // Uma aba so aparece quando o papel alcanca e o admin nao desligou. Sem
+  // isto a UI oferece caminhos que a API vai recusar com 403.
+  const isReachable = (key: Tab): boolean => {
+    const off = (name: string) =>
+      switches.some((s) => s.name === name && !s.enabled);
+    if (key === "admin") return user.role === "admin";
+    if (key === "migration") return user.role === "admin" && !off("xray_import");
+    if (key === "ia") return !off("ai");
+    if (key === "automation") return !off("local_runner") || user.role === "admin";
+    return true;
+  };
+
+  useEffect(() => {
+    api
+      .switches()
+      .then((r) => setSwitches(r.switches))
+      .catch(() => setSwitches([]));
+  }, []);
+
   return (
     <>
       <header className="app-header">
@@ -351,6 +450,10 @@ export default function App() {
         <button onClick={() => void reindex()} disabled={reindexing}>
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
+        <span className="session-identity" title={`${user.email} · ${user.role}`}>
+          {user.name || user.email} · {user.role}
+        </span>
+        <button onClick={onLogout}>Sair</button>
       </header>
       {cmdkOpen && (
         <Suspense fallback={null}>
@@ -367,7 +470,7 @@ export default function App() {
             <div className="nav-group">
               <button
                 className={`nav-item ${tab === "home" ? "active" : ""}`}
-                onClick={() => setTab("home")}
+                onClick={() => selectTab("home")}
                 aria-current={tab === "home" ? "page" : undefined}
               >
                 Hoje
@@ -379,13 +482,13 @@ export default function App() {
                   <span>Acesso rápido</span>
                 </div>
                 {pins
-                  .filter((k) => NAV_BY_KEY[k])
+                  .filter((k) => NAV_BY_KEY[k] && isReachable(k))
                   .map((k) => (
                     <NavItem
                       key={`pin-${k}`}
                       item={NAV_BY_KEY[k]}
                       tab={tab}
-                      setTab={setTab}
+                      setTab={selectTab}
                       problemCount={problemCount}
                       pinned
                       onTogglePin={() => togglePin(k)}
@@ -407,12 +510,12 @@ export default function App() {
                   </span>
                 </button>
                 {!collapsed.includes(group.title) &&
-                  group.keys.map((k) => (
+                  group.keys.filter(isReachable).map((k) => (
                     <NavItem
                       key={k}
                       item={NAV_BY_KEY[k]}
                       tab={tab}
-                      setTab={setTab}
+                      setTab={selectTab}
                       problemCount={problemCount}
                       pinned={pins.includes(k)}
                       onTogglePin={() => togglePin(k)}
@@ -446,7 +549,12 @@ export default function App() {
             </Suspense>
           ) : tab === "dashboard" ? (
             <Suspense fallback={<p className="empty">Carregando dashboard…</p>}>
-              <Dashboard onError={setError} onNavigate={navigateTo} />
+              <Dashboard
+                onError={setError}
+                onNavigate={navigateTo}
+                squad={hashParams.squad ?? ""}
+                onSquadChange={(v) => setHashParam("squad", v)}
+              />
             </Suspense>
           ) : tab === "automation" ? (
             <Suspense fallback={<p className="empty">Carregando automação…</p>}>
@@ -454,6 +562,8 @@ export default function App() {
                 onChanged={() => void refresh()}
                 onError={setError}
                 onNavigate={navigateTo}
+                innerTab={hashParams.atab}
+                onInnerTabChange={(v) => setHashParam("atab", v)}
               />
             </Suspense>
           ) : tab === "ia" ? (
@@ -484,7 +594,12 @@ export default function App() {
             </Suspense>
           ) : tab === "memory" ? (
             <Suspense fallback={<p className="empty">Carregando memória do projeto…</p>}>
-              <Memory onError={setError} onNavigate={navigateTo} />
+              <Memory
+                onError={setError}
+                onNavigate={navigateTo}
+                year={hashParams.year ?? ""}
+                onYearChange={(v) => setHashParam("year", v)}
+              />
             </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
@@ -501,6 +616,10 @@ export default function App() {
           ) : tab === "profile" ? (
             <Suspense fallback={<p className="empty">Carregando perfil…</p>}>
               <Profile onError={setError} />
+            </Suspense>
+          ) : tab === "admin" ? (
+            <Suspense fallback={<p className="empty">Carregando administração…</p>}>
+              <Admin currentUserId={user.id} />
             </Suspense>
           ) : tab === "migration" ? (
             <Suspense fallback={<p className="empty">Carregando migração…</p>}>
@@ -551,6 +670,7 @@ export default function App() {
                     setExecCreating(true);
                   }}
                   onError={setError}
+                  onNavigate={navigateTo}
                 />
               </Suspense>
             )
@@ -612,6 +732,8 @@ export default function App() {
                 onChanged={() => void refresh()}
                 onError={setError}
                 onNew={() => setCreatingCt(true)}
+                statusFilter={hashParams.status ?? ""}
+                onStatusFilterChange={(v) => setHashParam("status", v)}
               />
             </Suspense>
           ) : (

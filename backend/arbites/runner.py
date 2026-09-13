@@ -22,10 +22,49 @@ from typing import Any
 
 from . import executions as exec_ops
 from .behave_json import BehaveJsonError, parse_behave_json
-from .indexer import reindex_file
+from .indexer import clear_needs_rerun, reindex_file
 from .workspace import Workspace
 
 DEFAULT_TIMEOUT_MINUTES = 30.0
+
+
+def load_env_file(path: Path) -> dict[str, str]:
+    """Lê um `.env` estilo dotenv (KEY=VALUE) num dict, ignorando comentários e
+    linhas em branco e removendo aspas do valor. Best-effort: um arquivo
+    ilegível devolve `{}` (0099 — o Arbites se adapta ao projeto)."""
+    values: dict[str, str] = {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return values
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        key = key.strip()
+        if key.lower().startswith("export "):
+            key = key[len("export "):].strip()
+        if key:
+            values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
+def build_run_env(
+    base_env: dict[str, str], local_path: Path, evidence_dir: Path
+) -> dict[str, str]:
+    """Ambiente do subprocess do run (0099): base + `.env` do projeto-alvo, com
+    as chaves de controle do Arbites reafirmadas por último (o `.env` do
+    projeto NUNCA sobrescreve `ARBITES_*`/`PYTHONIOENCODING`)."""
+    env = dict(base_env)
+    env.update(load_env_file(local_path / ".env"))
+    env["ARBITES_EVIDENCE_DIR"] = str(evidence_dir)
+    # o behave é Python: sem isto, no Windows o stdout sai no encoding do
+    # console (cp1252) e a decodificação UTF-8 do pump vira mojibake
+    # ("Cenário" → "Cen�rio") — quebrava o terminal ao vivo E o parse de
+    # progresso (0076)
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
 
 # Progresso ao vivo (mudança 0076) — parse best-effort do formato plain do
 # behave, EN e PT. A fonte OFICIAL é sempre o Cucumber JSON do fim do run
@@ -192,13 +231,9 @@ class RunManager:
 
         import os
 
-        env = dict(os.environ)
-        env["ARBITES_EVIDENCE_DIR"] = str(evidence_dir)
-        # o behave é Python: sem isto, no Windows o stdout sai no encoding do
-        # console (cp1252) e a decodificação UTF-8 do pump vira mojibake
-        # ("Cenário" → "Cen�rio") — quebrava o terminal ao vivo E o parse de
-        # progresso (0076)
-        env["PYTHONIOENCODING"] = "utf-8"
+        # 0099: injeta o `.env` do projeto-alvo — sem isto o Behave/WebDriver
+        # não vê BASE_URL/LOCAL_BROWSER/credenciais e o browser abre sem destino.
+        env = build_run_env(dict(os.environ), local_path, evidence_dir)
         timeout = float(target.get("timeout_minutes") or DEFAULT_TIMEOUT_MINUTES) * 60
 
         proc = await asyncio.create_subprocess_exec(
@@ -277,6 +312,7 @@ class RunManager:
             exec_ops.set_result_status(execution, ct_id, status, "behave")
             path = exec_ops.save(self.ws, execution)
             reindex_file(self.ws, self.conn, path)
+            clear_needs_rerun(self.ws, self.conn, ct_id)  # 0090
             run.emit(f"[arbites] parcial: {ct_id} {status}")
         except Exception:
             pass  # parcial falhou → o JSON final cobre
@@ -292,6 +328,7 @@ class RunManager:
             execution = exec_ops.load(self.ws, run.exec_id)
         except exec_ops.ExecutionError:
             return
+        recorded: set[str] = set()  # CTs que receberam resultado neste run (0090)
         if result_json.exists():
             try:
                 results = parse_behave_json(
@@ -309,6 +346,7 @@ class RunManager:
                     )
                 except exec_ops.ExecutionError:
                     continue  # cenário de CT que não está nesta execution
+                recorded.add(ct_id)
                 result["steps"] = scenario.steps
                 result["duration_seconds"] = scenario.duration_seconds
                 result["error"] = scenario.error
@@ -328,6 +366,8 @@ class RunManager:
                     continue
         path = exec_ops.save(self.ws, execution)
         reindex_file(self.ws, self.conn, path)
+        for ct_id in recorded:
+            clear_needs_rerun(self.ws, self.conn, ct_id)  # 0090
 
     def _mark_pending(self, run: RunInfo, status: str, error: str) -> None:
         try:

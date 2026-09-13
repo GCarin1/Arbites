@@ -3,7 +3,13 @@ import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
 import { useToast } from "./Toast";
-import type { Execution, ExecutionSummary, ResultEntry, TestCase } from "../types";
+import type {
+  Execution,
+  ExecutionDiff,
+  ExecutionSummary,
+  ResultEntry,
+  TestCase,
+} from "../types";
 
 /**
  * Barra de progresso por PASSO: um segmento por step, colorido pelo status
@@ -134,16 +140,85 @@ export function ExecutionsRepo({
   onOpen,
   onNew,
   onError,
+  onNavigate,
 }: {
   version: number;
   onOpen: (id: string) => void;
   onNew: () => void;
   onError: (message: string) => void;
+  onNavigate?: (id: string) => void;
 }) {
   const [items, setItems] = useState<ExecutionSummary[]>([]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<ExecutionSummary | null>(null);
+  // modo Comparar: selecionar exatamente 2 executions → diff por categoria.
+  const [compareMode, setCompareMode] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [diff, setDiff] = useState<ExecutionDiff | null>(null);
+  // 0083: modo de seleção múltipla → exclusão em lote (endpoints unitários).
+  const [selMode, setSelMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { toast } = useToast();
+
+  function toggleCompare() {
+    setCompareMode((on) => !on);
+    setPicked([]);
+    setDiff(null);
+  }
+
+  function toggleSelMode() {
+    setSelMode((on) => !on);
+    setSelected(new Set());
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function runBulkDelete() {
+    const ids = [...selected];
+    setConfirmBulkDelete(false);
+    setBulkBusy(true);
+    let ok = 0;
+    let fail = 0;
+    for (const id of ids) {
+      try {
+        await api.deleteExecution(id);
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setBulkBusy(false);
+    toast(`${ok} excluída(s)${fail ? ` · ${fail} falha(s)` : ""}`);
+    setSelMode(false);
+    setSelected(new Set());
+    load();
+  }
+
+  function togglePick(id: string) {
+    setPicked((old) => {
+      if (old.includes(id)) return old.filter((x) => x !== id);
+      if (old.length >= 2) return [old[1], id]; // mantém só os 2 últimos
+      return [...old, id];
+    });
+  }
+
+  async function runDiff() {
+    if (picked.length !== 2) return;
+    try {
+      setDiff(await api.executionsDiff(picked[0], picked[1]));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const load = useCallback(() => {
     api
@@ -189,11 +264,57 @@ export function ExecutionsRepo({
         <h1 className="page-title">Execuções</h1>
         <span className="spacer" />
         <div className="head-controls">
+          <button
+            className={selMode ? "primary" : ""}
+            onClick={toggleSelMode}
+            disabled={items.length === 0 || compareMode}
+          >
+            {selMode ? "Cancelar seleção" : "Selecionar"}
+          </button>
+          <button
+            className={compareMode ? "primary" : ""}
+            onClick={toggleCompare}
+            disabled={items.length < 2 || selMode}
+            title="Selecionar duas execuções para comparar os resultados"
+          >
+            {compareMode ? "Cancelar comparação" : "Comparar"}
+          </button>
           <button className="primary" onClick={onNew}>
             Nova execução
           </button>
         </div>
       </div>
+      {compareMode && (
+        <div className="card compare-bar">
+          <span className="caption">
+            Selecione duas execuções ({picked.length}/2)
+            {picked.length > 0 && (
+              <span className="mono muted"> — {picked.join(" ↔ ")}</span>
+            )}
+          </span>
+          <span className="spacer" />
+          <button
+            className="primary"
+            disabled={picked.length !== 2}
+            onClick={() => void runDiff()}
+          >
+            Comparar selecionadas
+          </button>
+        </div>
+      )}
+      {selMode && (
+        <div className="card compare-bar bulk-bar">
+          <span className="caption">{selected.size} selecionada(s)</span>
+          <span className="spacer" />
+          <button
+            className="btn-sm danger"
+            disabled={selected.size === 0 || bulkBusy}
+            onClick={() => setConfirmBulkDelete(true)}
+          >
+            {bulkBusy ? "Excluindo…" : "Excluir selecionadas"}
+          </button>
+        </div>
+      )}
 
       <div className="repo-tree card">
         {items.length === 0 ? (
@@ -229,11 +350,42 @@ export function ExecutionsRepo({
                     );
                     const passed = item.result_counts["passed"] ?? 0;
                     return (
-                      <div key={item.id} className="repo-row repo-file">
+                      <div
+                        key={item.id}
+                        className={
+                          "repo-row repo-file" +
+                          ((compareMode && picked.includes(item.id)) ||
+                          (selMode && selected.has(item.id))
+                            ? " selected"
+                            : "")
+                        }
+                      >
                         <span className="tree-prefix">
                           {childPrefix + (ii === list.length - 1 ? "└── " : "├── ")}
                         </span>
-                        <button className="repo-file-main" onClick={() => onOpen(item.id)}>
+                        {selMode && (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(item.id)}
+                            onChange={() => toggleSelected(item.id)}
+                            aria-label={`Selecionar ${item.id}`}
+                          />
+                        )}
+                        <button
+                          className="repo-file-main"
+                          onClick={() =>
+                            selMode
+                              ? toggleSelected(item.id)
+                              : compareMode
+                                ? togglePick(item.id)
+                                : onOpen(item.id)
+                          }
+                        >
+                          {compareMode && (
+                            <span className="mono">
+                              {picked.includes(item.id) ? "☑" : "☐"}
+                            </span>
+                          )}
                           <span className="mono muted">{item.id}</span>
                           <span className="repo-file-title">{item.name}</span>
                         </button>
@@ -279,6 +431,86 @@ export function ExecutionsRepo({
           onCancel={() => setDeleting(null)}
         />
       )}
+      {confirmBulkDelete && (
+        <ConfirmModal
+          title="Excluir execuções em lote"
+          message={
+            <>
+              Mover <strong>{selected.size}</strong> execução
+              {selected.size === 1 ? "" : "ões"} e suas evidências para a lixeira?
+            </>
+          }
+          confirmLabel="Mover para a lixeira"
+          danger
+          onConfirm={() => void runBulkDelete()}
+          onCancel={() => setConfirmBulkDelete(false)}
+        />
+      )}
+      {diff && (
+        <Modal title={`Diff ${diff.a} → ${diff.b}`} onClose={() => setDiff(null)}>
+          <ExecutionDiffView
+            diff={diff}
+            onNavigate={(id) => {
+              setDiff(null);
+              onNavigate?.(id);
+            }}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// Painel de diff: uma seção por categoria, cada CT navegável.
+const DIFF_SECTIONS: { key: keyof ExecutionDiff["categories"]; label: string }[] = [
+  { key: "regressed", label: "Regrediram" },
+  { key: "fixed", label: "Consertaram" },
+  { key: "added", label: "Adicionados" },
+  { key: "removed", label: "Removidos" },
+  { key: "unchanged", label: "Sem mudança" },
+];
+
+function ExecutionDiffView({
+  diff,
+  onNavigate,
+}: {
+  diff: ExecutionDiff;
+  onNavigate: (id: string) => void;
+}) {
+  const empty = DIFF_SECTIONS.every((s) => diff.counts[s.key] === 0);
+  if (empty) {
+    return <p className="empty">Nenhum CT em comum ou distinto entre as execuções.</p>;
+  }
+  return (
+    <div className="exec-diff">
+      {DIFF_SECTIONS.map((section) => {
+        const entries = diff.categories[section.key];
+        if (entries.length === 0) return null;
+        return (
+          <section key={section.key} className={`diff-cat diff-${section.key}`}>
+            <h3 className="diff-cat-title">
+              {section.label}{" "}
+              <span className="caption mono muted">{entries.length}</span>
+            </h3>
+            <ul className="diff-list">
+              {entries.map((e) => (
+                <li key={e.testcase_id} className="diff-row">
+                  <button
+                    className="linklike mono"
+                    onClick={() => onNavigate(e.testcase_id)}
+                  >
+                    {e.testcase_id}
+                  </button>
+                  <span className="diff-title">{e.title ?? "—"}</span>
+                  <span className="caption mono muted">
+                    {e.status_a ?? "∅"} → {e.status_b ?? "∅"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
     </div>
   );
 }

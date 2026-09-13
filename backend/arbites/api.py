@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import os
+import re
 import sqlite3
 import zipfile
 from contextlib import asynccontextmanager
@@ -33,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from . import __version__
 from . import agent_pack as agent_pack_ops
+from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
@@ -54,12 +56,16 @@ from .gherkin_scan import (
 )
 from .runner import RunManager
 from .xray_import import XrayImportError
-from .indexer import connect, reindex_file, reindex_full
+from .indexer import clear_needs_rerun, connect, reindex_file, reindex_full
 from .parser import parse_markdown
 from .watcher import start_watcher
 from .workspace import Workspace, slugify
 
 API_PREFIX = "/api/v1"
+
+# Silencio maximo no stream de um run antes de emitir um comentario de
+# keepalive. Bem abaixo do timeout de conexao ociosa do Cloudflare (~100s).
+SSE_KEEPALIVE_SECONDS = 15.0
 log = logging.getLogger("arbites")
 
 
@@ -123,6 +129,7 @@ class TestcaseUpdate(BaseModel):
     squad: str | None = None
     automation: AutomationRef | None = None
     criteria: list[str] | None = None
+    quarantine: bool | None = None
     body: str | None = None
 
 
@@ -149,6 +156,8 @@ class ExecutionCreate(BaseModel):
     environment: str | None = None
     squad: str | None = None
     testcase_ids: list[str]
+    # Mantido por compatibilidade de contrato; o valor e ignorado — a
+    # autoria vem da sessao (capability profile).
     owner: str = "local"
 
 
@@ -403,47 +412,70 @@ class MeetingSummarizeIn(BaseModel):
     provider: str | None = None
 
 
-# Catálogo do .env do projeto de automação (doc de ajustes §1.5.1 etapa 5)
-ENV_CATALOG: list[dict[str, str]] = [
-    {"section": "Credenciais de Teste", "key": "TEST_DOCUMENTO", "description": "Documento (CPF) utilizado para login nos testes"},
-    {"section": "Credenciais de Teste", "key": "TEST_SENHA", "description": "Senha do usuário de teste"},
-    {"section": "URLs", "key": "BASE_URL", "description": "URL base da aplicação sob teste"},
-    {"section": "WebDriver Local", "key": "EDGE_DRIVER_PATH", "description": "Caminho personalizado para o msedgedriver (opcional)"},
-    {"section": "WebDriver Local", "key": "HEADLESS", "description": "Executar sem interface gráfica (true/false)"},
-    {"section": "WebDriver Manager", "key": "USE_WEBDRIVER_MANAGER", "description": "Se true, baixa o driver automaticamente via webdriver_manager"},
-    {"section": "WebDriver Manager", "key": "LOCAL_BROWSER", "description": "Navegador para execução local (edge, chrome)"},
-    {"section": "Timeouts", "key": "PAGE_LOAD_TIMEOUT", "description": "Timeout de carregamento de página (segundos)"},
-    {"section": "Timeouts", "key": "SCRIPT_TIMEOUT", "description": "Timeout de execução de scripts (segundos)"},
-    {"section": "Timeouts", "key": "ELEMENT_WAIT_TIMEOUT", "description": "Timeout de espera por elementos (segundos)"},
-    {"section": "BrowserStack — Ativação", "key": "USE_BROWSERSTACK", "description": "Ativar execução remota no BrowserStack (true/false)"},
-    {"section": "BrowserStack — Credenciais", "key": "BROWSERSTACK_USERNAME", "description": "Username da conta BrowserStack"},
-    {"section": "BrowserStack — Credenciais", "key": "BROWSERSTACK_ACCESS_KEY", "description": "Access Key da conta BrowserStack"},
-    {"section": "BrowserStack — Projeto", "key": "BROWSERSTACK_PROJECT_NAME", "description": "Nome do projeto no BrowserStack"},
-    {"section": "BrowserStack — Projeto", "key": "BROWSERSTACK_BUILD_NAME", "description": "Nome da build/execução"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_OS", "description": "Sistema operacional (Windows, OS X)"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_OS_VERSION", "description": "Versão do SO (11, 10, Ventura, etc.)"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_BROWSER", "description": "Navegador (Chrome, Firefox, Edge, Safari)"},
-    {"section": "BrowserStack — Browser", "key": "BROWSERSTACK_BROWSER_VERSION", "description": "Versão do navegador (latest, 120.0, etc.)"},
-    {"section": "BrowserStack — Local Testing", "key": "BROWSERSTACK_LOCAL", "description": "Testar URLs internas/localhost (true/false)"},
-    {"section": "Ambiente", "key": "ENVIRONMENT", "description": "Ambiente de execução (dev, staging, prod)"},
-    {"section": "Ambiente", "key": "DEBUG", "description": "Habilitar logs de debug (true/false)"},
-    {"section": "Logger", "key": "LOG_ENABLED", "description": "Habilitar/desabilitar logs (true/false)"},
-    {"section": "Logger", "key": "LOG_LEVEL", "description": "Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)"},
-    {"section": "Logger", "key": "LOG_SAVE_TO_FILE", "description": "Salvar logs em arquivo (true/false)"},
-    {"section": "Logger", "key": "LOG_SHOW_CONSOLE", "description": "Exibir logs no console (true/false)"},
-    {"section": "Logger", "key": "LOG_MAX_FILE_SIZE", "description": "Tamanho máximo do arquivo de log em bytes"},
-    {"section": "Logger", "key": "LOG_BACKUP_COUNT", "description": "Quantidade de arquivos de backup de log"},
-    {"section": "Análise de Logs com IA", "key": "AI_LOG_ANALYZER_ENABLED", "description": "Habilitar análise de logs com IA (true/false)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_API_KEY", "description": "Chave de API da OpenAI ou B3GPT"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_BASE_URL", "description": "URL base da API (vazio para OpenAI padrão)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_API_VERSION", "description": "Versão da API (necessário para B3GPT/Azure)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_MODEL", "description": "Modelo a ser utilizado (gpt-4o-mini, etc.)"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_MAX_TOKENS", "description": "Máximo de tokens na resposta"},
-    {"section": "Análise de Logs com IA", "key": "OPENAI_TEMPERATURE", "description": "Temperatura (0.0 = preciso, 1.0 = criativo)"},
-    {"section": "Análise de Logs com IA", "key": "AI_ANALYZE_ON_FAILURE_ONLY", "description": "Analisar apenas em falhas (true/false)"},
-    {"section": "Análise de Logs com IA", "key": "AI_SAVE_ANALYSIS_TO_FILE", "description": "Salvar análises em arquivo (true/false)"},
-    {"section": "Análise de Logs com IA", "key": "AI_MAX_LOG_LINES", "description": "Máximo de linhas do log enviadas para análise"},
-]
+class MeetingActionItemsGenerateIn(BaseModel):
+    provider: str | None = None
+
+
+class MeetingActionItemsAcceptIn(BaseModel):
+    items: list[str]
+
+
+class ExecutiveSummaryIn(BaseModel):
+    provider: str | None = None
+    sprint: str | None = None
+    squad: str | None = None
+
+
+# Catálogo do .env: DERIVADO do próprio projeto-alvo (0099). O Arbites se
+# adapta a cada projeto — não impõe campos padrão de projeto nenhum. As chaves,
+# seções e descrições vêm do `.env.example` (preferido, documenta tudo) e do
+# `.env` do target. Regra de parse:
+#   - `# Seção` seguido de linha em branco  → cabeçalho de seção
+#   - `# descrição` logo acima de uma chave → descrição da chave
+#   - `KEY=valor  # descrição inline`        → descrição (tem prioridade)
+def derive_env_catalog(local_path: Path) -> list[dict[str, str]]:
+    catalog: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for filename in (".env.example", ".env"):
+        path = local_path / filename
+        try:
+            lines = path.read_text(encoding="utf-8-sig").splitlines()
+        except OSError:
+            continue
+        section = ""
+        pending_desc = ""
+        for i, raw in enumerate(lines):
+            stripped = raw.strip()
+            if not stripped:
+                pending_desc = ""
+                continue
+            if stripped.startswith("#"):
+                comment = stripped.lstrip("#").strip(" =-")
+                # comentário seguido de linha em branco → é seção
+                nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                if not nxt:
+                    section = comment
+                    pending_desc = ""
+                else:
+                    pending_desc = comment
+                continue
+            if "=" not in stripped:
+                continue
+            key_part, _, rest = stripped.partition("=")
+            key = key_part.strip()
+            if key.lower().startswith("export "):
+                key = key[len("export "):].strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            inline = rest.split("#", 1)[1].strip() if "#" in rest else ""
+            catalog.append({
+                "section": section,
+                "key": key,
+                "description": inline or pending_desc,
+            })
+            pending_desc = ""
+    return catalog
 
 # Formato canônico BDD (doc de ajustes §1.1) — steps extraídos de Given/When/Then
 DEFAULT_TC_BODY = """Feature: [Nome da Feature]
@@ -481,8 +513,11 @@ def create_app(
     token_store: TokenStore | None = None,
     ai_key_store: AIKeyStore | None = None,
     ai_transport=None,
+    auth_enabled: bool | None = None,
 ) -> FastAPI:
     ws = Workspace(workspace_root or os.environ.get("ARBITES_WORKSPACE", "workspace"))
+    if auth_enabled is None:
+        auth_enabled = os.environ.get("ARBITES_AUTH", "on").strip().lower() != "off"
     tokens = token_store or TokenStore()
     github = github_client or HttpxGitHub(tokens)
     ai_keys = ai_key_store or AIKeyStore()
@@ -499,6 +534,22 @@ def create_app(
         app.state.ci = CIManager(ws, app.state.conn, github, tokens)
         app.state.ai_keys = ai_keys
         app.state.ai_transport = ai_transport
+        # Banco de contas: conexao propria e duravel, jamais a do indice
+        # descartavel (ADR 0011).
+        app.state.auth = auth_ops.connect_auth(ws)
+        app.state.auth_enabled = auth_enabled
+        if auth_enabled:
+            created = auth_ops.bootstrap_admin(app.state.auth)
+            if created is not None:
+                log.warning(
+                    "conta admin de bootstrap criada para %s — troque a senha"
+                    " no primeiro login", created["email"],
+                )
+        else:
+            log.warning(
+                "ARBITES_AUTH=off — a API esta SEM autenticacao. Nao exponha"
+                " esta instancia fora de uma rede confiavel.",
+            )
         observer = None
         if watch:
             watch_conn = connect(ws)
@@ -509,6 +560,7 @@ def create_app(
         if observer is not None:
             observer.stop()
         app.state.conn.close()
+        app.state.auth.close()
 
     app = FastAPI(title="Arbites", version=__version__, lifespan=lifespan)
 
@@ -547,6 +599,14 @@ def create_app(
             content={"error": {"code": exc.code, "message": exc.message}},
         )
 
+    @app.exception_handler(auth_ops.AuthError)
+    async def _auth_error(request: Request, exc: auth_ops.AuthError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    _register_auth(app)
     _register_routes(app)
     _mount_frontend(app)
     return app
@@ -626,6 +686,8 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
     if not row:
         raise _error(404, "not_found", f"{entity_id} não encontrado")
     out = dict(row)
+    out["quarantine"] = bool(row["quarantine"])
+    out["needs_rerun"] = bool(row["needs_rerun"])
     out["tags"] = [
         r["tag"]
         for r in conn.execute(
@@ -645,6 +707,16 @@ def _tc_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
 
 # ---------------------------------------------------------------------------
 # Rotas
+
+
+def author_of(request: Request) -> str:
+    """Quem assina o que esta sendo escrito. Vem SEMPRE da sessao: aceitar
+    autoria do corpo faria dela um campo que qualquer um preenche com o nome
+    de qualquer um."""
+    if not getattr(request.app.state, "auth_enabled", True):
+        return "local"
+    user = getattr(request.state, "user", None)
+    return (user or {}).get("email", "local")
 
 
 def _register_routes(app: FastAPI) -> None:
@@ -792,6 +864,7 @@ def _register_routes(app: FastAPI) -> None:
             "external_key": payload.external_key,
             "tags": payload.tags,
             "created": date.today().isoformat(),
+            "created_by": author_of(request),
         }
         if payload.squad:
             meta["squad"] = payload.squad
@@ -967,6 +1040,7 @@ def _register_routes(app: FastAPI) -> None:
         folder: str = "",
         squad: str = "",
         q: str = "",
+        needs_rerun: bool | None = None,
     ):
         sql, params = "SELECT DISTINCT t.* FROM testcases t", []
         if tag:
@@ -983,6 +1057,9 @@ def _register_routes(app: FastAPI) -> None:
             if value:
                 sql += f" AND t.{field} = ?"
                 params.append(value)
+        if needs_rerun is not None:
+            sql += " AND COALESCE(t.needs_rerun, 0) = ?"
+            params.append(1 if needs_rerun else 0)
         if folder:
             sql += " AND t.path LIKE ?"
             params.append(f"testcases/{folder.strip('/')}/%")
@@ -1016,6 +1093,7 @@ def _register_routes(app: FastAPI) -> None:
             "story": payload.story,
             "created": today,
             "updated": today,
+            "created_by": author_of(request),
         }
         if payload.squad:
             meta["squad"] = payload.squad
@@ -1119,6 +1197,9 @@ def _register_routes(app: FastAPI) -> None:
         if "criteria" in changes and not changes["criteria"]:
             meta.pop("criteria", None)  # lista vazia/None limpa o vínculo
             changes.pop("criteria")
+        if "quarantine" in changes and not changes["quarantine"]:
+            meta.pop("quarantine", None)  # false não polui o frontmatter
+            changes.pop("quarantine")
         meta.update(changes)
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
@@ -1230,11 +1311,65 @@ def _register_routes(app: FastAPI) -> None:
             doc = parse_markdown(ws.root / row["path"])
             testcases.append({"id": ct_id, "steps": doc.steps})
         execution = exec_ops.create(
-            ws, payload.name, payload.owner, payload.sprint, payload.environment,
-            testcases, squad=payload.squad,
+            ws, payload.name, author_of(request), payload.sprint,
+            payload.environment, testcases, squad=payload.squad,
         )
         _save_and_index(ws, conn, execution)
         return execution
+
+    @app.get(API_PREFIX + "/executions/diff")
+    async def diff_executions(request: Request, a: str, b: str):
+        """Compara os resultados por CT de duas executions (a → b).
+
+        Categorias: regressed / fixed / added (só em b) / removed (só em a) /
+        unchanged. Leitura pura da tabela `results` (registrada antes da rota
+        `/{exec_id}` para não ser capturada como path param)."""
+        conn = conn_of(request)
+        for eid in (a, b):
+            if not conn.execute(
+                "SELECT 1 FROM executions WHERE id = ?", (eid,)
+            ).fetchone():
+                raise _error(404, "not_found", f"{eid} não encontrada")
+
+        def _results(eid: str) -> dict[str, str]:
+            return {
+                row["testcase_id"]: row["status"]
+                for row in conn.execute(
+                    "SELECT testcase_id, status FROM results WHERE execution_id = ?",
+                    (eid,),
+                )
+            }
+
+        ra, rb = _results(a), _results(b)
+        ids = sorted(set(ra) | set(rb))
+        titles: dict[str, str] = {}
+        if ids:
+            placeholders = ",".join("?" * len(ids))
+            titles = {
+                row["id"]: row["title"]
+                for row in conn.execute(
+                    f"SELECT id, title FROM testcases WHERE id IN ({placeholders})",
+                    ids,
+                )
+            }
+        categories: dict[str, list] = {
+            k: [] for k in ("regressed", "fixed", "added", "removed", "unchanged")
+        }
+        for ct in ids:
+            entry = {"testcase_id": ct, "title": titles.get(ct)}
+            if ct in ra and ct in rb:
+                cat = exec_ops.diff_category(ra[ct], rb[ct])
+                categories[cat].append({**entry, "status_a": ra[ct], "status_b": rb[ct]})
+            elif ct in rb:
+                categories["added"].append({**entry, "status_a": None, "status_b": rb[ct]})
+            else:
+                categories["removed"].append({**entry, "status_a": ra[ct], "status_b": None})
+        return {
+            "a": a,
+            "b": b,
+            "categories": categories,
+            "counts": {k: len(v) for k, v in categories.items()},
+        }
 
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
@@ -1278,6 +1413,7 @@ def _register_routes(app: FastAPI) -> None:
             execution, ct_id, payload.status, payload.who, payload.comment, payload.column
         )
         _save_and_index(ws, conn, execution)
+        clear_needs_rerun(ws, conn, ct_id)  # resultado novo → limpa re-execução (0090)
         return execution
 
     @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/steps/{step_index}")
@@ -1368,7 +1504,25 @@ def _register_routes(app: FastAPI) -> None:
             "rework_rate": metrics_ops.rework_rate(conn, s, d, sq),
         }
         thresholds = ws_of(request).config().get("metric_thresholds")
-        return metrics_ops.annotate_thresholds(summary, thresholds)
+        annotated = metrics_ops.annotate_thresholds(summary, thresholds)
+        # contagem SEMPRE visível de quarentenados (excluídos do pass rate)
+        annotated["quarantine"] = metrics_ops.quarantine(conn, sq)
+        return annotated
+
+    @app.post(API_PREFIX + "/ai/executive-summary")
+    async def ai_executive_summary(request: Request, payload: ExecutiveSummaryIn):
+        """0098: resumo executivo narrado pela IA a partir dos NÚMEROS já
+        apurados (preview editável, sem gravar). Sem provider → 409, e o
+        dashboard segue 100% funcional."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        context_md = metrics_ops.executive_context_markdown(
+            conn, payload.sprint or None, payload.squad or None
+        )
+        result = await asyncio.to_thread(
+            ai_ops.generate_executive_summary, provider, _with_memory(request, context_md)
+        )
+        return {"preview": True, **result.model_dump(), "context_markdown": context_md}
 
     @app.get(API_PREFIX + "/metrics/trend")
     async def metrics_trend(request: Request, days: int = 7, sprint: str = "", squad: str = ""):
@@ -1500,14 +1654,15 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/metrics/traceability/export")
     async def metrics_traceability_export(
-        request: Request, format: str = "md", epic: str = "", sprint: str = "", squad: str = ""
+        request: Request, format: str = "md", epic: str = "", sprint: str = "",
+        squad: str = "", summary: str = "",
     ):
         matrix = metrics_ops.traceability(
             conn_of(request), epic or None, sprint or None, squad or None
         )
         if format == "md":
             return PlainTextResponse(
-                metrics_ops.matrix_markdown(matrix),
+                metrics_ops.matrix_markdown(matrix, summary or None),
                 media_type="text/markdown; charset=utf-8",
                 headers={"Content-Disposition": 'attachment; filename="matriz.md"'},
             )
@@ -1515,7 +1670,7 @@ def _register_routes(app: FastAPI) -> None:
             from .export_pdf import matrix_pdf
 
             return Response(
-                content=matrix_pdf(matrix),
+                content=matrix_pdf(matrix, summary or None),
                 media_type="application/pdf",
                 headers={"Content-Disposition": 'attachment; filename="matriz.pdf"'},
             )
@@ -1660,6 +1815,8 @@ def _register_routes(app: FastAPI) -> None:
     async def put_targets(request: Request, payload: AutomationTargetsIn):
         """Substitui `automation_targets` no arbites.yaml (mesmo padrão do
         PUT /ai/providers) — sem precisar abrir o YAML na mão."""
+        # Um alvo define o executavel e o cwd do subprocess: escrever aqui
+        # equivale a executar codigo no servidor (runner.py).
         ws, conn = ws_of(request), conn_of(request)
         runner: RunManager = request.app.state.runner
         import yaml as _yaml
@@ -1770,6 +1927,9 @@ def _register_routes(app: FastAPI) -> None:
                 str(automation.get("scenario_name", "")),
             )
             meta["updated"] = date.today().isoformat()
+            # re-base consciente de steps → o CT precisa ser re-executado (0090);
+            # o flag é limpo quando um resultado novo do CT é registrado
+            meta["needs_rerun"] = True
             _write_doc(ws.root / rel, meta, feature_sync_ops.scenario_body(
                 feat["feature_name"], sc, feat["language"]
             ))
@@ -1902,8 +2062,20 @@ def _register_routes(app: FastAPI) -> None:
         return local / ".env"
 
     @app.get(API_PREFIX + "/env/catalog")
-    async def env_catalog(request: Request):
-        return {"catalog": ENV_CATALOG}
+    async def env_catalog(request: Request, target: str = ""):
+        """Catálogo de `.env` derivado do projeto-alvo (0099) — nunca campos
+        fixos. Sem target útil ou sem `.env`/`.env.example`, catálogo vazio."""
+        if not target:
+            return {"catalog": []}
+        ws = ws_of(request)
+        try:
+            cfg = _find_target(ws, target)
+        except HTTPException:
+            return {"catalog": []}
+        local = Path(str(cfg.get("local_path") or ""))
+        if not local.is_dir():
+            return {"catalog": []}
+        return {"catalog": derive_env_catalog(local)}
 
     @app.get(API_PREFIX + "/targets/{name}/env")
     async def get_target_env(request: Request, name: str):
@@ -2065,7 +2237,19 @@ def _register_routes(app: FastAPI) -> None:
                     yield f"data: {line}\n\n"
                 if not finished:
                     while True:
-                        line = await queue.get()
+                        try:
+                            line = await asyncio.wait_for(
+                                queue.get(), timeout=SSE_KEEPALIVE_SECONDS
+                            )
+                        except asyncio.TimeoutError:
+                            # Passo silencioso do Behave: sem isto a conexao
+                            # fica sem trafego, e um proxy no caminho (o
+                            # Cloudflare Tunnel corta conexao ociosa por
+                            # volta de 100s) derruba um run que esta vivo.
+                            # `:` e comentario SSE — o EventSource ignora,
+                            # entao o terminal da UI nao ve nada.
+                            yield ": keepalive\n\n"
+                            continue
                         if line is None:
                             break
                         yield f"data: {line}\n\n"
@@ -2198,40 +2382,71 @@ def _register_routes(app: FastAPI) -> None:
 
     # -- perfil / memória de longo prazo (doc §2) ---------------------------
 
-    def _profile_path(ws: Workspace) -> Path:
+    def _legacy_profile_path(ws: Workspace) -> Path:
         return ws.root / "profile.md"
 
-    def _load_profile(ws: Workspace) -> tuple[str, str]:
-        path = _profile_path(ws)
-        if not path.exists():
+    def _profile_path(request: Request) -> Path:
+        """Perfil da conta logada.
+
+        A memoria de longo prazo entra em TODA chamada de IA; compartilhar o
+        arquivo faria a IA responder a um QA com o contexto de outro. Sem
+        autenticacao (instalacao de uma pessoa so) segue o arquivo da raiz.
+        """
+        ws = ws_of(request)
+        if not getattr(request.app.state, "auth_enabled", True):
+            return _legacy_profile_path(ws)
+        user = current_user(request)
+        return ws.root / "profiles" / f"{slugify(user['email'])}.md"
+
+    def _seed_profile(request: Request, path: Path) -> None:
+        """Primeira leitura de uma conta: template, ou o `profile.md` da raiz
+        para a conta de menor id — que e, por construcao, o usuario unico que
+        existia antes de a instancia virar multiusuario."""
+        legacy = _legacy_profile_path(ws_of(request))
+        inherits = False
+        if getattr(request.app.state, "auth_enabled", True) and legacy.exists():
+            first = request.app.state.auth.execute(
+                "SELECT MIN(id) AS id FROM users"
+            ).fetchone()
+            inherits = first is not None and first["id"] == current_user(request)["id"]
+        if inherits:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(legacy.read_text(encoding="utf-8"), encoding="utf-8")
+            legacy.unlink()  # herdado uma unica vez
+        else:
             _write_doc(path, {"name": ""}, PROFILE_TEMPLATE)
+
+    def _load_profile(request: Request) -> tuple[str, str]:
+        ws = ws_of(request)
+        path = _profile_path(request)
+        if not path.exists():
+            _seed_profile(request, path)
         meta, body = _load_doc(ws, ws.relpath(path))
         return str(meta.get("name") or ""), body
 
     @app.get(API_PREFIX + "/profile")
     async def get_profile(request: Request):
-        name, memory = _load_profile(ws_of(request))
+        name, memory = _load_profile(request)
         return {"name": name, "memory": memory}
 
     @app.put(API_PREFIX + "/profile")
     async def put_profile(request: Request, payload: ProfileIn):
-        ws = ws_of(request)
-        name, memory = _load_profile(ws)
+        name, memory = _load_profile(request)
         if payload.name is not None:
             name = payload.name
         if payload.memory is not None:
             memory = payload.memory
-        _write_doc(_profile_path(ws), {"name": name or None}, memory)
+        _write_doc(_profile_path(request), {"name": name or None}, memory)
         return {"name": name, "memory": memory}
 
-    def _with_memory(ws: Workspace, user_text: str) -> str:
+    def _with_memory(request: Request, user_text: str) -> str:
         """Prefixa o conteúdo do usuário com a memória de longo prazo (doc §2).
 
         Injetado em TODA chamada de IA, independente do provider. Memória
         vazia/template intocado → sem bloco (prompt limpo).
         """
         try:
-            _, memory = _load_profile(ws)
+            _, memory = _load_profile(request)
         except OSError:
             return user_text
         stripped = memory.strip()
@@ -2242,14 +2457,14 @@ def _register_routes(app: FastAPI) -> None:
             f"{stripped}\n\n---\n\n{user_text}"
         )
 
-    def _with_project_recap(conn: sqlite3.Connection, ws: Workspace, user_text: str) -> str:
+    def _with_project_recap(request: Request, conn: sqlite3.Connection, user_text: str) -> str:
         """Empilha o recap de decisões/lições recentes (Memória Histórica do
         Projeto) sobre a memória de longo prazo do usuário — a IA "lembra"
         do que já aconteceu no projeto, não só do que o usuário escreveu no
         perfil."""
         recap = memory_ops.recent_recap(conn)
         text = f"{recap}\n\n---\n\n{user_text}" if recap else user_text
-        return _with_memory(ws, text)
+        return _with_memory(request, text)
 
     def _log_agent_event(
         ws: Workspace, conn: sqlite3.Connection, action: str,
@@ -2281,6 +2496,9 @@ def _register_routes(app: FastAPI) -> None:
         return ws.config().get("ai") or {"default_provider": None, "providers": []}
 
     def _ai_provider(request: Request, name: str | None):
+        # Ponto unico por onde toda chamada de IA passa: o interruptor fica
+        # aqui, e nao nas 7 rotas, para que uma rota nova ja nasca governada.
+        require_switch(request, "ai")
         ws = ws_of(request)
         config = _ai_config(ws)
         chosen = name or config.get("default_provider")
@@ -2414,7 +2632,7 @@ def _register_routes(app: FastAPI) -> None:
                 )
                 gen = await asyncio.to_thread(
                     ai_ops.generate_testcases, provider,
-                    _with_project_recap(conn, ws, focus), lessons,
+                    _with_project_recap(request, conn, focus), lessons,
                 )
                 for it in gen.testcases:
                     items.append({
@@ -2430,7 +2648,7 @@ def _register_routes(app: FastAPI) -> None:
                     "lessons_used": lessons_used}
 
         generated = await asyncio.to_thread(
-            ai_ops.generate_testcases, provider, _with_project_recap(conn, ws, source), lessons
+            ai_ops.generate_testcases, provider, _with_project_recap(request, conn, source), lessons
         )
         _log_agent_event(
             ws, conn, "generate_testcases", source_id, source_title,
@@ -2455,7 +2673,7 @@ def _register_routes(app: FastAPI) -> None:
         ]
         similar = ai_ops.find_similar(conn, row["title"], tags, exclude_id=ct_id)
         result = await asyncio.to_thread(
-            ai_ops.review_testcase, provider, _with_project_recap(conn, ws, ct_md), similar
+            ai_ops.review_testcase, provider, _with_project_recap(request, conn, ct_md), similar
         )
         _log_agent_event(
             ws, conn, "review_testcase", ct_id, row["title"] if row else None,
@@ -2532,7 +2750,7 @@ def _register_routes(app: FastAPI) -> None:
             "SELECT title FROM testcases WHERE id = ?", (ct_id,)
         ).fetchone()
         generated = await asyncio.to_thread(
-            ai_ops.negative_cases, provider, _with_memory(ws, ct_md)
+            ai_ops.negative_cases, provider, _with_memory(request, ct_md)
         )
         _log_agent_event(
             ws, conn, "negative_cases", ct_id, row["title"] if row else None,
@@ -2580,7 +2798,7 @@ def _register_routes(app: FastAPI) -> None:
 
         prov = _ai_provider(request, provider or None)
         conversion = await asyncio.to_thread(
-            ai_ops.convert_import, prov, name, _with_memory(ws, text)
+            ai_ops.convert_import, prov, name, _with_memory(request, text)
         )
         return {
             "preview": True,  # nada gravado; aceite = POST /testcases por item
@@ -2631,6 +2849,7 @@ def _register_routes(app: FastAPI) -> None:
             "execution": payload.execution,
             "external_key": payload.external_key,
             "opened": date.today().isoformat(),
+            "created_by": author_of(request),
             "root_cause": payload.root_cause,
             "fix": payload.fix,
             "prevention": payload.prevention,
@@ -2889,7 +3108,7 @@ def _register_routes(app: FastAPI) -> None:
         ctx = daily_ops.build_context(ws, conn, _check_date(day))
         markdown = daily_ops.context_markdown(ctx)
         digest = await asyncio.to_thread(
-            ai_ops.generate_daily, provider, _with_memory(ws, markdown)
+            ai_ops.generate_daily, provider, _with_memory(request, markdown)
         )
         return {"preview": True, "date": day, **digest.model_dump(), "context_markdown": markdown}
 
@@ -2988,9 +3207,78 @@ def _register_routes(app: FastAPI) -> None:
         if not body.strip():
             raise _error(422, "empty_meeting", "reunião sem descrição/transcrição para resumir")
         result = await asyncio.to_thread(
-            ai_ops.summarize_meeting, provider, _with_memory(ws, body)
+            ai_ops.summarize_meeting, provider, _with_memory(request, body)
         )
         return {"preview": True, "id": meeting_id, **result.model_dump()}
+
+    def _converted_todos(conn, meeting_id: str) -> list[dict]:
+        """Todos já criados a partir desta reunião (link no todo, 0097)."""
+        rows = conn.execute(
+            "SELECT id, title, status FROM todos"
+            " WHERE ',' || COALESCE(links, '') || ',' LIKE ?"
+            " ORDER BY id",
+            (f"%,{meeting_id},%",),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    @app.get(API_PREFIX + "/meetings/{meeting_id}/action-items")
+    async def meeting_action_items(request: Request, meeting_id: str):
+        """Preview determinístico (linhas `- [ ]`) + histórico dos afazeres
+        já convertidos. Funciona sem nenhum provider de IA (0097)."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        return {
+            "id": meeting_id,
+            "deterministic": daily_ops.extract_action_items(body),
+            "converted": _converted_todos(conn, meeting_id),
+        }
+
+    @app.post(API_PREFIX + "/meetings/{meeting_id}/action-items/generate")
+    async def meeting_action_items_generate(
+        request: Request, meeting_id: str, payload: MeetingActionItemsGenerateIn
+    ):
+        """Extração assistida por IA (preview), mesmo padrão da daily — usa o
+        `summarize_meeting` e devolve os action items para revisão."""
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        rel = _find_path(conn, "meetings", meeting_id)
+        _, body = _load_doc(ws, rel)
+        if not body.strip():
+            raise _error(422, "empty_meeting",
+                         "reunião sem descrição/transcrição para extrair")
+        result = await asyncio.to_thread(
+            ai_ops.summarize_meeting, provider, _with_memory(request, body)
+        )
+        return {"preview": True, "id": meeting_id, "action_items": result.action_items}
+
+    @app.post(
+        API_PREFIX + "/meetings/{meeting_id}/action-items/accept", status_code=201
+    )
+    async def meeting_action_items_accept(
+        request: Request, meeting_id: str, payload: MeetingActionItemsAcceptIn
+    ):
+        """Cria um afazer por item selecionado, vinculado à reunião (0097)."""
+        ws, conn = ws_of(request), conn_of(request)
+        _find_path(conn, "meetings", meeting_id)  # 404 se a reunião não existe
+        created: list[str] = []
+        for title in payload.items:
+            title = title.strip()
+            if not title:
+                continue
+            todo_id = ws.next_id("todo")
+            meta = {
+                "id": todo_id,
+                "title": title,
+                "status": "open",
+                "links": [meeting_id],
+                "created": date.today().isoformat(),
+            }
+            path = ws.root / "todos" / f"{todo_id}-{slugify(title)}.md"
+            _write_doc(path, meta, "")
+            reindex_file(ws, conn, path)
+            created.append(todo_id)
+        return {"created": created, "converted": _converted_todos(conn, meeting_id)}
 
     # -- decisions / decisões arquiteturais (Memória Histórica) -------------
     # Ponteiro + metadados do TIME DE QA sobre o projeto sob teste — não é
@@ -3190,6 +3478,430 @@ def _register_routes(app: FastAPI) -> None:
         wanted = [k for k in kinds.split(",") if k] or None
         return memory_ops.timeline_years(conn_of(request), wanted)
 
+
+
+# ---------------------------------------------------------------------------
+# Autenticacao (capability auth) — rotas /auth/* e o gate de sessao
+
+
+class RegisterIn(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class PasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class SwitchIn(BaseModel):
+    enabled: bool
+
+class ApproveIn(BaseModel):
+    role: str = "viewer"
+
+
+class RoleIn(BaseModel):
+    role: str
+
+
+class ResetIn(BaseModel):
+    password: str
+
+
+
+# Rotas que respondem sem sessao. Tudo o mais sob API_PREFIX exige cookie.
+_PUBLIC_PATHS = {
+    API_PREFIX + "/auth/login",
+    API_PREFIX + "/auth/register",
+    API_PREFIX + "/auth/me",
+    API_PREFIX + "/health",
+}
+
+# Com must_change_password a sessao existe mas so serve para trocar a senha.
+_PASSWORD_CHANGE_PATHS = {
+    API_PREFIX + "/auth/password",
+    API_PREFIX + "/auth/logout",
+    API_PREFIX + "/auth/me",
+}
+
+
+def client_ip(request: Request) -> str:
+    """IP real atras de tunel/proxy: Cloudflare primeiro, depois o primeiro
+    salto do X-Forwarded-For, e so entao o socket (que seria sempre o proxy)."""
+    cf = request.headers.get("cf-connecting-ip", "").strip()
+    if cf:
+        return cf
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded.strip():
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def _set_session_cookie(response: Response, request: Request, token: str) -> None:
+    response.set_cookie(
+        auth_ops.SESSION_COOKIE,
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+        max_age=int(auth_ops.ABSOLUTE_TIMEOUT.total_seconds()),
+    )
+
+
+def current_user(request: Request) -> dict[str, Any]:
+    """Usuario da sessao. Fora do gate (ARBITES_AUTH=off) devolve um
+    operador local sintetico, para que o resto do codigo nao precise de
+    ramificacao."""
+    user = getattr(request.state, "user", None)
+    if user is not None:
+        return user
+    if not getattr(request.app.state, "auth_enabled", True):
+        return {"id": 0, "email": "local", "name": "local", "role": "admin",
+                "status": "active", "must_change_password": False,
+                "created_at": None, "last_login_at": None}
+    raise _error(401, "unauthenticated", "sessao necessaria")
+
+
+# Superficies governadas: papel exigido e interruptor, numa tabela unica e
+# auditavel. Fica no gate, e nao no corpo dos handlers, porque a validacao de
+# parametros do FastAPI roda antes do handler — um 422 na frente do 403
+# entregaria de graca a forma da rota a quem nao pode alcanca-la.
+#
+# (regex do caminho, metodos, papel exigido, interruptor)
+_GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
+    # Define o executavel e o cwd do subprocess: e o caminho real para
+    # executar codigo no servidor (runner.py).
+    (r"/targets$", {"PUT"}, "admin", None),
+    (r"/targets/[^/]+/env$", {"GET", "PUT"}, "admin", "target_env"),
+    (r"/env/catalog$", {"GET"}, "admin", "target_env"),
+    (r"/automation/browse-features$", {"GET"}, "admin", "filesystem_browse"),
+    (r"/settings/github/token$", {"PUT"}, "admin", None),
+    (r"/ai/providers$", {"PUT"}, "admin", None),
+    (r"/import/xray", {"POST"}, "admin", "xray_import"),
+    (r"/runs/local$", {"POST"}, None, "local_runner"),
+    # O painel inteiro, e nao rota a rota: uma rota /admin/ nova ja nasce
+    # restrita. GET /admin/switches e a excecao deliberada — a UI precisa
+    # saber o que esconder, e o estado de um interruptor nao e segredo.
+    (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),
+    (r"/admin/switches$", {"PUT"}, "admin", None),
+)
+
+_GOVERNED_COMPILED = tuple(
+    (re.compile("^" + API_PREFIX + pattern), methods, role, switch)
+    for pattern, methods, role, switch in _GOVERNED
+)
+
+
+def governed_for(path: str, method: str) -> tuple[str | None, str | None]:
+    """Papel e interruptor exigidos por este caminho, se houver."""
+    for matcher, methods, role, switch in _GOVERNED_COMPILED:
+        if method in methods and matcher.match(path):
+            return role, switch
+    return None, None
+
+
+# Escritas que um `viewer` pode fazer: as que agem sobre a propria conta.
+_VIEWER_WRITABLE = {
+    API_PREFIX + "/auth/password",
+    API_PREFIX + "/auth/logout",
+    API_PREFIX + "/auth/login",
+    API_PREFIX + "/auth/register",
+}
+
+
+def require_role(request: Request, *roles: str) -> dict[str, Any]:
+    """Exige um dos papeis. 403 e nao 404: esconder a existencia da rota nao
+    protege nada e transforma autorizacao em adivinhacao."""
+    user = current_user(request)
+    if user["role"] not in roles:
+        raise _error(
+            403, "forbidden",
+            "esta operacao exige papel %s" % " ou ".join(roles),
+        )
+    return user
+
+
+def require_switch(request: Request, name: str) -> None:
+    """Recusa a rota quando o admin desligou a capacidade correspondente."""
+    if not getattr(request.app.state, "auth_enabled", True):
+        return
+    if not auth_ops.switch_enabled(request.app.state.auth, name):
+        raise _error(
+            403, "feature_disabled",
+            "recurso desligado pelo administrador (interruptor '%s')" % name,
+        )
+
+
+def _register_auth(app: FastAPI) -> None:
+    def auth_of(request: Request):
+        return request.app.state.auth
+
+    def ws_of(request: Request) -> Workspace:
+        return request.app.state.ws
+
+    def conn_of(request: Request) -> sqlite3.Connection:
+        return request.app.state.conn
+
+    @app.middleware("http")
+    async def _session_gate(request: Request, call_next):
+        path = request.url.path
+        if not path.startswith(API_PREFIX) or not request.app.state.auth_enabled:
+            return await call_next(request)
+        raw = request.cookies.get(auth_ops.SESSION_COOKIE)
+        user = auth_ops.resolve_session(request.app.state.auth, raw)
+        request.state.user = user
+        if path in _PUBLIC_PATHS:
+            return await call_next(request)
+        if user is None:
+            response = JSONResponse(
+                status_code=401,
+                content={"error": {"code": "unauthenticated",
+                                   "message": "sessao necessaria"}},
+            )
+            response.delete_cookie(auth_ops.SESSION_COOKIE, path="/")
+            return response
+        if user["must_change_password"] and path not in _PASSWORD_CHANGE_PATHS:
+            return JSONResponse(
+                status_code=403,
+                content={"error": {"code": "password_change_required",
+                                   "message": "troque a senha antes de continuar"}},
+            )
+        # Recusa de escrita para `viewer` aqui, e nao rota a rota: uma rota
+        # nova nasce protegida sem ninguem precisar lembrar de anota-la.
+        if (user["role"] == "viewer"
+                and request.method not in ("GET", "HEAD", "OPTIONS")
+                and path not in _VIEWER_WRITABLE):
+            return JSONResponse(
+                status_code=403,
+                content={"error": {"code": "forbidden",
+                                   "message": "papel viewer nao pode escrever"}},
+            )
+        role, switch = governed_for(path, request.method)
+        if role is not None and user["role"] != role:
+            return JSONResponse(
+                status_code=403,
+                content={"error": {"code": "forbidden",
+                                   "message": "esta operacao exige papel %s" % role}},
+            )
+        if switch is not None and not auth_ops.switch_enabled(
+                request.app.state.auth, switch):
+            return JSONResponse(
+                status_code=403,
+                content={"error": {
+                    "code": "feature_disabled",
+                    "message": "recurso desligado pelo administrador"
+                               " (interruptor '%s')" % switch}},
+            )
+        response = await call_next(request)
+        # Log de atividade aqui, e nao rota a rota: uma rota de escrita nova
+        # entra no registro sozinha. Nada de corpo — caminho e metodo bastam,
+        # e o corpo levaria senha e token para um registro que ninguem apaga.
+        if (request.method not in ("GET", "HEAD", "OPTIONS")
+                and response.status_code < 400
+                and not path.startswith(API_PREFIX + "/auth/")):
+            auth_ops.record_activity(
+                request.app.state.auth, user, request.method, path,
+                response.status_code, client_ip(request),
+            )
+        return response
+
+    @app.get(API_PREFIX + "/health")
+    async def health():
+        return {"status": "ok", "version": __version__}
+
+    @app.post(API_PREFIX + "/auth/register", status_code=201)
+    async def register(request: Request, payload: RegisterIn):
+        if os.environ.get("ARBITES_SIGNUP", "on").strip().lower() == "off":
+            raise _error(403, "signup_disabled", "cadastro fechado nesta instancia")
+        user = auth_ops.create_user(
+            auth_of(request), payload.email, payload.password, payload.name,
+            role="viewer", status="pending",
+        )
+        # Nasce pendente: nenhuma sessao aqui, de proposito.
+        return {"user": user, "message": "cadastro recebido; aguarde a liberacao"}
+
+    @app.post(API_PREFIX + "/auth/login")
+    async def login(request: Request, payload: LoginIn):
+        conn = auth_of(request)
+        user = auth_ops.authenticate(
+            conn, payload.email, payload.password, client_ip(request),
+            request.headers.get("user-agent", ""),
+        )
+        token = auth_ops.open_session(
+            conn, user["id"], client_ip(request),
+            request.headers.get("user-agent", ""),
+        )
+        response = JSONResponse({"user": auth_ops.get_user(conn, user["id"])})
+        _set_session_cookie(response, request, token)
+        return response
+
+    @app.post(API_PREFIX + "/auth/logout")
+    async def logout(request: Request):
+        auth_ops.revoke_session(
+            auth_of(request), request.cookies.get(auth_ops.SESSION_COOKIE)
+        )
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(auth_ops.SESSION_COOKIE, path="/")
+        return response
+
+    @app.get(API_PREFIX + "/auth/me")
+    async def me(request: Request):
+        if not request.app.state.auth_enabled:
+            return {"user": current_user(request), "auth_enabled": False}
+        user = getattr(request.state, "user", None)
+        return {"user": user, "auth_enabled": True,
+                "signup_enabled":
+                    os.environ.get("ARBITES_SIGNUP", "on").strip().lower() != "off"}
+
+
+    # -- painel de administracao (capability admin) -------------------------
+
+    def _target_user(request: Request, user_id: int) -> dict[str, Any]:
+        """Alvo de uma acao de governo, ja recusando acao sobre si mesmo.
+
+        A saida de um admin e decisao de outro admin: sem isto, um clique
+        errado tranca a instancia com um admin desativado por ele mesmo.
+        """
+        target = auth_ops.get_user(auth_of(request), user_id)
+        if target is None:
+            raise _error(404, "user_not_found", "conta inexistente")
+        if target["id"] == current_user(request)["id"]:
+            raise _error(
+                403, "self_demotion",
+                "um admin nao altera o proprio papel nem o proprio status",
+            )
+        return target
+
+    @app.get(API_PREFIX + "/admin/users")
+    async def admin_list_users(request: Request):
+        return {"users": auth_ops.list_users(auth_of(request))}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/approve")
+    async def admin_approve(request: Request, user_id: int, payload: ApproveIn):
+        target = _target_user(request, user_id)
+        conn = auth_of(request)
+        # Papel escolhido na propria aprovacao: exigir uma segunda acao so
+        # criaria uma janela em que a conta ja entra com o papel errado.
+        if payload.role != target["role"]:
+            auth_ops.set_role(conn, user_id, payload.role)
+        return {"user": auth_ops.set_status(conn, user_id, "active")}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/reject")
+    async def admin_reject(request: Request, user_id: int):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_status(auth_of(request), user_id, "rejected")}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/disable")
+    async def admin_disable(request: Request, user_id: int):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_status(auth_of(request), user_id, "disabled")}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/enable")
+    async def admin_enable(request: Request, user_id: int):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_status(auth_of(request), user_id, "active")}
+
+    @app.put(API_PREFIX + "/admin/users/{user_id}/role")
+    async def admin_set_role(request: Request, user_id: int, payload: RoleIn):
+        _target_user(request, user_id)
+        return {"user": auth_ops.set_role(auth_of(request), user_id, payload.role)}
+
+    @app.post(API_PREFIX + "/admin/users/{user_id}/password")
+    async def admin_reset_password(request: Request, user_id: int, payload: ResetIn):
+        _target_user(request, user_id)
+        conn = auth_of(request)
+        # Temporaria por construcao: quem definiu a senha conhece o valor,
+        # entao ela so serve para um login.
+        auth_ops.set_password(conn, user_id, payload.password, must_change=True)
+        return {"user": auth_ops.get_user(conn, user_id)}
+
+    @app.delete(API_PREFIX + "/admin/users/{user_id}/sessions")
+    async def admin_revoke_sessions(request: Request, user_id: int):
+        target = _target_user(request, user_id)
+        # Derrubar quem esta dentro e barrar quem quer entrar sao decisoes
+        # separadas: o status da conta nao muda aqui.
+        revoked = auth_ops.revoke_user_sessions(auth_of(request), target["id"])
+        return {"revoked": revoked,
+                "user": auth_ops.get_user(auth_of(request), user_id)}
+
+    @app.get(API_PREFIX + "/admin/activity")
+    async def admin_activity(
+        request: Request,
+        limit: int = 100,
+        offset: int = 0,
+        user: str = "",
+        path: str = "",
+        date_from: str = "",
+        date_to: str = "",
+    ):
+        return {"entries": auth_ops.list_activity(
+            auth_of(request), limit, offset, user, path, date_from, date_to)}
+
+    @app.get(API_PREFIX + "/admin/access-log")
+    async def admin_access_log(request: Request, limit: int = 100, offset: int = 0):
+        return {"attempts": auth_ops.list_attempts(auth_of(request), limit, offset)}
+
+    @app.get(API_PREFIX + "/admin/overview")
+    async def admin_overview(request: Request):
+        conn = conn_of(request)
+        ws = ws_of(request)
+        meta = {
+            row["key"]: row["value"]
+            for row in conn.execute("SELECT key, value FROM index_meta")
+        }
+        trash = ws.arbites_dir / "trash"
+        trash_items = (
+            len([p for p in trash.iterdir() if not p.name.endswith(".arbtrash")])
+            if trash.is_dir() else 0
+        )
+        return {
+            "version": __version__,
+            "users": auth_ops.count_users_by_status(auth_of(request)),
+            "index": {
+                "last_reindex": meta.get("last_reindex"),
+                "last_reindex_seconds": meta.get("last_reindex_seconds"),
+            },
+            "trash_items": trash_items,
+            "switches": auth_ops.list_switches(auth_of(request)),
+        }
+
+    @app.get(API_PREFIX + "/admin/switches")
+    async def get_switches(request: Request):
+        # Legivel por qualquer sessao: a UI precisa esconder o que esta
+        # desligado, e o estado de um interruptor nao e segredo.
+        return {"switches": auth_ops.list_switches(auth_of(request))}
+
+    @app.put(API_PREFIX + "/admin/switches/{name}")
+    async def put_switch(request: Request, name: str, payload: SwitchIn):
+        user = current_user(request)
+        return {"switch": auth_ops.set_switch(
+            auth_of(request), name, payload.enabled, user["email"])}
+
+    @app.post(API_PREFIX + "/auth/password")
+    async def change_password(request: Request, payload: PasswordIn):
+        conn = auth_of(request)
+        user = current_user(request)
+        row = auth_ops.get_user_by_email(conn, user["email"])
+        if not auth_ops.verify_password(row["password_hash"], payload.current_password):
+            raise _error(401, "invalid_credentials", "senha atual incorreta")
+        auth_ops.set_password(conn, user["id"], payload.new_password)
+        # set_password derruba todas as sessoes; quem trocou recebe uma nova
+        # (rotacao) para nao ser deslogado pelo proprio acerto.
+        token = auth_ops.open_session(
+            conn, user["id"], client_ip(request),
+            request.headers.get("user-agent", ""),
+        )
+        response = JSONResponse({"user": auth_ops.get_user(conn, user["id"])})
+        _set_session_cookie(response, request, token)
+        return response
 
 def _mount_frontend(app: FastAPI) -> None:
     """Serve o build da SPA (frontend/dist) como estático — um comando sobe tudo."""

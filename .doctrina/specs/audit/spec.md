@@ -2,10 +2,10 @@
 
 **Capability:** audit
 **Status:** active
-**Implementation:** verified
+**Implementation:** verified — snapshot de qualidade (`backend/arbites/audit.py`) + log de atividade no gate (`backend/arbites/api.py`, `backend/arbites/auth.py`)
 **Realizes:** n/a — capability nova (Agente Auditor), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-20
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -59,6 +59,9 @@ atenção.
   parágrafo curto do que o auditor consolida e quando roda, e a legenda das
   severidades (bad/warn/info com status-dot) — um usuário novo entende a
   aba sem sair dela.
+- The system shall registrar em `.arbites/auth.db` toda requisição de escrita bem-sucedida sob o prefixo da API — data, id e e-mail do autor, método, caminho, código de resposta e IP real — sem depender de anotação rota a rota, de modo que uma rota de escrita nova seja registrada sozinha.
+- The system shall expor `GET /admin/activity` (apenas `admin`), mais recente primeiro, paginado por `limit` e `offset`, filtrável por autor (`user`), por trecho de caminho (`path`) e por intervalo de datas (`from`, `to`).
+- The system shall manter o log de atividade separado das rodadas de auditoria de qualidade: aquele é contínuo e imutável, estas são retratos sob demanda.
 
 ### Event-driven
 
@@ -68,6 +71,7 @@ atenção.
 - When `GET /audit/latest` é chamado e a rodada mais recente ainda está
   dentro do intervalo configurado, the system shall devolver essa rodada sem
   reprocessar.
+- When uma requisição de escrita falha (resposta 4xx ou 5xx), the system shall deixá-la fora do log de atividade — tentativa recusada não é ação; as de autenticação já vivem no registro de acessos.
 
 ### State-driven
 
@@ -88,6 +92,8 @@ atenção.
   externamente (workspace é editável fora do Arbites, ADR 0001) — um
   `created_at` sem fuso horário no check de automação vira "tempo
   desconhecido" no achado, nunca um erro 500.
+- The system shall not gravar corpo de requisição no log de atividade; caminho e método bastam para responder quem mexeu no quê, e o corpo carregaria senha, token e conteúdo de artefato para dentro de um registro que ninguém apaga.
+- The system shall not oferecer rota de exclusão ou edição de entrada do log de atividade; um registro que o próprio suspeito pode apagar não prova nada.
 
 ### Optional
 
@@ -130,6 +136,10 @@ atenção.
    (`uncovered_criterion`/warn) e CT ready/automated de story com critérios
    sem vínculo (`unlinked_testcase`/info) — verified by
    `backend/tests/test_audit.py` (`test_audit_spec_coverage_criteria`).
+9. [verified] Criar, editar e apagar um caso de teste deixa três entradas no log com o e-mail de quem fez, método, caminho e IP, na ordem inversa da execução — verified by `backend/tests/test_activity_log.py`.
+10. [verified] Uma escrita recusada por papel ou por interruptor não entra no log, e uma leitura por GET também não — verified by `backend/tests/test_activity_log.py`.
+11. [verified] O log filtra por autor, por trecho de caminho e por intervalo de datas, e pagina — verified by `backend/tests/test_activity_log.py`.
+12. [verified] Nenhuma entrada do log carrega corpo de requisição, e não existe rota que apague ou edite o log; reindexar o workspace não o afeta — verified by `backend/tests/test_activity_log.py`.
 
 ## Maturity
 

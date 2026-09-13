@@ -35,7 +35,11 @@ def test_metric_thresholds_traffic_light(client, dataset):
 def test_thresholds_absent_by_default(client, dataset):
     """Sem metas configuradas, nenhum semáforo (retrocompat)."""
     m = client.get("/api/v1/metrics/summary").json()
-    assert all(m[k]["status"] == "none" for k in m)
+    metric_keys = [
+        "requirement_coverage", "execution_coverage",
+        "pass_rate", "blocked_rate", "rework_rate",
+    ]
+    assert all(m[k]["status"] == "none" for k in metric_keys)
 
 
 @pytest.fixture()
@@ -111,6 +115,34 @@ def test_flaky_detects_alternation(client, dataset):
     m = client.get("/api/v1/metrics/flaky", params={"window": 5}).json()
     flagged = [f["testcase_id"] for f in m["testcases"]]
     assert flagged == [dataset["ct1"]["id"]]
+
+
+def test_quarantine_excluded_from_pass_rate_and_counted(client, dataset):
+    """0089: CT em quarentena sai do pass rate e da cobertura, mas a
+    contagem aparece SEMPRE no summary com a lista para drill-down."""
+    before = client.get("/api/v1/metrics/summary").json()
+    assert before["pass_rate"]["denominator"] == 4  # ct1(2) + ct2(2)
+    assert before["quarantine"]["count"] == 0
+
+    # ct2 (2 resultados finais) vai para quarentena
+    client.put(f"/api/v1/testcases/{dataset['ct2']['id']}", json={"quarantine": True})
+
+    after = client.get("/api/v1/metrics/summary").json()
+    # pass rate agora só considera ct1: passed(E1) + failed(E2) = 1/2
+    assert (after["pass_rate"]["numerator"], after["pass_rate"]["denominator"]) == (1, 2)
+    assert after["pass_rate"]["value"] == 0.5
+    # cobertura de execução: ct2 sai do numerador e do denominador (só ct1 ready)
+    assert after["execution_coverage"]["denominator"] == 1
+    assert after["execution_coverage"]["numerator"] == 1
+    # contagem visível + lista para drill-down
+    assert after["quarantine"]["count"] == 1
+    assert [t["testcase_id"] for t in after["quarantine"]["testcases"]] == [
+        dataset["ct2"]["id"]
+    ]
+
+    # o toggle persiste no frontmatter e volta no GET do CT
+    tc = client.get(f"/api/v1/testcases/{dataset['ct2']['id']}").json()
+    assert tc["quarantine"] is True
 
 
 def test_trend_counts_daily_events(client, dataset):

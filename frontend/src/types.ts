@@ -1,3 +1,62 @@
+// -- sessao (capability auth) ------------------------------------------------
+
+export type Role = "admin" | "editor" | "viewer";
+export type UserStatus = "pending" | "active" | "disabled" | "rejected";
+
+export interface SessionUser {
+  id: number;
+  email: string;
+  name: string;
+  role: Role;
+  status: UserStatus;
+  must_change_password: boolean;
+  created_at: string | null;
+  last_login_at: string | null;
+}
+
+export interface Switch {
+  name: string;
+  label: string;
+  enabled: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface ManagedUser extends SessionUser {
+  open_sessions: number;
+}
+
+export interface LoginAttempt {
+  email: string;
+  ip: string;
+  user_agent: string;
+  ok: boolean;
+  at: string;
+}
+
+export interface ActivityEntry {
+  at: string;
+  user_email: string;
+  method: string;
+  path: string;
+  status_code: number;
+  ip: string;
+}
+
+export interface AdminOverview {
+  version: string;
+  users: Record<UserStatus, number>;
+  index: { last_reindex: string | null; last_reindex_seconds: string | null };
+  trash_items: number;
+  switches: Switch[];
+}
+
+export interface SessionInfo {
+  user: SessionUser | null;
+  auth_enabled: boolean;
+  signup_enabled?: boolean;
+}
+
 export interface WorkspaceInfo {
   config: {
     workspace?: { name?: string; id_prefixes?: Record<string, string> };
@@ -85,6 +144,8 @@ export interface TestCase {
   scenario_tag: string | null;
   squad: string | null;
   squad_effective: string | null;
+  quarantine?: boolean; // fora do pass rate quando true (0089)
+  needs_rerun?: boolean; // re-base de steps pendente de re-execução (0090)
   tags?: string[];
   criteria?: string[]; // EARS ids da story que este CT cobre (0092)
   body?: string;
@@ -183,6 +244,20 @@ export interface MeetingSummaryResult {
   action_items: string[];
 }
 
+export interface MeetingActionItems {
+  id: string;
+  deterministic: string[];
+  converted: { id: string; title: string; status: string }[];
+}
+
+export interface ExecutiveSummaryResult {
+  preview: boolean;
+  synthesis: string;
+  risks: string[];
+  recommendation: string;
+  context_markdown: string;
+}
+
 export interface TreeNode {
   name: string;
   path: string;
@@ -270,6 +345,27 @@ export interface ExecutionSummary {
   result_counts: Record<string, number>;
 }
 
+export interface ExecutionDiffEntry {
+  testcase_id: string;
+  title: string | null;
+  status_a: string | null;
+  status_b: string | null;
+}
+
+export type ExecutionDiffCategory =
+  | "regressed"
+  | "fixed"
+  | "added"
+  | "removed"
+  | "unchanged";
+
+export interface ExecutionDiff {
+  a: string;
+  b: string;
+  categories: Record<ExecutionDiffCategory, ExecutionDiffEntry[]>;
+  counts: Record<ExecutionDiffCategory, number>;
+}
+
 export interface Defect {
   id: string;
   title: string;
@@ -311,12 +407,18 @@ export interface MetricValue {
   threshold?: { warn?: number; bad?: number; direction?: string } | null;
 }
 
+export interface QuarantineSummary {
+  count: number;
+  testcases: { testcase_id: string; title: string | null }[];
+}
+
 export interface MetricsSummary {
   requirement_coverage: MetricValue;
   execution_coverage: MetricValue;
   pass_rate: MetricValue;
   blocked_rate: MetricValue;
   rework_rate: MetricValue;
+  quarantine?: QuarantineSummary;
 }
 
 export interface TrendPoint {

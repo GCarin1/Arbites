@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import make_md
+from conftest import login_admin, make_md
 from fastapi.testclient import TestClient
 
 from arbites.api import create_app
@@ -65,6 +65,7 @@ def auto_client(tmp_path):
     ws = _make_ws(tmp_path)
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         yield client
 
@@ -127,6 +128,7 @@ def test_timeout_marks_pending_as_blocked(tmp_path):
     ws = _make_ws(tmp_path, timeout_minutes=0.05)  # 3 s
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         resp = client.post(
             "/api/v1/runs/local",
@@ -167,6 +169,7 @@ def test_run_whole_feature_without_any_ct_tag_does_not_422(tmp_path):
     )
     app = create_app(ws.root, watch=False)
     with TestClient(app) as client:
+        login_admin(client)
         client.ws = ws
         resp = client.post(
             "/api/v1/runs/local",
@@ -232,3 +235,80 @@ def test_live_progress_reconciled_by_final_json(auto_client):
     # o stream registrou parciais ao vivo (best-effort) antes do fim
     stream = auto_client.get(f"/api/v1/runs/{exec_id}/stream")
     assert "[arbites] parcial:" in stream.text
+
+
+# -- 0099: injeção do .env do projeto no ambiente do run ----------------------
+
+from arbites.runner import build_run_env, load_env_file  # noqa: E402
+
+
+def test_load_env_file_parses_and_ignores_noise(tmp_path):
+    p = tmp_path / ".env"
+    p.write_text(
+        "# comentário de topo\n"
+        'BASE_URL="https://app.test"\n'
+        "export LOCAL_BROWSER=chrome\n"
+        "VAZIO=\n"
+        "\n"
+        "linha inválida sem igual\n"
+        "HEADLESS='false'\n",
+        encoding="utf-8",
+    )
+    vals = load_env_file(p)
+    assert vals["BASE_URL"] == "https://app.test"
+    assert vals["LOCAL_BROWSER"] == "chrome"  # prefixo export removido
+    assert vals["VAZIO"] == ""
+    assert vals["HEADLESS"] == "false"
+    assert "linha inválida sem igual" not in vals
+
+
+def test_load_env_file_missing_is_empty(tmp_path):
+    assert load_env_file(tmp_path / "nao-existe.env") == {}
+
+
+def test_build_run_env_injects_project_env_but_arbites_keys_win(tmp_path):
+    (tmp_path / ".env").write_text(
+        "BASE_URL=https://app.test\n"
+        "ARBITES_EVIDENCE_DIR=/tentativa/de/sobrescrever\n"
+        "PYTHONIOENCODING=latin-1\n",
+        encoding="utf-8",
+    )
+    evidence = tmp_path / "ev"
+    env = build_run_env({"PATH": "/bin"}, tmp_path, evidence)
+    assert env["BASE_URL"] == "https://app.test"  # projeto injetado no subprocess
+    assert env["PATH"] == "/bin"  # base preservada
+    # o .env do projeto NUNCA sobrescreve as chaves de controle do Arbites
+    assert env["ARBITES_EVIDENCE_DIR"] == str(evidence)
+    assert env["PYTHONIOENCODING"] == "utf-8"
+
+
+def test_stream_emite_keepalive_em_run_silencioso(auto_client, monkeypatch):
+    """Atrás de um proxy, conexão sem tráfego é derrubada por ociosidade — o
+    Cloudflare corta por volta de 100s. Um passo silencioso do Behave não
+    pode parecer um run morto."""
+    import arbites.api as api_module
+
+    monkeypatch.setattr(api_module, "SSE_KEEPALIVE_SECONDS", 0.05)
+
+    started = auto_client.post(
+        "/api/v1/runs/local",
+        json={"target": "frontend-web", "testcase_ids": ["CT-9001"]},
+    )
+    exec_id = started.json()["execution"]["id"]
+
+    with auto_client.stream("GET", f"/api/v1/runs/{exec_id}/stream") as stream:
+        assert stream.status_code == 200
+        keepalives, dados = 0, 0
+        for raw in stream.iter_lines():
+            line = raw if isinstance(raw, str) else raw.decode("utf-8")
+            if line.startswith(": keepalive"):
+                keepalives += 1
+            elif line.startswith("data: "):
+                dados += 1
+            if line.startswith("event: done") or keepalives >= 2:
+                break
+
+    # Com o intervalo em 50ms, qualquer intervalo entre linhas do Behave
+    # produz keepalive. Ele é comentário SSE: o EventSource ignora, então o
+    # terminal da UI não mostra nada — mas a conexão continua com tráfego.
+    assert keepalives >= 1, "nenhum keepalive no silêncio entre linhas do run"

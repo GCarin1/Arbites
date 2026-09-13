@@ -10,6 +10,7 @@ a daily — isso é ação explícita do usuário (ver api).
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
@@ -17,6 +18,28 @@ from typing import Any
 
 from . import metrics as metrics_ops
 from .workspace import Workspace
+
+# Action item determinístico: linha de checkbox aberto (`- [ ] texto`),
+# aceitando `*` como marcador e espaço interno opcional.
+_ACTION_ITEM_RE = re.compile(r"^\s*[-*]\s*\[\s*\]\s+(.+?)\s*$")
+
+
+def extract_action_items(text: str) -> list[str]:
+    """Extrai action items de um markdown pelas linhas de checkbox aberto.
+
+    Determinístico e sem IA — o caminho que sempre funciona (a spec de
+    meetings exige a aba 100% funcional sem provider). Duplicatas são
+    removidas preservando a ordem."""
+    seen: set[str] = set()
+    items: list[str] = []
+    for line in (text or "").splitlines():
+        match = _ACTION_ITEM_RE.match(line)
+        if match:
+            item = match.group(1).strip()
+            if item and item not in seen:
+                seen.add(item)
+                items.append(item)
+    return items
 
 _METRIC_LABELS = {
     "requirement_coverage": "Cobertura de requisito",

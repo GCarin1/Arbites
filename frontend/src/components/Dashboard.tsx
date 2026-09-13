@@ -29,13 +29,21 @@ import type {
 export function Dashboard({
   onError,
   onNavigate,
+  squad = "",
+  onSquadChange,
 }: {
   onError: (message: string) => void;
   onNavigate?: (id: string) => void;
+  // 0084: squad controlado pela URL (deep-link "board do squad X"); se não
+  // vier, cai para estado interno.
+  squad?: string;
+  onSquadChange?: (v: string) => void;
 }) {
   const [sprint, setSprint] = useState("");
   const [days, setDays] = useState(30);
-  const [squad, setSquad] = useState("");
+  const [localSquad, setLocalSquad] = useState("");
+  const effSquad = onSquadChange ? squad : localSquad;
+  const setSquad = onSquadChange ?? setLocalSquad;
   const [squads, setSquads] = useState<string[]>([]);
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
@@ -47,24 +55,51 @@ export function Dashboard({
   const [health, setHealth] = useState<HealthScore | null>(null);
   const [riskMap, setRiskMap] = useState<RiskMap | null>(null);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  // 0098: resumo executivo narrado pela IA (preview editável → export)
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [execSummary, setExecSummary] = useState<string>("");
+  const [genBusy, setGenBusy] = useState(false);
 
   useEffect(() => {
     api
       .squads()
       .then((r) => setSquads(r.squads))
       .catch(() => {});
+    api
+      .aiProviders()
+      .then((info) => setAiEnabled(!!info.default_provider))
+      .catch(() => setAiEnabled(false));
   }, []);
+
+  async function generateExecutiveSummary() {
+    setGenBusy(true);
+    try {
+      const r = await api.executiveSummary(sprint, effSquad);
+      const text = [
+        r.synthesis,
+        r.risks.length ? `Riscos:\n${r.risks.map((x) => `- ${x}`).join("\n")}` : "",
+        r.recommendation ? `Recomendação: ${r.recommendation}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      setExecSummary(text);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
       const [s, t, f, m, d, h, o] = await Promise.all([
-        api.metricsSummary(sprint, days, squad),
-        api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, squad),
+        api.metricsSummary(sprint, days, effSquad),
+        api.metricsTrend(days === 15 ? 15 : days === 7 ? 7 : 30, sprint, effSquad),
         api.metricsFlaky(5),
-        api.traceability("", sprint, squad),
-        api.metricsDefects(squad),
-        api.metricsHealth(sprint, days, squad),
-        api.metricsDashboard(sprint, days, squad),
+        api.traceability("", sprint, effSquad),
+        api.metricsDefects(effSquad),
+        api.metricsHealth(sprint, days, effSquad),
+        api.metricsDashboard(sprint, days, effSquad),
       ]);
       setSummary(s);
       setTrend(t);
@@ -76,7 +111,7 @@ export function Dashboard({
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
-  }, [sprint, days, squad, onError]);
+  }, [sprint, days, effSquad, onError]);
 
   useEffect(() => {
     void load();
@@ -112,7 +147,7 @@ export function Dashboard({
           />
           {squads.length > 0 && (
             <select
-              value={squad}
+              value={effSquad}
               onChange={(e) => setSquad(e.target.value)}
               aria-label="Filtrar por squad"
             >
@@ -129,14 +164,41 @@ export function Dashboard({
             <option value={15}>15 dias</option>
             <option value={30}>30 dias</option>
           </select>
-          <a className="button-link" href={api.exportUrl("md", sprint, squad)} download>
+          {aiEnabled && (
+            <button onClick={() => void generateExecutiveSummary()} disabled={genBusy}>
+              {genBusy ? "Gerando…" : "Resumo executivo (IA)"}
+            </button>
+          )}
+          <a className="button-link" href={api.exportUrl("md", sprint, effSquad, execSummary)} download>
             Export MD
           </a>
-          <a className="button-link" href={api.exportUrl("pdf", sprint, squad)} download>
+          <a className="button-link" href={api.exportUrl("pdf", sprint, effSquad, execSummary)} download>
             Export PDF
           </a>
         </div>
       </div>
+
+      {aiEnabled && execSummary && (
+        <div className="card exec-summary-card">
+          <div className="card-head">
+            <h3>Resumo executivo (IA)</h3>
+            <span className="spacer" />
+            <span className="caption muted">
+              editável — entra no início do export PDF/MD
+            </span>
+            <button className="btn-sm" onClick={() => setExecSummary("")}>
+              Descartar
+            </button>
+          </div>
+          <textarea
+            className="raw"
+            style={{ minHeight: 120, width: "100%" }}
+            value={execSummary}
+            onChange={(e) => setExecSummary(e.target.value)}
+            spellCheck={false}
+          />
+        </div>
+      )}
 
       <ExecutivePanel overview={overview} onNavigate={onNavigate} />
 
@@ -158,6 +220,28 @@ export function Dashboard({
             <div className="metric-value">{flaky?.testcases.length ?? 0}</div>
             <div className="metric-formula mono">
               {flaky?.testcases.map((f) => f.testcase_id).join(", ") || "nenhum CT"}
+            </div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">Em quarentena</div>
+            <div className="metric-value">{summary.quarantine?.count ?? 0}</div>
+            <div className="metric-formula mono">
+              {summary.quarantine && summary.quarantine.count > 0 ? (
+                summary.quarantine.testcases.map((t, i) => (
+                  <span key={t.testcase_id}>
+                    {i > 0 && ", "}
+                    <button
+                      className="linklike mono"
+                      title={t.title ?? undefined}
+                      onClick={() => onNavigate?.(t.testcase_id)}
+                    >
+                      {t.testcase_id}
+                    </button>
+                  </span>
+                ))
+              ) : (
+                "nenhum CT (fora do pass rate)"
+              )}
             </div>
           </div>
         </div>

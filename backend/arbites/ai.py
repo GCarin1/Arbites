@@ -112,6 +112,12 @@ class MeetingSummary(BaseModel):
     action_items: list[str] = []  # próximos passos
 
 
+class ExecutiveSummary(BaseModel):
+    synthesis: str  # síntese do estado atual
+    risks: list[str] = []  # riscos identificados
+    recommendation: str = ""  # recomendação executiva
+
+
 class ImportConversion(BaseModel):
     folder: str = "importados"  # pasta sugerida pelo contexto do arquivo
     testcases: list[GeneratedTestcase]
@@ -720,6 +726,24 @@ _MEETING_SYSTEM = (
 def summarize_meeting(provider: _BaseProvider, body: str) -> MeetingSummary:
     result = provider.complete(_MEETING_SYSTEM, body, MeetingSummary)
     assert isinstance(result, MeetingSummary)
+    return result
+
+
+_EXECUTIVE_SYSTEM = (
+    "Você é um líder de QA escrevendo o parágrafo executivo que abre um "
+    "relatório de qualidade para a gestão. A partir dos NÚMEROS já apurados "
+    "(métricas, defeitos abertos e cobertura) fornecidos no contexto, escreva "
+    "uma síntese objetiva do estado atual, os principais riscos e uma "
+    "recomendação. Use SOMENTE os números fornecidos — nunca invente valores. "
+    "Português do Brasil, tom executivo e factual."
+)
+
+
+def generate_executive_summary(
+    provider: _BaseProvider, context_md: str
+) -> ExecutiveSummary:
+    result = provider.complete(_EXECUTIVE_SYSTEM, context_md, ExecutiveSummary)
+    assert isinstance(result, ExecutiveSummary)
     return result
 
 
