@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fetchOuAvisar } from "../api";
+import { FilePicker } from "./FilePicker";
 
 const BASE = "/api/v1";
 
@@ -96,11 +97,11 @@ export function XrayImport({
       </p>
 
       <div className="step-row" style={{ marginBottom: 12 }}>
-        <input
-          type="file"
+        <FilePicker
           accept=".xml,text/xml"
-          onChange={(e) => {
-            const selected = e.target.files?.[0] ?? null;
+          label="Escolher XML do Xray"
+          onPick={(files) => {
+            const selected = files?.[0] ?? null;
             setFile(selected);
             if (selected) void doPreview(selected);
           }}

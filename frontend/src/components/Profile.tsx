@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+import { FilePicker } from "./FilePicker";
 import { AccountAvatar, bumpAvatarVersion } from "./AccountMenu";
 import {
   DENSITIES,
@@ -42,7 +43,6 @@ export function Profile({
   user: SessionUser;
   onError: (message: string) => void;
 }) {
-  const fileInput = useRef<HTMLInputElement>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [density, setDensity] = useState<Density>(loadDensity);
   const [theme, setTheme] = useState<Theme>(loadTheme);
@@ -85,7 +85,8 @@ export function Profile({
       onError(e instanceof Error ? e.message : String(e));
     } finally {
       setAvatarBusy(false);
-      if (fileInput.current) fileInput.current.value = "";
+      // o reset do input para permitir reescolher o mesmo arquivo agora
+      // mora no FilePicker
     }
   }
 
@@ -122,19 +123,14 @@ export function Profile({
               PNG, JPEG ou WebP de até 1 MB.
             </p>
             <div className="toolbar">
-              <input
-                ref={fileInput}
-                type="file"
+              {/* este card estreou o padrão à mão; agora ele vem do sistema */}
+              <FilePicker
                 accept="image/png,image/jpeg,image/webp"
-                style={{ display: "none" }}
-                onChange={(e) => void pickAvatar(e.target.files?.[0])}
-              />
-              <button
-                onClick={() => fileInput.current?.click()}
                 disabled={avatarBusy}
-              >
-                {avatarBusy ? "Enviando…" : "Trocar foto"}
-              </button>
+                label={avatarBusy ? "Enviando…" : "Trocar foto"}
+                showName={false}
+                onPick={(files) => void pickAvatar(files?.[0])}
+              />
               <button onClick={() => void removeAvatar()} disabled={avatarBusy}>
                 Voltar ao identicon
               </button>

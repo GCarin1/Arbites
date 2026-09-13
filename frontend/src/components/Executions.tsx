@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
+import { FilePicker } from "./FilePicker";
 import { ConfirmModal, Modal } from "./Modal";
 import { useToast } from "./Toast";
 import type {
@@ -1297,8 +1298,10 @@ export function ResultPanel({
       {result.steps.length === 0 && <p className="muted">CT sem passos estruturados.</p>}
       {result.steps.map((step) => (
         <div key={step.index} className="step-row">
-          <span className={`status-dot dot-step-${step.status} mono`}>{step.index}.</span>
-          <span style={{ flex: 1 }}>{step.text}</span>
+          <span className={`status-dot dot-step-${step.status} mono step-num`}>
+            {step.index}.
+          </span>
+          <span className="step-text">{step.text}</span>
           {!closed && (
             <span className="step-actions">
               <button onClick={() => void markStep(step.index, "passed")}>pass</button>
@@ -1306,7 +1309,7 @@ export function ResultPanel({
               <button onClick={() => void markStep(step.index, "blocked")}>block</button>
             </span>
           )}
-          <span className="muted">{step.status}</span>
+          <span className="muted step-status">{step.status}</span>
         </div>
       ))}
 
@@ -1335,7 +1338,7 @@ export function ResultPanel({
             onChange={(e) => setNote(e.target.value)}
             style={{ maxWidth: 280 }}
           />
-          <input type="file" onChange={(e) => void upload(e.target.files)} />
+          <FilePicker label="Anexar evidência" onPick={(files) => void upload(files)} />
         </div>
       )}
 

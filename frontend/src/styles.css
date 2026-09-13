@@ -2302,12 +2302,47 @@ table.dense tbody tr:hover td {
   flex: 1;
   min-width: 160px;
 }
+.step-text {
+  flex: 1;
+  min-width: 0;
+}
+.step-num,
+.step-status {
+  flex: 0 0 auto;
+}
 .step-actions {
   display: flex;
   gap: 6px;
   flex: 0 0 auto;
 }
 
+/* Escolher arquivo com a cara do sistema, não a do sistema operacional
+   (0140). O `input[type=file]` continua sendo quem recebe o arquivo — só
+   não é ele que aparece: `.sr-only` o mantém no fluxo de acessibilidade e o
+   botão o aciona. */
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-width: 0;
+}
+/* `.sr-only` zera o padding, mas `input[type=file]` o repõe com mais peso
+   de seletor — e com `box-sizing: border-box` o campo "escondido" ficava
+   com 20 px de caixa, empurrando o botão ao lado. */
+.file-picker input[type="file"] {
+  padding: 0;
+}
+.file-picker-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.step-actions button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: var(--fs-caption);
+}
 
 .ct-picker {
   border: 1px solid var(--border);
@@ -3654,6 +3689,29 @@ button.link-chip-btn:disabled {
      ela não cabia e virava uma TERCEIRA linha */
   .repo-row .repo-actions {
     opacity: 1;
+  }
+
+  /* A linha do passo vira DUAS faixas (0140): número + texto em cima,
+     ações + status embaixo. Espremido numa faixa só, "Abrir a tela de
+     login" caía numa coluna de ~90 px e virava três linhas ao lado dos
+     botões, com o `pending` órfão numa quarta. O passo é o que se lê para
+     executar; os botões são a ação sobre ele. A quebra é explícita, como na
+     linha de árvore, para o status nunca se soltar das ações que o mudam. */
+  .step-row::after {
+    content: "";
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+  }
+  .step-row > .step-num,
+  .step-row > .step-text {
+    order: 1;
+  }
+  .step-row > * {
+    order: 3;
+  }
+  .step-text {
+    flex: 1 1 auto;
   }
 
   /* o menu da conta não pode sangrar pela direita */

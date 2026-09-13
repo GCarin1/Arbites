@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { FilePicker } from "./FilePicker";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
 import { useToast } from "./Toast";
@@ -925,11 +926,12 @@ function AiImportModal({
       </p>
       <div className="modal-field">
         <label>Arquivo</label>
-        <input
-          type="file"
+        <FilePicker
           accept=".txt,.md,.xml"
           disabled={busy}
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          label="Escolher arquivo"
+          showName={false}
+          onPick={(files) => setFile(files?.[0] ?? null)}
         />
         <div className="toolbar" style={{ marginTop: 8 }}>
           <button className="primary" disabled={!file || busy} onClick={() => void upload()}>
