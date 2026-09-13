@@ -21,13 +21,22 @@ escrever porque o git tossiu é inaceitável.
 
 from __future__ import annotations
 
+import logging
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
 
 from .workspace import Workspace
 
+log = logging.getLogger("arbites")
+
 _GIT_TIMEOUT_SECONDS = 15
+
+# O git tem UM lock por repositório: duas escritas simultâneas disputam o
+# `index.lock` e a perdedora falha. Uma fila no processo transforma a disputa
+# em espera, que é o que ela deveria ter sido desde o início (change 0120).
+_git_lock = threading.Lock()
 
 # O índice é descartável (ADR 0001) e a lixeira é estado local: nenhum dos
 # dois entra no histórico. Segredos nunca deveriam estar aqui, mas se
@@ -69,10 +78,13 @@ def _run(
         *args,
     ]
     try:
-        proc = subprocess.run(
-            command, cwd=str(ws.root), capture_output=True, text=True,
-            timeout=_GIT_TIMEOUT_SECONDS, check=True,
-        )
+        with _git_lock:
+            proc = subprocess.run(
+                command, cwd=str(ws.root), capture_output=True, text=True,
+                timeout=_GIT_TIMEOUT_SECONDS, check=True,
+            )
+    except subprocess.CalledProcessError as exc:
+        raise GitUnavailable(exc.stderr.strip() or str(exc)) from exc
     except (OSError, subprocess.SubprocessError) as exc:
         raise GitUnavailable(str(exc)) from exc
     return proc.stdout
@@ -124,7 +136,13 @@ def commit_paths(
             author=_author_of(email),
         )
         return _run(ws, ["rev-parse", "HEAD"]).strip()
-    except GitUnavailable:
+    except GitUnavailable as exc:
+        # A escrita do usuário continua de pé — mas a ausência no histórico
+        # precisa ser explicável, e não misteriosa (change 0120).
+        log.warning(
+            "versionamento: commit nao gravado (%s) para %s — %s",
+            message, ", ".join(relatives), exc,
+        )
         return None
 
 

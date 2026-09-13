@@ -201,3 +201,84 @@ def test_workspace_sem_git_continua_aceitando_criar_e_editar(ws, monkeypatch):
         # e o histórico simplesmente vem vazio, sem explodir
         versoes = client.get(f"/api/v1/testcases/{ct.json()['id']}/versions")
         assert versoes.status_code == 200 and versoes.json()["versions"] == []
+
+
+# -- Concorrência e observabilidade (change 0120) ------------------------
+
+
+def test_gravacoes_simultaneas_geram_um_commit_cada(ws):
+    """O git tem UM lock por repositório: sem fila, doze commits disparados
+    ao mesmo tempo gravavam dois, e dez morriam na disputa pelo index.lock —
+    arquivos fora do histórico para sempre, porque nenhuma ação futura os
+    recolhe. Numa instância de time, duas pessoas salvando ao mesmo tempo é
+    o caso normal."""
+    import threading
+
+    versioning.ensure_repo(ws)
+    (ws.root / "testcases").mkdir(exist_ok=True)
+    quantos = 12
+    caminhos = []
+    for i in range(quantos):
+        caminho = ws.root / "testcases" / f"CT-{i:04d}.md"
+        caminho.write_text(f"# caso {i}\n", encoding="utf-8")
+        caminhos.append(caminho)
+
+    shas: dict[int, str | None] = {}
+
+    def commita(i: int) -> None:
+        shas[i] = versioning.commit_paths(
+            ws, [caminhos[i]], f"cria CT-{i:04d}", "quem@arbites.test"
+        )
+
+    fios = [threading.Thread(target=commita, args=(i,)) for i in range(quantos)]
+    for fio in fios:
+        fio.start()
+    for fio in fios:
+        fio.join()
+
+    assert [i for i, sha in shas.items() if sha is None] == []
+    mensagens = subjects(ws)
+    for i in range(quantos):
+        assert f"cria CT-{i:04d}" in mensagens
+    # e nenhum caso ficou fora do histórico
+    pendentes = git(ws, "status", "--porcelain", "testcases").strip()
+    assert pendentes == ""
+
+
+def test_commit_impedido_deixa_aviso_no_log(ws, monkeypatch, caplog):
+    """Seguir sem derrubar a escrita está certo; fazê-lo em silêncio absoluto
+    não. A ausência no histórico tem de ser explicável."""
+    import logging
+
+    versioning.ensure_repo(ws)
+    caminho = ws.root / "testcases" / "CT-0001.md"
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    caminho.write_text("# caso\n", encoding="utf-8")
+
+    def git_quebrado(*args, **kwargs):
+        raise OSError("git sumiu no meio da operacao")
+
+    monkeypatch.setattr(versioning.subprocess, "run", git_quebrado)
+    with caplog.at_level(logging.WARNING, logger="arbites"):
+        assert versioning.commit_paths(ws, [caminho], "cria CT-0001") is None
+
+    aviso = "\n".join(r.getMessage() for r in caplog.records)
+    assert "commit nao gravado" in aviso
+    assert "cria CT-0001" in aviso          # qual ação se perdeu
+    assert "testcases/CT-0001.md" in aviso  # e de qual arquivo
+
+
+def test_falha_do_git_nao_derruba_a_operacao_do_usuario(ws, monkeypatch):
+    """A regra da change 0112 continua valendo: registro nunca derruba
+    escrita. O que muda é que a perda deixa rastro."""
+    def git_quebrado(*args, **kwargs):
+        raise OSError("git sumiu")
+
+    monkeypatch.setattr(versioning.subprocess, "run", git_quebrado)
+    app = create_app(ws.root, watch=False)
+    with TestClient(app) as client:
+        login_admin(client)
+        criado = client.post(
+            "/api/v1/testcases", json={"title": "Login", "body": TC_BODY}
+        )
+        assert criado.status_code == 201

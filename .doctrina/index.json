@@ -226,7 +226,7 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.12.0",
+        "version": "0.13.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
@@ -1947,6 +1947,19 @@
         "specs_affected": [
           {
             "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0120-versionamento-serializado-observavel-commit",
+        "title": "versionamento serializado e observavel: commit fora do event loop e falha registrada em vez de perdida",
+        "path": ".doctrina/changes/archive/2026-09-13-0120-versionamento-serializado-observavel-commit",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
             "operation": "MODIFIED"
           }
         ]

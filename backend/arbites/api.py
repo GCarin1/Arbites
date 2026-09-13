@@ -1128,7 +1128,8 @@ def _register_routes(app: FastAPI) -> None:
         reindex_file(ws, conn, path)
         # Um commit por ACAO (change 0112), nao por gravacao — e nunca
         # derrubando a escrita do usuario se o git falhar.
-        versioning.commit_paths(
+        await asyncio.to_thread(
+            versioning.commit_paths,
             ws, [path], f"cria {new_id}: {payload.title}", author_of(request)
         )
         return _tc_out(conn, ws, new_id)
@@ -1227,7 +1228,8 @@ def _register_routes(app: FastAPI) -> None:
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
-        versioning.commit_paths(
+        await asyncio.to_thread(
+            versioning.commit_paths,
             ws, [ws.root / rel],
             f"edita {entity_id}: {meta.get('title') or rel}", author_of(request),
         )
@@ -1242,7 +1244,8 @@ def _register_routes(app: FastAPI) -> None:
         reindex_file(ws, conn, path)
         # O arquivo foi para a lixeira, nao para o vazio: o commit registra
         # que saiu, e o historico continua servindo para recupera-lo.
-        versioning.commit_paths(
+        await asyncio.to_thread(
+            versioning.commit_paths,
             ws, [path], f"exclui {entity_id}", author_of(request)
         )
 
@@ -1275,7 +1278,8 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "testcases", entity_id)
         (ws.root / rel).write_text(payload.content, encoding="utf-8")
         reindex_file(ws, conn, ws.root / rel)
-        versioning.commit_paths(
+        await asyncio.to_thread(
+            versioning.commit_paths,
             ws, [ws.root / rel], f"edita {entity_id} (markdown cru)",
             author_of(request),
         )
@@ -1297,7 +1301,8 @@ def _register_routes(app: FastAPI) -> None:
             reindex_file(ws, conn, dest)  # indexa o novo
             # As duas pontas no MESMO commit: e o que faz o `--follow` do
             # historico enxergar a mudanca de pasta como renomeacao.
-            versioning.commit_paths(
+            await asyncio.to_thread(
+                versioning.commit_paths,
                 ws, [src, dest],
                 f"move {entity_id} para {payload.folder or 'testcases/'}",
                 author_of(request),
@@ -1315,8 +1320,12 @@ def _register_routes(app: FastAPI) -> None:
         mexeu no arquivo no Obsidian tambem merece aparecer no historico."""
         ws = ws_of(request)
         rel = _tc_rel(request, entity_id)
-        versioning.commit_external_edits(ws, rel)
-        return {"versions": versioning.history(ws, rel, limit=limit)}
+        await asyncio.to_thread(versioning.commit_external_edits, ws, rel)
+        return {
+            "versions": await asyncio.to_thread(
+                versioning.history, ws, rel, limit
+            )
+        }
 
     @app.get(API_PREFIX + "/testcases/{entity_id}/versions/diff",
              response_class=PlainTextResponse)
@@ -1324,7 +1333,7 @@ def _register_routes(app: FastAPI) -> None:
         ws = ws_of(request)
         rel = _tc_rel(request, entity_id)
         try:
-            return versioning.diff(ws, rel, a, b or None)
+            return await asyncio.to_thread(versioning.diff, ws, rel, a, b or None)
         except versioning.GitUnavailable as exc:
             raise _error(422, "git_failed", str(exc)) from None
 
@@ -1334,7 +1343,7 @@ def _register_routes(app: FastAPI) -> None:
         ws = ws_of(request)
         rel = _tc_rel(request, entity_id)
         try:
-            return versioning.content_at(ws, sha, rel)
+            return await asyncio.to_thread(versioning.content_at, ws, sha, rel)
         except versioning.GitUnavailable:
             raise _error(404, "version_not_found",
                          f"{sha} nao tem este arquivo") from None
@@ -1346,7 +1355,9 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         rel = _tc_rel(request, entity_id)
         try:
-            versioning.restore(ws, sha, rel, author_of(request))
+            await asyncio.to_thread(
+                versioning.restore, ws, sha, rel, author_of(request)
+            )
         except versioning.GitUnavailable:
             raise _error(404, "version_not_found",
                          f"{sha} nao tem este arquivo") from None

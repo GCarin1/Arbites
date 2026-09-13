@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-09-13
-**Version:** 0.12.0
+**Version:** 0.13.0
 
 ## Purpose
 
@@ -101,6 +101,8 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall gravar um commit por AÇÃO semântica da interface — criar, editar, mover e excluir um caso de teste —, com mensagem descrevendo a ação e autor vindo da sessão, nunca um commit por gravação de arquivo.
 - The system shall expor `GET /testcases/{id}/versions` (histórico do arquivo), `GET /testcases/{id}/versions/{sha}` (o conteúdo naquele commit), `GET /testcases/{id}/versions/diff?a=&b=` (comparação unificada) e `POST /testcases/{id}/versions/{sha}/restore` (restauração).
 - The system shall apresentar o histórico numa aba do próprio caso de teste, com a versão escolhida comparável à atual e restaurável dali.
+- The system shall serializar as operações de git do workspace numa fila única por processo, para que duas escritas simultâneas esperem em vez de disputar o lock do repositório.
+- The system shall executar as operações de git fora do laço de eventos, como já faz com as demais chamadas bloqueantes.
 
 ### Event-driven
 
@@ -115,6 +117,7 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   mover após confirmação explícita.
 - When um arquivo do workspace é alterado por fora da interface e existe alteração não commitada, the system shall registrá-la como commit de autoria externa antes de responder o histórico, para que a edição no Obsidian não suma do registro.
 - When uma versão anterior é restaurada, the system shall gravar a restauração como um commit NOVO, preservando o histórico em vez de reescrevê-lo.
+- When um commit de versionamento não acontece por falha do git, the system shall registrar um aviso no log identificando a ação e o motivo, em vez de seguir em silêncio.
 
 ### State-driven
 
@@ -209,6 +212,8 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 17. [verified] Criar, editar e mover um caso de teste gera um commit por ação, com a mensagem da ação e o e-mail da sessão como autor, e o índice descartável fica fora do repositório — verified by `backend/tests/test_versioning.py`.
 18. [verified] O histórico de um caso lista suas versões, a comparação entre duas mostra a linha alterada e restaurar uma versão anterior devolve o conteúdo gravando um commit novo — verified by `backend/tests/test_versioning.py`.
 19. [verified] Uma edição feita por fora da interface entra no histórico como commit de autoria externa, e um workspace onde o git não funciona continua aceitando criar e editar casos — verified by `backend/tests/test_versioning.py`.
+20. [verified] Doze gravações simultâneas geram doze commits e não deixam nenhum arquivo fora do histórico — verified by `backend/tests/test_versioning.py`.
+21. [verified] Um commit impedido por falha do git deixa aviso no log com a ação que se perdeu, e a operação do usuário continua respondendo normalmente — verified by `backend/tests/test_versioning.py`.
 
 ## Maturity
 
