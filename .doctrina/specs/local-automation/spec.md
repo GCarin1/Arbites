@@ -5,7 +5,7 @@
 **Implementation:** verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)
 **Realizes:** SC5
 **Last updated:** 2026-07-21
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -84,6 +84,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - The system shall carregar o `.env` do `local_path` do target e mesclá-lo no ambiente do subprocess do run — os valores do projeto ficam disponíveis ao Behave/WebDriver, sem sobrescrever `ARBITES_*` nem `PYTHONIOENCODING`.
 - The system shall derivar o catálogo de `.env` (`GET /env/catalog?target=`) das chaves, seções e comentários do próprio `.env`/`.env.example` do target, sem lista fixa embutida; sem target ou sem arquivo, o catálogo é vazio e o usuário adiciona chaves livres.
 - The UI shall tornar o `EXEC-XXXX` do painel de run navegável para o board da execution e oferecer selecionar-todos/limpar no seletor de arquivos `.feature`.
+- The system shall emitir um comentário SSE de keepalive a cada 15 segundos de silêncio no stream do run, para que um proxy no caminho não derrube por ociosidade uma conexão cujo run ainda está vivo.
 
 ### Event-driven
 
@@ -143,6 +144,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - The system shall not usar fontes divergentes para o preview de features e
   para a operação (dropdown/run) da mesma lista — o que o browse mostra é
   o que o dropdown oferece.
+- The system shall not emitir o keepalive como evento de dados; ele é um comentário SSE (linha iniciada por `:`), invisível ao `EventSource` e ao terminal da UI.
 
 ### Optional
 
@@ -213,6 +215,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 16. [verified] O run injeta o `.env` do target no ambiente do subprocess (project vars disponíveis; `ARBITES_*`/`PYTHONIOENCODING` preservados) — verified by `backend/tests/test_local_runs.py`.
 17. [verified] `GET /env/catalog` deriva chaves/seções do `.env`/`.env.example` do target e não expõe campos fixos de outro projeto — verified by `backend/tests/test_automation_targets_config.py`.
 18. [verified] Terminal reconecta ao voltar à aba; `EXEC-` navega ao board; seletor de `.feature` tem selecionar-todos/limpar — verified by `frontend/src/components/Automation.tsx` + `npm run build` limpo + revisão visual.
+19. [verified] Um run que fica em silêncio além do intervalo de keepalive continua recebendo bytes no stream, e o que chega no período é comentário — nenhuma linha nova aparece no terminal — verified by `backend/tests/test_local_runs.py`.
 
 ## Maturity
 

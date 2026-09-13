@@ -32,9 +32,13 @@ qualquer entrada**. Quem chega pela rede local encontra a mesma tela de
 login que quem chega pela internet; é um caminho a mais para o mesmo
 porteiro, não um desvio dele.
 
+> **`umbrel.local` é só o padrão.** O hostname é o do seu dispositivo e pode
+> ser outro (`rp4.local`, por exemplo). Confirme com `hostname` no SSH e use
+> o seu em todo lugar onde este guia escreve `umbrel.local`.
+
 > Se você prefere que o Arbites seja inalcançável sem passar pela
-> Cloudflare, veja a **Alternativa** na seção 2.4: um túnel dedicado, sem
-> porta publicada. Custa um segundo token para administrar.
+> Cloudflare, veja a seção **2.4** (mesmo túnel, sem porta publicada) ou a
+> **2.5** (túnel dedicado, com um segundo token).
 
 ### O wildcard do BFFless captura tudo — e como conviver com ele
 
@@ -154,7 +158,49 @@ DNS: nada a fazer. O CNAME `*` que a instalação do BFFless criou já resolve
 Abra `https://arbites.seudominio.com`, entre com as credenciais do `.env`,
 troque a senha.
 
-### 2.4. Alternativa: túnel dedicado
+### 2.4. Variante: sem publicar a porta, na rede do túnel
+
+O `cloudflared` do Umbrel alcança outros containers pelo **nome**, não só
+por `<host>:<porta>` — é como a
+[wiki do app](https://github.com/Radiokot/umbrel-cloudflared/wiki/How-to-set-up-Cloudflare-Tunnel-on-your-Umbrel)
+roteia apps protegidos (`http://photoprism_web_1:8087`). Dá para usar isso e
+ficar sem porta publicada, mantendo o túnel compartilhado.
+
+Descubra a rede do container do túnel:
+
+```bash
+# nome do container do túnel
+docker ps --format '{{.Names}}' | grep -i cloudflared
+
+# as redes dele — os nomes são as chaves do JSON
+docker inspect -f '{{json .NetworkSettings.Networks}}' <container>
+```
+
+No `docker-compose.yml`, troque `ports` por `expose`, fixe o nome do
+container e entre naquela rede:
+
+```yaml
+  arbites:
+    container_name: arbites
+    expose: ["8347"]
+    networks: [tunel]
+
+networks:
+  tunel:
+    external: true
+    name: <a rede que o comando acima mostrou>
+```
+
+O route no painel passa a apontar para `http://arbites:8347`.
+
+Fica melhor que o caminho padrão — mesmo túnel, sem exposição na LAN — ao
+custo de depender de um nome de rede interno do Umbrel, que pode mudar entre
+versões. Por isso o padrão do repositório continua sendo a porta publicada:
+funciona sem saber nada sobre a topologia interna do Umbrel. Se esta variante
+parar de funcionar depois de uma atualização, o sintoma é 502 no hostname, e
+voltar para `ports` resolve.
+
+### 2.5. Alternativa: túnel dedicado
 
 Se você quiser que o Arbites seja inalcançável sem passar pela Cloudflare —
 nem pela LAN —, crie um segundo túnel e deixe o `cloudflared` junto do
@@ -241,6 +287,13 @@ docker compose restart arbites        # reiniciar
 docker compose up -d --build          # atualizar depois de um git pull
 ```
 
+**Log de automação ao vivo.** O Cloudflare Tunnel passa HTTP e WebSocket; o
+stream do run é SSE, que é HTTP comum e atravessa sem problema. O que
+atrapalharia é a borda derrubar conexão ociosa (~100s) durante um passo
+silencioso do Behave — por isso o servidor emite um comentário de keepalive
+a cada 15s. Se o terminal ainda assim congelar, é sinal de outra coisa: veja
+`docker compose logs -f arbites`.
+
 **IP real.** Atrás do túnel, o endereço do socket é sempre o do proxy. O
 Arbites lê `CF-Connecting-IP` (e cai para `X-Forwarded-For`), então o IP que
 aparece nas abas Acessos e Atividade é o do visitante de verdade.
@@ -282,5 +335,6 @@ Duas consequências que valem estar claras:
   LAN isso é aceitável; pela internet, sempre o túnel — que termina TLS na
   borda da Cloudflare.
 
-Para fechar a LAN por completo, use o túnel dedicado da seção 2.4: sem
-`ports`, o container só é alcançável de dentro da rede Docker.
+Para fechar a LAN por completo, use a seção 2.4 (entrar na rede do túnel
+do Umbrel) ou a 2.5 (túnel dedicado). Em ambas o container deixa de ter
+porta publicada e só é alcançável de dentro do Docker.

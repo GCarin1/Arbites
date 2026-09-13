@@ -62,6 +62,10 @@ from .watcher import start_watcher
 from .workspace import Workspace, slugify
 
 API_PREFIX = "/api/v1"
+
+# Silencio maximo no stream de um run antes de emitir um comentario de
+# keepalive. Bem abaixo do timeout de conexao ociosa do Cloudflare (~100s).
+SSE_KEEPALIVE_SECONDS = 15.0
 log = logging.getLogger("arbites")
 
 
@@ -2233,7 +2237,19 @@ def _register_routes(app: FastAPI) -> None:
                     yield f"data: {line}\n\n"
                 if not finished:
                     while True:
-                        line = await queue.get()
+                        try:
+                            line = await asyncio.wait_for(
+                                queue.get(), timeout=SSE_KEEPALIVE_SECONDS
+                            )
+                        except asyncio.TimeoutError:
+                            # Passo silencioso do Behave: sem isto a conexao
+                            # fica sem trafego, e um proxy no caminho (o
+                            # Cloudflare Tunnel corta conexao ociosa por
+                            # volta de 100s) derruba um run que esta vivo.
+                            # `:` e comentario SSE — o EventSource ignora,
+                            # entao o terminal da UI nao ve nada.
+                            yield ": keepalive\n\n"
+                            continue
                         if line is None:
                             break
                         yield f"data: {line}\n\n"

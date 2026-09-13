@@ -36,6 +36,12 @@ services:
 volumes:
   arbites-data:
 
+# Variante — sem publicar a porta, entrando na rede do cloudflared do Umbrel
+# (ele alcança containers pelo nome, não só por host:porta). Troque `ports`
+# por `expose: ["8347"]`, fixe `container_name: arbites` e entre na rede
+# externa do túnel; o route passa a apontar para http://arbites:8347.
+# O comando que descobre o nome da rede está na §2.4 do docs/self-hosting.md.
+#
 # Alternativa — túnel dedicado, sem depender do app do Umbrel:
 # troque o bloco `ports` acima por `expose: ["8347"]`, ponha os dois
 # serviços numa rede comum e acrescente:

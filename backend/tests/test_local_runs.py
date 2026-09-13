@@ -280,3 +280,35 @@ def test_build_run_env_injects_project_env_but_arbites_keys_win(tmp_path):
     # o .env do projeto NUNCA sobrescreve as chaves de controle do Arbites
     assert env["ARBITES_EVIDENCE_DIR"] == str(evidence)
     assert env["PYTHONIOENCODING"] == "utf-8"
+
+
+def test_stream_emite_keepalive_em_run_silencioso(auto_client, monkeypatch):
+    """Atrás de um proxy, conexão sem tráfego é derrubada por ociosidade — o
+    Cloudflare corta por volta de 100s. Um passo silencioso do Behave não
+    pode parecer um run morto."""
+    import arbites.api as api_module
+
+    monkeypatch.setattr(api_module, "SSE_KEEPALIVE_SECONDS", 0.05)
+
+    started = auto_client.post(
+        "/api/v1/runs/local",
+        json={"target": "frontend-web", "testcase_ids": ["CT-9001"]},
+    )
+    exec_id = started.json()["execution"]["id"]
+
+    with auto_client.stream("GET", f"/api/v1/runs/{exec_id}/stream") as stream:
+        assert stream.status_code == 200
+        keepalives, dados = 0, 0
+        for raw in stream.iter_lines():
+            line = raw if isinstance(raw, str) else raw.decode("utf-8")
+            if line.startswith(": keepalive"):
+                keepalives += 1
+            elif line.startswith("data: "):
+                dados += 1
+            if line.startswith("event: done") or keepalives >= 2:
+                break
+
+    # Com o intervalo em 50ms, qualquer intervalo entre linhas do Behave
+    # produz keepalive. Ele é comentário SSE: o EventSource ignora, então o
+    # terminal da UI não mostra nada — mas a conexão continua com tráfego.
+    assert keepalives >= 1, "nenhum keepalive no silêncio entre linhas do run"

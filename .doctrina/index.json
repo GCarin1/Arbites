@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-12",
+  "last_updated": "2026-09-13",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -155,7 +155,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "active",
-        "version": "0.9.0",
+        "version": "0.10.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — M3 + reformulação §1.5.1 (feature+tag, artefatos, .env) (backend/arbites/runner.py, backend/arbites/gherkin_scan.py, backend/arbites/behave_json.py, frontend/src/components/Automation.tsx)",
         "realizes": [
@@ -1746,6 +1746,19 @@
         "status": "applied",
         "applied": "2026-09-12",
         "specs_affected": []
+      },
+      {
+        "id": "0107-keepalive-no-sse-atras-do-tunel",
+        "title": "Keepalive no SSE atras do tunel",
+        "path": ".doctrina/changes/archive/2026-09-13-0107-keepalive-no-sse-atras-do-tunel",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
