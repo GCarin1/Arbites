@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.8.0",
+        "version": "0.9.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2033,6 +2033,19 @@
         "id": "0126-escala-espacamento-valores-abaixo",
         "title": "escala de espacamento sem valores abaixo de oito forca numeros magicos e nao ha controle de densidade",
         "path": ".doctrina/changes/archive/2026-09-13-0126-escala-espacamento-valores-abaixo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0127-quadro-execucao-so-funciona",
+        "title": "quadro de execucao so funciona com mouse: arrastar um card e impossivel pelo teclado",
+        "path": ".doctrina/changes/archive/2026-09-13-0127-quadro-execucao-so-funciona",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [

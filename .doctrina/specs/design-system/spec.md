@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.8.0
+**Version:** 0.9.0
 
 ## Purpose
 
@@ -81,6 +81,12 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall oferecer degraus de espaçamento de 4px e 12px na escala de tokens, para que não haja valor de espaçamento decidido fora dela.
 - The system shall oferecer três densidades de leitura — compacta, padrão e confortável — que alteram o respiro das linhas e a altura dos controles, preservando a separação entre seções.
 - The system shall guardar a densidade escolhida no navegador de quem escolheu, por ser preferência de leitura de uma pessoa num aparelho, e não configuração do workspace.
+- The system shall tornar cada card do quadro alcançável e operável por teclado — foco, abrir o resultado e mover entre colunas —, sem depender de arrastar.
+- The system shall identificar cada card e cada coluna do quadro para tecnologia assistiva, dizendo de que caso se trata e em que coluna ele está.
+
+### Event-driven
+
+- When um caso muda de coluna, the system shall anunciar a mudança numa região viva, para que quem usa leitor de tela saiba o que aconteceu em vez de perceber o card sumir.
 
 ### State-driven
 
@@ -94,6 +100,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   autoexplicativa — a ajuda é curta e contextual.
 - The system shall not servir uma interface reduzida em funcionalidade na tela estreita; o que muda é a forma, e nenhuma tela deixa de ser alcançável.
 - The system shall not deixar a densidade compacta reduzir um alvo interativo abaixo do mínimo de toque quando o ponteiro for grosseiro.
+- The system shall not oferecer no quadro nenhuma ação que exista apenas como arrastar; arrastar com precisão é o gesto que exclui quem tem limitação motora.
 
 ## Acceptance criteria
 
@@ -142,6 +149,8 @@ e prova a sua fatia, citando o teste/artefato. -->
 8. [verified] Nenhuma tela em largura de 390 px transborda horizontalmente, e o que é largo por natureza rola dentro do próprio bloco — verified by `frontend/src/styles.css`.
 9. [verified] As três densidades mudam quantas linhas cabem na mesma altura de tela, e a compacta não reduz nenhum alvo de toque abaixo do mínimo — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
 10. [verified] A escala de espaçamento cobre os degraus usados pela interface, e a densidade escolhida sobrevive ao recarregamento da página — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
+11. [verified] Um card do quadro recebe foco pelo teclado, abre o resultado por Enter e muda de coluna por atalho, com o mesmo efeito de arrastá-lo — verified by `frontend/src/components/Executions.tsx`.
+12. [verified] Card e coluna se identificam para tecnologia assistiva e a mudança de coluna é anunciada numa região viva — verified by `frontend/src/components/Executions.tsx`.
 
 ## Maturity
 

@@ -755,6 +755,7 @@ export function ExecutionBoard({
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
   const [dragCt, setDragCt] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
   const [squadFilter, setSquadFilter] = useState("");
   const [squadOf, setSquadOf] = useState<Record<string, string | null>>({});
   const [titleOf, setTitleOf] = useState<Record<string, string>>({});
@@ -803,9 +804,25 @@ export function ExecutionBoard({
       const updated = await api.resultStatus(id, ctId, { status });
       setExecution(updated);
       onChanged();
+      // Sem isto o card some de um lugar e aparece em outro em silêncio:
+      // quem usa leitor de tela não fica sabendo de nada (change 0127).
+      const coluna = COLUMNS.find((c) => c.key === status)?.label ?? status;
+      setAnnouncement(`${ctId} movido para ${coluna}`);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * Move o caso para a coluna vizinha. É o que faltava para o quadro não
+   * exigir mouse: arrastar com precisão é justamente o gesto que exclui
+   * quem tem limitação motora, e não havia alternativa nenhuma.
+   */
+  function moveByKeyboard(ctId: string, atual: string, passo: -1 | 1) {
+    const indice = COLUMNS.findIndex((c) => c.key === atual);
+    const destino = COLUMNS[indice + passo];
+    if (!destino) return;
+    void moveTo(ctId, destino.key);
   }
 
   async function analyzeRun() {
@@ -989,11 +1006,27 @@ export function ExecutionBoard({
         endsOn={execution.ends_on ?? null}
       />
 
+      {/* A região viva fica fora do quadro e sempre presente: um elemento que
+          nasce junto com a mensagem costuma não ser anunciado. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </p>
+      {!closed && (
+        <p className="caption muted kanban-hint">
+          Pelo teclado: <kbd>Tab</kbd> chega ao card, <kbd>Enter</kbd> abre e{" "}
+          <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd> move de coluna.
+        </p>
+      )}
+
       <div className="kanban">
         {COLUMNS.map((col) => (
           <div
             key={col.key}
             className="kanban-col"
+            role="group"
+            aria-label={`${col.label}: ${
+              visible.filter((r) => (r.column || r.status) === col.key).length
+            } casos`}
             onDragOver={(e) => {
               if (!closed) e.preventDefault();
             }}
@@ -1016,9 +1049,35 @@ export function ExecutionBoard({
                   className={`kanban-card ${
                     result.testcase_id === selectedCt ? "selected" : ""
                   }`}
+                  // O card deixa de exigir mouse (change 0127): o Tab chega
+                  // nele, Enter abre e Ctrl+setas move de coluna — o mesmo
+                  // caminho que arrastar chama.
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${result.testcase_id} ${
+                    titleOf[result.testcase_id] ?? ""
+                  } — coluna ${col.label}${
+                    closed ? "" : ". Ctrl com seta esquerda ou direita move de coluna"
+                  }`}
                   draggable={!closed}
                   onDragStart={() => setDragCt(result.testcase_id)}
                   onClick={() => setSelectedCt(result.testcase_id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedCt(result.testcase_id);
+                      return;
+                    }
+                    if (closed || !(e.ctrlKey || e.metaKey)) return;
+                    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      moveByKeyboard(
+                        result.testcase_id,
+                        result.column || result.status,
+                        e.key === "ArrowLeft" ? -1 : 1,
+                      );
+                    }
+                  }}
                 >
                   <div className="kanban-card-head">
                     <span className="mono">{result.testcase_id}</span>

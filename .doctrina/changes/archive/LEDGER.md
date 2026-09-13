@@ -132,3 +132,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0124-versao-anterior-mudanca-pasta — versao anterior a mudanca de pasta e listada no historico mas nao abre nem restaura (specs: testcases MODIFIED)
 - 2026-09-13 — 0125-visao-mobile-casca-app — visao mobile: a casca do app e desktop e num celular a barra lateral fixa engole a tela (specs: design-system MODIFIED)
 - 2026-09-13 — 0126-escala-espacamento-valores-abaixo — escala de espacamento sem valores abaixo de oito forca numeros magicos e nao ha controle de densidade (specs: design-system MODIFIED)
+- 2026-09-13 — 0127-quadro-execucao-so-funciona — quadro de execucao so funciona com mouse: arrastar um card e impossivel pelo teclado (specs: design-system MODIFIED)
