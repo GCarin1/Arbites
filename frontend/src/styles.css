@@ -2788,6 +2788,83 @@ button.link-chip-btn:disabled {
   white-space: nowrap;
 }
 
+/* Avatar da conta no canto superior direito (change 0110): presença
+   permanente da identidade, no padrão GitHub. */
+.account-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.account-trigger {
+  padding: 2px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid transparent;
+  line-height: 0;
+}
+.account-trigger:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: none;
+}
+.account-avatar-img,
+.identicon {
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
+}
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s1) 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.account-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px var(--s2) var(--s1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+.account-head strong,
+.account-head .caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-dropdown button {
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 6px var(--s2);
+  color: var(--text);
+}
+.account-dropdown button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+/* Editor do avatar na tela de Perfil. */
+.avatar-editor {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  margin-bottom: var(--s2);
+}
+.avatar-editor > svg,
+.avatar-editor > img {
+  flex: none;
+}
+
 /* Capability congelada (ADR 0012): presente e funcional, mas fora do foco.
    Discreta em vez de escondida — quem usa continua achando. */
 .nav-item.frozen {

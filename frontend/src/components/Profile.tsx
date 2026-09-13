@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+import { AccountAvatar, bumpAvatarVersion } from "./AccountMenu";
+import { api } from "../api";
+import type { SessionUser } from "../types";
 
 const BASE = "/api/v1";
 
@@ -18,7 +21,15 @@ interface ProfileData {
   memory: string;
 }
 
-export function Profile({ onError }: { onError: (message: string) => void }) {
+export function Profile({
+  user,
+  onError,
+}: {
+  user: SessionUser;
+  onError: (message: string) => void;
+}) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [name, setName] = useState("");
   const [memory, setMemory] = useState("");
   const [saving, setSaving] = useState(false);
@@ -48,6 +59,32 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
     }
   }
 
+  async function pickAvatar(file: File | undefined) {
+    if (!file) return;
+    setAvatarBusy(true);
+    try {
+      await api.putAvatar(file);
+      bumpAvatarVersion();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAvatarBusy(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  async function removeAvatar() {
+    setAvatarBusy(true);
+    try {
+      await api.deleteAvatar();
+      bumpAvatarVersion();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
   return (
     <div className="content-narrow">
       <div className="page-head">
@@ -59,6 +96,34 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
       <div className="card block">
         <div className="card-head">
           <h3>Informações pessoais</h3>
+        </div>
+        <div className="avatar-editor">
+          <AccountAvatar user={user} size={72} />
+          <div>
+            <p className="caption muted">
+              Sem foto, a conta usa um identicon desenhado a partir do e-mail —
+              determinístico e gerado aqui mesmo, sem chamar serviço externo.
+              PNG, JPEG ou WebP de até 1 MB.
+            </p>
+            <div className="toolbar">
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }}
+                onChange={(e) => void pickAvatar(e.target.files?.[0])}
+              />
+              <button
+                onClick={() => fileInput.current?.click()}
+                disabled={avatarBusy}
+              >
+                {avatarBusy ? "Enviando…" : "Trocar foto"}
+              </button>
+              <button onClick={() => void removeAvatar()} disabled={avatarBusy}>
+                Voltar ao identicon
+              </button>
+            </div>
+          </div>
         </div>
         <div className="field-grid">
           <div className="field col-6">

@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
+import { AccountMenu } from "./components/AccountMenu";
 import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
@@ -470,10 +471,12 @@ export default function App({
         <button onClick={() => void reindex()} disabled={reindexing}>
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
-        <span className="session-identity" title={`${user.email} · ${user.role}`}>
-          {user.name || user.email} · {user.role}
-        </span>
-        <button onClick={onLogout}>Sair</button>
+        <AccountMenu
+          user={user}
+          onProfile={() => selectTab("profile")}
+          onAdmin={() => selectTab("admin")}
+          onLogout={onLogout}
+        />
       </header>
       {cmdkOpen && (
         <Suspense fallback={null}>
@@ -636,7 +639,7 @@ export default function App({
             </Suspense>
           ) : tab === "profile" ? (
             <Suspense fallback={<p className="empty">Carregando perfil…</p>}>
-              <Profile onError={setError} />
+              <Profile user={user} onError={setError} />
             </Suspense>
           ) : tab === "admin" ? (
             <Suspense fallback={<p className="empty">Carregando administração…</p>}>

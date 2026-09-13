@@ -166,9 +166,9 @@
         "id": "profile",
         "path": ".doctrina/specs/profile/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-09",
-        "implementation": "verified — perfil por conta e autoria pela sessão (`backend/arbites/api.py`)",
+        "version": "0.3.0",
+        "last_updated": "2026-09-13",
+        "implementation": "verified — perfil por conta, autoria pela sessão e avatar da conta (`backend/arbites/api.py`, `frontend/src/components/Profile.tsx`, `frontend/src/components/AccountMenu.tsx`, `frontend/src/components/Identicon.tsx`, `frontend/src/api.ts`)",
         "realizes": [
           "SC14"
         ]
@@ -377,14 +377,6 @@
       }
     ],
     "changes": [
-      {
-        "id": "0110-navegacao-e-identidade-no-padrao-github",
-        "title": "Navegacao e identidade no padrao GitHub",
-        "path": ".doctrina/changes/0110-navegacao-e-identidade-no-padrao-github",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (confident; signals: para que)"
-      },
       {
         "id": "0111-execution-como-ciclo-de-teste",
         "title": "Execution como ciclo de teste",
@@ -1847,6 +1839,19 @@
           },
           {
             "capability": "xray-migration",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0110-navegacao-e-identidade-no-padrao-github",
+        "title": "Navegacao e identidade no padrao GitHub",
+        "path": ".doctrina/changes/archive/2026-09-13-0110-navegacao-e-identidade-no-padrao-github",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "profile",
             "operation": "MODIFIED"
           }
         ]
