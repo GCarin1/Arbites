@@ -2019,6 +2019,12 @@
     ],
     "skills": [
       {
+        "id": "arquivo-como-fonte-da-verdade-nao-tem-transacao",
+        "path": ".doctrina/skills/arquivo-como-fonte-da-verdade-nao-tem-transacao.md",
+        "description": "Com o filesystem como fonte de verdade (ADR 0001) não existe transação: todo trecho carregar-alterar-gravar é crítico, e qualquer suspensão ou disputa no meio dele perde dado em silêncio, normalmente com resposta de sucesso.",
+        "last_updated": "2026-09-13"
+      },
+      {
         "id": "botao-como-item-de-lista-heranca-justify",
         "path": ".doctrina/skills/botao-como-item-de-lista-heranca-justify.md",
         "description": "Um <button> reestilizado como item de lista/linha herda justify-content:center do estilo base de button — o conteúdo aparece centralizado; sobrescreva para flex-start.",
@@ -2281,12 +2287,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "arquivo-como-fonte-da-verdade-nao-tem-transacao",
-        "path": ".doctrina/skills/arquivo-como-fonte-da-verdade-nao-tem-transacao.md",
-        "description": "Com o filesystem como fonte de verdade (ADR 0001) não existe transação: todo trecho carregar-alterar-gravar é crítico, e qualquer suspensão ou disputa no meio dele perde dado em silêncio, normalmente com resposta de sucesso.",
-        "last_updated": "2026-09-13"
       }
     ],
     "contracts": [
