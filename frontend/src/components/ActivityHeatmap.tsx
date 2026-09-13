@@ -91,7 +91,10 @@ export function ActivityHeatmap({ onError }: { onError: (message: string) => voi
       const first = week[0] && toDate(week[0]);
       if (first && first.getMonth() !== lastMonth) {
         lastMonth = first.getMonth();
-        labels.push({ col: ci, label: MONTHS[first.getMonth()] });
+        // Um mês que começa nas duas últimas colunas não tem largura para o
+        // próprio rótulo: ele transbordaria a área da grade (0138). Rótulo
+        // que não cabe não é rótulo — o mês continua ali, só sem legenda.
+        if (ci <= cols.length - 3) labels.push({ col: ci, label: MONTHS[first.getMonth()] });
       }
     });
 
@@ -137,7 +140,7 @@ export function ActivityHeatmap({ onError }: { onError: (message: string) => voi
             </span>
           ))}
         </div>
-        <div className="heatmap-main">
+        <div className="heatmap-main scroll-x">
           <div className="heatmap-months">
             {weeks.map((_, ci) => {
               const label = monthLabels.find((m) => m.col === ci)?.label ?? "";

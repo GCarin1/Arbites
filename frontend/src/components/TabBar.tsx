@@ -41,7 +41,7 @@ export function TabBar<K extends string>({
   return (
     <div
       ref={bar}
-      className={`tab-bar ${className}`.trim()}
+      className={`tab-bar scroll-x ${className}`.trim()}
       role="tablist"
       aria-label={label}
     >

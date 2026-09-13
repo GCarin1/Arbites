@@ -185,7 +185,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.14.0",
+        "version": "0.15.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -387,7 +387,16 @@
         "summary": "O ciclo é a execution, não uma entidade nova."
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0139-periodo-ciclo-cabecalho-execucao",
+        "title": "periodo do ciclo no cabecalho da execucao e duas caixas de data sem rotulo e de larguras diferentes, precedidas de um traco solto quando sprint e ambiente estao vazios",
+        "path": ".doctrina/changes/0139-periodo-ciclo-cabecalho-execucao",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -2160,6 +2169,19 @@
         ]
       },
       {
+        "id": "0136-linha-arvore-requisitos-execucoes",
+        "title": "linha de arvore de requisitos e de execucoes desenha os rotulos uns por cima dos outros em 390px: id, cobertura, status e data se sobrepoem porque o flex encolhe todos abaixo do proprio texto",
+        "path": ".doctrina/changes/archive/2026-09-13-0136-linha-arvore-requisitos-execucoes",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
         "id": "0137-cenario-interrompido-timeout-cancelamento",
         "title": "cenario interrompido por timeout ou cancelamento e gravado como passed porque o fecho do progresso ao vivo trata ausencia de falha como aprovacao",
         "path": ".doctrina/changes/archive/2026-09-13-0137-cenario-interrompido-timeout-cancelamento",
@@ -2173,14 +2195,14 @@
         ]
       },
       {
-        "id": "0136-linha-arvore-requisitos-execucoes",
-        "title": "linha de arvore de requisitos e de execucoes desenha os rotulos uns por cima dos outros em 390px: id, cobertura, status e data se sobrepoem porque o flex encolhe todos abaixo do proprio texto",
-        "path": ".doctrina/changes/archive/2026-09-13-0136-linha-arvore-requisitos-execucoes",
+        "id": "0138-heatmap-atividade-fica-ilegivel",
+        "title": "heatmap de atividade fica ilegivel em 390px: celula de 2 pixels numa grade de 38px de altura contra coluna de dias de 140px, rotulos de mes amontoados e seletores do cabecalho cortados a 96px",
+        "path": ".doctrina/changes/archive/2026-09-13-0138-heatmap-atividade-fica-ilegivel",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [
           {
-            "capability": "design-system",
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]
