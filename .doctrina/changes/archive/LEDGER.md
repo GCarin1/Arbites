@@ -114,3 +114,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0107-keepalive-no-sse-atras-do-tunel — Keepalive no SSE atras do tunel (specs: local-automation MODIFIED)
   - 2026-09-13 — 0108-caminho-sem-dominio-no-guia — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
 - 2026-09-13 — 0108-caminho-sem-dominio-no-guia — Caminho sem dominio no guia
+- 2026-09-13 — 0109-refoco-do-produto-e-congelamento-da-periferia — Refoco do produto e congelamento da periferia (specs: businessmap REMOVED, ci-automation MODIFIED, daily MODIFIED, decisions MODIFIED, local-automation MODIFIED, meetings MODIFIED, project-memory MODIFIED, risk-map MODIFIED, xray-migration MODIFIED)

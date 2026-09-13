@@ -1,8 +1,8 @@
 # Spec — daily
 
 **Capability:** daily
-**Status:** active
-**Implementation:** verified — M11 (backend/arbites/daily.py, backend/arbites/api.py, backend/arbites/ai.py; frontend Daily.tsx). IA opcional (reusa provider do M5); snapshots em `metrics/`, dailies em `dailies/`
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC12
 **Last updated:** 2026-07-06
 **Version:** 0.2.0
