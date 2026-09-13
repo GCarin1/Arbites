@@ -118,6 +118,21 @@ docker compose up -d --build
 docker compose logs -f arbites   # deve dizer que criou o admin de bootstrap
 ```
 
+> **`permission denied ... /var/run/docker.sock`?** Seu usuário não está no
+> grupo `docker`. Resolva uma vez e esqueça:
+>
+> ```bash
+> sudo usermod -aG docker $USER
+> newgrp docker      # aplica no shell atual, sem precisar deslogar
+> ```
+>
+> `sudo docker compose ...` também funciona, mas aí *todos* os comandos
+> seguintes precisam de `sudo` — misturar os dois faz você enxergar dois
+> conjuntos diferentes de containers.
+
+O primeiro build demora alguns minutos: baixa o Node, monta o frontend,
+baixa o Python e instala as dependências.
+
 Confirme pela LAN antes de mexer na Cloudflare — separa um problema de
 container de um problema de rede:
 
