@@ -345,6 +345,20 @@ textarea.raw {
   flex: 1;
 }
 
+/* Ação de manutenção na barra superior (change 0130): presente e a um
+   clique, sem a aparência de ação de trabalho que disputava atenção com a
+   busca em toda tela. */
+.header-icon-btn {
+  padding: 0 var(--s1);
+  color: var(--text-muted);
+}
+.header-icon-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+.header-icon-btn:disabled .nav-icon {
+  opacity: 0.4;
+}
+
 /* Gaveta de navegação (change 0125). Em tela larga o botão não existe: a
    lateral já está ali, e um controle para abrir o que está aberto confunde. */
 .nav-toggle {

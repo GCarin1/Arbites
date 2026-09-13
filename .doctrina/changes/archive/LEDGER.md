@@ -135,3 +135,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0127-quadro-execucao-so-funciona — quadro de execucao so funciona com mouse: arrastar um card e impossivel pelo teclado (specs: design-system MODIFIED)
 - 2026-09-13 — 0128-tema-claro-opcional-cores — tema claro opcional com as cores dos graficos saindo de valores cravados para tokens (specs: design-system MODIFIED)
 - 2026-09-13 — 0129-menu-lateral-cinco-cabecalhos — menu lateral com cinco cabecalhos para doze itens sem icone e com navegacao duplicada no avatar (specs: design-system MODIFIED)
+- 2026-09-13 — 0130-cabecalho-caminho-disco-reindexar — cabecalho com caminho do disco e reindexar competindo, e botao orfao acima do titulo em execucoes (specs: design-system MODIFIED)

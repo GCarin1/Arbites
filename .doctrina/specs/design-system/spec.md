@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.11.0
+**Version:** 0.11.1
 
 ## Purpose
 
@@ -87,6 +87,8 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall oferecer tema claro além do escuro, com a escolha guardada no navegador de quem escolheu e aplicada antes da primeira pintura.
 - The system shall acompanhar cada item do menu lateral de um ícone, para que a navegação seja varrida e não lida item a item.
 - The system shall agrupar o menu lateral apenas onde o grupo esclarece — sem cabeçalho para grupo de um item só — e ancorar no rodapé, separado por régua, o que é de manutenção e não de trabalho do dia.
+- The system shall reservar a barra superior para identidade, busca e conta, mantendo informação de instalação e ação de manutenção acessíveis sem ocupar espaço permanente nela.
+- The system shall posicionar as ações de uma tela dentro do cabeçalho dela, nunca antes do título da página.
 
 ### Event-driven
 
@@ -162,6 +164,8 @@ e prova a sua fatia, citando o teste/artefato. -->
 14. [verified] O tema claro muda fundo, superfície, borda e texto mantendo os estados distinguíveis, e a escolha sobrevive ao recarregamento — verified by `frontend/src/styles.css` + `frontend/src/theme.ts`.
 15. [verified] O menu lateral tem ícone em todo item, nenhum cabeçalho de grupo com um item só, e o que é de manutenção ancorado no rodapé depois de uma régua — verified by `frontend/src/App.tsx` + `frontend/src/styles.css`.
 16. [verified] Nenhuma tela sai do alcance na reorganização: o que deixa o menu lateral continua acessível pelo menu da conta e pelo endereço direto — verified by `frontend/src/App.tsx`.
+17. [verified] A barra superior não exibe caminho de disco nem ação de manutenção como botão de destaque, e ambos continuam alcançáveis — verified by `frontend/src/App.tsx`.
+18. [verified] Nenhuma tela tem controle renderizado antes do título da página — verified by `frontend/src/App.tsx`.
 
 ## Maturity
 

@@ -260,12 +260,14 @@ export function ExecutionsRepo({
   onNew,
   onError,
   onNavigate,
+  onGuided,
 }: {
   version: number;
   onOpen: (id: string) => void;
   onNew: () => void;
   onError: (message: string) => void;
   onNavigate?: (id: string) => void;
+  onGuided?: () => void;
 }) {
   const [items, setItems] = useState<ExecutionSummary[]>([]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -383,6 +385,11 @@ export function ExecutionsRepo({
         <h1 className="page-title">Execuções</h1>
         <span className="spacer" />
         <div className="head-controls">
+          {onGuided && (
+            <button onClick={onGuided} title="Sentar e executar os casos em sequência">
+              Modo guiado
+            </button>
+          )}
           <button
             className={selMode ? "primary" : ""}
             onClick={toggleSelMode}
@@ -746,10 +753,12 @@ export function ExecutionBoard({
   id,
   onChanged,
   onError,
+  onGuided,
 }: {
   id: string;
   onChanged: () => void;
   onError: (message: string) => void;
+  onGuided?: () => void;
 }) {
   const [execution, setExecution] = useState<Execution | null>(null);
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
@@ -933,6 +942,9 @@ export function ExecutionBoard({
             <button onClick={() => void analyzeRun()} disabled={analysis === "busy"}>
               {analysis === "busy" ? "Analisando…" : "Analisar falha (IA)"}
             </button>
+          )}
+          {onGuided && (
+            <button onClick={onGuided}>Modo guiado</button>
           )}
           {!closed && (
             <button onClick={() => setConfirmClose(true)}>Fechar execução</button>

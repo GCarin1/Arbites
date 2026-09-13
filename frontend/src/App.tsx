@@ -516,10 +516,12 @@ export default function App({
           <span aria-hidden="true">☰</span>
         </button>
         <span className="brand">Arbites</span>
-        {/* `wide-only`: contadores, caminho e reindexar são controles de quem
-            administra a instância sentado numa mesa — não de quem abre o
-            celular para ver como está a regressão (change 0125). */}
-        <span className="meta wide-only">
+        {/* `wide-only`: contadores e reindexar são controles de quem administra
+            a instância sentado numa mesa — não de quem abre o celular para ver
+            como está a regressão (change 0125). O caminho no disco virou dica
+            aqui: é informação de instalação, consultada uma vez por mês, e não
+            merecia espaço fixo no topo de toda tela (change 0130). */}
+        <span className="meta wide-only" title={workspace?.root ?? undefined}>
           {workspace?.config.workspace?.name ?? "…"} ·{" "}
           {workspace?.index.testcases ?? 0} CTs · {workspace?.index.requirements ?? 0}{" "}
           requisitos
@@ -529,13 +531,14 @@ export default function App({
           <span>Buscar…</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <span className="meta mono wide-only">{workspace?.root}</span>
         <button
-          className="wide-only"
+          className="header-icon-btn wide-only"
           onClick={() => void reindex()}
           disabled={reindexing}
+          title={reindexing ? "Reindexando…" : "Reindexar o índice do workspace"}
+          aria-label="Reindexar"
         >
-          {reindexing ? "Reindexando…" : "Reindexar"}
+          <NavIcon name="reindex" />
         </button>
         <AccountMenu
           user={user}
@@ -830,22 +833,18 @@ export default function App({
                     <span className="mono">{selectedExec}</span>
                   </span>
                 </div>
-                <div className="toolbar">
-                  <button onClick={() => setExecGuided(true)}>
-                    Modo guiado (sentar e executar)
-                  </button>
-                </div>
-                <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
+                <ExecutionBoard
+                  id={selectedExec}
+                  onChanged={refresh}
+                  onError={setError}
+                  onGuided={() => setExecGuided(true)}
+                />
               </Suspense>
             ) : (
               <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
-                <div className="toolbar">
-                  <button onClick={() => setExecGuided(true)}>
-                    Modo guiado (sentar e executar)
-                  </button>
-                </div>
                 <ExecutionsRepo
                   version={reqVersion}
+                  onGuided={() => setExecGuided(true)}
                   onOpen={(id) => {
                     setExecCreating(false);
                     setSelectedExec(id);
