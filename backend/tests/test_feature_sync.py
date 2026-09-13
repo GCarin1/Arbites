@@ -214,7 +214,7 @@ def test_update_marks_needs_rerun_and_new_result_clears_it(client, tmp_path):
     ).json()
     client.post(
         f"/api/v1/executions/{execution['id']}/results/{ct_id}/status",
-        json={"status": "passed", "who": "carini"},
+        json={"status": "passed"},
     )
     assert client.get(f"/api/v1/testcases/{ct_id}").json()["needs_rerun"] is False
     assert client.get("/api/v1/testcases", params={"needs_rerun": True}).json() == []

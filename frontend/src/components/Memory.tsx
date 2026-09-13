@@ -6,7 +6,7 @@ const KIND_LABEL: Record<string, string> = {
   requirement: "Requisito",
   testcase: "Caso de teste",
   defect: "Defeito",
-  lesson: "Lição aprendida",
+  lesson: "Análise de causa",
   decision: "Decisão",
   agent: "Agente de IA",
   result: "Resultado de execução",

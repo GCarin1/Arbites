@@ -2,6 +2,8 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
+import { AccountMenu } from "./components/AccountMenu";
+import { NavIcon } from "./components/NavIcons";
 import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
@@ -30,6 +32,9 @@ const ExecutionCreate = lazy(() =>
 );
 const ExecutionsRepo = lazy(() =>
   import("./components/Executions").then((m) => ({ default: m.ExecutionsRepo }))
+);
+const ExecutionGuided = lazy(() =>
+  import("./components/ExecutionGuided").then((m) => ({ default: m.ExecutionGuided }))
 );
 const Dashboard = lazy(() =>
   import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
@@ -142,11 +147,27 @@ function buildHash(tab: Tab, params: Record<string, string>): string {
 // quem usa o produto para o que ele é — repositório, ciclo e execução.
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Testes", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["defects", "dashboard", "todos", "audit"] },
-  { title: "Ferramentas", keys: ["ia"] },
-  { title: "Mais", keys: ["decisions", "memory", "daily", "meetings", "automation", "migration"] },
-  { title: "Suporte", keys: ["problems", "profile", "admin"] },
+  { title: "Acompanhamento", keys: ["dashboard", "defects", "todos", "audit"] },
 ];
+
+// Itens sem grupo, entre o trabalho do dia e o que foi congelado.
+// "Ferramentas" tinha UM item: um cabeçalho para um item ocupa uma linha
+// inteira para dizer o que o próprio item já diz (change 0129).
+const NAV_LOOSE: Tab[] = ["ia"];
+
+// As capabilities congeladas (ADR 0012) vêm por último, antes do rodapé:
+// continuam alcançáveis e fora do caminho de quem usa o produto para o que
+// ele é.
+const NAV_FROZEN_GROUP = {
+  title: "Mais",
+  keys: ["decisions", "memory", "daily", "meetings", "automation", "migration"] as Tab[],
+};
+
+// Rodapé da navegação: o que é de manutenção, não de trabalho do dia, fica
+// ancorado embaixo depois de uma régua — não compete com a regressão de
+// hoje. `profile` NÃO entra: é da pessoa e mora no menu do avatar desde a
+// change 0110; repeti-lo aqui era navegação duplicada.
+const NAV_FOOTER: Tab[] = ["problems", "admin"];
 
 // Capabilities congeladas: o grupo "Mais" nasce recolhido, e cada item leva
 // a marca para que ninguém confunda "está aqui" com "é para usar".
@@ -203,7 +224,8 @@ function NavItem({
         onClick={() => setTab(item.key)}
         aria-current={tab === item.key ? "page" : undefined}
       >
-        {item.label}
+        <NavIcon name={item.key} />
+        <span className="nav-item-label">{item.label}</span>
         {live && <span className="nav-live-dot" title="automação executando" />}
         {item.key === "problems" && problemCount > 0 && (
           <span className="count">{problemCount}</span>
@@ -266,6 +288,9 @@ export default function App({
   const selectTab = useCallback((key: Tab) => {
     setTab(key);
     setHashParams({});
+    // Navegar fecha a gaveta: num celular ela cobre a tela, e deixá-la
+    // aberta esconderia justamente o que a pessoa acabou de pedir.
+    setNavOpen(false);
   }, []);
 
   const setHashParam = useCallback((key: string, value: string) => {
@@ -286,6 +311,12 @@ export default function App({
   const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
+  // modo guiado (change 0113): complementa o Kanban, não o substitui
+  const [execGuided, setExecGuided] = useState(false);
+  // Gaveta de navegação em tela estreita (change 0125). A lateral sai do
+  // fluxo em vez de comer 240px de uma tela de 390.
+  const [navOpen, setNavOpen] = useState(false);
+  const navToggle = useRef<HTMLButtonElement>(null);
   const [cmdkOpen, setCmdkOpen] = useState(false);
   // runs de automação ativos → dot pulsante no item Automação (0076)
   const [activeRuns, setActiveRuns] = useState(0);
@@ -452,11 +483,45 @@ export default function App({
       .catch(() => setSwitches([]));
   }, []);
 
+  // Esc fecha a gaveta e devolve o foco a quem a abriu: sem isso o teclado
+  // volta para o topo do documento e a pessoa se perde.
+  useEffect(() => {
+    if (!navOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setNavOpen(false);
+        navToggle.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    // trava a rolagem do conteúdo atrás da gaveta
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = antes;
+    };
+  }, [navOpen]);
+
   return (
     <>
       <header className="app-header">
+        <button
+          ref={navToggle}
+          className="nav-toggle"
+          onClick={() => setNavOpen((v) => !v)}
+          aria-label={navOpen ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={navOpen}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
         <span className="brand">Arbites</span>
-        <span className="meta">
+        {/* `wide-only`: contadores e reindexar são controles de quem administra
+            a instância sentado numa mesa — não de quem abre o celular para ver
+            como está a regressão (change 0125). O caminho no disco virou dica
+            aqui: é informação de instalação, consultada uma vez por mês, e não
+            merecia espaço fixo no topo de toda tela (change 0130). */}
+        <span className="meta wide-only" title={workspace?.root ?? undefined}>
           {workspace?.config.workspace?.name ?? "…"} ·{" "}
           {workspace?.index.testcases ?? 0} CTs · {workspace?.index.requirements ?? 0}{" "}
           requisitos
@@ -466,14 +531,21 @@ export default function App({
           <span>Buscar…</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <span className="meta mono">{workspace?.root}</span>
-        <button onClick={() => void reindex()} disabled={reindexing}>
-          {reindexing ? "Reindexando…" : "Reindexar"}
+        <button
+          className="header-icon-btn wide-only"
+          onClick={() => void reindex()}
+          disabled={reindexing}
+          title={reindexing ? "Reindexando…" : "Reindexar o índice do workspace"}
+          aria-label="Reindexar"
+        >
+          <NavIcon name="reindex" />
         </button>
-        <span className="session-identity" title={`${user.email} · ${user.role}`}>
-          {user.name || user.email} · {user.role}
-        </span>
-        <button onClick={onLogout}>Sair</button>
+        <AccountMenu
+          user={user}
+          onProfile={() => selectTab("profile")}
+          onAdmin={() => selectTab("admin")}
+          onLogout={onLogout}
+        />
       </header>
       {cmdkOpen && (
         <Suspense fallback={null}>
@@ -484,7 +556,16 @@ export default function App({
           />
         </Suspense>
       )}
-      <div className="app-body">
+      <div className={`app-body ${navOpen ? "nav-open" : ""}`}>
+        {/* O fundo escurecido é o alvo do "toque fora" — num celular o gesto
+            de fechar varia, e nenhum deles é o óbvio para todo mundo. */}
+        {navOpen && (
+          <div
+            className="nav-backdrop"
+            onClick={() => setNavOpen(false)}
+            aria-hidden="true"
+          />
+        )}
         <aside className="sidebar">
           <nav className="nav">
             <div className="nav-group">
@@ -493,7 +574,8 @@ export default function App({
                 onClick={() => selectTab("home")}
                 aria-current={tab === "home" ? "page" : undefined}
               >
-                Hoje
+                <NavIcon name="home" />
+                <span className="nav-item-label">Hoje</span>
               </button>
             </div>
             {pins.length > 0 && (
@@ -545,6 +627,65 @@ export default function App({
                   ))}
               </div>
             ))}
+
+            {/* Item sem grupo: um cabeçalho para um item só é ruído. */}
+            <div className="nav-group">
+              {NAV_LOOSE.filter(isReachable).map((k) => (
+                <NavItem
+                  key={k}
+                  item={NAV_BY_KEY[k]}
+                  tab={tab}
+                  setTab={selectTab}
+                  problemCount={problemCount}
+                  pinned={pins.includes(k)}
+                  onTogglePin={() => togglePin(k)}
+                  frozen={FROZEN_TABS.includes(k)}
+                />
+              ))}
+            </div>
+
+            <div className="nav-group">
+              <button
+                className="nav-group-title"
+                onClick={() => toggleGroup(NAV_FROZEN_GROUP.title)}
+                aria-expanded={!collapsed.includes(NAV_FROZEN_GROUP.title)}
+              >
+                <span>{NAV_FROZEN_GROUP.title}</span>
+                <span className="nav-chevron">
+                  {collapsed.includes(NAV_FROZEN_GROUP.title) ? "▸" : "▾"}
+                </span>
+              </button>
+              {!collapsed.includes(NAV_FROZEN_GROUP.title) &&
+                NAV_FROZEN_GROUP.keys.filter(isReachable).map((k) => (
+                  <NavItem
+                    key={k}
+                    item={NAV_BY_KEY[k]}
+                    tab={tab}
+                    setTab={selectTab}
+                    problemCount={problemCount}
+                    pinned={pins.includes(k)}
+                    onTogglePin={() => togglePin(k)}
+                    live={k === "automation" && activeRuns > 0}
+                    frozen={FROZEN_TABS.includes(k)}
+                  />
+                ))}
+            </div>
+
+            {/* Rodapé ancorado: manutenção não compete com o trabalho do dia. */}
+            <div className="nav-footer">
+              {NAV_FOOTER.filter(isReachable).map((k) => (
+                <NavItem
+                  key={k}
+                  item={NAV_BY_KEY[k]}
+                  tab={tab}
+                  setTab={selectTab}
+                  problemCount={problemCount}
+                  pinned={pins.includes(k)}
+                  onTogglePin={() => togglePin(k)}
+                  frozen={FROZEN_TABS.includes(k)}
+                />
+              ))}
+            </div>
           </nav>
         </aside>
         <main className="main">
@@ -636,7 +777,7 @@ export default function App({
             </Suspense>
           ) : tab === "profile" ? (
             <Suspense fallback={<p className="empty">Carregando perfil…</p>}>
-              <Profile onError={setError} />
+              <Profile user={user} onError={setError} />
             </Suspense>
           ) : tab === "admin" ? (
             <Suspense fallback={<p className="empty">Carregando administração…</p>}>
@@ -647,7 +788,23 @@ export default function App({
               <XrayImport onImported={() => void refresh()} onError={setError} />
             </Suspense>
           ) : tab === "executions" ? (
-            execCreating ? (
+            execGuided ? (
+              <Suspense fallback={<p className="empty">Carregando modo guiado…</p>}>
+                <div className="back-bar">
+                  <button onClick={() => setExecGuided(false)}>← Voltar</button>
+                  <span className="crumbs caption">
+                    <span className="muted">Execuções</span>
+                    <span className="crumb-sep">/</span>
+                    <span>modo guiado</span>
+                  </span>
+                </div>
+                <ExecutionGuided
+                  initialId={selectedExec}
+                  onChanged={refresh}
+                  onError={setError}
+                />
+              </Suspense>
+            ) : execCreating ? (
               <Suspense fallback={<p className="empty">Carregando criação…</p>}>
                 <div className="back-bar">
                   <button onClick={() => setExecCreating(false)}>← Voltar</button>
@@ -676,12 +833,18 @@ export default function App({
                     <span className="mono">{selectedExec}</span>
                   </span>
                 </div>
-                <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
+                <ExecutionBoard
+                  id={selectedExec}
+                  onChanged={refresh}
+                  onError={setError}
+                  onGuided={() => setExecGuided(true)}
+                />
               </Suspense>
             ) : (
               <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
                 <ExecutionsRepo
                   version={reqVersion}
+                  onGuided={() => setExecGuided(true)}
                   onOpen={(id) => {
                     setExecCreating(false);
                     setSelectedExec(id);

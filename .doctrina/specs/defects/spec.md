@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)
 **Realizes:** SC2
-**Last updated:** 2026-07-20
-**Version:** 0.8.0
+**Last updated:** 2026-09-13
+**Version:** 0.8.1
 
 ## Purpose
 
@@ -48,6 +48,7 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
   `DELETE /executions/{exec_id}/results/{ct_id}/defects/{defect_id}`
   (desvincular), além do vínculo automático ao criar defeito a partir de um
   resultado `failed`.
+- The system shall nomear na interface o conjunto causa raiz, correção e prevenção como análise da causa do defeito, sem usar vocabulário que sugira avaliação de pessoas.
 
 ### Event-driven
 
@@ -71,6 +72,7 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
   triagem, atribuição, comentários); é ponteiro + metadados.
 - The system shall not aceitar vincular um `defect_id` inexistente (404) nem
   vincular/desvincular numa execution `closed` (409).
+- The system shall not renomear o frontmatter, o parâmetro de filtro nem as colunas do índice ao ajustar o nome exibido; o dado já gravado nos workspaces continua válido.
 
 ### Optional
 
@@ -106,6 +108,7 @@ com metadados mínimos; o bug "de verdade" vive no sistema corporativo e
    estruturada; a injeção no prompt prefere o formato estruturado; e
    `POST /ai/structure-lesson/{id}` devolve a sugestão em preview sem gravar
    — verified by `backend/tests/test_lessons_learned.py`.
+8. [verified] A interface nomeia o conjunto como análise da causa, e o frontmatter, o filtro da rota e o índice seguem com os nomes originais — verified by `frontend/src/components/Defects.tsx` + `backend/tests/test_lessons_learned.py`.
 
 ## Maturity
 

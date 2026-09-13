@@ -2,10 +2,10 @@
 
 **Capability:** executions
 **Status:** active
-**Implementation:** verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
+**Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
-**Last updated:** 2026-07-21
-**Version:** 0.6.0
+**Last updated:** 2026-09-13
+**Version:** 0.9.4
 
 ## Purpose
 
@@ -64,6 +64,16 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   `removed` (só em a) ou `unchanged`; a UI shall oferecer um modo
   "Comparar" (selecionar duas executions) que abre o diff por categoria,
   cada CT navegável.
+- The system shall guardar no `execution.json` o período do ciclo em `starts_on` e `ends_on` (datas ISO `YYYY-MM-DD`, ambas opcionais), aceitando alteração por `PATCH /executions/{id}`.
+- The system shall guardar em cada resultado o `assignee` — o responsável por aquele caso dentro do ciclo — e expor `POST /executions/{id}/results/{ct}/assignee` para defini-lo ou limpá-lo.
+- The system shall exibir o vocabulário do ciclo como planejado (`draft`), em andamento (`in_progress`) e fechado (`closed`), mantendo no disco os valores que a máquina de estados já usa.
+- The system shall apresentar um cabeçalho de progresso do ciclo com a barra empilhada por coluna, um contador grande por coluna, o total de casos e o período com a situação do prazo, exibindo a contagem apurada pelo servidor em vez de recalculá-la no cliente.
+- The system shall oferecer, ao lado do Kanban, um modo guiado em três painéis — ciclos, casos do ciclo e caso ativo — operando sobre a mesma execution, sem nenhum endpoint novo.
+- The system shall permitir no painel do caso ativo marcar cada passo, anexar evidência, escrever comentário e dar o resultado, sem abrir modal e sem sair da tela.
+- The system shall exibir no rodapé do modo guiado a posição do caso ativo no ciclo, o avanço para o próximo caso e o atalho que dá resultado e avança num gesto só.
+- The system shall preencher a autoria de toda escrita num resultado — `executed_by` e o `who` de cada evento do `history[]` — a partir da sessão, nas rotas de status do resultado, status do passo, evidência e vínculo de defeito.
+- The system shall resolver os títulos dos casos de um ciclo com uma única leitura de `GET /testcases`, tanto no Kanban quanto no modo guiado, em vez de uma requisição por caso.
+- The system shall exibir na lista de ciclos o prazo de cada um e a situação dele — no prazo, termina hoje ou em atraso —, e o estado no vocabulário do ciclo, o mesmo que o cabeçalho usa.
 
 ### Event-driven
 
@@ -75,6 +85,9 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   `{at, who, event: "result", testcase_id, to}` no `history[]`.
 - When a execution é fechada, the system shall preencher `closed_at` e
   mudar `status` para `closed`.
+- When `ends_on` é anterior a `starts_on`, the system shall recusar a alteração com 422 em vez de gravar um ciclo que termina antes de começar.
+- When o responsável de um caso muda, the system shall registrar evento `{at, who, event: "assignee", testcase_id, to}` no `history[]`, pela mesma razão que status e step já registram.
+- When o resultado do caso ativo é registrado no modo guiado, the system shall avançar para o próximo caso ainda pendente do ciclo, e parar no último em vez de voltar ao começo.
 
 ### State-driven
 
@@ -87,6 +100,11 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   resultado; o mesmo CT pode estar `passed` na EXEC-0001 e `failed` na
   EXEC-0002 sem contradição.
 - The system shall not exigir cadastro prévio de sprint ou ambiente.
+- The system shall not criar cadastro de sprint, release ou responsável; `sprint` e `environment` seguem texto livre e o `assignee` é o e-mail de uma conta que já existe.
+- The system shall not substituir o Kanban pelo modo guiado; os dois modos leem e escrevem a mesma execution e a escolha é de quem executa.
+- The system shall not aceitar `who` no corpo dessas rotas; um cliente que envie o campo recebe 422, porque ignorá-lo em silêncio deixa no contrato uma promessa que o servidor não cumpre.
+- The system shall not apurar o progresso do ciclo por `status` enquanto o quadro conta por coluna; a coluna é o que o time olha e move, e duas contagens da mesma pergunta divergem no primeiro caso arrastado.
+- The system shall not suspender a requisição entre carregar a execution e gravá-la; um upload concorrente que aguarde no meio desse trecho faz a última gravação apagar o registro das anteriores.
 
 ### Optional
 
@@ -121,6 +139,17 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
    correta (regressed/fixed/added/removed/unchanged) — verified by
    `backend/tests/test_executions.py`
    (`test_diff_classifies_five_categories`).
+9. [verified] Uma execution nasce sem período, recebe `starts_on`/`ends_on` por PATCH e sobrevive ao reinício; um período invertido é recusado com 422 — verified by `backend/tests/test_execution_cycle.py`.
+10. [verified] Um caso recebe responsável, o evento entra no `history[]`, o índice enxerga o valor e limpar o responsável volta o caso a sem dono — verified by `backend/tests/test_execution_cycle.py`.
+11. [verified] O cabeçalho do ciclo soma os contadores por status batendo com o total de casos, e um `execution.json` antigo — sem as chaves novas — continua sendo lido como ciclo sem período e sem responsável — verified by `backend/tests/test_execution_cycle.py`.
+12. [verified] O modo guiado percorre os casos de um ciclo na ordem, dá resultado e avança sem sair da tela, e o que ele grava é a mesma execution que o Kanban lê — verified by `backend/tests/test_executions_guided.py`.
+13. [verified] Dar resultado no último caso pendente encerra a fila em vez de voltar ao começo, e um ciclo fechado é percorrível mas não gravável — verified by `backend/tests/test_executions_guided.py`.
+14. [verified] Resultado, passo, evidência e defeito gravam como autor o e-mail da sessão, mesmo quando o corpo não traz autoria nenhuma — verified by `backend/tests/test_authorship_executions.py`.
+15. [verified] Um cliente que tenta forjar a autoria de um resultado é recusado com 422 e nada é gravado, e o mesmo caso executado por duas contas registra cada resultado em nome de quem o executou — verified by `backend/tests/test_authorship_executions.py`.
+16. [verified] Abrir um ciclo resolve os títulos dos seus casos com uma única leitura da lista de casos, e o número de requisições não cresce com o tamanho do ciclo — verified by `frontend/src/components/ExecutionGuided.tsx` + `backend/tests/test_executions_guided.py`.
+17. [verified] A lista de ciclos devolve o período de cada um, e um ciclo com prazo vencido é distinguível de um no prazo sem abrir nenhum dos dois — verified by `backend/tests/test_execution_cycle.py`.
+18. [verified] Um caso arrastado para uma coluna diferente do seu status é contado na coluna em que está, e o progresso do ciclo bate com o que o quadro mostra — verified by `backend/tests/test_execution_cycle.py`.
+19. [verified] Seis evidências enviadas ao mesmo tempo para o mesmo resultado são todas registradas no `execution.json`, com um arquivo em disco para cada — verified by `backend/tests/test_executions_concurrency.py`.
 
 ## Maturity
 

@@ -1,5 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
+import { AccountAvatar, bumpAvatarVersion } from "./AccountMenu";
+import {
+  DENSITIES,
+  DENSITY_LABELS,
+  loadDensity,
+  saveDensity,
+  type Density,
+} from "../density";
+import {
+  THEMES,
+  THEME_LABELS,
+  loadTheme,
+  saveTheme,
+  type Theme,
+} from "../theme";
+import { api } from "../api";
+import type { SessionUser } from "../types";
 
 const BASE = "/api/v1";
 
@@ -18,7 +35,17 @@ interface ProfileData {
   memory: string;
 }
 
-export function Profile({ onError }: { onError: (message: string) => void }) {
+export function Profile({
+  user,
+  onError,
+}: {
+  user: SessionUser;
+  onError: (message: string) => void;
+}) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [density, setDensity] = useState<Density>(loadDensity);
+  const [theme, setTheme] = useState<Theme>(loadTheme);
   const [name, setName] = useState("");
   const [memory, setMemory] = useState("");
   const [saving, setSaving] = useState(false);
@@ -48,6 +75,32 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
     }
   }
 
+  async function pickAvatar(file: File | undefined) {
+    if (!file) return;
+    setAvatarBusy(true);
+    try {
+      await api.putAvatar(file);
+      bumpAvatarVersion();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAvatarBusy(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  async function removeAvatar() {
+    setAvatarBusy(true);
+    try {
+      await api.deleteAvatar();
+      bumpAvatarVersion();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
   return (
     <div className="content-narrow">
       <div className="page-head">
@@ -59,6 +112,34 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
       <div className="card block">
         <div className="card-head">
           <h3>Informações pessoais</h3>
+        </div>
+        <div className="avatar-editor">
+          <AccountAvatar user={user} size={72} />
+          <div>
+            <p className="caption muted">
+              Sem foto, a conta usa um identicon desenhado a partir do e-mail —
+              determinístico e gerado aqui mesmo, sem chamar serviço externo.
+              PNG, JPEG ou WebP de até 1 MB.
+            </p>
+            <div className="toolbar">
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }}
+                onChange={(e) => void pickAvatar(e.target.files?.[0])}
+              />
+              <button
+                onClick={() => fileInput.current?.click()}
+                disabled={avatarBusy}
+              >
+                {avatarBusy ? "Enviando…" : "Trocar foto"}
+              </button>
+              <button onClick={() => void removeAvatar()} disabled={avatarBusy}>
+                Voltar ao identicon
+              </button>
+            </div>
+          </div>
         </div>
         <div className="field-grid">
           <div className="field col-6">
@@ -72,6 +153,67 @@ export function Profile({ onError }: { onError: (message: string) => void }) {
               placeholder="Seu nome"
             />
           </div>
+        </div>
+      </div>
+
+      <div className="card block">
+        <div className="card-head">
+          <h3>Densidade de leitura</h3>
+          <span className="spacer" />
+          <span className="caption muted">
+            vale neste navegador — é como você lê, não como o time trabalha
+          </span>
+        </div>
+        <p className="caption muted" style={{ marginBottom: "var(--s1)" }}>
+          Muda o respiro das linhas e a altura dos controles nas telas de
+          lista, árvore e quadro. A separação entre seções não muda: encolhê-la
+          não faz caber mais nada.
+        </p>
+        <div className="toolbar" role="radiogroup" aria-label="Densidade de leitura">
+          {DENSITIES.map((option) => (
+            <button
+              key={option}
+              className={option === density ? "primary" : ""}
+              role="radio"
+              aria-checked={option === density}
+              onClick={() => {
+                setDensity(option);
+                saveDensity(option);
+              }}
+            >
+              {DENSITY_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card block">
+        <div className="card-head">
+          <h3>Tema</h3>
+          <span className="spacer" />
+          <span className="caption muted">
+            vale neste navegador, como a densidade
+          </span>
+        </div>
+        <p className="caption muted" style={{ marginBottom: "var(--s1)" }}>
+          O escuro é o padrão do produto. O claro existe para quem lê em sala
+          clara ou projeta a tela numa reunião.
+        </p>
+        <div className="toolbar" role="radiogroup" aria-label="Tema">
+          {THEMES.map((option) => (
+            <button
+              key={option}
+              className={option === theme ? "primary" : ""}
+              role="radio"
+              aria-checked={option === theme}
+              onClick={() => {
+                setTheme(option);
+                saveTheme(option);
+              }}
+            >
+              {THEME_LABELS[option]}
+            </button>
+          ))}
         </div>
       </div>
 

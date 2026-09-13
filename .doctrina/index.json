@@ -94,8 +94,8 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.8.0",
-        "last_updated": "2026-07-20",
+        "version": "0.8.1",
+        "last_updated": "2026-09-13",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -105,17 +105,17 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.6.0",
-        "last_updated": "2026-07-21",
+        "version": "0.13.0",
+        "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.6.0",
-        "last_updated": "2026-07-21",
-        "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
+        "version": "0.9.4",
+        "last_updated": "2026-09-13",
+        "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
         ]
@@ -166,9 +166,9 @@
         "id": "profile",
         "path": ".doctrina/specs/profile/spec.md",
         "status": "active",
-        "version": "0.2.0",
-        "last_updated": "2026-07-09",
-        "implementation": "verified — perfil por conta e autoria pela sessão (`backend/arbites/api.py`)",
+        "version": "0.4.0",
+        "last_updated": "2026-09-13",
+        "implementation": "verified — perfil por conta, autoria pela sessão e avatar da conta (`backend/arbites/api.py`, `frontend/src/components/Profile.tsx`, `frontend/src/components/AccountMenu.tsx`, `frontend/src/components/Identicon.tsx`, `frontend/src/api.ts`)",
         "realizes": [
           "SC14"
         ]
@@ -185,8 +185,8 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.13.0",
-        "last_updated": "2026-07-21",
+        "version": "0.14.0",
+        "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
@@ -226,8 +226,8 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.11.0",
-        "last_updated": "2026-07-21",
+        "version": "0.14.1",
+        "last_updated": "2026-09-13",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
           "SC1"
@@ -353,8 +353,9 @@
         "id": "0010",
         "path": ".doctrina/decisions/0010-sprint-e-ambiente-como-texto-livre-na-v1.md",
         "title": "Sprint e ambiente como texto livre na v1",
-        "status": "accepted",
+        "status": "superseded by 0013",
         "date": "2026-07-03",
+        "superseded_by": "0013",
         "landed": "2026-07-03 — `backend/arbites/executions.py`",
         "summary": "`sprint` e `environment` são texto livre no `execution.json` na v1."
       },
@@ -374,50 +375,19 @@
         "status": "accepted",
         "date": "2026-09-13",
         "summary": "O escopo ativo do Arbites passa a ser:"
+      },
+      {
+        "id": "0013",
+        "path": ".doctrina/decisions/0013-execution-e-o-ciclo-datas-no-proprio-ciclo-e-sprint-como-rotulo.md",
+        "title": "Execution e o ciclo datas no proprio ciclo e sprint como rotulo",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "supersedes": "0010",
+        "landed": "2026-09-13 — `backend/arbites/executions.py`, `backend/arbites/api.py`, `backend/tests/test_execution_cycle.py`",
+        "summary": "O ciclo é a execution, não uma entidade nova."
       }
     ],
-    "changes": [
-      {
-        "id": "0110-navegacao-e-identidade-no-padrao-github",
-        "title": "Navegacao e identidade no padrao GitHub",
-        "path": ".doctrina/changes/0110-navegacao-e-identidade-no-padrao-github",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (confident; signals: para que)"
-      },
-      {
-        "id": "0111-execution-como-ciclo-de-teste",
-        "title": "Execution como ciclo de teste",
-        "path": ".doctrina/changes/0111-execution-como-ciclo-de-teste",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0112-versionamento-dos-casos-de-teste-com-git-no",
-        "title": "Versionamento dos casos de teste com git no workspace",
-        "path": ".doctrina/changes/0112-versionamento-dos-casos-de-teste-com-git-no",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0113-tela-de-execucao-guiada-em-tres-paineis",
-        "title": "Tela de execucao guiada em tres paineis",
-        "path": ".doctrina/changes/0113-tela-de-execucao-guiada-em-tres-paineis",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
-        "title": "Dashboard com KPIs e o que precisa de atencao",
-        "path": ".doctrina/changes/0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain; signals: para que)"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1850,9 +1820,327 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0110-navegacao-e-identidade-no-padrao-github",
+        "title": "Navegacao e identidade no padrao GitHub",
+        "path": ".doctrina/changes/archive/2026-09-13-0110-navegacao-e-identidade-no-padrao-github",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0111-execution-como-ciclo-de-teste",
+        "title": "Execution como ciclo de teste",
+        "path": ".doctrina/changes/archive/2026-09-13-0111-execution-como-ciclo-de-teste",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0112-versionamento-dos-casos-de-teste-com-git-no",
+        "title": "Versionamento dos casos de teste com git no workspace",
+        "path": ".doctrina/changes/archive/2026-09-13-0112-versionamento-dos-casos-de-teste-com-git-no",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0113-tela-de-execucao-guiada-em-tres-paineis",
+        "title": "Tela de execucao guiada em tres paineis",
+        "path": ".doctrina/changes/archive/2026-09-13-0113-tela-de-execucao-guiada-em-tres-paineis",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
+        "title": "Dashboard com KPIs e o que precisa de atencao",
+        "path": ".doctrina/changes/archive/2026-09-13-0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0115-autoria-resultado-execucao-vem",
+        "title": "autoria do resultado de execucao vem da sessao e nao do corpo da requisicao",
+        "path": ".doctrina/changes/archive/2026-09-13-0115-autoria-resultado-execucao-vem",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0116-modo-guiado-busca-titulo",
+        "title": "modo guiado busca o titulo de cada caso numa requisicao por caso em vez de uma so, como o Kanban faz",
+        "path": ".doctrina/changes/archive/2026-09-13-0116-modo-guiado-busca-titulo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0117-avatar-conta-servido-cache-control",
+        "title": "avatar da conta e servido sem Cache-Control: o navegador guarda a imagem antiga e um intermediario pode guardar imagem de uma conta",
+        "path": ".doctrina/changes/archive/2026-09-13-0117-avatar-conta-servido-cache-control",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0118-lista-ciclos-mostra-prazo",
+        "title": "lista de ciclos nao mostra prazo nem o vocabulario do ciclo, entao saber qual esta atrasado exige abrir um por um",
+        "path": ".doctrina/changes/archive/2026-09-13-0118-lista-ciclos-mostra-prazo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0119-e-mails-diferentes-colidem-mesmo",
+        "title": "e-mails diferentes colidem no mesmo slug e duas contas passam a compartilhar perfil memoria de IA e avatar",
+        "path": ".doctrina/changes/archive/2026-09-13-0119-e-mails-diferentes-colidem-mesmo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0120-versionamento-serializado-observavel-commit",
+        "title": "versionamento serializado e observavel: commit fora do event loop e falha registrada em vez de perdida",
+        "path": ".doctrina/changes/archive/2026-09-13-0120-versionamento-serializado-observavel-commit",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0121-excluir-mover-pasta-restaurar",
+        "title": "excluir mover pasta e restaurar da lixeira nao entram no versionamento e deixam o repositorio permanentemente sujo",
+        "path": ".doctrina/changes/archive/2026-09-13-0121-excluir-mover-pasta-restaurar",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0122-progresso-ciclo-conta-status",
+        "title": "progresso do ciclo conta por status enquanto o quadro conta por coluna e os dois numeros divergem",
+        "path": ".doctrina/changes/archive/2026-09-13-0122-progresso-ciclo-conta-status",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0123-upload-simultaneo-evidencia-responde",
+        "title": "upload simultaneo de evidencia responde 201 mas perde parte dos registros no execution.json",
+        "path": ".doctrina/changes/archive/2026-09-13-0123-upload-simultaneo-evidencia-responde",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0124-versao-anterior-mudanca-pasta",
+        "title": "versao anterior a mudanca de pasta e listada no historico mas nao abre nem restaura",
+        "path": ".doctrina/changes/archive/2026-09-13-0124-versao-anterior-mudanca-pasta",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0125-visao-mobile-casca-app",
+        "title": "visao mobile: a casca do app e desktop e num celular a barra lateral fixa engole a tela",
+        "path": ".doctrina/changes/archive/2026-09-13-0125-visao-mobile-casca-app",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0126-escala-espacamento-valores-abaixo",
+        "title": "escala de espacamento sem valores abaixo de oito forca numeros magicos e nao ha controle de densidade",
+        "path": ".doctrina/changes/archive/2026-09-13-0126-escala-espacamento-valores-abaixo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0127-quadro-execucao-so-funciona",
+        "title": "quadro de execucao so funciona com mouse: arrastar um card e impossivel pelo teclado",
+        "path": ".doctrina/changes/archive/2026-09-13-0127-quadro-execucao-so-funciona",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0128-tema-claro-opcional-cores",
+        "title": "tema claro opcional com as cores dos graficos saindo de valores cravados para tokens",
+        "path": ".doctrina/changes/archive/2026-09-13-0128-tema-claro-opcional-cores",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0129-menu-lateral-cinco-cabecalhos",
+        "title": "menu lateral com cinco cabecalhos para doze itens sem icone e com navegacao duplicada no avatar",
+        "path": ".doctrina/changes/archive/2026-09-13-0129-menu-lateral-cinco-cabecalhos",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0130-cabecalho-caminho-disco-reindexar",
+        "title": "cabecalho com caminho do disco e reindexar competindo, e botao orfao acima do titulo em execucoes",
+        "path": ".doctrina/changes/archive/2026-09-13-0130-cabecalho-caminho-disco-reindexar",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0131-tela-detalhe-mostra-campo",
+        "title": "tela de detalhe mostra campo vazio com o mesmo peso do preenchido e a acao destrutiva com o mesmo destaque da principal",
+        "path": ".doctrina/changes/archive/2026-09-13-0131-tela-detalhe-mostra-campo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0132-acoes-empilhadas-linha-tabela",
+        "title": "acoes empilhadas na linha da tabela inflam a altura e a acao destrutiva fica o elemento mais chamativo",
+        "path": ".doctrina/changes/archive/2026-09-13-0132-acoes-empilhadas-linha-tabela",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0133-rotulo-licao-aprendida-tela",
+        "title": "rotulo licao aprendida na tela de defeitos e lido como algo de pessoas em vez de causa raiz correcao e prevencao",
+        "path": ".doctrina/changes/archive/2026-09-13-0133-rotulo-licao-aprendida-tela",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "defects",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
+      {
+        "id": "arquivo-como-fonte-da-verdade-nao-tem-transacao",
+        "path": ".doctrina/skills/arquivo-como-fonte-da-verdade-nao-tem-transacao.md",
+        "description": "Com o filesystem como fonte de verdade (ADR 0001) não existe transação: todo trecho carregar-alterar-gravar é crítico, e qualquer suspensão ou disputa no meio dele perde dado em silêncio, normalmente com resposta de sucesso.",
+        "last_updated": "2026-09-13"
+      },
       {
         "id": "botao-como-item-de-lista-heranca-justify",
         "path": ".doctrina/skills/botao-como-item-de-lista-heranca-justify.md",
@@ -1888,6 +2176,12 @@
         "path": ".doctrina/skills/conteudo-longo-em-tabela-overflow.md",
         "description": "Conteúdo longo dentro de tabela auto-layout com overflow-x cresce lateralmente; use overflow-wrap para zerar a min-content e forçar quebra para baixo.",
         "last_updated": "2026-07-07"
+      },
+      {
+        "id": "criterio-de-isolamento-precisa-de-identidade-colidente",
+        "path": ".doctrina/skills/criterio-de-isolamento-precisa-de-identidade-colidente.md",
+        "description": "Critério que prova isolamento entre contas com dois valores obviamente diferentes não prova nada — ele tem de usar duas identidades que COLIDEM na função que deriva a chave (slug, hash curto, normalização).",
+        "last_updated": "2026-09-13"
       },
       {
         "id": "default-por-tipo-de-provider",
@@ -2038,6 +2332,12 @@
         "path": ".doctrina/skills/progresso-ao-vivo-fonte-oficial-reconcilia.md",
         "description": "Progresso em tempo real parseado de um stream de texto é sempre best-effort — pode e deve existir para UX, mas a fonte oficial estruturada (JSON/artefato final) SEMPRE reconcilia o estado no fim; o live nunca é a verdade final.",
         "last_updated": "2026-07-17"
+      },
+      {
+        "id": "responsividade-se-verifica-no-navegador-nao-no-css",
+        "path": ".doctrina/skills/responsividade-se-verifica-no-navegador-nao-no-css.md",
+        "description": "Responsividade não se confere lendo CSS nem confiando no build — abra o app no viewport alvo e meça `scrollWidth` contra `innerWidth` tela a tela; o que quebra são sobras de layout que o CSS não denuncia.",
+        "last_updated": "2026-09-13"
       },
       {
         "id": "rota-estatica-antes-da-dinamica",

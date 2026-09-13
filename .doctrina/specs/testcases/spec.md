@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
-**Last updated:** 2026-07-21
-**Version:** 0.11.0
+**Last updated:** 2026-09-13
+**Version:** 0.14.1
 
 ## Purpose
 
@@ -97,6 +97,14 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   /testcases` e exibir o badge "precisa re-execução" no repositório e no
   detalhe do CT (o flag é gerido pela sync de features — ver
   `local-automation`).
+- The system shall manter o workspace como repositório git, criando-o com `git init` e um `.gitignore` do índice descartável na primeira escrita quando ainda não existir `.git/`.
+- The system shall gravar um commit por AÇÃO semântica da interface — criar, editar, mover e excluir um caso de teste —, com mensagem descrevendo a ação e autor vindo da sessão, nunca um commit por gravação de arquivo.
+- The system shall expor `GET /testcases/{id}/versions` (histórico do arquivo), `GET /testcases/{id}/versions/{sha}` (o conteúdo naquele commit), `GET /testcases/{id}/versions/diff?a=&b=` (comparação unificada) e `POST /testcases/{id}/versions/{sha}/restore` (restauração).
+- The system shall apresentar o histórico numa aba do próprio caso de teste, com a versão escolhida comparável à atual e restaurável dali.
+- The system shall serializar as operações de git do workspace numa fila única por processo, para que duas escritas simultâneas esperem em vez de disputar o lock do repositório.
+- The system shall executar as operações de git fora do laço de eventos, como já faz com as demais chamadas bloqueantes.
+- The system shall gravar um commit também nas três ações que movem uma pasta inteira de casos de uma vez — excluir pasta, mover pasta e restaurar da lixeira —, com a mesma regra de um commit por ação e autor da sessão.
+- The system shall resolver, para cada versão de um caso de teste, o caminho que o arquivo tinha naquele commit, de modo que ver, comparar e restaurar funcionem também nas versões anteriores a uma mudança de pasta.
 
 ### Event-driven
 
@@ -109,6 +117,9 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
   (recursivamente) para dentro de outra pasta, the system shall abrir um
   modal de confirmação informando quantos CTs serão movidos junto, e só
   mover após confirmação explícita.
+- When um arquivo do workspace é alterado por fora da interface e existe alteração não commitada, the system shall registrá-la como commit de autoria externa antes de responder o histórico, para que a edição no Obsidian não suma do registro.
+- When uma versão anterior é restaurada, the system shall gravar a restauração como um commit NOVO, preservando o histórico em vez de reescrevê-lo.
+- When um commit de versionamento não acontece por falha do git, the system shall registrar um aviso no log identificando a ação e o motivo, em vez de seguir em silêncio.
 
 ### State-driven
 
@@ -128,6 +139,9 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall not aceitar mover uma pasta para dentro dela mesma ou de
   uma pasta descendente (422); nem sobrescrever uma pasta existente com o
   mesmo nome no destino (409).
+- The system shall not versionar o índice descartável, a lixeira nem os segredos do workspace; o que o `.gitignore` cobre não entra em commit nenhum.
+- The system shall not falhar uma operação de caso de teste porque o git falhou ou não está instalado; o versionamento é registro, e registro que derruba a escrita do usuário é pior do que registro nenhum.
+- The system shall not deixar no repositório do workspace arquivo de caso de teste apagado ou criado por uma ação da interface sem o commit correspondente; um histórico que afirma o que a árvore de trabalho desmente não serve para comparar nem para restaurar.
 
 ### Optional
 
@@ -198,6 +212,14 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
     exclusão em lote no mesmo padrão — verified by build + revisão visual
     (os endpoints unitários já são cobertos por
     `backend/tests/test_testcases.py` e `backend/tests/test_executions.py`).
+17. [verified] Criar, editar e mover um caso de teste gera um commit por ação, com a mensagem da ação e o e-mail da sessão como autor, e o índice descartável fica fora do repositório — verified by `backend/tests/test_versioning.py`.
+18. [verified] O histórico de um caso lista suas versões, a comparação entre duas mostra a linha alterada e restaurar uma versão anterior devolve o conteúdo gravando um commit novo — verified by `backend/tests/test_versioning.py`.
+19. [verified] Uma edição feita por fora da interface entra no histórico como commit de autoria externa, e um workspace onde o git não funciona continua aceitando criar e editar casos — verified by `backend/tests/test_versioning.py`.
+20. [verified] Doze gravações simultâneas geram doze commits e não deixam nenhum arquivo fora do histórico — verified by `backend/tests/test_versioning.py`.
+21. [verified] Um commit impedido por falha do git deixa aviso no log com a ação que se perdeu, e a operação do usuário continua respondendo normalmente — verified by `backend/tests/test_versioning.py`.
+22. [verified] Excluir e mover uma pasta com casos deixa um commit por ação e o repositório sem pendência, e o histórico de um caso sobrevive à mudança de pasta feita pela pasta inteira — verified by `backend/tests/test_versioning.py`.
+23. [verified] Restaurar da lixeira grava o commit da volta, e o caso restaurado volta a ter histórico contínuo — verified by `backend/tests/test_versioning.py`.
+24. [verified] Uma versão anterior à mudança de pasta é aberta, comparada e restaurada pelo ID do caso, sem depender de onde o arquivo está hoje — verified by `backend/tests/test_versioning.py`.
 
 ## Maturity
 

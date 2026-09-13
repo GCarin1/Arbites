@@ -51,7 +51,7 @@ def test_kanban_move_persists_json_and_history(client):
     execution = make_exec(client, ct_ids=[ct["id"]])
     updated = client.post(
         f"/api/v1/executions/{execution['id']}/results/{ct['id']}/status",
-        json={"status": "passed", "who": "carini"},
+        json={"status": "passed"},
     ).json()
     assert updated["status"] == "in_progress"  # draft → in_progress na 1ª atividade
     result = updated["results"][0]
@@ -75,7 +75,7 @@ def test_step_marking(client):
     execution = make_exec(client, ct_ids=[ct["id"]])
     updated = client.post(
         f"/api/v1/executions/{execution['id']}/results/{ct['id']}/steps/2",
-        json={"status": "failed", "who": "carini"},
+        json={"status": "failed"},
     ).json()
     steps = {s["index"]: s["status"] for s in updated["results"][0]["steps"]}
     assert steps == {1: "pending", 2: "failed", 3: "pending"}
@@ -236,7 +236,7 @@ def test_delete_unknown_execution_404(client):
 def _set(client, exec_id, ct_id, status):
     return client.post(
         f"/api/v1/executions/{exec_id}/results/{ct_id}/status",
-        json={"status": status, "who": "carini"},
+        json={"status": status},
     )
 
 

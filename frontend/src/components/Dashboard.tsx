@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../api";
+import { token } from "../theme";
 import type {
   AutomationReport,
   DashboardOverview,
@@ -25,6 +26,33 @@ import type {
   TraceabilityMatrix,
   TrendPoint,
 } from "../types";
+
+/**
+ * As cores do gráfico vêm dos mesmos tokens que o resto da interface, e são
+ * relidas quando o tema troca — a biblioteca de gráfico recebe cor como
+ * valor, não como variável CSS, então alguém precisa fazer a ponte.
+ */
+function useChartColors() {
+  const ler = () => ({
+    border: token("--border", "#30363d"),
+    muted: token("--text-muted", "#8b949e"),
+    surface: token("--surface", "#161b22"),
+    text: token("--text", "#e6edf3"),
+    success: token("--success", "#3fb950"),
+    danger: token("--danger", "#f85149"),
+    warning: token("--warning", "#d29922"),
+  });
+  const [cores, setCores] = useState(ler);
+  useEffect(() => {
+    const observador = new MutationObserver(() => setCores(ler()));
+    observador.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observador.disconnect();
+  }, []);
+  return cores;
+}
 
 export function Dashboard({
   onError,
@@ -54,6 +82,7 @@ export function Dashboard({
   const [autoEnv, setAutoEnv] = useState("");
   const [health, setHealth] = useState<HealthScore | null>(null);
   const [riskMap, setRiskMap] = useState<RiskMap | null>(null);
+  const chart = useChartColors();
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   // 0098: resumo executivo narrado pela IA (preview editável → export)
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -164,11 +193,6 @@ export function Dashboard({
             <option value={15}>15 dias</option>
             <option value={30}>30 dias</option>
           </select>
-          {aiEnabled && (
-            <button onClick={() => void generateExecutiveSummary()} disabled={genBusy}>
-              {genBusy ? "Gerando…" : "Resumo executivo (IA)"}
-            </button>
-          )}
           <a className="button-link" href={api.exportUrl("md", sprint, effSquad, execSummary)} download>
             Export MD
           </a>
@@ -178,32 +202,11 @@ export function Dashboard({
         </div>
       </div>
 
-      {aiEnabled && execSummary && (
-        <div className="card exec-summary-card">
-          <div className="card-head">
-            <h3>Resumo executivo (IA)</h3>
-            <span className="spacer" />
-            <span className="caption muted">
-              editável — entra no início do export PDF/MD
-            </span>
-            <button className="btn-sm" onClick={() => setExecSummary("")}>
-              Descartar
-            </button>
-          </div>
-          <textarea
-            className="raw"
-            style={{ minHeight: 120, width: "100%" }}
-            value={execSummary}
-            onChange={(e) => setExecSummary(e.target.value)}
-            spellCheck={false}
-          />
-        </div>
-      )}
-
-      <ExecutivePanel overview={overview} onNavigate={onNavigate} />
-
-      <HealthScoreCard health={health} />
-
+      {/* Change 0114: o numero primeiro. Quem abre o dashboard pergunta
+          "como estamos?" e nao deveria ter de descer para achar a resposta. */}
+      <div className="kpi-row">
+        <HealthScoreCard health={health} />
+      </div>
       {summary && (
         <div className="metric-cards">
           <MetricCard label="Cobertura de requisito" metric={summary.requirement_coverage} />
@@ -247,21 +250,37 @@ export function Dashboard({
         </div>
       )}
 
+      {/* E logo abaixo a leitura do numero, que sem ela e so um numero. */}
+      <AttentionBlock
+        overview={overview}
+        narrated={execSummary}
+        onNarratedChange={setExecSummary}
+        aiEnabled={aiEnabled}
+        busy={genBusy}
+        onNarrate={() => void generateExecutiveSummary()}
+        onNavigate={onNavigate}
+      />
+
+      <ExecutivePanel overview={overview} onNavigate={onNavigate} />
+
       <h3 className="section-title">Tendência ({days} dias)</h3>
       <div className="chart-card" style={{ width: "100%", height: 260 }}>
         <ResponsiveContainer>
           <BarChart data={trend} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
-            <CartesianGrid stroke="#30363d" vertical={false} />
-            <XAxis dataKey="day" stroke="#8b949e" fontSize={11} tickFormatter={(d: string) => d.slice(5)} />
-            <YAxis stroke="#8b949e" fontSize={11} allowDecimals={false} />
+            {/* Cor sempre de token (change 0128): cravada no código, a grade
+                cinza-escura sumiria sobre fundo branco e o texto claro
+                desapareceria na dica de valor do tema claro. */}
+            <CartesianGrid stroke={chart.border} vertical={false} />
+            <XAxis dataKey="day" stroke={chart.muted} fontSize={11} tickFormatter={(d: string) => d.slice(5)} />
+            <YAxis stroke={chart.muted} fontSize={11} allowDecimals={false} />
             <Tooltip
-              contentStyle={{ background: "#161b22", border: "1px solid #30363d" }}
-              labelStyle={{ color: "#e6edf3" }}
+              contentStyle={{ background: chart.surface, border: `1px solid ${chart.border}` }}
+              labelStyle={{ color: chart.text }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="passed" stackId="a" fill="#238636" name="passed" />
-            <Bar dataKey="failed" stackId="a" fill="#da3633" name="failed" />
-            <Bar dataKey="blocked" stackId="a" fill="#d29922" name="blocked" />
+            <Bar dataKey="passed" stackId="a" fill={chart.success} name="passed" />
+            <Bar dataKey="failed" stackId="a" fill={chart.danger} name="failed" />
+            <Bar dataKey="blocked" stackId="a" fill={chart.warning} name="blocked" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -399,6 +418,110 @@ function reindexLabel(iso: string | null): string {
  * entregando bem? onde está o risco? o que piorou?" — alertas de risco,
  * ações recomendadas e top problemas, tudo derivado dos reports existentes.
  */
+/**
+ * "O que precisa de atenção" — a leitura do número, logo abaixo do número.
+ *
+ * Quando há provider de IA, o texto é o resumo executivo narrado a partir
+ * dos mesmos indicadores. Quando não há, o bloco NÃO some nem fica vazio:
+ * ele mostra os achados determinísticos que `GET /metrics/dashboard` já
+ * devolve. A leitura é obrigação do dashboard; a IA é só a melhor redação
+ * dela — nenhum número aqui depende dela.
+ */
+function AttentionBlock({
+  overview,
+  narrated,
+  onNarratedChange,
+  aiEnabled,
+  busy,
+  onNarrate,
+  onNavigate,
+}: {
+  overview: DashboardOverview | null;
+  narrated: string;
+  onNarratedChange: (text: string) => void;
+  aiEnabled: boolean;
+  busy: boolean;
+  onNarrate: () => void;
+  onNavigate?: (id: string) => void;
+}) {
+  if (!overview) return null;
+  const { alerts, recommended_actions } = overview;
+  const nothingWrong = alerts.length === 0 && recommended_actions.length === 0;
+
+  return (
+    <div className="card block attention-block">
+      <div className="card-head">
+        <h3>O que precisa de atenção</h3>
+        <span className="spacer" />
+        {narrated && (
+          <span className="caption muted">
+            editável — entra no início do export PDF/MD
+          </span>
+        )}
+        {aiEnabled && (
+          <button className="btn-sm" onClick={onNarrate} disabled={busy}>
+            {busy ? "Gerando…" : narrated ? "Regerar (IA)" : "Narrar com IA"}
+          </button>
+        )}
+        {narrated && (
+          <button className="btn-sm" onClick={() => onNarratedChange("")}>
+            Descartar
+          </button>
+        )}
+      </div>
+
+      {narrated ? (
+        <textarea
+          className="raw attention-prose"
+          style={{ minHeight: 120, width: "100%" }}
+          value={narrated}
+          onChange={(e) => onNarratedChange(e.target.value)}
+          spellCheck={false}
+        />
+      ) : nothingWrong ? (
+        <p className="attention-prose muted">
+          Nada exige atenção no período filtrado: sem alertas de risco e sem
+          ações pendentes nos indicadores acima.
+        </p>
+      ) : (
+        <>
+          <p className="attention-prose">
+            {alerts.length > 0
+              ? `${alerts.length} ponto${alerts.length === 1 ? "" : "s"} de risco no período` +
+                (recommended_actions.length > 0
+                  ? `, com ${recommended_actions.length} ação${
+                      recommended_actions.length === 1 ? "" : "ões"
+                    } recomendada${recommended_actions.length === 1 ? "" : "s"}.`
+                  : ".")
+              : `Sem alerta crítico, mas ${recommended_actions.length} ação${
+                  recommended_actions.length === 1 ? "" : "ões"
+                } recomendada${recommended_actions.length === 1 ? "" : "s"} no período.`}
+            {!aiEnabled && " Configure um provider de IA para a leitura narrada."}
+          </p>
+          <ul className="attention-list">
+            {alerts.slice(0, 4).map((a, i) => (
+              <li key={`a${i}`}>
+                <span className={`status-dot ${ALERT_DOT[a.severity]}`} />
+                {a.message}
+                {a.ref && onNavigate && (
+                  <button className="linklike mono" onClick={() => onNavigate(a.ref!)}>
+                    {a.ref}
+                  </button>
+                )}
+              </li>
+            ))}
+            {recommended_actions.slice(0, 4).map((action, i) => (
+              <li key={`r${i}`} className="muted">
+                {action.message}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ExecutivePanel({
   overview,
   onNavigate,
@@ -1008,7 +1131,7 @@ function StoryRow({
                     <a
                       key={i}
                       className="mono"
-                      style={{ display: "block", color: "#2f81f7" }}
+                      style={{ display: "block", color: "var(--primary)" }}
                       href={api.evidenceFileUrl(evidenceOf.id, tc.id, i)}
                       download
                     >

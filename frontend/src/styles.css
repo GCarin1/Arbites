@@ -49,11 +49,29 @@
   --fs-caption: 12px;
 
   /* Spacing scale (8px grid) */
+  /* Escala de espaçamento. Os degraus abaixo de 8px existem porque a
+     interface os usa: sem eles, 87 valores acabaram decididos caso a caso
+     no CSS de cada componente (change 0126). */
+  --s0: 4px;
   --s1: 8px;
+  --s1h: 12px;
   --s2: 16px;
   --s3: 24px;
   --s4: 32px;
   --s6: 48px;
+
+  /* Densidade de leitura (change 0126). A mesma tela serve a duas perguntas
+     opostas — "quantos casos há neste ciclo" e "o que diz este caso" — e o
+     fator muda o que determina quantas linhas cabem: o respiro das linhas e
+     a altura dos controles. A separação entre seções fica de fora: ela é
+     estrutura, e encolhê-la não faz caber mais nada. */
+  --density: 1;
+  --row-pad-y: calc(4px * var(--density));
+  --row-gap: calc(2px * var(--density));
+  /* A entrelinha entra junto: sem ela o conteúdo da linha domina o respiro
+     e a densidade compacta quase não compacta. Entrelinha não é tamanho de
+     fonte — o texto continua com 14px em qualquer densidade. */
+  --row-line: 1.5;
 
   /* Radii */
   --r-control: 6px;
@@ -62,10 +80,60 @@
   /* Sizing */
   --h-header: 56px;
   --w-sidebar: 240px;
-  --h-control: 36px;
+  --h-control: calc(36px * var(--density));
+  /* Ponto de quebra único da casca (change 0125): abaixo dele a lateral
+     sai do fluxo. 860px porque é onde 240 de menu + o conteúdo mínimo
+     legível deixam de caber lado a lado. */
+  --bp-narrow: 860px;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Tema claro (change 0128). O escuro continua sendo o padrão do produto e a
+   identidade dele; esta é a variante para quem lê em sala clara ou projeta a
+   tela numa reunião. Mesma estrutura, mesmos papéis de cor — só os valores
+   mudam, e os estados continuam distinguíveis entre si. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f6f8fa;
+  --surface-2: #eef1f4;
+  --surface-hover: #eaeef2;
+  --border: #d0d7de;
+  --border-strong: #8c959f;
+
+  --text: #1f2328;
+  --text-muted: #656d76;
+  --text-subtle: #8c959f;
+
+  --primary: #0969da;
+  --primary-hover: #0550ae;
+  --primary-contrast: #ffffff;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+  --danger-hover: #a40e26;
+  --retest: #8250df;
+
+  --selected: rgba(9, 105, 218, 0.1);
+  --selected-border: rgba(9, 105, 218, 0.45);
+
+  /* Sombra mais fraca: o contraste que a sombra dá no escuro vem da borda
+     no claro, e sombra pesada sobre branco suja a tela. */
+  --shadow-card: 0 1px 0 rgba(31, 35, 40, 0.06);
+  --shadow-pop: 0 8px 24px rgba(31, 35, 40, 0.14);
+}
+
+/* As três densidades (change 0126). Só o fator muda: tudo que respira lê
+   `--row-pad-y`, `--row-gap` e `--h-control`, então nenhum componente
+   precisa saber que a densidade existe. */
+:root[data-density="compact"] {
+  --density: 0.7;
+  --row-line: 1.2;
+}
+:root[data-density="comfortable"] {
+  --density: 1.4;
+  --row-line: 1.75;
 }
 
 * {
@@ -175,8 +243,10 @@ button.danger:hover:not(:disabled) {
 
 /* Small inline button (step actions, table row actions) */
 button.btn-sm {
-  height: 28px;
-  padding: 0 10px;
+  /* Ação de linha acompanha a densidade: é ela que segura a altura das
+     linhas da árvore e da tabela (change 0126). */
+  height: calc(28px * var(--density));
+  padding: 0 var(--s1h);
   font-size: var(--fs-caption);
 }
 
@@ -275,6 +345,104 @@ textarea.raw {
   flex: 1;
 }
 
+/* Ações de linha numa tabela densa (change 0132). Elas ficam à direita, sem
+   quebrar, e não podem esticar a linha: uma tabela densa com linha de 77px
+   cabe menos da metade do que deveria. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s0);
+  white-space: nowrap;
+}
+
+/* Identificador não quebra: `DF-` numa linha e `0001` na outra deixa de ser
+   identificador. */
+td.mono,
+.id-cell {
+  white-space: nowrap;
+}
+
+/* A caixa de marcar anda junto do seu rótulo: esticado, o par vira dois
+   controles diferentes separados por um vão de 145px. */
+.head-controls label,
+.list-toolbar label {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  width: auto;
+}
+
+/* Menu de ações (change 0131): recolhe o que é destrutivo sem escondê-lo. */
+.overflow-menu {
+  position: relative;
+  display: inline-flex;
+}
+.overflow-trigger {
+  padding: 0 var(--s1h);
+  font-size: var(--fs-h3);
+  line-height: 1;
+  color: var(--text-muted);
+}
+.overflow-trigger:hover:not(:disabled) {
+  color: var(--text);
+}
+.overflow-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s0) 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.overflow-dropdown button {
+  text-align: left;
+  justify-content: flex-start;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 6px var(--s2);
+  color: var(--text);
+  height: auto;
+}
+.overflow-dropdown button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.overflow-dropdown button.danger {
+  color: var(--danger);
+}
+
+/* Ação de manutenção na barra superior (change 0130): presente e a um
+   clique, sem a aparência de ação de trabalho que disputava atenção com a
+   busca em toda tela. */
+.header-icon-btn {
+  padding: 0 var(--s1);
+  color: var(--text-muted);
+}
+.header-icon-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+.header-icon-btn:disabled .nav-icon {
+  opacity: 0.4;
+}
+
+/* Gaveta de navegação (change 0125). Em tela larga o botão não existe: a
+   lateral já está ali, e um controle para abrir o que está aberto confunde. */
+.nav-toggle {
+  display: none;
+  font-size: var(--fs-h3);
+  line-height: 1;
+  padding: 0 10px;
+}
+.nav-backdrop {
+  display: none;
+}
+
 .app-body {
   flex: 1;
   display: flex;
@@ -309,20 +477,23 @@ textarea.raw {
   gap: 2px;
   margin-bottom: 6px;
 }
+/* Cabeçalho de grupo: rótulo, não botão de destaque. Ele organiza a lista
+   e não deve competir com os itens que organiza (change 0129). */
 .nav-group-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 24px;
-  padding: 0 10px;
+  height: 22px;
+  padding: 0 var(--s1h);
+  margin-top: var(--s1);
   background: none;
   border: none;
   color: var(--text-subtle);
-  font-size: var(--fs-caption);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   cursor: pointer;
 }
 button.nav-group-title:hover {
@@ -332,6 +503,12 @@ button.nav-group-title:hover {
 }
 .nav-chevron {
   font-size: 10px;
+  opacity: 0.55;
+  transition: opacity 0.12s;
+}
+.nav-group-title:hover .nav-chevron,
+.nav-group-title:focus-visible .nav-chevron {
+  opacity: 1;
 }
 
 /* Linha do item: botão de navegação + pin que aparece no hover */
@@ -372,13 +549,42 @@ button.nav-group-title:hover {
   height: var(--h-control);
   justify-content: flex-start;
   width: 100%;
-  padding: 0 10px;
+  padding: 0 var(--s1h);
   background: none;
   border: none;
   border-radius: var(--r-control);
   color: var(--text-muted);
   font-weight: 500;
-  gap: 8px;
+  gap: var(--s1);
+}
+
+/* Ícone da navegação (change 0129): âncora visual que permite varrer o menu
+   em vez de ler os doze rótulos. Não encolhe, e herda a cor do item — logo
+   acompanha ativo, hover, congelado e os dois temas sem regra extra. */
+.nav-icon {
+  flex: 0 0 16px;
+  opacity: 0.85;
+}
+.nav-item.active .nav-icon {
+  opacity: 1;
+}
+.nav-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* Rodapé da navegação: o que é de manutenção, empurrado para baixo e
+   separado por régua — não compete com o trabalho do dia. */
+.nav-footer {
+  margin-top: auto;
+  padding-top: var(--s1);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .nav-item:hover:not(:disabled) {
   background: var(--surface-hover);
@@ -388,6 +594,7 @@ button.nav-group-title:hover {
 .nav-item.active {
   background: var(--selected);
   color: var(--text);
+  font-weight: 600;
 }
 .nav-item.active::before {
   content: "";
@@ -435,11 +642,12 @@ button.nav-group-title:hover {
 }
 .list-item {
   display: flex;
-  gap: 8px;
+  line-height: var(--row-line);
+  gap: var(--s1);
   align-items: center;
   width: 100%;
   height: auto;
-  min-height: 32px;
+  min-height: calc(32px * var(--density));
   text-align: left;
   background: none;
   border: none;
@@ -559,7 +767,10 @@ button.nav-group-title:hover {
   gap: var(--s1);
   flex-wrap: wrap;
 }
-.page-head .head-controls input,
+/* A largura mínima vale para campo de texto e seletor — não para caixa de
+   marcar: ela ganhava 140px de largura e o rótulo aparecia a um vão do
+   próprio controle, como se fossem dois (change 0132). */
+.page-head .head-controls input:not([type="checkbox"]):not([type="radio"]),
 .page-head .head-controls select {
   width: auto;
   min-width: 140px;
@@ -950,6 +1161,10 @@ button.nav-group-title:hover {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--s2);
   margin-bottom: var(--s3);
+  /* Cada campo pela PRÓPRIA altura (change 0131). Esticando, um caminho de
+     arquivo de duas linhas fazia os três campos vazios ao lado ocuparem
+     139px cada, com o travessão flutuando no meio do nada. */
+  align-items: start;
 }
 .read-field {
   display: flex;
@@ -973,7 +1188,7 @@ button.nav-group-title:hover {
   color: var(--text);
   min-height: 21px;
 }
-.read-value.empty {
+.read-value.read-empty {
   color: var(--text-subtle);
 }
 @media (max-width: 720px) {
@@ -1098,7 +1313,8 @@ table.dense thead th {
 table.dense th,
 table.dense td {
   text-align: left;
-  padding: 10px 12px;
+  line-height: var(--row-line);
+  padding: calc(var(--row-pad-y) * 2.5) var(--s1h);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -1227,10 +1443,11 @@ table.dense tbody tr:hover td {
   text-align: center;
 }
 .kanban-card {
+  line-height: var(--row-line);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-control);
-  padding: 8px 10px;
+  padding: calc(var(--row-pad-y) * 2) calc(var(--row-pad-y) * 2.5);
   font-size: var(--fs-body);
   cursor: grab;
   transition: border-color 0.12s, background 0.12s;
@@ -1299,6 +1516,257 @@ table.dense tbody tr:hover td {
 .exec-seg.col-failed { background: var(--danger); }
 .exec-seg.col-retest { background: var(--retest); }
 .exec-seg.col-passed { background: var(--success); }
+
+/* Dashboard: o número primeiro, a leitura do número logo abaixo
+   (change 0114). A linha de KPIs abre a tela; o bloco de atenção explica o
+   que os números querem dizer — com IA quando há provider, com os achados
+   determinísticos quando não há. */
+.kpi-row {
+  margin-bottom: var(--s2);
+}
+.attention-block .attention-prose {
+  white-space: pre-wrap;
+  margin: 0;
+}
+.attention-list {
+  list-style: none;
+  margin: var(--s1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.attention-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  font-size: var(--fs-body);
+}
+
+/* Modo guiado (change 0113): sentar e executar. Três painéis lado a lado —
+   ciclos, casos do ciclo e caso ativo — com o rodapé que avança sem sair da
+   tela. Complementa o Kanban; não o substitui. */
+.guided {
+  display: grid;
+  grid-template-columns: 200px 260px minmax(0, 1fr);
+  gap: var(--s2);
+  align-items: start;
+}
+.guided-cycles,
+.guided-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 200px);
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding-right: var(--s1);
+}
+.guided-panel-title {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.guided-cycle,
+.guided-case {
+  display: flex;
+  align-items: center;
+  /* `justify-content` explícito: o estilo base de `button` centraliza, e um
+     button reestilizado como linha de lista herda isso — o id e o título
+     apareciam no meio da linha. Em painel estreito passava despercebido;
+     em largura de celular fica evidente. */
+  justify-content: flex-start;
+  gap: var(--s1);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  padding: calc(var(--row-pad-y) * 1.5) var(--s1);
+  width: 100%;
+}
+.guided-cycle {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+.guided-cycle:hover:not(:disabled),
+.guided-case:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.guided-cycle.active,
+.guided-case.active {
+  background: var(--selected);
+  border-color: var(--selected-border);
+}
+.guided-cycle-name,
+.guided-case-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guided-case.done .guided-case-title {
+  color: var(--text-muted);
+}
+.guided-active-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.guided-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+  margin-top: var(--s2);
+  padding: var(--s1) 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* Telas estreitas: os painéis viram uma coluna só, em vez de três colunas
+   ilegíveis. */
+@media (max-width: 1100px) {
+  .guided {
+    grid-template-columns: 1fr;
+  }
+  .guided-cycles,
+  .guided-cases {
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+  }
+}
+
+/* Versões do caso de teste no git do workspace (change 0112). */
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.version-row {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+}
+.version-row:first-child {
+  border-top: none;
+}
+.version-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+.version-message {
+  font-size: var(--fs-body);
+}
+.version-diff {
+  margin: var(--s1) 0 0;
+  padding: var(--s1);
+  max-height: 320px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  white-space: pre;
+}
+
+/* Visível só para tecnologia assistiva (change 0127). `clip-path` em vez de
+   `display:none`: o que some do layout também some do leitor de tela. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Dica do atalho do quadro: quem usa teclado precisa descobrir sem
+   adivinhar, e quem usa mouse não precisa tropeçar nela. */
+.kanban-hint {
+  margin: 0 0 var(--s1);
+}
+.kanban-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px var(--s0);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+
+/* Foco no card do quadro — sem realce, mover pelo teclado é às cegas. */
+.kanban-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* Cabeçalho do ciclo (change 0111): a barra empilhada com os contadores
+   grandes por status e a situação do prazo — o número e a leitura dele no
+   mesmo lugar, no padrão do Xray. */
+.cycle-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.cycle-header-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.cycle-total strong {
+  font-size: var(--fs-h2);
+}
+.cycle-deadline.late {
+  color: var(--danger);
+}
+.cycle-deadline.due {
+  color: var(--warning);
+}
+.cycle-counters {
+  display: flex;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.cycle-counter {
+  display: flex;
+  flex-direction: column;
+  min-width: 64px;
+}
+.cycle-count {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.col-text-pending { color: var(--text-subtle); }
+.col-text-in_progress { color: var(--primary); }
+.col-text-blocked { color: var(--warning); }
+.col-text-failed { color: var(--danger); }
+.col-text-retest { color: var(--retest); }
+.col-text-passed { color: var(--success); }
+
+/* Responsável pelo caso dentro do ciclo, no card do Kanban. */
+.kanban-card-meta .assignee {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
 
 /* ------------------------------------------------- Activity heatmap */
 /* Preenche a largura do card: colunas flexíveis (flex:1) e células que
@@ -2204,9 +2672,10 @@ a {
 .repo-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 1px 8px;
+  line-height: var(--row-line);
+  gap: var(--s0);
+  min-height: calc(30px * var(--density));
+  padding: var(--row-gap) var(--s1);
   border-radius: var(--r-control);
 }
 /* conectores de árvore (box-drawing) — monospace p/ alinhamento exato */
@@ -2244,7 +2713,7 @@ a {
   flex: 1;
   min-width: 0;
   height: auto;
-  padding: 4px 0;
+  padding: var(--row-pad-y) 0;
   background: none;
   border: none;
   text-align: left;
@@ -2788,6 +3257,83 @@ button.link-chip-btn:disabled {
   white-space: nowrap;
 }
 
+/* Avatar da conta no canto superior direito (change 0110): presença
+   permanente da identidade, no padrão GitHub. */
+.account-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.account-trigger {
+  padding: 2px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid transparent;
+  line-height: 0;
+}
+.account-trigger:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: none;
+}
+.account-avatar-img,
+.identicon {
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
+}
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s1) 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.account-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px var(--s2) var(--s1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+.account-head strong,
+.account-head .caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-dropdown button {
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 6px var(--s2);
+  color: var(--text);
+}
+.account-dropdown button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+/* Editor do avatar na tela de Perfil. */
+.avatar-editor {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  margin-bottom: var(--s2);
+}
+.avatar-editor > svg,
+.avatar-editor > img {
+  flex: none;
+}
+
 /* Capability congelada (ADR 0012): presente e funcional, mas fora do foco.
    Discreta em vez de escondida — quem usa continua achando. */
 .nav-item.frozen {
@@ -2795,4 +3341,203 @@ button.link-chip-btn:disabled {
 }
 .nav-item.frozen:hover {
   opacity: 1;
+}
+
+/* =====================================================================
+   Visão em tela estreita (change 0125)
+
+   Não é um app separado: é a mesma tela sabendo se encolher. Um ponto de
+   quebra, nenhum componente duplicado, nenhuma funcionalidade escondida —
+   o que muda é a forma.
+   ===================================================================== */
+
+@media (max-width: 860px) {
+  /* -- cabeçalho: marca, busca e conta. O resto é de quem administra a
+        instância sentado numa mesa. -------------------------------------- */
+  .wide-only {
+    display: none !important;
+  }
+  .app-header {
+    padding: 0 var(--s2);
+    gap: var(--s1);
+  }
+  .nav-toggle {
+    display: inline-flex;
+  }
+  .cmdk-trigger kbd {
+    display: none; /* não há Ctrl+K num polegar */
+  }
+
+  /* -- a lateral vira gaveta: sai do fluxo em vez de comer 240px de 390 -- */
+  .app-body {
+    position: relative;
+  }
+  .sidebar {
+    position: fixed;
+    top: var(--h-header);
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: min(80vw, var(--w-sidebar));
+    flex-basis: auto;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease-out;
+    box-shadow: var(--shadow-pop);
+  }
+  .app-body.nav-open .sidebar {
+    transform: translateX(0);
+  }
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: var(--h-header) 0 0 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* -- conteúdo ocupa a largura inteira ------------------------------- */
+  .main {
+    padding: var(--s2);
+  }
+  .content-narrow,
+  .main-inner {
+    max-width: 100%;
+  }
+  /* O título quebra em duas linhas — id em cima, nome embaixo — em vez de
+     espremer o id numa coluna estreita e reticenciar o nome com a metade da
+     largura vazia ao lado. */
+  .page-head .page-title {
+    font-size: var(--fs-h2);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+  }
+  .page-head .page-title > span:not(.mono):not(.status-dot) {
+    flex: 1 1 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .page-head .page-title > .mono {
+    white-space: nowrap;
+  }
+
+  /* A marca não quebra em duas linhas ao lado do botão da gaveta. */
+  .app-header .brand {
+    white-space: nowrap;
+    flex: none;
+  }
+  .cmdk-trigger {
+    min-width: 0;
+  }
+  /* controles de página empilham em vez de espremer */
+  .head-controls,
+  .list-toolbar,
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .head-controls > input,
+  .head-controls > select {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  /* -- o que é largo rola DENTRO do próprio bloco, sem transbordar a
+        página: espremer seis colunas torna todas ilegíveis de uma vez --- */
+  .kanban {
+    grid-auto-flow: column;
+    grid-auto-columns: 80vw;
+    grid-template-columns: none;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    padding-bottom: var(--s1);
+  }
+  .kanban-col {
+    scroll-snap-align: start;
+  }
+  .metric-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .cycle-counters {
+    gap: var(--s2);
+  }
+  /* As duas datas do ciclo cabem lado a lado; esticá-las como os demais
+     controles jogaria uma para a linha seguinte sem ganho nenhum. */
+  .head-controls > input[type="date"] {
+    flex: 1 1 120px;
+  }
+  /* O bloco do Health Score não encolhia (`flex: 0 0 auto`) e o subtítulo
+     era cortado no meio da frase pela borda do card. */
+  .health-score-main {
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
+  .health-score-components {
+    border-left: none;
+    padding-left: 0;
+    padding-top: var(--s1);
+    border-top: 1px solid var(--border);
+  }
+  .chart-card {
+    overflow-x: auto;
+  }
+
+  /* três painéis do modo guiado, um sobre o outro e com teto de altura */
+  .guided-cycles,
+  .guided-cases {
+    max-height: 30vh;
+  }
+  /* O rodapé deixa de ser grudado: sem uma área de rolagem própria, ele
+     flutuava sobre os passos e escondia justamente o que a pessoa precisa
+     marcar antes de decidir o resultado. Fluindo ao fim do painel, as ações
+     continuam na mesma tela, logo abaixo do que as justifica. */
+  .guided-footer {
+    position: static;
+  }
+
+  /* diff e markdown cru cabem na largura sem empurrar a página */
+  .version-diff,
+  textarea.raw {
+    max-width: 100%;
+  }
+  textarea.raw {
+    min-height: 220px;
+  }
+
+  /* Na árvore do repositório o título é o que identifica o caso: os
+     conectores encolhem e a data sai (marcada `wide-only` no componente),
+     para o nome não virar "Lo…". */
+  .tree-prefix {
+    font-size: 10px;
+  }
+  .repo-row {
+    gap: 4px;
+    padding: 1px 4px;
+  }
+  .repo-file-main {
+    gap: 6px;
+  }
+
+  /* o menu da conta não pode sangrar pela direita */
+  .account-dropdown {
+    right: 0;
+    max-width: calc(100vw - var(--s3));
+  }
+}
+
+/* Alvo de toque: o mesmo pixel que sobra num mouse falta num polegar.
+   `coarse` em vez de largura — um tablet largo também é tocado. */
+@media (pointer: coarse) {
+  .nav-item,
+  .nav-group-title,
+  .account-dropdown button,
+  .guided-cycle,
+  .guided-case {
+    min-height: 44px;
+  }
+  .nav-pin,
+  .btn-sm {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

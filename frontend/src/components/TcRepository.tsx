@@ -377,7 +377,9 @@ export function TcRepository({
             {f.status && (
               <span className={`status-dot dot-${f.status} caption`}>{f.status}</span>
             )}
-            <span className="caption mono muted">{f.created ?? ""}</span>
+            {/* A data de criação é o que menos identifica um caso; em tela
+                estreita ela some para o título caber (change 0125). */}
+            <span className="caption mono muted wide-only">{f.created ?? ""}</span>
             <span className="repo-actions">
               {f.id && (
                 <button

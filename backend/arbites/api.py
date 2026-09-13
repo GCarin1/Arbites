@@ -7,6 +7,7 @@ Toda resposta de escrita retorna a entidade atualizada (contrato http-api).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import logging
@@ -30,7 +31,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from . import agent_pack as agent_pack_ops
@@ -38,6 +39,7 @@ from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
+from . import versioning
 from . import project_memory as memory_ops
 from . import risk_map as risk_map_ops
 from . import metrics as metrics_ops
@@ -155,6 +157,9 @@ class ExecutionCreate(BaseModel):
     sprint: str | None = None
     environment: str | None = None
     squad: str | None = None
+    # O ciclo e a execution (ADR 0013): o periodo mora aqui, opcional.
+    starts_on: str | None = None
+    ends_on: str | None = None
     testcase_ids: list[str]
     # Mantido por compatibilidade de contrato; o valor e ignorado — a
     # autoria vem da sessao (capability profile).
@@ -166,23 +171,36 @@ class ExecutionPatch(BaseModel):
     sprint: str | None = None
     environment: str | None = None
     status: str | None = Field(default=None, pattern="^(draft|in_progress)$")
+    starts_on: str | None = None
+    ends_on: str | None = None
 
 
+class AssigneeIn(BaseModel):
+    # Vazio limpa o responsavel: o caso volta a ser de quem pegar.
+    assignee: str | None = None
+
+
+# `who` NAO entra por estes modelos (change 0115): a autoria vem da sessao,
+# como o author_of() diz. `extra="forbid"` faz o cliente que insiste receber
+# 422 em vez de mandar um campo que o servidor ignora em silencio.
 class ResultStatusIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
     comment: str | None = None
     column: str | None = None
-    who: str = "local"
 
 
 class StepStatusIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
-    who: str = "local"
 
 
 class DefectLinkIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     defect_id: str
-    who: str = "local"
 
 
 class LocalRunIn(BaseModel):
@@ -783,6 +801,19 @@ def _register_routes(app: FastAPI) -> None:
                     reindex_file(ws, conn, p)
         else:
             reindex_file(ws, conn, restored)
+        # Restaurar e o desfazer de uma exclusao que foi registrada: deixa-lo
+        # de fora quebraria o par (change 0121). So casos de teste entram —
+        # o versionamento tem esse escopo desde a 0112.
+        de_volta = [
+            p for p in (restored.rglob("*.md") if restored.is_dir() else [restored])
+            if p.suffix == ".md" and ws.relpath(p).startswith("testcases/")
+        ]
+        if de_volta:
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, de_volta, f"restaura {ws.relpath(restored)} da lixeira",
+                author_of(request),
+            )
         return {"restored": ws.relpath(restored)}
 
     @app.delete(API_PREFIX + "/trash")
@@ -1108,6 +1139,12 @@ def _register_routes(app: FastAPI) -> None:
         path = target_dir / f"{new_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body if payload.body is not None else DEFAULT_TC_BODY)
         reindex_file(ws, conn, path)
+        # Um commit por ACAO (change 0112), nao por gravacao — e nunca
+        # derrubando a escrita do usuario se o git falhar.
+        await asyncio.to_thread(
+            versioning.commit_paths,
+            ws, [path], f"cria {new_id}: {payload.title}", author_of(request)
+        )
         return _tc_out(conn, ws, new_id)
 
     # -- repositório de pastas (doc de ajustes §1.1) ------------------------
@@ -1143,6 +1180,15 @@ def _register_routes(app: FastAPI) -> None:
         ws.trash(target)  # move a pasta inteira p/ a lixeira
         for md in affected:
             reindex_file(ws, conn, md)  # não existe mais → remove do índice
+        # Uma acao em lote e uma acao (change 0121): sem este commit os
+        # casos ficariam apagados na arvore e presentes no historico, e
+        # nenhuma acao futura os recolheria.
+        if affected:
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, affected, f"exclui a pasta {path or 'testcases/'}"
+                f" ({len(affected)} casos)", author_of(request),
+            )
         return None
 
     @app.post(API_PREFIX + "/testcases/folders/move")
@@ -1168,8 +1214,18 @@ def _register_routes(app: FastAPI) -> None:
         src.rename(dest)
         for old_md in affected:
             reindex_file(ws, conn, old_md)  # caminho antigo não existe mais → remove
-        for new_md in dest.rglob("*.md"):
+        movidos = list(dest.rglob("*.md"))
+        for new_md in movidos:
             reindex_file(ws, conn, new_md)  # indexa no caminho novo
+        # As duas pontas no MESMO commit, como no move de um caso: e o que
+        # faz o `--follow` enxergar a mudanca de pasta como renomeacao.
+        if affected or movidos:
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, affected + movidos,
+                f"move a pasta {ws.relpath(src)} para {ws.relpath(dest)}",
+                author_of(request),
+            )
         return {"path": ws.relpath(dest)}
 
     @app.get(API_PREFIX + "/testcases/{entity_id}")
@@ -1204,6 +1260,11 @@ def _register_routes(app: FastAPI) -> None:
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
+        await asyncio.to_thread(
+            versioning.commit_paths,
+            ws, [ws.root / rel],
+            f"edita {entity_id}: {meta.get('title') or rel}", author_of(request),
+        )
         return _tc_out(conn, ws, entity_id)
 
     @app.delete(API_PREFIX + "/testcases/{entity_id}", status_code=204)
@@ -1213,6 +1274,12 @@ def _register_routes(app: FastAPI) -> None:
         path = ws.root / rel
         ws.trash(path)
         reindex_file(ws, conn, path)
+        # O arquivo foi para a lixeira, nao para o vazio: o commit registra
+        # que saiu, e o historico continua servindo para recupera-lo.
+        await asyncio.to_thread(
+            versioning.commit_paths,
+            ws, [path], f"exclui {entity_id}", author_of(request)
+        )
 
     @app.get(API_PREFIX + "/testcases/{entity_id}/raw", response_class=PlainTextResponse)
     async def get_testcase_raw(request: Request, entity_id: str):
@@ -1243,6 +1310,11 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "testcases", entity_id)
         (ws.root / rel).write_text(payload.content, encoding="utf-8")
         reindex_file(ws, conn, ws.root / rel)
+        await asyncio.to_thread(
+            versioning.commit_paths,
+            ws, [ws.root / rel], f"edita {entity_id} (markdown cru)",
+            author_of(request),
+        )
         return _tc_out(conn, ws, entity_id)
 
     @app.post(API_PREFIX + "/testcases/{entity_id}/move")
@@ -1259,6 +1331,69 @@ def _register_routes(app: FastAPI) -> None:
             src.rename(dest)
             reindex_file(ws, conn, src)   # remove o caminho antigo do índice
             reindex_file(ws, conn, dest)  # indexa o novo
+            # As duas pontas no MESMO commit: e o que faz o `--follow` do
+            # historico enxergar a mudanca de pasta como renomeacao.
+            await asyncio.to_thread(
+                versioning.commit_paths,
+                ws, [src, dest],
+                f"move {entity_id} para {payload.folder or 'testcases/'}",
+                author_of(request),
+            )
+        return _tc_out(conn, ws, entity_id)
+
+    # -- versões do caso de teste (change 0112) ----------------------------
+
+    def _tc_rel(request: Request, entity_id: str) -> str:
+        return _find_path(conn_of(request), "testcases", entity_id)
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions")
+    async def list_versions(request: Request, entity_id: str, limit: int = 50):
+        """Antes de responder, recolhe o que foi editado por fora: quem
+        mexeu no arquivo no Obsidian tambem merece aparecer no historico."""
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        await asyncio.to_thread(versioning.commit_external_edits, ws, rel)
+        return {
+            "versions": await asyncio.to_thread(
+                versioning.history, ws, rel, limit
+            )
+        }
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions/diff",
+             response_class=PlainTextResponse)
+    async def diff_versions(request: Request, entity_id: str, a: str, b: str = ""):
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            return await asyncio.to_thread(versioning.diff, ws, rel, a, b or None)
+        except versioning.GitUnavailable as exc:
+            raise _error(422, "git_failed", str(exc)) from None
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions/{sha}",
+             response_class=PlainTextResponse)
+    async def version_content(request: Request, entity_id: str, sha: str):
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            return await asyncio.to_thread(versioning.content_at, ws, sha, rel)
+        except versioning.GitUnavailable:
+            raise _error(404, "version_not_found",
+                         f"{sha} nao tem este arquivo") from None
+
+    @app.post(API_PREFIX + "/testcases/{entity_id}/versions/{sha}/restore")
+    async def restore_version(request: Request, entity_id: str, sha: str):
+        """Restaurar grava um commit NOVO: o historico entre a versao
+        restaurada e hoje continua la para quem for entender por que."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            await asyncio.to_thread(
+                versioning.restore, ws, sha, rel, author_of(request)
+            )
+        except versioning.GitUnavailable:
+            raise _error(404, "version_not_found",
+                         f"{sha} nao tem este arquivo") from None
+        reindex_file(ws, conn, ws.root / rel)
         return _tc_out(conn, ws, entity_id)
 
     # -- executions (M1) ---------------------------------------------------
@@ -1313,6 +1448,7 @@ def _register_routes(app: FastAPI) -> None:
         execution = exec_ops.create(
             ws, payload.name, author_of(request), payload.sprint,
             payload.environment, testcases, squad=payload.squad,
+            starts_on=payload.starts_on, ends_on=payload.ends_on,
         )
         _save_and_index(ws, conn, execution)
         return execution
@@ -1373,7 +1509,10 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
-        return exec_ops.load(ws_of(request), exec_id)
+        """O progresso vem derivado dos resultados a cada leitura, e nao
+        guardado: contador gravado e contador que diverge do que ele conta."""
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return {**execution, "progress": exec_ops.progress(execution)}
 
     @app.delete(API_PREFIX + "/executions/{exec_id}", status_code=204)
     async def delete_execution(request: Request, exec_id: str):
@@ -1398,8 +1537,18 @@ def _register_routes(app: FastAPI) -> None:
         execution = exec_ops.load(ws, exec_id)
         if execution["status"] == "closed":
             raise _error(409, "execution_closed", f"{exec_id} está fechada")
-        for key, value in payload.model_dump(exclude_unset=True).items():
+        fields = payload.model_dump(exclude_unset=True)
+        period = {k: fields.pop(k) for k in ("starts_on", "ends_on") if k in fields}
+        for key, value in fields.items():
             execution[key] = value
+        if period:
+            # O periodo passa pela validacao do modulo (ADR 0013): um ciclo
+            # que termina antes de comecar e erro de digitacao, nao estado.
+            exec_ops.set_period(
+                execution,
+                period.get("starts_on", execution.get("starts_on")),
+                period.get("ends_on", execution.get("ends_on")),
+            )
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1410,7 +1559,8 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
         exec_ops.set_result_status(
-            execution, ct_id, payload.status, payload.who, payload.comment, payload.column
+            execution, ct_id, payload.status, author_of(request),
+            payload.comment, payload.column
         )
         _save_and_index(ws, conn, execution)
         clear_needs_rerun(ws, conn, ct_id)  # resultado novo → limpa re-execução (0090)
@@ -1422,7 +1572,21 @@ def _register_routes(app: FastAPI) -> None:
     ):
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
-        exec_ops.set_step_status(execution, ct_id, step_index, payload.status, payload.who)
+        exec_ops.set_step_status(
+            execution, ct_id, step_index, payload.status, author_of(request)
+        )
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/assignee")
+    async def post_result_assignee(
+        request: Request, exec_id: str, ct_id: str, payload: AssigneeIn
+    ):
+        """Responsavel por um caso dentro do ciclo (ADR 0013): e o que divide
+        uma regressao entre duas ou mais pessoas sem duplicar a execution."""
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.set_assignee(execution, ct_id, payload.assignee, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1435,11 +1599,17 @@ def _register_routes(app: FastAPI) -> None:
         ct_id: str,
         file: UploadFile = File(...),
         note: str | None = Form(default=None),
-        who: str = Form(default="local"),
     ):
+        # Sem `who` no form (change 0115): quem anexou a evidencia e quem
+        # esta logado, e nao quem o cliente disser que e.
         ws, conn = ws_of(request), conn_of(request)
-        execution = exec_ops.load(ws, exec_id)
+        # O arquivo e lido ANTES de carregar a execution (change 0123): um
+        # upload grande vai para disco e o `read` suspende a requisicao. Com
+        # a suspensao no meio do ciclo carregar-alterar-gravar, dois uploads
+        # simultaneos partiam do mesmo estado e o ultimo apagava o registro
+        # do primeiro — com 201 nos dois e os dois arquivos ja no disco.
         content = await file.read()
+        execution = exec_ops.load(ws, exec_id)
         evidence = exec_ops.add_evidence(
             ws,
             execution,
@@ -1448,7 +1618,7 @@ def _register_routes(app: FastAPI) -> None:
             content,
             file.content_type,
             note,
-            who,
+            author_of(request),
         )
         _save_and_index(ws, conn, execution)
         return evidence
@@ -1468,7 +1638,7 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         _find_path(conn, "defects", payload.defect_id)  # 404 se o defeito não existe
         execution = exec_ops.load(ws, exec_id)
-        exec_ops.link_defect(execution, ct_id, payload.defect_id, payload.who)
+        exec_ops.link_defect(execution, ct_id, payload.defect_id, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1476,7 +1646,7 @@ def _register_routes(app: FastAPI) -> None:
     async def delete_link_defect(request: Request, exec_id: str, ct_id: str, defect_id: str):
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
-        exec_ops.unlink_defect(execution, ct_id, defect_id, "local")
+        exec_ops.unlink_defect(execution, ct_id, defect_id, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -2385,6 +2555,38 @@ def _register_routes(app: FastAPI) -> None:
     def _legacy_profile_path(ws: Workspace) -> Path:
         return ws.root / "profile.md"
 
+    def _account_slug(email: str) -> str:
+        """Identidade de ARQUIVO de uma conta — unívoca, e ainda legível.
+
+        `slugify` colapsa qualquer pontuacao no mesmo hifen, entao
+        `ana.silva@x.com` e `ana-silva@x.com` dao o mesmo texto. Usar so ele
+        faria duas contas distintas resolverem o mesmo caminho e
+        compartilharem perfil, memoria de IA e avatar (change 0119).
+
+        O slug fica na frente porque um workspace aberto no Obsidian precisa
+        dizer de quem e cada arquivo; o sufixo vem do e-mail INTEIRO e e o
+        que garante que duas contas nunca colidam.
+        """
+        digest = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:8]
+        return f"{slugify(email)}-{digest}"
+
+    def _adopt_legacy_name(directory: Path, slug: str, novo: str) -> None:
+        """Adota o arquivo gravado sob o nome antigo (so o slug).
+
+        Sem isto a atualizacao apagaria do mapa a memoria ja escrita: o
+        arquivo continuaria no disco, mas ninguem mais o leria. Se duas
+        contas colidiam, a primeira que ler adota — e a outra comeca limpa,
+        que e exatamente o isolamento que faltava.
+        """
+        if slug == novo or not directory.is_dir():
+            return
+        for antigo in directory.glob(f"{slug}.*"):
+            if not antigo.is_file():
+                continue
+            destino = directory / f"{novo}{antigo.suffix}"
+            if not destino.exists():
+                antigo.rename(destino)
+
     def _profile_path(request: Request) -> Path:
         """Perfil da conta logada.
 
@@ -2395,8 +2597,11 @@ def _register_routes(app: FastAPI) -> None:
         ws = ws_of(request)
         if not getattr(request.app.state, "auth_enabled", True):
             return _legacy_profile_path(ws)
-        user = current_user(request)
-        return ws.root / "profiles" / f"{slugify(user['email'])}.md"
+        email = current_user(request)["email"]
+        directory = ws.root / "profiles"
+        nome = _account_slug(email)
+        _adopt_legacy_name(directory, slugify(email), nome)
+        return directory / f"{nome}.md"
 
     def _seed_profile(request: Request, path: Path) -> None:
         """Primeira leitura de uma conta: template, ou o `profile.md` da raiz
@@ -2447,7 +2652,10 @@ def _register_routes(app: FastAPI) -> None:
     def _avatar_slug(request: Request) -> str:
         if not getattr(request.app.state, "auth_enabled", True):
             return "local"
-        return slugify(current_user(request)["email"])
+        email = current_user(request)["email"]
+        nome = _account_slug(email)
+        _adopt_legacy_name(_avatar_dir(request), slugify(email), nome)
+        return nome
 
     def _find_avatar(request: Request) -> Path | None:
         slug = _avatar_slug(request)
@@ -2462,7 +2670,12 @@ def _register_routes(app: FastAPI) -> None:
         if path is None:
             # Sem imagem nao e erro: o cliente desenha o identicon.
             raise _error(404, "no_avatar", "esta conta nao tem imagem")
-        return FileResponse(str(path))
+        # `private` porque a imagem e de UMA conta e esta instancia fica
+        # atras de um tunel; `no-cache` para revalidar sempre, o que mantem
+        # o ganho do ETag (304) sem servir a foto antiga depois da troca.
+        return FileResponse(
+            str(path), headers={"Cache-Control": "private, no-cache"}
+        )
 
     @app.put(API_PREFIX + "/profile/avatar")
     async def put_avatar(request: Request, file: UploadFile = File(...)):
@@ -2926,7 +3139,7 @@ def _register_routes(app: FastAPI) -> None:
         reindex_file(ws, conn, path)
         if payload.execution and payload.testcase:
             execution = exec_ops.load(ws, payload.execution)
-            exec_ops.link_defect(execution, payload.testcase, defect_id, "local")
+            exec_ops.link_defect(execution, payload.testcase, defect_id, author_of(request))
             _save_and_index(ws, conn, execution)
         return _defect_out(conn, ws, defect_id)
 

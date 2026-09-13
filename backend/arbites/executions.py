@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,25 @@ class ExecutionError(Exception):
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# O ciclo é a execution (ADR 0013): o período mora aqui, não numa entidade
+# Sprint. Vocabulário do produto para os estados que já existem no disco.
+CYCLE_LABELS = {"draft": "planejado", "in_progress": "em andamento",
+                "closed": "fechado"}
+
+
+def _parse_date(value: str | None, field: str) -> str | None:
+    """Aceita `YYYY-MM-DD` ou vazio. Data inválida é recusada na entrada, e
+    não descoberta depois por quem for ordenar ciclos por prazo."""
+    if value is None or value == "":
+        return None
+    try:
+        return date.fromisoformat(str(value)).isoformat()
+    except ValueError:
+        raise ExecutionError(
+            "invalid_date", f"{field} precisa ser uma data ISO (YYYY-MM-DD)"
+        ) from None
 
 
 def exec_dir(ws: Workspace, exec_id: str, created_at: str) -> Path:
@@ -74,6 +93,8 @@ def create(
     testcases: list[dict[str, Any]],
     origin: str = "manual",
     squad: str | None = None,
+    starts_on: str | None = None,
+    ends_on: str | None = None,
 ) -> dict[str, Any]:
     """Cria a execution com snapshot dos steps de cada CT (histórico fiel)."""
     exec_id = ws.next_id("execution")
@@ -85,6 +106,7 @@ def create(
                 "testcase_id": tc["id"],
                 "status": "pending",
                 "column": "pending",
+                "assignee": None,
                 "executed_by": None,
                 "executed_at": None,
                 "duration_seconds": None,
@@ -108,12 +130,15 @@ def create(
         "squad": (squad.strip() or None) if squad else None,
         "origin": origin,
         "created_at": now,
+        "starts_on": None,
+        "ends_on": None,
         "closed_at": None,
         "status": "draft",
         "ci": None,
         "results": results,
         "history": [{"at": now, "who": owner, "event": "created"}],
     }
+    set_period(execution, starts_on, ends_on)
     save(ws, execution)
     return execution
 
@@ -197,6 +222,70 @@ def set_step_status(
     raise ExecutionError(
         "not_found", f"step {step_index} não existe em {testcase_id}", 404
     )
+
+
+def set_period(
+    execution: dict[str, Any],
+    starts_on: str | None,
+    ends_on: str | None,
+) -> dict[str, Any]:
+    """Define o período do ciclo. Um ciclo que termina antes de começar é
+    erro de digitação, não um estado que o produto precise representar."""
+    start = _parse_date(starts_on, "starts_on")
+    end = _parse_date(ends_on, "ends_on")
+    if start and end and end < start:
+        raise ExecutionError(
+            "invalid_period", "ends_on não pode ser anterior a starts_on"
+        )
+    execution["starts_on"] = start
+    execution["ends_on"] = end
+    return execution
+
+
+def set_assignee(
+    execution: dict[str, Any], testcase_id: str, assignee: str | None, who: str
+) -> dict[str, Any]:
+    """Responsável por um caso DENTRO do ciclo — é o que permite dividir uma
+    regressão entre duas ou mais pessoas sem duplicar a execution."""
+    _guard_open(execution)
+    result = _find_result(execution, testcase_id)
+    value = (assignee or "").strip() or None
+    result["assignee"] = value
+    execution["history"].append(
+        {
+            "at": _now(),
+            "who": who,
+            "event": "assignee",
+            "testcase_id": testcase_id,
+            "to": value,
+        }
+    )
+    return result
+
+
+def progress(execution: dict[str, Any]) -> dict[str, Any]:
+    """Cabeçalho de progresso do ciclo: contagem por COLUNA e total.
+
+    Pela coluna, não pelo status cru: a ADR 0005 separou os dois de propósito
+    e é a coluna que o time olha e move. Contar por status faria um caso
+    arrastado para "Retest" aparecer na coluna Retest do quadro e como
+    `passed` no progresso da mesma execution (change 0122).
+
+    Derivado dos resultados a cada leitura — número guardado é número que
+    diverge do que ele conta.
+    """
+    counts = {column: 0 for column in KANBAN_COLUMNS}
+    for result in execution.get("results") or []:
+        column = result.get("column") or result.get("status", "pending")
+        counts[column] = counts.get(column, 0) + 1
+    total = sum(counts.values())
+    done = sum(counts.get(s, 0) for s in FINAL_STATUSES)
+    return {
+        "counts": counts,
+        "total": total,
+        "done": done,
+        "percent": round(done * 100 / total) if total else 0,
+    }
 
 
 def add_evidence(

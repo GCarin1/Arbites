@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
-**Last updated:** 2026-07-21
-**Version:** 0.6.0
+**Last updated:** 2026-09-13
+**Version:** 0.13.0
 
 ## Purpose
 
@@ -74,6 +74,35 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   (`#/<aba>?filtro=valor`), sem lib de router: `App.tsx` lê o hash no load,
   o escreve ao trocar aba/filtro e responde a `hashchange` (back/forward do
   navegador); o deep-link é compartilhável.
+- The system shall apresentar a mesma interface em tela estreita com a barra lateral fora do fluxo, aberta por um controle no cabeçalho e fechada ao navegar, ao tocar fora e pelo Esc.
+- The system shall reduzir o cabeçalho em tela estreita ao essencial — marca, busca e conta —, escondendo contadores do workspace, caminho do diretório e reindexar, que são controles de quem administra a instância.
+- The system shall dar rolagem horizontal com encaixe por coluna ao Kanban em tela estreita, em vez de espremer as seis colunas na largura disponível.
+- The system shall garantir alvo de toque de no mínimo 44 px de altura nos itens de navegação e nas ações de linha quando o ponteiro for grosseiro.
+- The system shall oferecer degraus de espaçamento de 4px e 12px na escala de tokens, para que não haja valor de espaçamento decidido fora dela.
+- The system shall oferecer três densidades de leitura — compacta, padrão e confortável — que alteram o respiro das linhas e a altura dos controles, preservando a separação entre seções.
+- The system shall guardar a densidade escolhida no navegador de quem escolheu, por ser preferência de leitura de uma pessoa num aparelho, e não configuração do workspace.
+- The system shall tornar cada card do quadro alcançável e operável por teclado — foco, abrir o resultado e mover entre colunas —, sem depender de arrastar.
+- The system shall identificar cada card e cada coluna do quadro para tecnologia assistiva, dizendo de que caso se trata e em que coluna ele está.
+- The system shall derivar toda cor exibida — inclusive a de gráfico, grade, eixo e dica de valor — dos tokens em tempo de execução, admitindo valor escrito apenas como último recurso caso a leitura do token falhe.
+- The system shall oferecer tema claro além do escuro, com a escolha guardada no navegador de quem escolheu e aplicada antes da primeira pintura.
+- The system shall acompanhar cada item do menu lateral de um ícone, para que a navegação seja varrida e não lida item a item.
+- The system shall agrupar o menu lateral apenas onde o grupo esclarece — sem cabeçalho para grupo de um item só — e ancorar no rodapé, separado por régua, o que é de manutenção e não de trabalho do dia.
+- The system shall reservar a barra superior para identidade, busca e conta, mantendo informação de instalação e ação de manutenção acessíveis sem ocupar espaço permanente nela.
+- The system shall posicionar as ações de uma tela dentro do cabeçalho dela, nunca antes do título da página.
+- The system shall dimensionar cada campo de metadado pelo próprio conteúdo, sem esticá-lo até a altura do campo mais alto da mesma linha.
+- The system shall separar a ação destrutiva da ação principal numa tela de detalhe, recolhendo-a num menu de ações em vez de deixá-la a um erro de mira.
+- The system shall manter a ação destrutiva de uma linha de tabela num menu de ações, para que ela não compita com o conteúdo nem estique a altura da linha.
+- The system shall impedir que identificador de artefato quebre em mais de uma linha em qualquer listagem.
+- The system shall manter a caixa de marcar junto do seu rótulo, sem esticar o par pela largura disponível.
+
+### Event-driven
+
+- When um caso muda de coluna, the system shall anunciar a mudança numa região viva, para que quem usa leitor de tela saiba o que aconteceu em vez de perceber o card sumir.
+
+### State-driven
+
+- While a gaveta de navegação está aberta, the system shall impedir a rolagem do conteúdo atrás dela e devolver o foco ao controle que a abriu quando ela fechar.
+- While a pessoa não tiver escolhido um tema, the system shall seguir a preferência declarada pelo sistema operacional dela.
 
 ### Unwanted-behavior (must-not)
 
@@ -81,6 +110,11 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   mesmo bloco — no máximo uma ação de destaque (CTA dominante) por bloco.
 - The system shall not exibir blocos de texto longos onde a interface já é
   autoexplicativa — a ajuda é curta e contextual.
+- The system shall not servir uma interface reduzida em funcionalidade na tela estreita; o que muda é a forma, e nenhuma tela deixa de ser alcançável.
+- The system shall not deixar a densidade compacta reduzir um alvo interativo abaixo do mínimo de toque quando o ponteiro for grosseiro.
+- The system shall not oferecer no quadro nenhuma ação que exista apenas como arrastar; arrastar com precisão é o gesto que exclui quem tem limitação motora.
+- The system shall not trocar o tema escuro por claro como padrão do produto; a escolha é de quem lê, e o escuro continua sendo o ponto de partida.
+- The system shall not repetir no menu lateral a navegação que o menu da conta já oferece; o perfil é da pessoa e pertence ao avatar, o menu lateral é do workspace.
 
 ## Acceptance criteria
 
@@ -125,6 +159,22 @@ e prova a sua fatia, citando o teste/artefato. -->
    navegador navegam — verified by `frontend/src/App.tsx` (parse/serialize +
    listener `hashchange`), os filtros controlados nos componentes e
    `npm run build` limpo.
+7. [verified] A casca declara o ponto de quebra, a gaveta e o cabeçalho enxuto, e nenhuma tela fica inalcançável em largura de celular — verified by `frontend/src/App.tsx` + `frontend/src/styles.css`.
+8. [verified] Nenhuma tela em largura de 390 px transborda horizontalmente, e o que é largo por natureza rola dentro do próprio bloco — verified by `frontend/src/styles.css`.
+9. [verified] As três densidades mudam quantas linhas cabem na mesma altura de tela, e a compacta não reduz nenhum alvo de toque abaixo do mínimo — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
+10. [verified] A escala de espaçamento cobre os degraus usados pela interface, e a densidade escolhida sobrevive ao recarregamento da página — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
+11. [verified] Um card do quadro recebe foco pelo teclado, abre o resultado por Enter e muda de coluna por atalho, com o mesmo efeito de arrastá-lo — verified by `frontend/src/components/Executions.tsx`.
+12. [verified] Card e coluna se identificam para tecnologia assistiva e a mudança de coluna é anunciada numa região viva — verified by `frontend/src/components/Executions.tsx`.
+13. [verified] Grade, eixos, dica de valor e barras do gráfico acompanham o tema porque vêm dos tokens, e não de cor decidida no componente — verified by `frontend/src/components/Dashboard.tsx`.
+14. [verified] O tema claro muda fundo, superfície, borda e texto mantendo os estados distinguíveis, e a escolha sobrevive ao recarregamento — verified by `frontend/src/styles.css` + `frontend/src/theme.ts`.
+15. [verified] O menu lateral tem ícone em todo item, nenhum cabeçalho de grupo com um item só, e o que é de manutenção ancorado no rodapé depois de uma régua — verified by `frontend/src/App.tsx` + `frontend/src/styles.css`.
+16. [verified] Nenhuma tela sai do alcance na reorganização: o que deixa o menu lateral continua acessível pelo menu da conta e pelo endereço direto — verified by `frontend/src/App.tsx`.
+17. [verified] A barra superior não exibe caminho de disco nem ação de manutenção como botão de destaque, e ambos continuam alcançáveis — verified by `frontend/src/App.tsx`.
+18. [verified] Nenhuma tela tem controle renderizado antes do título da página — verified by `frontend/src/App.tsx`.
+19. [verified] Um campo de metadado vazio ocupa a altura de uma linha, e não a do campo mais alto ao lado dele — verified by `frontend/src/styles.css`.
+20. [verified] A ação destrutiva de uma tela de detalhe fica num menu de ações, alcançável pelo teclado e fechando com Esc — verified by `frontend/src/components/OverflowMenu.tsx`.
+21. [verified] A linha de uma tabela densa não é esticada pelas suas ações, e o identificador nela cabe numa linha só — verified by `frontend/src/styles.css` + `frontend/src/components/Defects.tsx`.
+22. [verified] A caixa de marcar de um filtro fica ao lado do seu rótulo — verified by `frontend/src/styles.css`.
 
 ## Maturity
 
