@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { notifySwitchesChanged } from "../switches";
 import type {
   ActivityEntry,
   AdminOverview,
@@ -404,52 +405,48 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
 
       {pane === "system" && overview && (
         <>
-          <div className="card block">
-            <div className="card-head">
-              <h3>Superfícies perigosas</h3>
-            </div>
-            <p className="muted">
-              Desligue o que esta instância não usa. Vale na hora, sem
-              reiniciar o processo.
-            </p>
-            <div className="table-wrap">
-              <table className="dense">
-              <tbody>
-                {overview.switches.map((s: Switch) => (
-                  <tr key={s.name}>
-                    <td>
-                      {s.label}
-                      <br />
-                      <span className="muted mono">{s.name}</span>
-                    </td>
-                    <td>
-                      {s.updated_at ? (
-                        <span className="muted">
-                          {when(s.updated_at)} por {s.updated_by}
-                        </span>
-                      ) : (
-                        <span className="muted">nunca alterado</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        className={s.enabled ? "danger" : "primary"}
-                        onClick={() =>
-                          act(
-                            () => api.setSwitch(s.name, !s.enabled),
-                            `${s.label}: ${s.enabled ? "desligado" : "ligado"}`,
-                          )
-                        }
-                      >
-                        {s.enabled ? "Desligar" : "Ligar"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </div>
+          <SwitchCard
+            title="Módulos do produto"
+            hint={
+              "Desligue o que esta instância não usa. O módulo some do menu, " +
+              "recusa o link direto e o servidor passa a recusar as chamadas " +
+              "dele — não é só um rótulo de desativado. Vale na hora, sem " +
+              "reiniciar o processo."
+            }
+            switches={overview.switches.filter((s) => s.kind === "module")}
+            onToggle={(s) =>
+              act(
+                async () => {
+                  const r = await api.setSwitch(s.name, !s.enabled);
+                  // a casca relê a lista: o menu e a rota mudam na hora
+                  notifySwitchesChanged();
+                  return r;
+                },
+                `${s.label}: ${s.enabled ? "desligado" : "ligado"}`,
+              )
+            }
+          />
+
+          <SwitchCard
+            title="Superfícies perigosas"
+            hint={
+              "Não são telas, são capacidades técnicas do servidor. Desligue " +
+              "o que esta instância não precisa para reduzir o alcance de " +
+              "quem entrar sem convite."
+            }
+            switches={overview.switches.filter((s) => s.kind !== "module")}
+            onToggle={(s) =>
+              act(
+                async () => {
+                  const r = await api.setSwitch(s.name, !s.enabled);
+                  // a casca relê a lista: o menu e a rota mudam na hora
+                  notifySwitchesChanged();
+                  return r;
+                },
+                `${s.label}: ${s.enabled ? "desligado" : "ligado"}`,
+              )
+            }
+          />
 
           <div className="card block">
             <div className="card-head">
@@ -479,6 +476,65 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+
+/**
+ * Lista de interruptores com um TOGGLE por linha (change 0143).
+ *
+ * Antes era uma tabela com um botão "Desligar"/"Ligar": o rótulo do botão
+ * dizia a AÇÃO, não o ESTADO, e para saber se a feature estava ligada era
+ * preciso ler o botão ao contrário. Um `switch` de verdade mostra o estado e
+ * aceita o clique no mesmo lugar, e o teclado o alcança como qualquer caixa
+ * de marcar.
+ */
+function SwitchCard({
+  title,
+  hint,
+  switches,
+  onToggle,
+}: {
+  title: string;
+  hint: string;
+  switches: Switch[];
+  onToggle: (s: Switch) => void;
+}) {
+  return (
+    <div className="card block">
+      <div className="card-head">
+        <h3>{title}</h3>
+      </div>
+      <p className="muted">{hint}</p>
+      <ul className="switch-list">
+        {switches.map((s) => (
+          <li key={s.name} className="switch-row">
+            <label className="switch-label" htmlFor={`sw-${s.name}`}>
+              <span className="switch-name">{s.label}</span>
+              <span className="caption muted mono">{s.name}</span>
+              <span className="caption muted">
+                {s.updated_at
+                  ? `${when(s.updated_at)} por ${s.updated_by}`
+                  : "nunca alterado"}
+              </span>
+            </label>
+            <span className="switch-state">
+              <span className={`caption ${s.enabled ? "" : "muted"}`}>
+                {s.enabled ? "Ligado" : "Desligado"}
+              </span>
+              <input
+                id={`sw-${s.name}`}
+                type="checkbox"
+                role="switch"
+                className="toggle"
+                checked={s.enabled}
+                onChange={() => onToggle(s)}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -507,6 +507,69 @@ SWITCHES: dict[str, str] = {
     "xray_import": "Importação de XML do Xray",
 }
 
+# MÓDULOS do produto (ADR 0014). Um módulo é uma TELA mais os caminhos de API
+# que só ela usa — outra pergunta da que os interruptores acima respondem:
+# aqueles governam uma CAPACIDADE técnica (rodar subprocess, ler o .env),
+# estes governam se a feature existe nesta instância.
+#
+# Desligado, o módulo some do menu, recusa o deep link e responde 403 em
+# todos os seus caminhos. Ausente no banco = ligado, para não mudar o
+# comportamento de quem já instalou.
+#
+# O núcleo NÃO entra aqui: requisitos, test cases, execuções, dashboard,
+# defeitos, afazeres, auditoria, problemas, perfil e a própria administração
+# não são desligáveis — sem eles não sobra produto, e um interruptor que
+# permite se trancar para fora do painel é uma armadilha.
+MODULES: dict[str, dict[str, Any]] = {
+    "mod_ia": {
+        "label": "Assistente de IA",
+        # o Context Pack mora nesta tela e vai junto (ADR 0014, consequência
+        # negativa declarada): o módulo é a tela, não o botão
+        "tab": "ia",
+        "paths": ("/ai", "/context-pack", "/agent-pack"),
+    },
+    "mod_automation": {
+        "label": "Automação",
+        "tab": "automation",
+        "paths": ("/targets", "/automation", "/runs", "/env"),
+    },
+    "mod_migration": {
+        "label": "Migração do Xray",
+        "tab": "migration",
+        "paths": ("/import/xray",),
+    },
+    "mod_decisions": {
+        "label": "Decisões",
+        "tab": "decisions",
+        "paths": ("/decisions",),
+    },
+    "mod_memory": {
+        "label": "Memória do projeto",
+        "tab": "memory",
+        "paths": ("/memory",),
+    },
+    "mod_daily": {
+        "label": "Daily",
+        "tab": "daily",
+        "paths": ("/daily", "/dailies"),
+    },
+    "mod_meetings": {
+        "label": "Reuniões",
+        "tab": "meetings",
+        "paths": ("/meetings",),
+    },
+}
+
+
+def _all_switch_labels() -> dict[str, tuple[str, str, str | None]]:
+    """name -> (label, kind, tab). Uma só fonte para listar e validar."""
+    out: dict[str, tuple[str, str, str | None]] = {
+        name: (label, "surface", None) for name, label in SWITCHES.items()
+    }
+    for name, spec in MODULES.items():
+        out[name] = (spec["label"], "module", spec["tab"])
+    return out
+
 
 def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     """Estado de todos os interruptores conhecidos. Ausente no banco = ligado:
@@ -516,11 +579,15 @@ def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         for row in conn.execute("SELECT * FROM switches").fetchall()
     }
     out = []
-    for name, label in SWITCHES.items():
+    for name, (label, kind, tab) in _all_switch_labels().items():
         row = stored.get(name)
         out.append({
             "name": name,
             "label": label,
+            # o cliente agrupa por `kind`: superfície perigosa e módulo do
+            # produto respondem a perguntas diferentes (ADR 0014)
+            "kind": kind,
+            "tab": tab,
             "enabled": bool(row["enabled"]) if row is not None else True,
             "updated_at": row["updated_at"] if row is not None else None,
             "updated_by": row["updated_by"] if row is not None else None,
@@ -538,7 +605,7 @@ def switch_enabled(conn: sqlite3.Connection, name: str) -> bool:
 def set_switch(
     conn: sqlite3.Connection, name: str, enabled: bool, updated_by: str = ""
 ) -> dict[str, Any]:
-    if name not in SWITCHES:
+    if name not in _all_switch_labels():
         raise AuthError(404, "unknown_switch", "interruptor inexistente: %s" % name)
     conn.execute(
         "INSERT INTO switches (name, enabled, updated_at, updated_by)"

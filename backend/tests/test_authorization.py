@@ -144,9 +144,18 @@ def test_put_targets_e_privativo_do_admin(editor):
 
 def test_interruptores_nascem_todos_ligados(client):
     switches = client.get("/api/v1/admin/switches").json()["switches"]
-    assert {s["name"] for s in switches} == set(auth_ops.SWITCHES)
+    # Duas famílias na mesma lista (ADR 0014): superfície perigosa governa
+    # uma CAPACIDADE técnica, módulo governa uma TELA e os caminhos dela.
+    assert {s["name"] for s in switches} == set(auth_ops.SWITCHES) | set(
+        auth_ops.MODULES
+    )
     assert all(s["enabled"] for s in switches)
     assert all(s["updated_at"] is None for s in switches)
+    por_nome = {s["name"]: s for s in switches}
+    assert por_nome["ai"]["kind"] == "surface"
+    assert por_nome["ai"]["tab"] is None
+    assert por_nome["mod_ia"]["kind"] == "module"
+    assert por_nome["mod_ia"]["tab"] == "ia"
 
 
 def test_desligar_local_runner_recusa_a_rota_e_religar_devolve(client):
@@ -220,4 +229,72 @@ def test_estado_dos_interruptores_e_legivel_por_qualquer_sessao(viewer):
     """A UI precisa esconder o que esta desligado; o estado nao e segredo."""
     response = viewer.get("/api/v1/admin/switches")
     assert response.status_code == 200
-    assert len(response.json()["switches"]) == len(auth_ops.SWITCHES)
+    assert len(response.json()["switches"]) == len(auth_ops.SWITCHES) + len(
+        auth_ops.MODULES
+    )
+
+
+# -- módulos desligáveis (ADR 0014, change 0143) ----------------------------
+
+
+def test_modulo_desligado_recusa_todos_os_seus_caminhos(client):
+    """Desligar um módulo desliga a FEATURE, não só o item do menu.
+
+    Antes, o interruptor de superfície escondia a aba em alguns casos e nunca
+    bloqueava a rota do cliente: quem tivesse o link na mão abria a tela
+    inteira e só descobria no primeiro envio. O backend é a única camada que
+    vale como segurança, e é ela que este teste prende.
+    """
+    assert client.get("/api/v1/decisions").status_code == 200
+
+    off = client.put("/api/v1/admin/switches/mod_decisions", json={"enabled": False})
+    assert off.status_code == 200
+    assert off.json()["switch"]["enabled"] is False
+
+    recusa = client.get("/api/v1/decisions")
+    assert recusa.status_code == 403
+    assert recusa.json()["error"]["code"] == "feature_disabled"
+    # a escrita também, não só a leitura
+    assert client.post("/api/v1/decisions", json={"title": "x"}).status_code == 403
+
+    # religar vale na hora, sem reiniciar o processo
+    client.put("/api/v1/admin/switches/mod_decisions", json={"enabled": True})
+    assert client.get("/api/v1/decisions").status_code == 200
+
+
+def test_modulo_desligado_nao_derruba_o_resto_do_produto(client):
+    """O interruptor é cirúrgico: o núcleo não pode cair junto."""
+    client.put("/api/v1/admin/switches/mod_meetings", json={"enabled": False})
+    assert client.get("/api/v1/meetings").status_code == 403
+    for rota in ("/api/v1/requirements", "/api/v1/testcases", "/api/v1/executions",
+                 "/api/v1/defects", "/api/v1/todos"):
+        assert client.get(rota).status_code == 200, rota
+
+
+def test_cada_modulo_conhecido_tem_aba_e_caminhos(client):
+    """Registro sem aba ou sem caminho é um interruptor que não desliga nada."""
+    for name, spec in auth_ops.MODULES.items():
+        assert spec["tab"], name
+        assert spec["paths"], name
+        assert all(p.startswith("/") for p in spec["paths"]), name
+
+
+def test_so_admin_liga_e_desliga_interruptor(viewer, editor):
+    """Quem não é admin não mexe em interruptor — nem módulo, nem superfície."""
+    for sessao in (viewer, editor):
+        for name in ("mod_ia", "ai"):
+            negado = sessao.put(
+                "/api/v1/admin/switches/%s" % name, json={"enabled": False}
+            )
+            assert negado.status_code == 403, (name, negado.text)
+
+
+def test_so_admin_alcanca_a_gestao_de_contas(viewer, editor):
+    """Liberar, recusar, desativar e reativar cadastro são do admin e só dele."""
+    for sessao in (viewer, editor):
+        assert sessao.get("/api/v1/admin/users").status_code == 403
+        assert sessao.post("/api/v1/admin/users/1/approve",
+                           json={"role": "viewer"}).status_code == 403
+        assert sessao.post("/api/v1/admin/users/1/reject").status_code == 403
+        assert sessao.post("/api/v1/admin/users/1/disable").status_code == 403
+        assert sessao.post("/api/v1/admin/users/1/enable").status_code == 403

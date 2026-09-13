@@ -15,7 +15,7 @@
         "id": "admin",
         "path": ".doctrina/specs/admin/spec.md",
         "status": "active",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "last_updated": "2026-09-12",
         "implementation": "verified — `backend/arbites/api.py` (rotas /admin/*), `frontend/src/components/Admin.tsx`",
         "realizes": [
@@ -385,6 +385,15 @@
         "supersedes": "0010",
         "landed": "2026-09-13 — `backend/arbites/executions.py`, `backend/arbites/api.py`, `backend/tests/test_execution_cycle.py`",
         "summary": "O ciclo é a execution, não uma entidade nova."
+      },
+      {
+        "id": "0014",
+        "path": ".doctrina/decisions/0014-modulo-desligavel-e-tela-mais-caminhos-de-api-bloqueado-nas-tres-camadas.md",
+        "title": "Modulo desligavel e tela mais caminhos de API, bloqueado nas tres camadas",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "summary": "Um modulo e uma tela do produto mais os caminhos de API que so ela usa.",
+        "landed": "2026-09-13 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `frontend/src/App.tsx`, `backend/tests/test_authorization.py`"
       }
     ],
     "changes": [],
@@ -2236,6 +2245,19 @@
         "id": "0142-abas-admin-cabem-px",
         "title": "abas do admin nao cabem em 390px e geram rolagem lateral da pagina inteira, e as tabelas densas do admin escondem a coluna de acoes, o que faz as acoes de liberar e desativar cadastro parecerem inexistentes",
         "path": ".doctrina/changes/archive/2026-09-13-0142-abas-admin-cabem-px",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "admin",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0143-interruptor-modulo-produto-desliga",
+        "title": "interruptor por modulo do produto que desliga a feature de verdade: some do menu, recusa o deep link e bloqueia os caminhos de API do modulo, em vez de apenas exibir um status de desativado",
+        "path": ".doctrina/changes/archive/2026-09-13-0143-interruptor-modulo-produto-desliga",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [

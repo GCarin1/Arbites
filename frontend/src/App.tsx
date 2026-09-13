@@ -4,6 +4,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import { AccountMenu } from "./components/AccountMenu";
 import { NavIcon } from "./components/NavIcons";
+import { SWITCHES_CHANGED } from "./switches";
 import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
@@ -189,6 +190,46 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
+/**
+ * Um módulo que o administrador desligou (ADR 0014).
+ *
+ * O interruptor tem que significar a mesma coisa nas três camadas. O
+ * servidor já recusa os caminhos do módulo com 403; aqui a TELA deixa de
+ * montar, em vez de abrir com todos os botões e falhar no primeiro envio.
+ * Não é uma mensagem de erro: nada quebrou, esta instância só não usa isso.
+ */
+function ModuleOff({
+  label,
+  isAdmin,
+  onHome,
+  onAdmin,
+}: {
+  label: string;
+  isAdmin: boolean;
+  onHome: () => void;
+  onAdmin: () => void;
+}) {
+  return (
+    <div className="empty-state block">
+      <div className="empty-art" aria-hidden="true">
+        <NavIcon name="admin" />
+      </div>
+      <div className="empty-title">{label} está desligado nesta instância</div>
+      <div className="empty-body">
+        O administrador desligou este módulo. Ele não aparece no menu e o
+        servidor recusa as chamadas dele — não é uma falha, é uma escolha de
+        quem administra o Arbites aqui.
+      </div>
+      <div className="empty-actions">
+        <button className="primary" onClick={onHome}>
+          Voltar para Hoje
+        </button>
+        {isAdmin && <button onClick={onAdmin}>Ligar em Administração</button>}
+      </div>
+    </div>
+  );
+}
+
 function NavItem({
   item,
   tab,
@@ -303,6 +344,9 @@ export default function App({
   }, []);
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [switches, setSwitches] = useState<Switch[]>([]);
+  // sem isto a tela de um modulo desligado PISCA antes de sumir: no
+  // primeiro render a lista ainda esta vazia e tudo parece ligado
+  const [switchesLoaded, setSwitchesLoaded] = useState(false);
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [selectedCt, setSelectedCt] = useState<string | null>(null);
@@ -466,22 +510,40 @@ export default function App({
 
   // Uma aba so aparece quando o papel alcanca e o admin nao desligou. Sem
   // isto a UI oferece caminhos que a API vai recusar com 403.
+  //
+  // O modulo desligado (ADR 0014) some do menu E nao monta a tela: quem tem
+  // o link na mao nao abre mais um formulario inteiro para descobrir no
+  // primeiro envio que a feature nao existe nesta instancia. A lista de
+  // modulos vem do SERVIDOR — a mesma que gera o bloqueio no gate —, entao o
+  // que a UI esconde e o que o servidor recusa nao tem como divergir.
+  const moduleOffFor = (key: Tab): Switch | undefined =>
+    switches.find((s) => s.kind === "module" && s.tab === key && !s.enabled);
+
   const isReachable = (key: Tab): boolean => {
-    const off = (name: string) =>
-      switches.some((s) => s.name === name && !s.enabled);
+    if (moduleOffFor(key)) return false;
     if (key === "admin") return user.role === "admin";
-    if (key === "migration") return user.role === "admin" && !off("xray_import");
-    if (key === "ia") return !off("ai");
-    if (key === "automation") return !off("local_runner") || user.role === "admin";
+    if (key === "migration") return user.role === "admin";
     return true;
   };
 
-  useEffect(() => {
+  const loadSwitches = useCallback(() => {
     api
       .switches()
       .then((r) => setSwitches(r.switches))
-      .catch(() => setSwitches([]));
+      .catch(() => setSwitches([]))
+      .finally(() => setSwitchesLoaded(true));
   }, []);
+
+  useEffect(() => {
+    loadSwitches();
+    // O painel vive em outro componente e não tem como avisar a casca por
+    // prop: sem este canal, o admin desligava um módulo e o menu só mudava
+    // no próximo carregamento da página — com o item ainda clicável nesse
+    // meio-tempo. Um evento do documento é o canal mais barato aqui, e o
+    // estado continua vindo do SERVIDOR (o evento só diz "releia").
+    window.addEventListener(SWITCHES_CHANGED, loadSwitches);
+    return () => window.removeEventListener(SWITCHES_CHANGED, loadSwitches);
+  }, [loadSwitches]);
 
   // Esc fecha a gaveta e devolve o foco a quem a abriu: sem isso o teclado
   // volta para o topo do documento e a pessoa se perde.
@@ -692,7 +754,25 @@ export default function App({
           <div className="main-inner">
           {error && <div className="error-banner">{error}</div>}
           <ErrorBoundary key={tab}>
-          {tab === "home" ? (
+          {/* GUARDA DE ROTA (ADR 0014). Antes, `isReachable` decidia só o
+              MENU: o link `#/ia` de um módulo desligado montava a tela
+              inteira e a pessoa só descobria no primeiro envio. Aqui o
+              módulo desligado não monta nada.
+
+              `switchesLoaded` evita o pisca-pisca: no primeiro render a
+              lista ainda está vazia e tudo pareceria ligado. O núcleo
+              (`home`) nunca é guardado, senão a espera deixaria a tela
+              inicial em branco. */}
+          {tab !== "home" && !switchesLoaded ? (
+            <p className="empty">Carregando…</p>
+          ) : moduleOffFor(tab) ? (
+            <ModuleOff
+              label={moduleOffFor(tab)!.label}
+              isAdmin={user.role === "admin"}
+              onHome={() => selectTab("home")}
+              onAdmin={() => selectTab("admin")}
+            />
+          ) : tab === "home" ? (
             <Suspense fallback={<p className="empty">Carregando…</p>}>
               <Home
                 workspace={workspace}
