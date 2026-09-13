@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC5
 **Last updated:** 2026-07-21
-**Version:** 0.10.0
+**Version:** 0.11.0
 
 ## Purpose
 
@@ -145,6 +145,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
   para a operação (dropdown/run) da mesma lista — o que o browse mostra é
   o que o dropdown oferece.
 - The system shall not emitir o keepalive como evento de dados; ele é um comentário SSE (linha iniciada por `:`), invisível ao `EventSource` e ao terminal da UI.
+- The system shall not gravar resultado para um cenario que foi interrompido antes de terminar — ausencia de falha observada num cenario morto por timeout ou cancelamento nao e aprovacao, e o caso segue pendente ate ser marcado blocked.
 
 ### Optional
 
@@ -216,6 +217,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 17. [verified] `GET /env/catalog` deriva chaves/seções do `.env`/`.env.example` do target e não expõe campos fixos de outro projeto — verified by `backend/tests/test_automation_targets_config.py`.
 18. [verified] Terminal reconecta ao voltar à aba; `EXEC-` navega ao board; seletor de `.feature` tem selecionar-todos/limpar — verified by `frontend/src/components/Automation.tsx` + `npm run build` limpo + revisão visual.
 19. [verified] Um run que fica em silêncio além do intervalo de keepalive continua recebendo bytes no stream, e o que chega no período é comentário — nenhuma linha nova aparece no terminal — verified by `backend/tests/test_local_runs.py`.
+20. [unverified] Um cenario morto no meio por timeout nunca chega a execution como `passed`; chega `blocked` com `error: "timeout"` — verified by `backend/tests/test_local_runs.py`.
 
 ## Maturity
 

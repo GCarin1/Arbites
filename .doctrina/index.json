@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.13.1",
+        "version": "0.14.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -144,7 +144,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -387,7 +387,24 @@
         "summary": "O ciclo é a execution, não uma entidade nova."
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0135-barra-sub-abas-ia-transborda",
+        "title": "barra de sub-abas da IA transborda a viewport em 390px: a aba Configuracao fica cortada na borda direita sem nenhum sinal de rolagem",
+        "path": ".doctrina/changes/0135-barra-sub-abas-ia-transborda",
+        "status": "applied",
+        "opened": "2026-09-13",
+        "lane": "runtime (uncertain; signals: configuracao)"
+      },
+      {
+        "id": "0136-linha-arvore-requisitos-execucoes",
+        "title": "linha de arvore de requisitos e de execucoes desenha os rotulos uns por cima dos outros em 390px: id, cobertura, status e data se sobrepoem porque o flex encolhe todos abaixo do proprio texto",
+        "path": ".doctrina/changes/0136-linha-arvore-requisitos-execucoes",
+        "status": "proposed",
+        "opened": "2026-09-13",
+        "lane": "product (uncertain)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -2145,6 +2162,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0137-cenario-interrompido-timeout-cancelamento",
+        "title": "cenario interrompido por timeout ou cancelamento e gravado como passed porque o fecho do progresso ao vivo trata ausencia de falha como aprovacao",
+        "path": ".doctrina/changes/archive/2026-09-13-0137-cenario-interrompido-timeout-cancelamento",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2423,6 +2453,12 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "cenario-interrompido-nao-tem-resultado",
+        "path": ".doctrina/skills/cenario-interrompido-nao-tem-resultado.md",
+        "description": "Progresso ao vivo deduz o status pela AUSÊNCIA de falha — o que só vale para cenário que chegou ao fim. Ao fechar um parcial depois de matar o processo (timeout/cancelamento), o cenário aberto vira `passed` sem nunca ter terminado. Quem interrompe precisa dizer que interrompeu.",
+        "last_updated": "2026-09-13"
       }
     ],
     "contracts": [

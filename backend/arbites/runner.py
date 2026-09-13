@@ -266,7 +266,7 @@ class RunManager:
             run.emit(f"[arbites] timeout após {timeout:.0f}s — processo encerrado")
 
         cancelled = run.status == "cancelled"
-        self._collect(run, result_json, evidence_dir)
+        self._collect(run, result_json, evidence_dir, interrupted=timed_out or cancelled)
         if timed_out:
             self._mark_pending(run, "blocked", "timeout")
             run.finish("timeout")
@@ -297,11 +297,20 @@ class RunManager:
         except Exception:
             pass  # live é acessório — nunca crasha o worker
 
-    def _live_conclude(self, run: RunInfo) -> None:
-        """Persiste o resultado parcial do cenário corrente (se mapeado)."""
+    def _live_conclude(self, run: RunInfo, *, interrupted: bool = False) -> None:
+        """Persiste o resultado parcial do cenário corrente (se mapeado).
+
+        `interrupted` diz que o processo foi MORTO (timeout/cancelamento) com
+        este cenário no meio. Um cenário que não terminou não tem resultado:
+        "não vi falha" só significa "passou" quando o cenário chegou ao fim.
+        Sem isto, o `Quando` que ainda dormia quando o timeout estourou vira
+        um `passed` gravado na execution — verde em cima de um caso que
+        nunca rodou até o fim, que é o pior defeito possível numa plataforma
+        de teste (0137). O caso fica pendente, e quem marca pendente como
+        `blocked`/`timeout` é o chamador."""
         name = run._live_scenario
         run._live_scenario = None
-        if not name:
+        if interrupted or not name:
             return
         ct_id = run.live_map.get(name)
         if not ct_id:
@@ -317,13 +326,21 @@ class RunManager:
         except Exception:
             pass  # parcial falhou → o JSON final cobre
 
-    def _collect(self, run: RunInfo, result_json: Path, evidence_dir: Path) -> None:
+    def _collect(
+        self,
+        run: RunInfo,
+        result_json: Path,
+        evidence_dir: Path,
+        *,
+        interrupted: bool = False,
+    ) -> None:
         """Parseia o Cucumber JSON e move evidências dos hooks p/ a execution.
 
         Fonte OFICIAL do resultado — reconcilia incondicionalmente qualquer
         parcial do progresso ao vivo (skill
-        progresso-ao-vivo-fonte-oficial-reconcilia)."""
-        self._live_conclude(run)  # fecha o último cenário do live, se houver
+        progresso-ao-vivo-fonte-oficial-reconcilia). `interrupted` propaga
+        para o fecho do live: run morto no meio não fecha cenário (0137)."""
+        self._live_conclude(run, interrupted=interrupted)
         try:
             execution = exec_ops.load(self.ws, run.exec_id)
         except exec_ops.ExecutionError:
