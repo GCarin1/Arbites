@@ -170,36 +170,60 @@ def history(ws: Workspace, rel: str, limit: int = 50) -> list[dict[str, Any]]:
 
     `--follow` para que renomear (mover de pasta) não corte o histórico ao
     meio — mover um caso preserva o ID, e deveria preservar o passado também.
+
+    Cada versão carrega o `path` que o arquivo tinha NAQUELE commit. Sem
+    ele, ver, comparar e restaurar uma versão anterior a uma mudança de
+    pasta pediriam o arquivo pelo caminho de hoje, onde ele ainda não
+    estava, e o git responderia que não existe (change 0124).
     """
     if not is_repo(ws):
         return []
     try:
         out = _run(ws, [
-            "log", f"-{limit}", "--follow", "--date=iso-strict",
-            "--pretty=format:%H%x1f%an%x1f%ae%x1f%ad%x1f%s", "--", rel,
+            "log", f"-{limit}", "--follow", "--date=iso-strict", "--name-only",
+            "--pretty=format:%x00%H%x1f%an%x1f%ae%x1f%ad%x1f%s", "--", rel,
         ])
     except GitUnavailable:
         return []
     versions = []
-    for line in out.splitlines():
-        if not line.strip():
-            continue
-        sha, name, email, when, subject = line.split("\x1f")
+    # NUL separa os commits: a mensagem pode ter quebra de linha, e depois
+    # dela vem o caminho do arquivo naquele commit.
+    for bloco in out.split("\x00")[1:]:
+        linhas = bloco.strip("\n").split("\n")
+        sha, name, email, when, subject = linhas[0].split("\x1f")
+        caminhos = [l.strip() for l in linhas[1:] if l.strip()]
         versions.append({
             "sha": sha, "short": sha[:8], "author": name, "email": email,
             "at": when, "message": subject,
+            "path": caminhos[0] if caminhos else rel,
         })
     return versions
 
 
+def path_at(ws: Workspace, rel: str, sha: str) -> str:
+    """O caminho que o arquivo tinha naquele commit — hoje pode ser outro."""
+    for versao in history(ws, rel, limit=200):
+        if versao["sha"].startswith(sha) or sha.startswith(versao["sha"]):
+            return str(versao["path"])
+    return rel
+
+
 def content_at(ws: Workspace, sha: str, rel: str) -> str:
-    """Conteúdo do arquivo naquele commit."""
-    return _run(ws, ["show", f"{sha}:{rel}"])
+    """Conteúdo do arquivo naquele commit, onde quer que ele estivesse."""
+    return _run(ws, ["show", f"{sha}:{path_at(ws, rel, sha)}"])
 
 
 def diff(ws: Workspace, rel: str, a: str, b: str | None = None) -> str:
-    """Comparação unificada entre duas versões; `b` vazio = árvore de trabalho."""
-    args = ["diff", a] + ([b] if b else []) + ["--", rel]
+    """Comparação unificada entre duas versões; `b` vazio = árvore de trabalho.
+
+    Cada ponta usa o caminho que o arquivo tinha na sua própria versão, para
+    que comparar através de uma mudança de pasta não devolva vazio.
+    """
+    caminho_a = path_at(ws, rel, a)
+    caminho_b = path_at(ws, rel, b) if b else rel
+    args = ["diff", a] + ([b] if b else []) + ["--", caminho_a]
+    if caminho_b != caminho_a:
+        args.append(caminho_b)
     return _run(ws, args)
 
 

@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)
 **Realizes:** SC1
 **Last updated:** 2026-09-13
-**Version:** 0.14.0
+**Version:** 0.14.1
 
 ## Purpose
 
@@ -104,6 +104,7 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 - The system shall serializar as operações de git do workspace numa fila única por processo, para que duas escritas simultâneas esperem em vez de disputar o lock do repositório.
 - The system shall executar as operações de git fora do laço de eventos, como já faz com as demais chamadas bloqueantes.
 - The system shall gravar um commit também nas três ações que movem uma pasta inteira de casos de uma vez — excluir pasta, mover pasta e restaurar da lixeira —, com a mesma regra de um commit por ação e autor da sessão.
+- The system shall resolver, para cada versão de um caso de teste, o caminho que o arquivo tinha naquele commit, de modo que ver, comparar e restaurar funcionem também nas versões anteriores a uma mudança de pasta.
 
 ### Event-driven
 
@@ -218,6 +219,7 @@ distinto do resultado de execução, e pode ser `manual`, `automated` ou
 21. [verified] Um commit impedido por falha do git deixa aviso no log com a ação que se perdeu, e a operação do usuário continua respondendo normalmente — verified by `backend/tests/test_versioning.py`.
 22. [verified] Excluir e mover uma pasta com casos deixa um commit por ação e o repositório sem pendência, e o histórico de um caso sobrevive à mudança de pasta feita pela pasta inteira — verified by `backend/tests/test_versioning.py`.
 23. [verified] Restaurar da lixeira grava o commit da volta, e o caso restaurado volta a ter histórico contínuo — verified by `backend/tests/test_versioning.py`.
+24. [verified] Uma versão anterior à mudança de pasta é aberta, comparada e restaurada pelo ID do caso, sem depender de onde o arquivo está hoje — verified by `backend/tests/test_versioning.py`.
 
 ## Maturity
 

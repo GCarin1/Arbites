@@ -342,3 +342,55 @@ def test_restaurar_da_lixeira_grava_o_commit_da_volta(client):
     # histórico contínuo: a criação, a exclusão e a volta
     versoes = client.get(f"/api/v1/testcases/{ct['id']}/versions").json()["versions"]
     assert f"cria {ct['id']}: Login" in [v["message"] for v in versoes]
+
+
+# -- Versões atravessando uma mudança de pasta (change 0124) -------------
+
+
+def _move_e_versoes(client):
+    ct = make_ct(client, "Login")
+    client.put(f"/api/v1/testcases/{ct['id']}", json={"priority": "critical"})
+    client.post(f"/api/v1/testcases/{ct['id']}/move", json={"folder": "regressao"})
+    versoes = client.get(f"/api/v1/testcases/{ct['id']}/versions").json()["versions"]
+    anterior = next(v for v in versoes if v["message"].startswith("cria "))
+    return ct, versoes, anterior
+
+
+def test_versao_anterior_ao_move_abre_pelo_id_do_caso(client):
+    """A lista já mostrava essas versões (o `--follow` atravessa o rename);
+    abrir qualquer uma devolvia 404, porque o arquivo era pedido pelo caminho
+    de hoje e naquele commit ele estava em outro lugar."""
+    ct, _, anterior = _move_e_versoes(client)
+    conteudo = client.get(f"/api/v1/testcases/{ct['id']}/versions/{anterior['sha']}")
+    assert conteudo.status_code == 200
+    assert "title: Login" in conteudo.text
+    assert "priority: medium" in conteudo.text  # antes da edição
+
+
+def test_cada_versao_carrega_o_caminho_que_tinha_naquele_commit(client):
+    ct, versoes, anterior = _move_e_versoes(client)
+    atual = versoes[0]
+    assert atual["path"].startswith("testcases/regressao/")
+    assert anterior["path"].startswith("testcases/")
+    assert not anterior["path"].startswith("testcases/regressao/")
+
+
+def test_comparar_atraves_do_move_mostra_a_alteracao(client):
+    ct, _, anterior = _move_e_versoes(client)
+    saida = client.get(f"/api/v1/testcases/{ct['id']}/versions/diff",
+                       params={"a": anterior["sha"]}).text
+    assert "priority" in saida
+
+
+def test_restaurar_versao_anterior_ao_move_devolve_o_conteudo(client):
+    """Restaurar devolve o CONTEÚDO para o caminho atual — não move o
+    arquivo de volta para a pasta antiga: restaurar texto e desfazer uma
+    organização são duas ações diferentes."""
+    ct, _, anterior = _move_e_versoes(client)
+    restaurado = client.post(
+        f"/api/v1/testcases/{ct['id']}/versions/{anterior['sha']}/restore"
+    )
+    assert restaurado.status_code == 200
+    assert restaurado.json()["priority"] == "medium"
+    # e o caso continua onde a organização o deixou
+    assert restaurado.json()["path"].startswith("testcases/regressao/")

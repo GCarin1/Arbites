@@ -226,7 +226,7 @@
         "id": "testcases",
         "path": ".doctrina/specs/testcases/spec.md",
         "status": "active",
-        "version": "0.14.0",
+        "version": "0.14.1",
         "last_updated": "2026-09-13",
         "implementation": "verified — M0 + repositório BDD (backend/arbites/api.py, backend/arbites/parser.py, frontend TcRepository.tsx/TestCaseEditor.tsx)",
         "realizes": [
@@ -1999,6 +1999,19 @@
         "specs_affected": [
           {
             "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0124-versao-anterior-mudanca-pasta",
+        "title": "versao anterior a mudanca de pasta e listada no historico mas nao abre nem restaura",
+        "path": ".doctrina/changes/archive/2026-09-13-0124-versao-anterior-mudanca-pasta",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "testcases",
             "operation": "MODIFIED"
           }
         ]

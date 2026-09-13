@@ -129,3 +129,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0121-excluir-mover-pasta-restaurar — excluir mover pasta e restaurar da lixeira nao entram no versionamento e deixam o repositorio permanentemente sujo (specs: testcases MODIFIED)
 - 2026-09-13 — 0122-progresso-ciclo-conta-status — progresso do ciclo conta por status enquanto o quadro conta por coluna e os dois numeros divergem (specs: executions MODIFIED)
 - 2026-09-13 — 0123-upload-simultaneo-evidencia-responde — upload simultaneo de evidencia responde 201 mas perde parte dos registros no execution.json (specs: executions MODIFIED)
+- 2026-09-13 — 0124-versao-anterior-mudanca-pasta — versao anterior a mudanca de pasta e listada no historico mas nao abre nem restaura (specs: testcases MODIFIED)
