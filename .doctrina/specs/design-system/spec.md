@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.12.0
+**Version:** 0.13.0
 
 ## Purpose
 
@@ -91,6 +91,9 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall posicionar as ações de uma tela dentro do cabeçalho dela, nunca antes do título da página.
 - The system shall dimensionar cada campo de metadado pelo próprio conteúdo, sem esticá-lo até a altura do campo mais alto da mesma linha.
 - The system shall separar a ação destrutiva da ação principal numa tela de detalhe, recolhendo-a num menu de ações em vez de deixá-la a um erro de mira.
+- The system shall manter a ação destrutiva de uma linha de tabela num menu de ações, para que ela não compita com o conteúdo nem estique a altura da linha.
+- The system shall impedir que identificador de artefato quebre em mais de uma linha em qualquer listagem.
+- The system shall manter a caixa de marcar junto do seu rótulo, sem esticar o par pela largura disponível.
 
 ### Event-driven
 
@@ -170,6 +173,8 @@ e prova a sua fatia, citando o teste/artefato. -->
 18. [verified] Nenhuma tela tem controle renderizado antes do título da página — verified by `frontend/src/App.tsx`.
 19. [verified] Um campo de metadado vazio ocupa a altura de uma linha, e não a do campo mais alto ao lado dele — verified by `frontend/src/styles.css`.
 20. [verified] A ação destrutiva de uma tela de detalhe fica num menu de ações, alcançável pelo teclado e fechando com Esc — verified by `frontend/src/components/OverflowMenu.tsx`.
+21. [verified] A linha de uma tabela densa não é esticada pelas suas ações, e o identificador nela cabe numa linha só — verified by `frontend/src/styles.css` + `frontend/src/components/Defects.tsx`.
+22. [verified] A caixa de marcar de um filtro fica ao lado do seu rótulo — verified by `frontend/src/styles.css`.
 
 ## Maturity
 

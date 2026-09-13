@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { OverflowMenu } from "./OverflowMenu";
 import { MentionTextarea, SingleRefInput } from "./Autocomplete";
 import { ConfirmModal, Modal } from "./Modal";
 import { useToast } from "./Toast";
@@ -225,13 +226,29 @@ export function Defects({
                     </td>
                     <td className="mono muted">{d.external_key || "—"}</td>
                     <td className="caption mono">{age !== null ? `${age}d` : "—"}</td>
-                    <td className="repo-actions">
+                    <td className="row-actions">
                       <button className="btn-sm" onClick={() => setEditing(d)}>
                         Editar
                       </button>
-                      <button className="btn-sm danger" onClick={() => setConfirmDelete(d)}>
-                        Excluir
-                      </button>
+                      {/* Excluir sai da linha (change 0132): repetido em toda
+                          linha, em vermelho, competia com o conteúdo que a
+                          tabela existe para mostrar — e as duas ações lado a
+                          lado quebravam em duas linhas, esticando a linha
+                          inteira para 77px. */}
+                      <OverflowMenu label={`Mais ações para ${d.id}`}>
+                        {(fechar) => (
+                          <button
+                            className="danger"
+                            role="menuitem"
+                            onClick={() => {
+                              fechar();
+                              setConfirmDelete(d);
+                            }}
+                          >
+                            Excluir defeito
+                          </button>
+                        )}
+                      </OverflowMenu>
                     </td>
                   </tr>
                 );

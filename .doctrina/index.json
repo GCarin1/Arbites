@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.12.0",
+        "version": "0.13.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2098,6 +2098,19 @@
         "id": "0131-tela-detalhe-mostra-campo",
         "title": "tela de detalhe mostra campo vazio com o mesmo peso do preenchido e a acao destrutiva com o mesmo destaque da principal",
         "path": ".doctrina/changes/archive/2026-09-13-0131-tela-detalhe-mostra-campo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0132-acoes-empilhadas-linha-tabela",
+        "title": "acoes empilhadas na linha da tabela inflam a altura e a acao destrutiva fica o elemento mais chamativo",
+        "path": ".doctrina/changes/archive/2026-09-13-0132-acoes-empilhadas-linha-tabela",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [
