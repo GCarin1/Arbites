@@ -1300,6 +1300,32 @@ table.dense tbody tr:hover td {
 .exec-seg.col-retest { background: var(--retest); }
 .exec-seg.col-passed { background: var(--success); }
 
+/* Dashboard: o número primeiro, a leitura do número logo abaixo
+   (change 0114). A linha de KPIs abre a tela; o bloco de atenção explica o
+   que os números querem dizer — com IA quando há provider, com os achados
+   determinísticos quando não há. */
+.kpi-row {
+  margin-bottom: var(--s2);
+}
+.attention-block .attention-prose {
+  white-space: pre-wrap;
+  margin: 0;
+}
+.attention-list {
+  list-style: none;
+  margin: var(--s1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.attention-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  font-size: var(--fs-body);
+}
+
 /* Modo guiado (change 0113): sentar e executar. Três painéis lado a lado —
    ciclos, casos do ciclo e caso ativo — com o rodapé que avança sem sair da
    tela. Complementa o Kanban; não o substitui. */

@@ -185,8 +185,8 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.13.0",
-        "last_updated": "2026-07-21",
+        "version": "0.14.0",
+        "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
           "SC3"
@@ -387,16 +387,7 @@
         "summary": "O ciclo é a execution, não uma entidade nova."
       }
     ],
-    "changes": [
-      {
-        "id": "0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
-        "title": "Dashboard com KPIs e o que precisa de atencao",
-        "path": ".doctrina/changes/0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain; signals: para que)"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -1878,6 +1869,19 @@
         "specs_affected": [
           {
             "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
+        "title": "Dashboard com KPIs e o que precisa de atencao",
+        "path": ".doctrina/changes/archive/2026-09-13-0114-dashboard-com-kpis-e-o-que-precisa-de-atencao",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]

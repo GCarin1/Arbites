@@ -164,11 +164,6 @@ export function Dashboard({
             <option value={15}>15 dias</option>
             <option value={30}>30 dias</option>
           </select>
-          {aiEnabled && (
-            <button onClick={() => void generateExecutiveSummary()} disabled={genBusy}>
-              {genBusy ? "Gerando…" : "Resumo executivo (IA)"}
-            </button>
-          )}
           <a className="button-link" href={api.exportUrl("md", sprint, effSquad, execSummary)} download>
             Export MD
           </a>
@@ -178,32 +173,11 @@ export function Dashboard({
         </div>
       </div>
 
-      {aiEnabled && execSummary && (
-        <div className="card exec-summary-card">
-          <div className="card-head">
-            <h3>Resumo executivo (IA)</h3>
-            <span className="spacer" />
-            <span className="caption muted">
-              editável — entra no início do export PDF/MD
-            </span>
-            <button className="btn-sm" onClick={() => setExecSummary("")}>
-              Descartar
-            </button>
-          </div>
-          <textarea
-            className="raw"
-            style={{ minHeight: 120, width: "100%" }}
-            value={execSummary}
-            onChange={(e) => setExecSummary(e.target.value)}
-            spellCheck={false}
-          />
-        </div>
-      )}
-
-      <ExecutivePanel overview={overview} onNavigate={onNavigate} />
-
-      <HealthScoreCard health={health} />
-
+      {/* Change 0114: o numero primeiro. Quem abre o dashboard pergunta
+          "como estamos?" e nao deveria ter de descer para achar a resposta. */}
+      <div className="kpi-row">
+        <HealthScoreCard health={health} />
+      </div>
       {summary && (
         <div className="metric-cards">
           <MetricCard label="Cobertura de requisito" metric={summary.requirement_coverage} />
@@ -246,6 +220,19 @@ export function Dashboard({
           </div>
         </div>
       )}
+
+      {/* E logo abaixo a leitura do numero, que sem ela e so um numero. */}
+      <AttentionBlock
+        overview={overview}
+        narrated={execSummary}
+        onNarratedChange={setExecSummary}
+        aiEnabled={aiEnabled}
+        busy={genBusy}
+        onNarrate={() => void generateExecutiveSummary()}
+        onNavigate={onNavigate}
+      />
+
+      <ExecutivePanel overview={overview} onNavigate={onNavigate} />
 
       <h3 className="section-title">Tendência ({days} dias)</h3>
       <div className="chart-card" style={{ width: "100%", height: 260 }}>
@@ -399,6 +386,110 @@ function reindexLabel(iso: string | null): string {
  * entregando bem? onde está o risco? o que piorou?" — alertas de risco,
  * ações recomendadas e top problemas, tudo derivado dos reports existentes.
  */
+/**
+ * "O que precisa de atenção" — a leitura do número, logo abaixo do número.
+ *
+ * Quando há provider de IA, o texto é o resumo executivo narrado a partir
+ * dos mesmos indicadores. Quando não há, o bloco NÃO some nem fica vazio:
+ * ele mostra os achados determinísticos que `GET /metrics/dashboard` já
+ * devolve. A leitura é obrigação do dashboard; a IA é só a melhor redação
+ * dela — nenhum número aqui depende dela.
+ */
+function AttentionBlock({
+  overview,
+  narrated,
+  onNarratedChange,
+  aiEnabled,
+  busy,
+  onNarrate,
+  onNavigate,
+}: {
+  overview: DashboardOverview | null;
+  narrated: string;
+  onNarratedChange: (text: string) => void;
+  aiEnabled: boolean;
+  busy: boolean;
+  onNarrate: () => void;
+  onNavigate?: (id: string) => void;
+}) {
+  if (!overview) return null;
+  const { alerts, recommended_actions } = overview;
+  const nothingWrong = alerts.length === 0 && recommended_actions.length === 0;
+
+  return (
+    <div className="card block attention-block">
+      <div className="card-head">
+        <h3>O que precisa de atenção</h3>
+        <span className="spacer" />
+        {narrated && (
+          <span className="caption muted">
+            editável — entra no início do export PDF/MD
+          </span>
+        )}
+        {aiEnabled && (
+          <button className="btn-sm" onClick={onNarrate} disabled={busy}>
+            {busy ? "Gerando…" : narrated ? "Regerar (IA)" : "Narrar com IA"}
+          </button>
+        )}
+        {narrated && (
+          <button className="btn-sm" onClick={() => onNarratedChange("")}>
+            Descartar
+          </button>
+        )}
+      </div>
+
+      {narrated ? (
+        <textarea
+          className="raw attention-prose"
+          style={{ minHeight: 120, width: "100%" }}
+          value={narrated}
+          onChange={(e) => onNarratedChange(e.target.value)}
+          spellCheck={false}
+        />
+      ) : nothingWrong ? (
+        <p className="attention-prose muted">
+          Nada exige atenção no período filtrado: sem alertas de risco e sem
+          ações pendentes nos indicadores acima.
+        </p>
+      ) : (
+        <>
+          <p className="attention-prose">
+            {alerts.length > 0
+              ? `${alerts.length} ponto${alerts.length === 1 ? "" : "s"} de risco no período` +
+                (recommended_actions.length > 0
+                  ? `, com ${recommended_actions.length} ação${
+                      recommended_actions.length === 1 ? "" : "ões"
+                    } recomendada${recommended_actions.length === 1 ? "" : "s"}.`
+                  : ".")
+              : `Sem alerta crítico, mas ${recommended_actions.length} ação${
+                  recommended_actions.length === 1 ? "" : "ões"
+                } recomendada${recommended_actions.length === 1 ? "" : "s"} no período.`}
+            {!aiEnabled && " Configure um provider de IA para a leitura narrada."}
+          </p>
+          <ul className="attention-list">
+            {alerts.slice(0, 4).map((a, i) => (
+              <li key={`a${i}`}>
+                <span className={`status-dot ${ALERT_DOT[a.severity]}`} />
+                {a.message}
+                {a.ref && onNavigate && (
+                  <button className="linklike mono" onClick={() => onNavigate(a.ref!)}>
+                    {a.ref}
+                  </button>
+                )}
+              </li>
+            ))}
+            {recommended_actions.slice(0, 4).map((action, i) => (
+              <li key={`r${i}`} className="muted">
+                {action.message}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ExecutivePanel({
   overview,
   onNavigate,
