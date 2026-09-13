@@ -118,3 +118,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0110-navegacao-e-identidade-no-padrao-github — Navegacao e identidade no padrao GitHub (specs: profile MODIFIED)
 - 2026-09-13 — 0111-execution-como-ciclo-de-teste — Execution como ciclo de teste (specs: executions MODIFIED)
 - 2026-09-13 — 0112-versionamento-dos-casos-de-teste-com-git-no — Versionamento dos casos de teste com git no workspace (specs: testcases MODIFIED)
+- 2026-09-13 — 0113-tela-de-execucao-guiada-em-tres-paineis — Tela de execucao guiada em tres paineis (specs: executions MODIFIED)

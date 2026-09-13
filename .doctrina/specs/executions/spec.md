@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-09-13
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -68,6 +68,9 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall guardar em cada resultado o `assignee` — o responsável por aquele caso dentro do ciclo — e expor `POST /executions/{id}/results/{ct}/assignee` para defini-lo ou limpá-lo.
 - The system shall exibir o vocabulário do ciclo como planejado (`draft`), em andamento (`in_progress`) e fechado (`closed`), mantendo no disco os valores que a máquina de estados já usa.
 - The system shall apresentar um cabeçalho de progresso do ciclo com a barra empilhada por status, um contador grande por status, o total de casos e o período com a situação do prazo.
+- The system shall oferecer, ao lado do Kanban, um modo guiado em três painéis — ciclos, casos do ciclo e caso ativo — operando sobre a mesma execution, sem nenhum endpoint novo.
+- The system shall permitir no painel do caso ativo marcar cada passo, anexar evidência, escrever comentário e dar o resultado, sem abrir modal e sem sair da tela.
+- The system shall exibir no rodapé do modo guiado a posição do caso ativo no ciclo, o avanço para o próximo caso e o atalho que dá resultado e avança num gesto só.
 
 ### Event-driven
 
@@ -81,6 +84,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   mudar `status` para `closed`.
 - When `ends_on` é anterior a `starts_on`, the system shall recusar a alteração com 422 em vez de gravar um ciclo que termina antes de começar.
 - When o responsável de um caso muda, the system shall registrar evento `{at, who, event: "assignee", testcase_id, to}` no `history[]`, pela mesma razão que status e step já registram.
+- When o resultado do caso ativo é registrado no modo guiado, the system shall avançar para o próximo caso ainda pendente do ciclo, e parar no último em vez de voltar ao começo.
 
 ### State-driven
 
@@ -94,6 +98,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   EXEC-0002 sem contradição.
 - The system shall not exigir cadastro prévio de sprint ou ambiente.
 - The system shall not criar cadastro de sprint, release ou responsável; `sprint` e `environment` seguem texto livre e o `assignee` é o e-mail de uma conta que já existe.
+- The system shall not substituir o Kanban pelo modo guiado; os dois modos leem e escrevem a mesma execution e a escolha é de quem executa.
 
 ### Optional
 
@@ -131,6 +136,8 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 9. [verified] Uma execution nasce sem período, recebe `starts_on`/`ends_on` por PATCH e sobrevive ao reinício; um período invertido é recusado com 422 — verified by `backend/tests/test_execution_cycle.py`.
 10. [verified] Um caso recebe responsável, o evento entra no `history[]`, o índice enxerga o valor e limpar o responsável volta o caso a sem dono — verified by `backend/tests/test_execution_cycle.py`.
 11. [verified] O cabeçalho do ciclo soma os contadores por status batendo com o total de casos, e um `execution.json` antigo — sem as chaves novas — continua sendo lido como ciclo sem período e sem responsável — verified by `backend/tests/test_execution_cycle.py`.
+12. [verified] O modo guiado percorre os casos de um ciclo na ordem, dá resultado e avança sem sair da tela, e o que ele grava é a mesma execution que o Kanban lê — verified by `backend/tests/test_executions_guided.py`.
+13. [verified] Dar resultado no último caso pendente encerra a fila em vez de voltar ao começo, e um ciclo fechado é percorrível mas não gravável — verified by `backend/tests/test_executions_guided.py`.
 
 ## Maturity
 

@@ -32,6 +32,9 @@ const ExecutionCreate = lazy(() =>
 const ExecutionsRepo = lazy(() =>
   import("./components/Executions").then((m) => ({ default: m.ExecutionsRepo }))
 );
+const ExecutionGuided = lazy(() =>
+  import("./components/ExecutionGuided").then((m) => ({ default: m.ExecutionGuided }))
+);
 const Dashboard = lazy(() =>
   import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
 );
@@ -287,6 +290,8 @@ export default function App({
   const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
+  // modo guiado (change 0113): complementa o Kanban, não o substitui
+  const [execGuided, setExecGuided] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
   // runs de automação ativos → dot pulsante no item Automação (0076)
   const [activeRuns, setActiveRuns] = useState(0);
@@ -650,7 +655,23 @@ export default function App({
               <XrayImport onImported={() => void refresh()} onError={setError} />
             </Suspense>
           ) : tab === "executions" ? (
-            execCreating ? (
+            execGuided ? (
+              <Suspense fallback={<p className="empty">Carregando modo guiado…</p>}>
+                <div className="back-bar">
+                  <button onClick={() => setExecGuided(false)}>← Voltar</button>
+                  <span className="crumbs caption">
+                    <span className="muted">Execuções</span>
+                    <span className="crumb-sep">/</span>
+                    <span>modo guiado</span>
+                  </span>
+                </div>
+                <ExecutionGuided
+                  initialId={selectedExec}
+                  onChanged={refresh}
+                  onError={setError}
+                />
+              </Suspense>
+            ) : execCreating ? (
               <Suspense fallback={<p className="empty">Carregando criação…</p>}>
                 <div className="back-bar">
                   <button onClick={() => setExecCreating(false)}>← Voltar</button>
@@ -679,10 +700,20 @@ export default function App({
                     <span className="mono">{selectedExec}</span>
                   </span>
                 </div>
+                <div className="toolbar">
+                  <button onClick={() => setExecGuided(true)}>
+                    Modo guiado (sentar e executar)
+                  </button>
+                </div>
                 <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
               </Suspense>
             ) : (
               <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
+                <div className="toolbar">
+                  <button onClick={() => setExecGuided(true)}>
+                    Modo guiado (sentar e executar)
+                  </button>
+                </div>
                 <ExecutionsRepo
                   version={reqVersion}
                   onOpen={(id) => {

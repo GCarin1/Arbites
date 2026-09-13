@@ -1038,7 +1038,7 @@ export function ExecutionBoard({
 
 // ---------------------------------------------------------------- painel
 
-function ResultPanel({
+export function ResultPanel({
   execution,
   result,
   closed,
