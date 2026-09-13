@@ -88,6 +88,9 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* cor CHAPADA (não um box-shadow): entra em gradiente, para marcar a
+     borda de um bloco que ainda esconde conteúdo rolável (0135) */
+  --shadow-edge: rgba(0, 0, 0, 0.70);
 }
 
 /* Tema claro (change 0128). O escuro continua sendo o padrão do produto e a
@@ -122,6 +125,7 @@
      no claro, e sombra pesada sobre branco suja a tela. */
   --shadow-card: 0 1px 0 rgba(31, 35, 40, 0.06);
   --shadow-pop: 0 8px 24px rgba(31, 35, 40, 0.14);
+  --shadow-edge: rgba(31, 35, 40, 0.38);
 }
 
 /* As três densidades (change 0126). Só o fator muda: tudo que respira lê
@@ -2572,13 +2576,30 @@ a {
 }
 
 /* -------------------------------------------- Abas de seção (0065) */
+/* A faixa rola de lado quando não cabe (0135). O sinal de que há mais aba
+   é a sombra de borda: dois pares de gradientes, o "tapa-buraco" preso ao
+   CONTEÚDO (`local`) e a sombra presa à CAIXA (`scroll`). Rolado até a
+   ponta, o tapa-buraco cobre a sombra daquele lado; no meio da rolagem as
+   duas aparecem. Quando a faixa inteira cabe, nenhuma aparece — sem
+   medição por JavaScript. */
 .tab-bar {
   display: flex;
   gap: 2px;
-  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-control);
   padding: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  background:
+    linear-gradient(to right, var(--bg) 70%, transparent) left / 26px 100% no-repeat local,
+    linear-gradient(to left, var(--bg) 70%, transparent) right / 26px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--shadow-edge), transparent) left / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--shadow-edge), transparent) right / 14px 100% no-repeat scroll,
+    var(--bg);
+}
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 .tab-btn {
   border: none;
@@ -2586,6 +2607,9 @@ a {
   height: 30px;
   padding: 0 14px;
   color: var(--text-muted);
+  /* aba não encolhe: rótulo pela metade não é rótulo — quem não cabe rola */
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .tab-btn.active {
   background: var(--surface-hover);

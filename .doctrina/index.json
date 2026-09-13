@@ -389,14 +389,6 @@
     ],
     "changes": [
       {
-        "id": "0135-barra-sub-abas-ia-transborda",
-        "title": "barra de sub-abas da IA transborda a viewport em 390px: a aba Configuracao fica cortada na borda direita sem nenhum sinal de rolagem",
-        "path": ".doctrina/changes/0135-barra-sub-abas-ia-transborda",
-        "status": "applied",
-        "opened": "2026-09-13",
-        "lane": "runtime (uncertain; signals: configuracao)"
-      },
-      {
         "id": "0136-linha-arvore-requisitos-execucoes",
         "title": "linha de arvore de requisitos e de execucoes desenha os rotulos uns por cima dos outros em 390px: id, cobertura, status e data se sobrepoem porque o flex encolhe todos abaixo do proprio texto",
         "path": ".doctrina/changes/0136-linha-arvore-requisitos-execucoes",
@@ -2175,6 +2167,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0135-barra-sub-abas-ia-transborda",
+        "title": "barra de sub-abas da IA transborda a viewport em 390px: a aba Configuracao fica cortada na borda direita sem nenhum sinal de rolagem",
+        "path": ".doctrina/changes/archive/2026-09-13-0135-barra-sub-abas-ia-transborda",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2201,6 +2206,12 @@
         "path": ".doctrina/skills/campos-de-referencia-com-autocomplete.md",
         "description": "Todo campo que referencia um item existente (id único, lista de links, ou descrição/comentário com @menção) deve usar autocomplete via GET /search em vez de <select> ou campo de id cru; e o item vinculado deve ficar visível e clicável no card.",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "cenario-interrompido-nao-tem-resultado",
+        "path": ".doctrina/skills/cenario-interrompido-nao-tem-resultado.md",
+        "description": "Progresso ao vivo deduz o status pela AUSÊNCIA de falha — o que só vale para cenário que chegou ao fim. Ao fechar um parcial depois de matar o processo (timeout/cancelamento), o cenário aberto vira `passed` sem nunca ter terminado. Quem interrompe precisa dizer que interrompeu.",
+        "last_updated": "2026-09-13"
       },
       {
         "id": "composite-score-sem-dado-nao-e-zero",
@@ -2453,12 +2464,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "cenario-interrompido-nao-tem-resultado",
-        "path": ".doctrina/skills/cenario-interrompido-nao-tem-resultado.md",
-        "description": "Progresso ao vivo deduz o status pela AUSÊNCIA de falha — o que só vale para cenário que chegou ao fim. Ao fechar um parcial depois de matar o processo (timeout/cancelamento), o cenário aberto vira `passed` sem nunca ter terminado. Quem interrompe precisa dizer que interrompeu.",
-        "last_updated": "2026-09-13"
       }
     ],
     "contracts": [

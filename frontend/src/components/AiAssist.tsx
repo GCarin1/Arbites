@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { SingleRefInput } from "./Autocomplete";
 import { DocBody } from "./ReadView";
+import { TabBar } from "./TabBar";
 import { useToast } from "./Toast";
 import type {
   AiProvider,
@@ -78,19 +79,13 @@ export function AiAssist({
         )}
       </div>
 
-      <div className="tab-bar block" role="tablist">
-        {AI_TABS.map(([key, label]) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={tab === key}
-            className={`tab-btn ${tab === key ? "active" : ""}`}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        tabs={AI_TABS}
+        value={tab}
+        onChange={setTab}
+        className="block"
+        label="Seções do assistente"
+      />
 
       {!enabled && work && (
         <div className="empty-state block">
