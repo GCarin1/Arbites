@@ -76,24 +76,24 @@ export function ExecutionGuided({
     if (cycleId) void loadCycle(cycleId);
   }, [cycleId, loadCycle]);
 
-  // títulos dos CTs: o id sozinho não diz o que se está testando
+  // Títulos dos CTs: o id sozinho não diz o que se está testando. UMA
+  // leitura da lista, como o Kanban faz — pedir caso a caso faria o número
+  // de requisições crescer com o tamanho do ciclo, e o modo guiado existe
+  // justamente para a regressão grande.
   useEffect(() => {
-    if (!execution) return;
     let alive = true;
-    Promise.all(
-      execution.results.map((r) =>
-        api
-          .testcase(r.testcase_id)
-          .then((tc) => [r.testcase_id, tc.title] as const)
-          .catch(() => [r.testcase_id, ""] as const),
-      ),
-    ).then((pairs) => {
-      if (alive) setTitleOf(Object.fromEntries(pairs));
-    });
+    api
+      .testcases()
+      .then((tcs) => {
+        if (alive) setTitleOf(Object.fromEntries(tcs.map((t) => [t.id, t.title])));
+      })
+      .catch(() => {
+        // sem título o modo guiado ainda funciona: o id identifica o caso
+      });
     return () => {
       alive = false;
     };
-  }, [execution?.id, execution?.results.length]);
+  }, []);
 
   const results = execution?.results ?? [];
   const active = results.find((r) => r.testcase_id === activeCt) ?? null;

@@ -113,7 +113,7 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.9.0",
+        "version": "0.9.1",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -1890,6 +1890,19 @@
         "id": "0115-autoria-resultado-execucao-vem",
         "title": "autoria do resultado de execucao vem da sessao e nao do corpo da requisicao",
         "path": ".doctrina/changes/archive/2026-09-13-0115-autoria-resultado-execucao-vem",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0116-modo-guiado-busca-titulo",
+        "title": "modo guiado busca o titulo de cada caso numa requisicao por caso em vez de uma so, como o Kanban faz",
+        "path": ".doctrina/changes/archive/2026-09-13-0116-modo-guiado-busca-titulo",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [

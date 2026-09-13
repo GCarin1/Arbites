@@ -159,3 +159,20 @@ def test_ciclo_sem_casos_nao_tem_fila_para_percorrer(client):
     )
     assert vazio.status_code == 422
     assert vazio.json()["error"]["code"] == "empty_execution"
+
+
+# -- AC: títulos dos casos do ciclo numa leitura só (change 0116) ---------
+
+
+def test_lista_de_casos_entrega_o_titulo_de_todos_numa_leitura_so(client):
+    """O modo guiado resolve os títulos como o Kanban: uma chamada a
+    `GET /testcases`. Pedir caso a caso faria o número de requisições
+    crescer com o tamanho do ciclo — e o modo guiado existe justamente para
+    a regressão grande."""
+    _, cts = make_cycle(client, 5)
+
+    listados = client.get("/api/v1/testcases").json()
+    titulos = {t["id"]: t["title"] for t in listados}
+
+    for ct in cts:
+        assert titulos[ct["id"]] == ct["title"]

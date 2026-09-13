@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-09-13
-**Version:** 0.9.0
+**Version:** 0.9.1
 
 ## Purpose
 
@@ -72,6 +72,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall permitir no painel do caso ativo marcar cada passo, anexar evidência, escrever comentário e dar o resultado, sem abrir modal e sem sair da tela.
 - The system shall exibir no rodapé do modo guiado a posição do caso ativo no ciclo, o avanço para o próximo caso e o atalho que dá resultado e avança num gesto só.
 - The system shall preencher a autoria de toda escrita num resultado — `executed_by` e o `who` de cada evento do `history[]` — a partir da sessão, nas rotas de status do resultado, status do passo, evidência e vínculo de defeito.
+- The system shall resolver os títulos dos casos de um ciclo com uma única leitura de `GET /testcases`, tanto no Kanban quanto no modo guiado, em vez de uma requisição por caso.
 
 ### Event-driven
 
@@ -142,6 +143,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 13. [verified] Dar resultado no último caso pendente encerra a fila em vez de voltar ao começo, e um ciclo fechado é percorrível mas não gravável — verified by `backend/tests/test_executions_guided.py`.
 14. [verified] Resultado, passo, evidência e defeito gravam como autor o e-mail da sessão, mesmo quando o corpo não traz autoria nenhuma — verified by `backend/tests/test_authorship_executions.py`.
 15. [verified] Um cliente que tenta forjar a autoria de um resultado é recusado com 422 e nada é gravado, e o mesmo caso executado por duas contas registra cada resultado em nome de quem o executou — verified by `backend/tests/test_authorship_executions.py`.
+16. [verified] Abrir um ciclo resolve os títulos dos seus casos com uma única leitura da lista de casos, e o número de requisições não cresce com o tamanho do ciclo — verified by `frontend/src/components/ExecutionGuided.tsx` + `backend/tests/test_executions_guided.py`.
 
 ## Maturity
 

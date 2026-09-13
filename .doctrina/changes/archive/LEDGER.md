@@ -121,3 +121,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0113-tela-de-execucao-guiada-em-tres-paineis — Tela de execucao guiada em tres paineis (specs: executions MODIFIED)
 - 2026-09-13 — 0114-dashboard-com-kpis-e-o-que-precisa-de-atencao — Dashboard com KPIs e o que precisa de atencao (specs: reporting MODIFIED)
 - 2026-09-13 — 0115-autoria-resultado-execucao-vem — autoria do resultado de execucao vem da sessao e nao do corpo da requisicao (specs: executions MODIFIED)
+- 2026-09-13 — 0116-modo-guiado-busca-titulo — modo guiado busca o titulo de cada caso numa requisicao por caso em vez de uma so, como o Kanban faz (specs: executions MODIFIED)
