@@ -1,6 +1,7 @@
 # Change 0109-refoco-do-produto-e-congelamento-da-periferia — Refoco do produto e congelamento da periferia
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-13
 - **Date:** 2026-09-13
 - **Owner:**
 - **Lane:** product (confident; signals: registrar)
@@ -50,13 +51,13 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] `python -m pytest backend/tests -q` passa **sem nenhuma alteração de
+- [x] `python -m pytest backend/tests -q` passa **sem nenhuma alteração de
       teste** — a prova de que congelar não quebrou nada é a suíte das áreas
       congeladas continuar verde.
-- [ ] `npm --prefix frontend run build` passa.
-- [ ] `doctrina validate` sem erros após marcar 8 specs como deprecated e
+- [x] `npm --prefix frontend run build` passa.
+- [x] `doctrina validate` sem erros após marcar 8 specs como deprecated e
       remover uma.
-- [ ] `doctrina trace` não reporta âncora órfã depois da saída do SC10.
+- [x] `doctrina trace` não reporta âncora órfã depois da saída do SC10.
 
 ## Open questions
 

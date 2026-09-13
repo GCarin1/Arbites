@@ -1,8 +1,8 @@
 # Spec — xray-migration
 
 **Capability:** xray-migration
-**Status:** active
-**Implementation:** verified — M2 (backend/arbites/xray_import.py, frontend/src/components/XrayImport.tsx); formato suportado: Jira RSS com custom fields do Xray, adapter isolado com fixture de contrato
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC4
 **Last updated:** 2026-07-04
 **Version:** 0.2.0

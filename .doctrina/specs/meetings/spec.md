@@ -1,8 +1,8 @@
 # Spec — meetings
 
 **Capability:** meetings
-**Status:** active
-**Implementation:** verified — M12 (backend/arbites/indexer.py, backend/arbites/api.py, backend/arbites/ai.py, backend/arbites/daily.py, backend/arbites/workspace.py; frontend Meetings.tsx). ID `MTG-`, arquivos em `meetings/`
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC13
 **Last updated:** 2026-07-21
 **Version:** 0.3.0

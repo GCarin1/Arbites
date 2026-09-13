@@ -10,6 +10,6 @@
 
 ## Closing steps
 
-- [ ] Apply the change: merge each delta into the corresponding spec.
-- [ ] Archive the change folder to `.doctrina/changes/archive/2026-09-13-0109-refoco-do-produto-e-congelamento-da-periferia/`.
-- [ ] Update `.doctrina/index.json` with new or modified artifacts.
+- [x] Apply the change: merge each delta into the corresponding spec.
+- [x] Archive the change folder to `.doctrina/changes/archive/2026-09-13-0109-refoco-do-produto-e-congelamento-da-periferia/`.
+- [x] Update `.doctrina/index.json` with new or modified artifacts.

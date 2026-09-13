@@ -1,8 +1,8 @@
 # Spec — ci-automation
 
 **Capability:** ci-automation
-**Status:** active
-**Implementation:** verified — M4 (backend/arbites/ci.py, frontend/src/components/Automation.tsx, docs/examples/tests.yml); orquestração provada com fake client — validação contra a API real pendente do primeiro uso com um repo real
+**Status:** deprecated
+**Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-07-09
 **Version:** 0.3.0
