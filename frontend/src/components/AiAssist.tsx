@@ -182,8 +182,8 @@ function AssistContextCard() {
           {decisionCount === 1 ? "" : "s"} no recap
         </span>
         <span className={`status-dot ${dot((lessonCount ?? 0) > 0)}`}>
-          {lessonCount ?? "…"} lição{lessonCount === 1 ? "" : "ões"} aprendida
-          {lessonCount === 1 ? "" : "s"} (injetadas por similaridade)
+          {lessonCount ?? "…"} análise{lessonCount === 1 ? "" : "s"} de causa
+          {" "}(injetadas por similaridade)
         </span>
       </div>
     </div>
@@ -662,8 +662,8 @@ function GenerateCard({
 
       {lessonsUsed.length > 0 && (
         <p className="caption muted" style={{ marginTop: 12 }}>
-          Considerou {lessonsUsed.length} lição{lessonsUsed.length === 1 ? "" : "ões"} aprendida
-          {lessonsUsed.length === 1 ? "" : "s"} de defeitos anteriores:{" "}
+          Considerou {lessonsUsed.length} análise
+          {lessonsUsed.length === 1 ? "" : "s"} de causa de defeitos anteriores:{" "}
           {lessonsUsed.map((l) => l.id).join(", ")}
         </p>
       )}
@@ -1118,8 +1118,8 @@ function ContextPackCard() {
         </div>
         <p className="muted caption">
           Gera um .zip com <span className="mono">AGENTS.md</span> (convenções =
-          decisões aceitas), <span className="mono">skills/</span> (uma por lição
-          de defeito com causa raiz) e <span className="mono">specs/</span> (story
+          decisões aceitas), <span className="mono">skills/</span> (uma por
+          defeito com análise de causa) e <span className="mono">specs/</span> (story
           + CTs BDD).
         </p>
         <div className="step-row" style={{ flexWrap: "wrap" }}>

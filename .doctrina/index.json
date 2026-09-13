@@ -94,8 +94,8 @@
         "id": "defects",
         "path": ".doctrina/specs/defects/spec.md",
         "status": "active",
-        "version": "0.8.0",
-        "last_updated": "2026-07-20",
+        "version": "0.8.1",
+        "last_updated": "2026-09-13",
         "implementation": "verified — M1 (CRUD/vínculo) + M1.5 (matriz) + M9 (aging/report; backend/arbites/metrics.py, backend/arbites/indexer.py)",
         "realizes": [
           "SC2"
@@ -2116,6 +2116,19 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0133-rotulo-licao-aprendida-tela",
+        "title": "rotulo licao aprendida na tela de defeitos e lido como algo de pessoas em vez de causa raiz correcao e prevencao",
+        "path": ".doctrina/changes/archive/2026-09-13-0133-rotulo-licao-aprendida-tela",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "defects",
             "operation": "MODIFIED"
           }
         ]

@@ -138,3 +138,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0130-cabecalho-caminho-disco-reindexar — cabecalho com caminho do disco e reindexar competindo, e botao orfao acima do titulo em execucoes (specs: design-system MODIFIED)
 - 2026-09-13 — 0131-tela-detalhe-mostra-campo — tela de detalhe mostra campo vazio com o mesmo peso do preenchido e a acao destrutiva com o mesmo destaque da principal (specs: design-system MODIFIED)
 - 2026-09-13 — 0132-acoes-empilhadas-linha-tabela — acoes empilhadas na linha da tabela inflam a altura e a acao destrutiva fica o elemento mais chamativo (specs: design-system MODIFIED)
+- 2026-09-13 — 0133-rotulo-licao-aprendida-tela — rotulo licao aprendida na tela de defeitos e lido como algo de pessoas em vez de causa raiz correcao e prevencao (specs: defects MODIFIED)

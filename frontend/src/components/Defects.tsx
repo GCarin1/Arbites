@@ -127,7 +127,7 @@ export function Defects({
               checked={lessonOnly}
               onChange={(e) => setLessonOnly(e.target.checked)}
             />
-            Só com lição aprendida
+            Só com análise de causa
           </label>
           <button className="primary" onClick={() => setEditing("new")}>
             Novo defeito
@@ -170,10 +170,10 @@ export function Defects({
                       {(d.root_cause || d.fix || d.prevention) && (
                         <span
                           className="status-dot dot-col-in_progress caption"
-                          title="Tem lição aprendida (causa/correção/prevenção)"
+                          title="Tem análise da causa (causa raiz, correção e prevenção)"
                           style={{ marginLeft: 6 }}
                         >
-                          lição
+                          análise
                         </span>
                       )}
                     </td>
@@ -443,10 +443,14 @@ function DefectModal({
         />
       </div>
 
-      <h4 className="section-title">Lição aprendida (opcional)</h4>
+      {/* "Análise da causa", não "lição aprendida" (change 0133): em
+          português o segundo termo carrega o vocabulário de retrospectiva de
+          equipe, e era lido como se o campo falasse de atitudes de pessoas.
+          O que se preenche aqui é postmortem técnico. */}
+      <h4 className="section-title">Análise da causa (opcional)</h4>
       <p className="caption muted" style={{ marginTop: -4, marginBottom: 8 }}>
-        Preenchido, a IA passa a considerar isto ao gerar casos de teste para
-        áreas relacionadas — evita repetir o mesmo bug.
+        Preenchida, a IA passa a considerar esta análise ao gerar casos de
+        teste para áreas relacionadas — evita repetir o mesmo bug.
       </p>
       <div className="modal-field">
         <label htmlFor="defect-root-cause">Causa raiz</label>
@@ -481,7 +485,7 @@ function DefectModal({
       {rootCause.trim() && (
         <div className="lesson-struct block">
           <div className="card-head">
-            <h4 className="section-title" style={{ margin: 0 }}>Estruturar lição</h4>
+            <h4 className="section-title" style={{ margin: 0 }}>Estruturar a análise</h4>
             <span className="spacer" />
             {defect && (
               <button
