@@ -134,3 +134,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0126-escala-espacamento-valores-abaixo — escala de espacamento sem valores abaixo de oito forca numeros magicos e nao ha controle de densidade (specs: design-system MODIFIED)
 - 2026-09-13 — 0127-quadro-execucao-so-funciona — quadro de execucao so funciona com mouse: arrastar um card e impossivel pelo teclado (specs: design-system MODIFIED)
 - 2026-09-13 — 0128-tema-claro-opcional-cores — tema claro opcional com as cores dos graficos saindo de valores cravados para tokens (specs: design-system MODIFIED)
+- 2026-09-13 — 0129-menu-lateral-cinco-cabecalhos — menu lateral com cinco cabecalhos para doze itens sem icone e com navegacao duplicada no avatar (specs: design-system MODIFIED)

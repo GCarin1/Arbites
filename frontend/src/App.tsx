@@ -3,6 +3,7 @@ import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import { AccountMenu } from "./components/AccountMenu";
+import { NavIcon } from "./components/NavIcons";
 import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
@@ -146,11 +147,27 @@ function buildHash(tab: Tab, params: Record<string, string>): string {
 // quem usa o produto para o que ele é — repositório, ciclo e execução.
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Testes", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["defects", "dashboard", "todos", "audit"] },
-  { title: "Ferramentas", keys: ["ia"] },
-  { title: "Mais", keys: ["decisions", "memory", "daily", "meetings", "automation", "migration"] },
-  { title: "Suporte", keys: ["problems", "profile", "admin"] },
+  { title: "Acompanhamento", keys: ["dashboard", "defects", "todos", "audit"] },
 ];
+
+// Itens sem grupo, entre o trabalho do dia e o que foi congelado.
+// "Ferramentas" tinha UM item: um cabeçalho para um item ocupa uma linha
+// inteira para dizer o que o próprio item já diz (change 0129).
+const NAV_LOOSE: Tab[] = ["ia"];
+
+// As capabilities congeladas (ADR 0012) vêm por último, antes do rodapé:
+// continuam alcançáveis e fora do caminho de quem usa o produto para o que
+// ele é.
+const NAV_FROZEN_GROUP = {
+  title: "Mais",
+  keys: ["decisions", "memory", "daily", "meetings", "automation", "migration"] as Tab[],
+};
+
+// Rodapé da navegação: o que é de manutenção, não de trabalho do dia, fica
+// ancorado embaixo depois de uma régua — não compete com a regressão de
+// hoje. `profile` NÃO entra: é da pessoa e mora no menu do avatar desde a
+// change 0110; repeti-lo aqui era navegação duplicada.
+const NAV_FOOTER: Tab[] = ["problems", "admin"];
 
 // Capabilities congeladas: o grupo "Mais" nasce recolhido, e cada item leva
 // a marca para que ninguém confunda "está aqui" com "é para usar".
@@ -207,7 +224,8 @@ function NavItem({
         onClick={() => setTab(item.key)}
         aria-current={tab === item.key ? "page" : undefined}
       >
-        {item.label}
+        <NavIcon name={item.key} />
+        <span className="nav-item-label">{item.label}</span>
         {live && <span className="nav-live-dot" title="automação executando" />}
         {item.key === "problems" && problemCount > 0 && (
           <span className="count">{problemCount}</span>
@@ -553,7 +571,8 @@ export default function App({
                 onClick={() => selectTab("home")}
                 aria-current={tab === "home" ? "page" : undefined}
               >
-                Hoje
+                <NavIcon name="home" />
+                <span className="nav-item-label">Hoje</span>
               </button>
             </div>
             {pins.length > 0 && (
@@ -605,6 +624,65 @@ export default function App({
                   ))}
               </div>
             ))}
+
+            {/* Item sem grupo: um cabeçalho para um item só é ruído. */}
+            <div className="nav-group">
+              {NAV_LOOSE.filter(isReachable).map((k) => (
+                <NavItem
+                  key={k}
+                  item={NAV_BY_KEY[k]}
+                  tab={tab}
+                  setTab={selectTab}
+                  problemCount={problemCount}
+                  pinned={pins.includes(k)}
+                  onTogglePin={() => togglePin(k)}
+                  frozen={FROZEN_TABS.includes(k)}
+                />
+              ))}
+            </div>
+
+            <div className="nav-group">
+              <button
+                className="nav-group-title"
+                onClick={() => toggleGroup(NAV_FROZEN_GROUP.title)}
+                aria-expanded={!collapsed.includes(NAV_FROZEN_GROUP.title)}
+              >
+                <span>{NAV_FROZEN_GROUP.title}</span>
+                <span className="nav-chevron">
+                  {collapsed.includes(NAV_FROZEN_GROUP.title) ? "▸" : "▾"}
+                </span>
+              </button>
+              {!collapsed.includes(NAV_FROZEN_GROUP.title) &&
+                NAV_FROZEN_GROUP.keys.filter(isReachable).map((k) => (
+                  <NavItem
+                    key={k}
+                    item={NAV_BY_KEY[k]}
+                    tab={tab}
+                    setTab={selectTab}
+                    problemCount={problemCount}
+                    pinned={pins.includes(k)}
+                    onTogglePin={() => togglePin(k)}
+                    live={k === "automation" && activeRuns > 0}
+                    frozen={FROZEN_TABS.includes(k)}
+                  />
+                ))}
+            </div>
+
+            {/* Rodapé ancorado: manutenção não compete com o trabalho do dia. */}
+            <div className="nav-footer">
+              {NAV_FOOTER.filter(isReachable).map((k) => (
+                <NavItem
+                  key={k}
+                  item={NAV_BY_KEY[k]}
+                  tab={tab}
+                  setTab={selectTab}
+                  problemCount={problemCount}
+                  pinned={pins.includes(k)}
+                  onTogglePin={() => togglePin(k)}
+                  frozen={FROZEN_TABS.includes(k)}
+                />
+              ))}
+            </div>
           </nav>
         </aside>
         <main className="main">

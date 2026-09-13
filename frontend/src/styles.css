@@ -391,20 +391,23 @@ textarea.raw {
   gap: 2px;
   margin-bottom: 6px;
 }
+/* Cabeçalho de grupo: rótulo, não botão de destaque. Ele organiza a lista
+   e não deve competir com os itens que organiza (change 0129). */
 .nav-group-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 24px;
-  padding: 0 10px;
+  height: 22px;
+  padding: 0 var(--s1h);
+  margin-top: var(--s1);
   background: none;
   border: none;
   color: var(--text-subtle);
-  font-size: var(--fs-caption);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   cursor: pointer;
 }
 button.nav-group-title:hover {
@@ -414,6 +417,12 @@ button.nav-group-title:hover {
 }
 .nav-chevron {
   font-size: 10px;
+  opacity: 0.55;
+  transition: opacity 0.12s;
+}
+.nav-group-title:hover .nav-chevron,
+.nav-group-title:focus-visible .nav-chevron {
+  opacity: 1;
 }
 
 /* Linha do item: botão de navegação + pin que aparece no hover */
@@ -460,7 +469,36 @@ button.nav-group-title:hover {
   border-radius: var(--r-control);
   color: var(--text-muted);
   font-weight: 500;
-  gap: 8px;
+  gap: var(--s1);
+}
+
+/* Ícone da navegação (change 0129): âncora visual que permite varrer o menu
+   em vez de ler os doze rótulos. Não encolhe, e herda a cor do item — logo
+   acompanha ativo, hover, congelado e os dois temas sem regra extra. */
+.nav-icon {
+  flex: 0 0 16px;
+  opacity: 0.85;
+}
+.nav-item.active .nav-icon {
+  opacity: 1;
+}
+.nav-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* Rodapé da navegação: o que é de manutenção, empurrado para baixo e
+   separado por régua — não compete com o trabalho do dia. */
+.nav-footer {
+  margin-top: auto;
+  padding-top: var(--s1);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .nav-item:hover:not(:disabled) {
   background: var(--surface-hover);
@@ -470,6 +508,7 @@ button.nav-group-title:hover {
 .nav-item.active {
   background: var(--selected);
   color: var(--text);
+  font-weight: 600;
 }
 .nav-item.active::before {
   content: "";

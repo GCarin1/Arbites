@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2059,6 +2059,19 @@
         "id": "0128-tema-claro-opcional-cores",
         "title": "tema claro opcional com as cores dos graficos saindo de valores cravados para tokens",
         "path": ".doctrina/changes/archive/2026-09-13-0128-tema-claro-opcional-cores",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0129-menu-lateral-cinco-cabecalhos",
+        "title": "menu lateral com cinco cabecalhos para doze itens sem icone e com navegacao duplicada no avatar",
+        "path": ".doctrina/changes/archive/2026-09-13-0129-menu-lateral-cinco-cabecalhos",
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": [
