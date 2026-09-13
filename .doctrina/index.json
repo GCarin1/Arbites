@@ -37,7 +37,7 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — snapshot de qualidade (`backend/arbites/audit.py`) + log de atividade no gate (`backend/arbites/api.py`, `backend/arbites/auth.py`)"
       },
@@ -2334,6 +2334,19 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0151-auditoria-tem-como-excluida",
+        "title": "auditoria nao tem como ser excluida: nenhuma rota de delete e o historico cresce sozinho porque abrir a aba dispara rodada nova quando a ultima passou do intervalo",
+        "path": ".doctrina/changes/archive/2026-09-13-0151-auditoria-tem-como-excluida",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "audit",
             "operation": "MODIFIED"
           }
         ]

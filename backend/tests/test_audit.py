@@ -266,3 +266,61 @@ def test_audit_latest_reruns_after_interval_expires(client):
     second = client.get("/api/v1/audit/latest").json()
     assert second["id"] != first["id"]
     assert second["trigger"] == "auto"
+
+
+# -- exclusão de rodada (change 0151) ---------------------------------------
+
+
+def test_admin_exclui_rodada_para_a_lixeira_e_restaura(client):
+    """Rodada é documento do workspace: exclusão é para a lixeira, não some.
+
+    Um retrato do estado de qualidade apagado sem volta não se recupera.
+    """
+    criada = client.post("/api/v1/audit/run").json()
+    assert client.delete(f"/api/v1/audit/{criada['id']}").status_code == 204
+
+    # sumiu do histórico e da leitura direta
+    assert criada["id"] not in [h["id"] for h in client.get("/api/v1/audit/history").json()]
+    assert client.get(f"/api/v1/audit/{criada['id']}").status_code == 404
+
+    # mas está na lixeira, e volta de lá
+    lixeira = client.get("/api/v1/trash").json()
+    itens = lixeira["items"] if isinstance(lixeira, dict) else lixeira
+    nome = next(i["name"] for i in itens if criada["id"] in i["name"])
+    restaurada = client.post(f"/api/v1/trash/{nome}/restore")
+    assert restaurada.status_code in (200, 201, 204), restaurada.text
+    assert client.get(f"/api/v1/audit/{criada['id']}").status_code == 200
+
+
+def test_exclusao_em_lote_leva_so_o_que_e_anterior_a_data(client):
+    """`before` é exclusivo: a rodada da data informada NÃO é levada."""
+    antigas, recentes = [], []
+    for i in range(3):
+        rodada = client.post("/api/v1/audit/run").json()
+        (antigas if i < 2 else recentes).append(rodada)
+
+    # envelhece as duas primeiras direto no índice: o recorte é por `ran_at`
+    corte = "2020-01-01T00:00:00+00:00"
+    conn = client.app.state.conn
+    for rodada in antigas:
+        conn.execute("UPDATE audits SET ran_at = ? WHERE id = ?",
+                     ("2019-06-01T00:00:00+00:00", rodada["id"]))
+    conn.commit()
+
+    resposta = client.request("DELETE", f"/api/v1/audit?before={corte}")
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["count"] == 2
+
+    restantes = [h["id"] for h in client.get("/api/v1/audit/history").json()]
+    for rodada in antigas:
+        assert rodada["id"] not in restantes
+    for rodada in recentes:
+        assert rodada["id"] in restantes
+
+
+def test_lote_sem_recorte_e_recusado(client):
+    """Sem `before`, a rota apagaria o histórico inteiro por descuido."""
+    client.post("/api/v1/audit/run")
+    resposta = client.request("DELETE", "/api/v1/audit")
+    assert resposta.status_code == 422
+    assert resposta.json()["error"]["code"] == "before_required"

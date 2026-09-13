@@ -3726,6 +3726,53 @@ def _register_routes(app: FastAPI) -> None:
             for r in rows
         ]
 
+    @app.delete(API_PREFIX + "/audit/{audit_id}", status_code=204)
+    async def delete_audit(request: Request, audit_id: str):
+        """Exclui UMA rodada, para a lixeira (change 0151).
+
+        Uma rodada é um documento do workspace como outro qualquer, e todos
+        os outros já tinham exclusão. Vai para `.arbites/trash/` e não some:
+        um retrato do estado de qualidade apagado sem volta não se
+        recupera."""
+        ws, conn = ws_of(request), conn_of(request)
+        row = conn.execute(
+            "SELECT path FROM audits WHERE id = ?", (audit_id,)
+        ).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{audit_id} não encontrada")
+        path = ws.root / row["path"]
+        ws.trash(path)
+        reindex_file(ws, conn, path)
+
+    @app.delete(API_PREFIX + "/audit", status_code=200)
+    async def delete_audits_before(request: Request, before: str = ""):
+        """Exclui em lote as rodadas ANTERIORES a uma data (change 0151).
+
+        `GET /audit/latest` dispara rodada nova sempre que a última passou do
+        intervalo, então basta abrir a aba todo dia para a pasta crescer sem
+        ninguém pedir. Exclusão de uma em uma não dá conta disso.
+
+        Comparação por prefixo de data ISO, não por parse: `ran_at` é gravado
+        em ISO UTC e ordenar string ISO é ordenar tempo. `before` é
+        EXCLUSIVO — a rodada exatamente da data informada não é levada."""
+        if not before:
+            raise _error(422, "before_required",
+                         "informe `before` (data ISO) — a exclusão em lote"
+                         " não apaga o histórico inteiro sem recorte")
+        ws, conn = ws_of(request), conn_of(request)
+        rows = conn.execute(
+            "SELECT id, path FROM audits WHERE ran_at < ? ORDER BY ran_at",
+            (before,),
+        ).fetchall()
+        removed = []
+        for row in rows:
+            path = ws.root / row["path"]
+            if path.exists():
+                ws.trash(path)
+                reindex_file(ws, conn, path)
+            removed.append(row["id"])
+        return {"removed": removed, "count": len(removed)}
+
     @app.get(API_PREFIX + "/audit/{audit_id}")
     async def get_audit(request: Request, audit_id: str):
         return _audit_out(conn_of(request), ws_of(request), audit_id)
@@ -3867,6 +3914,11 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # O painel inteiro, e nao rota a rota: uma rota /admin/ nova ja nasce
     # restrita. GET /admin/switches e a excecao deliberada — a UI precisa
     # saber o que esconder, e o estado de um interruptor nao e segredo.
+    # Excluir rodada de auditoria e mais perto de destruir registro do que de
+    # descartar rascunho: e um retrato do estado de qualidade num momento
+    # (0151). Rodar e ler continuam abertos a qualquer papel.
+    (r"/audit$", {"DELETE"}, "admin", None),
+    (r"/audit/[^/]+$", {"DELETE"}, "admin", None),
     (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),
     (r"/admin/switches$", {"PUT"}, "admin", None),
 )

@@ -298,3 +298,19 @@ def test_so_admin_alcanca_a_gestao_de_contas(viewer, editor):
         assert sessao.post("/api/v1/admin/users/1/reject").status_code == 403
         assert sessao.post("/api/v1/admin/users/1/disable").status_code == 403
         assert sessao.post("/api/v1/admin/users/1/enable").status_code == 403
+
+
+def test_so_admin_exclui_rodada_de_auditoria(viewer, editor):
+    """Rodar e ler auditoria é de todos; apagar é de quem administra (0151).
+
+    Uma rodada é o retrato do estado de qualidade num momento — apagar é
+    mais perto de destruir registro do que de descartar rascunho.
+    """
+    for sessao in (viewer, editor):
+        # ler continua aberto
+        assert sessao.get("/api/v1/audit/history").status_code == 200
+        # apagar, não
+        assert sessao.delete("/api/v1/audit/AUD-0001").status_code == 403
+        assert sessao.request(
+            "DELETE", "/api/v1/audit?before=2030-01-01T00:00:00+00:00"
+        ).status_code == 403

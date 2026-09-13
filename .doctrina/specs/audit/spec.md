@@ -5,7 +5,7 @@
 **Implementation:** verified — snapshot de qualidade (`backend/arbites/audit.py`) + log de atividade no gate (`backend/arbites/api.py`, `backend/arbites/auth.py`)
 **Realizes:** n/a — capability nova (Agente Auditor), fora do escopo do intake original; surgiu de uma sessão de brainstorm sobre memória/contexto para IA
 **Last updated:** 2026-07-20
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -62,6 +62,7 @@ atenção.
 - The system shall registrar em `.arbites/auth.db` toda requisição de escrita bem-sucedida sob o prefixo da API — data, id e e-mail do autor, método, caminho, código de resposta e IP real — sem depender de anotação rota a rota, de modo que uma rota de escrita nova seja registrada sozinha.
 - The system shall expor `GET /admin/activity` (apenas `admin`), mais recente primeiro, paginado por `limit` e `offset`, filtrável por autor (`user`), por trecho de caminho (`path`) e por intervalo de datas (`from`, `to`).
 - The system shall manter o log de atividade separado das rodadas de auditoria de qualidade: aquele é contínuo e imutável, estas são retratos sob demanda.
+- The system shall permitir que uma conta administradora exclua uma rodada de auditoria, individualmente ou em lote por data anterior, movendo o documento para a lixeira como qualquer outro artefato do workspace, em vez de apagar direto.
 
 ### Event-driven
 
@@ -94,6 +95,7 @@ atenção.
   desconhecido" no achado, nunca um erro 500.
 - The system shall not gravar corpo de requisição no log de atividade; caminho e método bastam para responder quem mexeu no quê, e o corpo carregaria senha, token e conteúdo de artefato para dentro de um registro que ninguém apaga.
 - The system shall not oferecer rota de exclusão ou edição de entrada do log de atividade; um registro que o próprio suspeito pode apagar não prova nada.
+- The system shall not permitir que papel diferente de administrador exclua rodada de auditoria, nem expor qualquer rota que remova o log de atividade, que e continuo e imutavel.
 
 ### Optional
 
@@ -140,6 +142,7 @@ atenção.
 10. [verified] Uma escrita recusada por papel ou por interruptor não entra no log, e uma leitura por GET também não — verified by `backend/tests/test_activity_log.py`.
 11. [verified] O log filtra por autor, por trecho de caminho e por intervalo de datas, e pagina — verified by `backend/tests/test_activity_log.py`.
 12. [verified] Nenhuma entrada do log carrega corpo de requisição, e não existe rota que apague ou edite o log; reindexar o workspace não o afeta — verified by `backend/tests/test_activity_log.py`.
+13. [unverified] Admin exclui rodada individual e em lote por data, o documento vai para a lixeira e pode ser restaurado, o lote nao leva rodada posterior a data, e viewer e editor recebem 403 nas duas — verified by `backend/tests/test_audit.py`.
 
 ## Maturity
 

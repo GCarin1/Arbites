@@ -90,6 +90,35 @@ npm --prefix frontend run build            # build + typecheck do frontend
 - Se o workspace for versionado em git, recomenda-se colocar `.arbites/`
   no `.gitignore` do workspace.
 
+## Rodadas de auditoria: elas se acumulam sozinhas
+
+A aba **Auditoria** dispara uma rodada nova sempre que a última passou de
+`audit.auto_interval_hours` (24h por padrão) — inclusive só por alguém abrir
+a aba. Cada rodada é um documento em `workspace/audits/`, então o histórico
+cresce com o uso normal, sem ninguém pedir.
+
+Para limpar, **com uma conta admin**, na aba Auditoria:
+
+- **uma rodada** — menu `⋯` na linha do histórico → *Excluir rodada*;
+- **em lote** — botão *Limpar antigas*, escolhendo uma data: leva tudo que é
+  **anterior** a ela (a rodada da própria data fica).
+
+Como todo o resto, a exclusão vai para `workspace/.arbites/trash/` e pode ser
+restaurada. Pela API:
+
+```
+DELETE /api/v1/audit/{id}                     # uma rodada
+DELETE /api/v1/audit?before=2026-08-01T00:00:00+00:00   # em lote
+```
+
+As duas exigem papel `admin`. Para aumentar o intervalo entre rodadas
+automáticas — e com isso reduzir o acúmulo — ajuste
+`audit.auto_interval_hours` no `arbites.yaml` do workspace.
+
+> O **log de atividade** (aba Administração → Atividade) é outra coisa, com
+> nome parecido: ele é contínuo e imutável de propósito, e não existe rota
+> que o apague. Registro que o próprio suspeito apaga não prova nada.
+
 ## Estrutura do repositório
 
 ```

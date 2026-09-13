@@ -356,6 +356,14 @@ export const api = {
   auditHistory: (limit = 20) =>
     request<AuditHistoryEntry[]>(`/audit/history?limit=${limit}`),
   audit: (id: string) => request<AuditReport>(`/audit/${id}`),
+  deleteAudit: (id: string) =>
+    request<void>(`/audit/${id}`, { method: "DELETE" }),
+  // `before` é exclusivo: a rodada exatamente dessa data NÃO é levada
+  deleteAuditsBefore: (before: string) =>
+    request<{ removed: string[]; count: number }>(
+      `/audit?before=${encodeURIComponent(before)}`,
+      { method: "DELETE" },
+    ),
 
   profile: () => request<{ name: string; memory: string }>("/profile"),
 

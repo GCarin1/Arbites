@@ -832,7 +832,7 @@ export default function App({
             </Suspense>
           ) : tab === "audit" ? (
             <Suspense fallback={<p className="empty">Carregando auditoria…</p>}>
-              <Audit onError={setError} />
+              <Audit onError={setError} isAdmin={user.role === "admin"} />
             </Suspense>
           ) : tab === "memory" ? (
             <Suspense fallback={<p className="empty">Carregando memória do projeto…</p>}>
