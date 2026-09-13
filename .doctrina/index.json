@@ -105,8 +105,8 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.6.0",
-        "last_updated": "2026-07-21",
+        "version": "0.7.0",
+        "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
@@ -2012,6 +2012,19 @@
         "specs_affected": [
           {
             "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0125-visao-mobile-casca-app",
+        "title": "visao mobile: a casca do app e desktop e num celular a barra lateral fixa engole a tela",
+        "path": ".doctrina/changes/archive/2026-09-13-0125-visao-mobile-casca-app",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]

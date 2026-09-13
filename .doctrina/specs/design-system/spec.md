@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
-**Last updated:** 2026-07-21
-**Version:** 0.6.0
+**Last updated:** 2026-09-13
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -74,6 +74,14 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   (`#/<aba>?filtro=valor`), sem lib de router: `App.tsx` lê o hash no load,
   o escreve ao trocar aba/filtro e responde a `hashchange` (back/forward do
   navegador); o deep-link é compartilhável.
+- The system shall apresentar a mesma interface em tela estreita com a barra lateral fora do fluxo, aberta por um controle no cabeçalho e fechada ao navegar, ao tocar fora e pelo Esc.
+- The system shall reduzir o cabeçalho em tela estreita ao essencial — marca, busca e conta —, escondendo contadores do workspace, caminho do diretório e reindexar, que são controles de quem administra a instância.
+- The system shall dar rolagem horizontal com encaixe por coluna ao Kanban em tela estreita, em vez de espremer as seis colunas na largura disponível.
+- The system shall garantir alvo de toque de no mínimo 44 px de altura nos itens de navegação e nas ações de linha quando o ponteiro for grosseiro.
+
+### State-driven
+
+- While a gaveta de navegação está aberta, the system shall impedir a rolagem do conteúdo atrás dela e devolver o foco ao controle que a abriu quando ela fechar.
 
 ### Unwanted-behavior (must-not)
 
@@ -81,6 +89,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
   mesmo bloco — no máximo uma ação de destaque (CTA dominante) por bloco.
 - The system shall not exibir blocos de texto longos onde a interface já é
   autoexplicativa — a ajuda é curta e contextual.
+- The system shall not servir uma interface reduzida em funcionalidade na tela estreita; o que muda é a forma, e nenhuma tela deixa de ser alcançável.
 
 ## Acceptance criteria
 
@@ -125,6 +134,8 @@ e prova a sua fatia, citando o teste/artefato. -->
    navegador navegam — verified by `frontend/src/App.tsx` (parse/serialize +
    listener `hashchange`), os filtros controlados nos componentes e
    `npm run build` limpo.
+7. [verified] A casca declara o ponto de quebra, a gaveta e o cabeçalho enxuto, e nenhuma tela fica inalcançável em largura de celular — verified by `frontend/src/App.tsx` + `frontend/src/styles.css`.
+8. [verified] Nenhuma tela em largura de 390 px transborda horizontalmente, e o que é largo por natureza rola dentro do próprio bloco — verified by `frontend/src/styles.css`.
 
 ## Maturity
 

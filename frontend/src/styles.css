@@ -63,6 +63,10 @@
   --h-header: 56px;
   --w-sidebar: 240px;
   --h-control: 36px;
+  /* Ponto de quebra único da casca (change 0125): abaixo dele a lateral
+     sai do fluxo. 860px porque é onde 240 de menu + o conteúdo mínimo
+     legível deixam de caber lado a lado. */
+  --bp-narrow: 860px;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -273,6 +277,18 @@ textarea.raw {
 }
 .app-header .spacer {
   flex: 1;
+}
+
+/* Gaveta de navegação (change 0125). Em tela larga o botão não existe: a
+   lateral já está ali, e um controle para abrir o que está aberto confunde. */
+.nav-toggle {
+  display: none;
+  font-size: var(--fs-h3);
+  line-height: 1;
+  padding: 0 10px;
+}
+.nav-backdrop {
+  display: none;
 }
 
 .app-body {
@@ -1358,6 +1374,11 @@ table.dense tbody tr:hover td {
 .guided-case {
   display: flex;
   align-items: center;
+  /* `justify-content` explícito: o estilo base de `button` centraliza, e um
+     button reestilizado como linha de lista herda isso — o id e o título
+     apareciam no meio da linha. Em painel estreito passava despercebido;
+     em largura de celular fica evidente. */
+  justify-content: flex-start;
   gap: var(--s1);
   text-align: left;
   background: none;
@@ -3085,4 +3106,203 @@ button.link-chip-btn:disabled {
 }
 .nav-item.frozen:hover {
   opacity: 1;
+}
+
+/* =====================================================================
+   Visão em tela estreita (change 0125)
+
+   Não é um app separado: é a mesma tela sabendo se encolher. Um ponto de
+   quebra, nenhum componente duplicado, nenhuma funcionalidade escondida —
+   o que muda é a forma.
+   ===================================================================== */
+
+@media (max-width: 860px) {
+  /* -- cabeçalho: marca, busca e conta. O resto é de quem administra a
+        instância sentado numa mesa. -------------------------------------- */
+  .wide-only {
+    display: none !important;
+  }
+  .app-header {
+    padding: 0 var(--s2);
+    gap: var(--s1);
+  }
+  .nav-toggle {
+    display: inline-flex;
+  }
+  .cmdk-trigger kbd {
+    display: none; /* não há Ctrl+K num polegar */
+  }
+
+  /* -- a lateral vira gaveta: sai do fluxo em vez de comer 240px de 390 -- */
+  .app-body {
+    position: relative;
+  }
+  .sidebar {
+    position: fixed;
+    top: var(--h-header);
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: min(80vw, var(--w-sidebar));
+    flex-basis: auto;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease-out;
+    box-shadow: var(--shadow-pop);
+  }
+  .app-body.nav-open .sidebar {
+    transform: translateX(0);
+  }
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: var(--h-header) 0 0 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* -- conteúdo ocupa a largura inteira ------------------------------- */
+  .main {
+    padding: var(--s2);
+  }
+  .content-narrow,
+  .main-inner {
+    max-width: 100%;
+  }
+  /* O título quebra em duas linhas — id em cima, nome embaixo — em vez de
+     espremer o id numa coluna estreita e reticenciar o nome com a metade da
+     largura vazia ao lado. */
+  .page-head .page-title {
+    font-size: var(--fs-h2);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+  }
+  .page-head .page-title > span:not(.mono):not(.status-dot) {
+    flex: 1 1 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .page-head .page-title > .mono {
+    white-space: nowrap;
+  }
+
+  /* A marca não quebra em duas linhas ao lado do botão da gaveta. */
+  .app-header .brand {
+    white-space: nowrap;
+    flex: none;
+  }
+  .cmdk-trigger {
+    min-width: 0;
+  }
+  /* controles de página empilham em vez de espremer */
+  .head-controls,
+  .list-toolbar,
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .head-controls > input,
+  .head-controls > select {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  /* -- o que é largo rola DENTRO do próprio bloco, sem transbordar a
+        página: espremer seis colunas torna todas ilegíveis de uma vez --- */
+  .kanban {
+    grid-auto-flow: column;
+    grid-auto-columns: 80vw;
+    grid-template-columns: none;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    padding-bottom: var(--s1);
+  }
+  .kanban-col {
+    scroll-snap-align: start;
+  }
+  .metric-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .cycle-counters {
+    gap: var(--s2);
+  }
+  /* As duas datas do ciclo cabem lado a lado; esticá-las como os demais
+     controles jogaria uma para a linha seguinte sem ganho nenhum. */
+  .head-controls > input[type="date"] {
+    flex: 1 1 120px;
+  }
+  /* O bloco do Health Score não encolhia (`flex: 0 0 auto`) e o subtítulo
+     era cortado no meio da frase pela borda do card. */
+  .health-score-main {
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
+  .health-score-components {
+    border-left: none;
+    padding-left: 0;
+    padding-top: var(--s1);
+    border-top: 1px solid var(--border);
+  }
+  .chart-card {
+    overflow-x: auto;
+  }
+
+  /* três painéis do modo guiado, um sobre o outro e com teto de altura */
+  .guided-cycles,
+  .guided-cases {
+    max-height: 30vh;
+  }
+  /* O rodapé deixa de ser grudado: sem uma área de rolagem própria, ele
+     flutuava sobre os passos e escondia justamente o que a pessoa precisa
+     marcar antes de decidir o resultado. Fluindo ao fim do painel, as ações
+     continuam na mesma tela, logo abaixo do que as justifica. */
+  .guided-footer {
+    position: static;
+  }
+
+  /* diff e markdown cru cabem na largura sem empurrar a página */
+  .version-diff,
+  textarea.raw {
+    max-width: 100%;
+  }
+  textarea.raw {
+    min-height: 220px;
+  }
+
+  /* Na árvore do repositório o título é o que identifica o caso: os
+     conectores encolhem e a data sai (marcada `wide-only` no componente),
+     para o nome não virar "Lo…". */
+  .tree-prefix {
+    font-size: 10px;
+  }
+  .repo-row {
+    gap: 4px;
+    padding: 1px 4px;
+  }
+  .repo-file-main {
+    gap: 6px;
+  }
+
+  /* o menu da conta não pode sangrar pela direita */
+  .account-dropdown {
+    right: 0;
+    max-width: calc(100vw - var(--s3));
+  }
+}
+
+/* Alvo de toque: o mesmo pixel que sobra num mouse falta num polegar.
+   `coarse` em vez de largura — um tablet largo também é tocado. */
+@media (pointer: coarse) {
+  .nav-item,
+  .nav-group-title,
+  .account-dropdown button,
+  .guided-cycle,
+  .guided-case {
+    min-height: 44px;
+  }
+  .nav-pin,
+  .btn-sm {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

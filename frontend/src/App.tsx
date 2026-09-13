@@ -270,6 +270,9 @@ export default function App({
   const selectTab = useCallback((key: Tab) => {
     setTab(key);
     setHashParams({});
+    // Navegar fecha a gaveta: num celular ela cobre a tela, e deixá-la
+    // aberta esconderia justamente o que a pessoa acabou de pedir.
+    setNavOpen(false);
   }, []);
 
   const setHashParam = useCallback((key: string, value: string) => {
@@ -292,6 +295,10 @@ export default function App({
   const [execCreating, setExecCreating] = useState(false);
   // modo guiado (change 0113): complementa o Kanban, não o substitui
   const [execGuided, setExecGuided] = useState(false);
+  // Gaveta de navegação em tela estreita (change 0125). A lateral sai do
+  // fluxo em vez de comer 240px de uma tela de 390.
+  const [navOpen, setNavOpen] = useState(false);
+  const navToggle = useRef<HTMLButtonElement>(null);
   const [cmdkOpen, setCmdkOpen] = useState(false);
   // runs de automação ativos → dot pulsante no item Automação (0076)
   const [activeRuns, setActiveRuns] = useState(0);
@@ -458,11 +465,43 @@ export default function App({
       .catch(() => setSwitches([]));
   }, []);
 
+  // Esc fecha a gaveta e devolve o foco a quem a abriu: sem isso o teclado
+  // volta para o topo do documento e a pessoa se perde.
+  useEffect(() => {
+    if (!navOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setNavOpen(false);
+        navToggle.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    // trava a rolagem do conteúdo atrás da gaveta
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = antes;
+    };
+  }, [navOpen]);
+
   return (
     <>
       <header className="app-header">
+        <button
+          ref={navToggle}
+          className="nav-toggle"
+          onClick={() => setNavOpen((v) => !v)}
+          aria-label={navOpen ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={navOpen}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
         <span className="brand">Arbites</span>
-        <span className="meta">
+        {/* `wide-only`: contadores, caminho e reindexar são controles de quem
+            administra a instância sentado numa mesa — não de quem abre o
+            celular para ver como está a regressão (change 0125). */}
+        <span className="meta wide-only">
           {workspace?.config.workspace?.name ?? "…"} ·{" "}
           {workspace?.index.testcases ?? 0} CTs · {workspace?.index.requirements ?? 0}{" "}
           requisitos
@@ -472,8 +511,12 @@ export default function App({
           <span>Buscar…</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <span className="meta mono">{workspace?.root}</span>
-        <button onClick={() => void reindex()} disabled={reindexing}>
+        <span className="meta mono wide-only">{workspace?.root}</span>
+        <button
+          className="wide-only"
+          onClick={() => void reindex()}
+          disabled={reindexing}
+        >
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
         <AccountMenu
@@ -492,7 +535,16 @@ export default function App({
           />
         </Suspense>
       )}
-      <div className="app-body">
+      <div className={`app-body ${navOpen ? "nav-open" : ""}`}>
+        {/* O fundo escurecido é o alvo do "toque fora" — num celular o gesto
+            de fechar varia, e nenhum deles é o óbvio para todo mundo. */}
+        {navOpen && (
+          <div
+            className="nav-backdrop"
+            onClick={() => setNavOpen(false)}
+            aria-hidden="true"
+          />
+        )}
         <aside className="sidebar">
           <nav className="nav">
             <div className="nav-group">
