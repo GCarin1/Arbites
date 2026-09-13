@@ -166,7 +166,7 @@
         "id": "profile",
         "path": ".doctrina/specs/profile/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.3.1",
         "last_updated": "2026-09-13",
         "implementation": "verified — perfil por conta, autoria pela sessão e avatar da conta (`backend/arbites/api.py`, `frontend/src/components/Profile.tsx`, `frontend/src/components/AccountMenu.tsx`, `frontend/src/components/Identicon.tsx`, `frontend/src/api.ts`)",
         "realizes": [
@@ -1908,6 +1908,19 @@
         "specs_affected": [
           {
             "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0117-avatar-conta-servido-cache-control",
+        "title": "avatar da conta e servido sem Cache-Control: o navegador guarda a imagem antiga e um intermediario pode guardar imagem de uma conta",
+        "path": ".doctrina/changes/archive/2026-09-13-0117-avatar-conta-servido-cache-control",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "profile",
             "operation": "MODIFIED"
           }
         ]

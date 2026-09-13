@@ -5,7 +5,7 @@
 **Implementation:** verified — perfil por conta, autoria pela sessão e avatar da conta (`backend/arbites/api.py`, `frontend/src/components/Profile.tsx`, `frontend/src/components/AccountMenu.tsx`, `frontend/src/components/Identicon.tsx`, `frontend/src/api.ts`)
 **Realizes:** SC14
 **Last updated:** 2026-09-13
-**Version:** 0.3.0
+**Version:** 0.3.1
 
 ## Purpose
 
@@ -32,6 +32,7 @@ fonte de verdade é `profile.md` na raiz do workspace (ADR 0001).
 - The system shall expor `GET /profile/avatar` e `PUT /profile/avatar` para a conta da sessão, aceitando PNG, JPEG ou WebP de até 1 MB, e `DELETE /profile/avatar` para voltar ao identicon.
 - The system shall guardar o avatar em `profiles/avatars/<slug-do-e-mail>.<ext>`, ao lado do perfil da conta, sem passar pelo índice descartável.
 - The system shall exibir o avatar da conta logada no canto superior direito de toda tela, abrindo um menu com Perfil, Administração (apenas para `admin`) e Sair.
+- The system shall servir o avatar da conta com `Cache-Control: private, no-cache`, para que o cache seja sempre revalidado e nenhum intermediário guarde imagem de uma conta.
 
 ### Event-driven
 
@@ -77,6 +78,7 @@ fonte de verdade é `profile.md` na raiz do workspace (ADR 0001).
 9. [verified] Uma conta sobe uma imagem, ela aparece no canto superior direito e sobrevive ao reinício do processo; removê-la volta ao identicon — verified by `backend/tests/test_avatar.py`.
 10. [verified] Duas contas sem foto recebem identicons diferentes, e a mesma conta recebe sempre o mesmo desenho — verified by `frontend/src/components/Identicon.tsx` + `backend/tests/test_avatar.py`.
 11. [verified] O avatar de uma conta não é legível por outra, e um arquivo que não é imagem é recusado mesmo com extensão de imagem — verified by `backend/tests/test_avatar.py`.
+12. [verified] O avatar responde com cache privado e revalidação obrigatória, e trocar a foto passa a servir a nova imagem com ETag diferente da anterior — verified by `backend/tests/test_avatar.py`.
 
 ## Maturity
 

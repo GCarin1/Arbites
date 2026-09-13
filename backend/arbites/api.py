@@ -2583,7 +2583,12 @@ def _register_routes(app: FastAPI) -> None:
         if path is None:
             # Sem imagem nao e erro: o cliente desenha o identicon.
             raise _error(404, "no_avatar", "esta conta nao tem imagem")
-        return FileResponse(str(path))
+        # `private` porque a imagem e de UMA conta e esta instancia fica
+        # atras de um tunel; `no-cache` para revalidar sempre, o que mantem
+        # o ganho do ETag (304) sem servir a foto antiga depois da troca.
+        return FileResponse(
+            str(path), headers={"Cache-Control": "private, no-cache"}
+        )
 
     @app.put(API_PREFIX + "/profile/avatar")
     async def put_avatar(request: Request, file: UploadFile = File(...)):

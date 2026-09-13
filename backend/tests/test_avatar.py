@@ -157,3 +157,28 @@ def test_imagem_acima_de_1mb_e_recusada(client):
 def test_avatar_exige_sessao(anon_client):
     assert anon_client.get("/api/v1/profile/avatar").status_code == 401
     assert _upload(anon_client, PNG).status_code == 401
+
+
+# -- Cache do avatar (change 0117) ---------------------------------------
+
+
+def test_avatar_declara_cache_privado_com_revalidacao(client):
+    """Sem diretiva explícita o navegador aplica cache heurístico e pode
+    servir a foto antiga; e um intermediário fica autorizado a guardar
+    imagem de UMA conta. `private, no-cache` fecha os dois."""
+    _upload(client, PNG)
+    resp = client.get("/api/v1/profile/avatar")
+    assert resp.headers["cache-control"] == "private, no-cache"
+    # o ETag continua lá: revalidar não é o mesmo que baixar de novo
+    assert resp.headers.get("etag")
+
+
+def test_trocar_a_foto_muda_o_etag(client):
+    """É o que faz a revalidação valer a pena: mesmo endereço, conteúdo
+    novo, e o navegador descobre isso no 304 que não veio."""
+    _upload(client, PNG)
+    antes = client.get("/api/v1/profile/avatar").headers["etag"]
+    _upload(client, JPEG, "foto.jpg", "image/jpeg")
+    depois = client.get("/api/v1/profile/avatar")
+    assert depois.headers["etag"] != antes
+    assert depois.content == JPEG
