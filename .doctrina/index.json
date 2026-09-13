@@ -387,16 +387,7 @@
         "summary": "O ciclo é a execution, não uma entidade nova."
       }
     ],
-    "changes": [
-      {
-        "id": "0141-dependencias-teste-backend-declaradas",
-        "title": "dependencias de teste do backend nao declaradas: behave e um backend de keyring fazem parte do gate mas nao estao em nenhum requirements, entao um container novo reprova cinco testes",
-        "path": ".doctrina/changes/0141-dependencias-teste-backend-declaradas",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "chore (confident; signals: dependencias) — opened as chore"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -2232,6 +2223,14 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0141-dependencias-teste-backend-declaradas",
+        "title": "dependencias de teste do backend nao declaradas: behave e um backend de keyring fazem parte do gate mas nao estao em nenhum requirements, entao um container novo reprova cinco testes",
+        "path": ".doctrina/changes/archive/2026-09-13-0141-dependencias-teste-backend-declaradas",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": []
       }
     ],
     "skills": [

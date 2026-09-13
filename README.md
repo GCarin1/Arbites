@@ -28,6 +28,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+Para rodar a suíte de testes, instale também as dependências de teste:
+
+```powershell
+pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
+
 ### 2. Buildar o frontend (uma vez, ou após mudanças na UI)
 
 ```powershell
