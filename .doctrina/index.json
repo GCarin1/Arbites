@@ -166,7 +166,7 @@
         "id": "profile",
         "path": ".doctrina/specs/profile/spec.md",
         "status": "active",
-        "version": "0.3.1",
+        "version": "0.4.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — perfil por conta, autoria pela sessão e avatar da conta (`backend/arbites/api.py`, `frontend/src/components/Profile.tsx`, `frontend/src/components/AccountMenu.tsx`, `frontend/src/components/Identicon.tsx`, `frontend/src/api.ts`)",
         "realizes": [
@@ -1934,6 +1934,19 @@
         "specs_affected": [
           {
             "capability": "executions",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0119-e-mails-diferentes-colidem-mesmo",
+        "title": "e-mails diferentes colidem no mesmo slug e duas contas passam a compartilhar perfil memoria de IA e avatar",
+        "path": ".doctrina/changes/archive/2026-09-13-0119-e-mails-diferentes-colidem-mesmo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "profile",
             "operation": "MODIFIED"
           }
         ]

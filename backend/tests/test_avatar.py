@@ -71,8 +71,11 @@ def test_upload_aparece_e_sobrevive_ao_reinicio(ws):
         assert served.status_code == 200 and served.content == PNG
 
     # o arquivo é o estado: o processo cai, o avatar continua no workspace.
-    stored = ws.root / "profiles" / "avatars" / f"{slugify(ADMIN_EMAIL)}.png"
-    assert stored.exists()
+    # O nome começa pelo slug (legível) e leva o sufixo que o torna unívoco
+    # (change 0119) — o teste olha o começo, não o sufixo inteiro.
+    guardados = list((ws.root / "profiles" / "avatars").glob(
+        f"{slugify(ADMIN_EMAIL)}-*.png"))
+    assert len(guardados) == 1
 
     app = create_app(ws.root, watch=False)
     with TestClient(app) as second:
@@ -93,7 +96,7 @@ def test_troca_de_formato_nao_deixa_arquivo_orfao(client):
     _upload(client, PNG)
     assert _upload(client, JPEG, "foto.jpg", "image/jpeg").json()["format"] == "jpg"
     avatars = client.ws.root / "profiles" / "avatars"
-    assert [p.suffix for p in avatars.glob(f"{slugify(ADMIN_EMAIL)}.*")] == [".jpg"]
+    assert [p.suffix for p in avatars.glob(f"{slugify(ADMIN_EMAIL)}-*")] == [".jpg"]
 
 
 def test_webp_tambem_e_aceito(client):

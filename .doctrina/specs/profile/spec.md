@@ -5,7 +5,7 @@
 **Implementation:** verified — perfil por conta, autoria pela sessão e avatar da conta (`backend/arbites/api.py`, `frontend/src/components/Profile.tsx`, `frontend/src/components/AccountMenu.tsx`, `frontend/src/components/Identicon.tsx`, `frontend/src/api.ts`)
 **Realizes:** SC14
 **Last updated:** 2026-09-13
-**Version:** 0.3.1
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -33,12 +33,14 @@ fonte de verdade é `profile.md` na raiz do workspace (ADR 0001).
 - The system shall guardar o avatar em `profiles/avatars/<slug-do-e-mail>.<ext>`, ao lado do perfil da conta, sem passar pelo índice descartável.
 - The system shall exibir o avatar da conta logada no canto superior direito de toda tela, abrindo um menu com Perfil, Administração (apenas para `admin`) e Sair.
 - The system shall servir o avatar da conta com `Cache-Control: private, no-cache`, para que o cache seja sempre revalidado e nenhum intermediário guarde imagem de uma conta.
+- The system shall derivar o nome do arquivo de perfil e de avatar de uma conta de forma unívoca — slug legível mais um sufixo curto derivado do e-mail completo —, para que duas contas nunca resolvam o mesmo caminho.
 
 ### Event-driven
 
 - When um artefato é criado, the system shall gravar `created_by` no frontmatter dele; edições posteriores preservam o valor original, porque quem criou não muda.
 - When uma conta lê o próprio perfil pela primeira vez e ainda não existe arquivo para ela, the system shall criá-lo a partir do template — exceto para a conta de menor id, que herda o `profile.md` da raiz uma única vez, preservando a memória escrita antes da instância virar multiusuário.
 - When a conta não tem imagem, the system shall desenhar um identicon determinístico — grade 5×5 espelhada e cor derivadas do hash do e-mail — gerado no cliente, sem requisição a serviço externo.
+- When a conta tem perfil ou avatar gravado sob o nome antigo, apenas baseado no slug, the system shall adotá-lo no nome novo na primeira leitura, para não perder a memória já escrita.
 
 ### State-driven
 
@@ -54,6 +56,7 @@ fonte de verdade é `profile.md` na raiz do workspace (ADR 0001).
 - The system shall not aceitar autoria vinda do corpo da requisição; um cliente que envie `owner` tem o valor ignorado, senão a autoria vira um campo que qualquer um preenche com o nome de qualquer um.
 - The system shall not buscar avatar em serviço externo (Gravatar ou equivalente); enviar o hash do e-mail de cada conta para fora contraria o local-first e a promessa de zero telemetria.
 - The system shall not aceitar como avatar arquivo que não seja imagem reconhecida por assinatura de bytes, nem confiar na extensão informada pelo cliente.
+- The system shall not usar o slug do e-mail sozinho como identidade de arquivo por conta; `slugify` colapsa pontuações diferentes no mesmo texto e duas contas distintas passariam a compartilhar o arquivo.
 
 ### Optional
 
@@ -79,6 +82,8 @@ fonte de verdade é `profile.md` na raiz do workspace (ADR 0001).
 10. [verified] Duas contas sem foto recebem identicons diferentes, e a mesma conta recebe sempre o mesmo desenho — verified by `frontend/src/components/Identicon.tsx` + `backend/tests/test_avatar.py`.
 11. [verified] O avatar de uma conta não é legível por outra, e um arquivo que não é imagem é recusado mesmo com extensão de imagem — verified by `backend/tests/test_avatar.py`.
 12. [verified] O avatar responde com cache privado e revalidação obrigatória, e trocar a foto passa a servir a nova imagem com ETag diferente da anterior — verified by `backend/tests/test_avatar.py`.
+13. [verified] Duas contas cujos e-mails colidem no slug têm perfis, memórias e avatares separados, e nenhuma das duas lê ou sobrescreve o da outra — verified by `backend/tests/test_profile_identity.py`.
+14. [verified] Um perfil e um avatar gravados sob o nome antigo continuam sendo os da conta depois da atualização, sem perda da memória escrita — verified by `backend/tests/test_profile_identity.py`.
 
 ## Maturity
 

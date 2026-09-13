@@ -7,6 +7,7 @@ Toda resposta de escrita retorna a entidade atualizada (contrato http-api).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import json
 import logging
@@ -2506,6 +2507,38 @@ def _register_routes(app: FastAPI) -> None:
     def _legacy_profile_path(ws: Workspace) -> Path:
         return ws.root / "profile.md"
 
+    def _account_slug(email: str) -> str:
+        """Identidade de ARQUIVO de uma conta — unívoca, e ainda legível.
+
+        `slugify` colapsa qualquer pontuacao no mesmo hifen, entao
+        `ana.silva@x.com` e `ana-silva@x.com` dao o mesmo texto. Usar so ele
+        faria duas contas distintas resolverem o mesmo caminho e
+        compartilharem perfil, memoria de IA e avatar (change 0119).
+
+        O slug fica na frente porque um workspace aberto no Obsidian precisa
+        dizer de quem e cada arquivo; o sufixo vem do e-mail INTEIRO e e o
+        que garante que duas contas nunca colidam.
+        """
+        digest = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:8]
+        return f"{slugify(email)}-{digest}"
+
+    def _adopt_legacy_name(directory: Path, slug: str, novo: str) -> None:
+        """Adota o arquivo gravado sob o nome antigo (so o slug).
+
+        Sem isto a atualizacao apagaria do mapa a memoria ja escrita: o
+        arquivo continuaria no disco, mas ninguem mais o leria. Se duas
+        contas colidiam, a primeira que ler adota — e a outra comeca limpa,
+        que e exatamente o isolamento que faltava.
+        """
+        if slug == novo or not directory.is_dir():
+            return
+        for antigo in directory.glob(f"{slug}.*"):
+            if not antigo.is_file():
+                continue
+            destino = directory / f"{novo}{antigo.suffix}"
+            if not destino.exists():
+                antigo.rename(destino)
+
     def _profile_path(request: Request) -> Path:
         """Perfil da conta logada.
 
@@ -2516,8 +2549,11 @@ def _register_routes(app: FastAPI) -> None:
         ws = ws_of(request)
         if not getattr(request.app.state, "auth_enabled", True):
             return _legacy_profile_path(ws)
-        user = current_user(request)
-        return ws.root / "profiles" / f"{slugify(user['email'])}.md"
+        email = current_user(request)["email"]
+        directory = ws.root / "profiles"
+        nome = _account_slug(email)
+        _adopt_legacy_name(directory, slugify(email), nome)
+        return directory / f"{nome}.md"
 
     def _seed_profile(request: Request, path: Path) -> None:
         """Primeira leitura de uma conta: template, ou o `profile.md` da raiz
@@ -2568,7 +2604,10 @@ def _register_routes(app: FastAPI) -> None:
     def _avatar_slug(request: Request) -> str:
         if not getattr(request.app.state, "auth_enabled", True):
             return "local"
-        return slugify(current_user(request)["email"])
+        email = current_user(request)["email"]
+        nome = _account_slug(email)
+        _adopt_legacy_name(_avatar_dir(request), slugify(email), nome)
+        return nome
 
     def _find_avatar(request: Request) -> Path | None:
         slug = _avatar_slug(request)
