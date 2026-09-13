@@ -75,7 +75,11 @@ const CYCLE_LABELS: Record<string, string> = {
   closed: "fechado",
 };
 
-/** Dias restantes até `ends_on` — a leitura do prazo que o número sozinho não dá. */
+/**
+ * Dias restantes até `ends_on` — a leitura do prazo que o número sozinho não
+ * dá. Usada pelo cabeçalho do ciclo e pela lista: um ciclo atrasado tem de
+ * ser reconhecível sem abrir.
+ */
 function deadlineNote(
   startsOn: string | null,
   endsOn: string | null,
@@ -91,6 +95,23 @@ function deadlineNote(
   if (days < 0) return { text: `${period} · ${-days}d em atraso`, tone: "late" };
   if (days === 0) return { text: `${period} · termina hoje`, tone: "due" };
   return { text: `${period} · faltam ${days}d`, tone: "" };
+}
+
+/**
+ * O prazo de um ciclo numa linha de lista. Nada quando não há período: um
+ * ciclo sem data não está atrasado, está sem data.
+ */
+function CycleDeadline({ execution }: { execution: ExecutionSummary }) {
+  // ciclo fechado não tem prazo a cumprir — já acabou
+  if (execution.status === "closed") return null;
+  const deadline = deadlineNote(
+    execution.starts_on ?? null,
+    execution.ends_on ?? null,
+  );
+  if (!deadline) return null;
+  return (
+    <span className={`caption cycle-deadline ${deadline.tone}`}>{deadline.text}</span>
+  );
 }
 
 /**
@@ -203,6 +224,7 @@ export function ExecutionsList({
           >
             <span className="mono muted">{item.id}</span>
             <span style={{ flex: 1 }}>{item.name}</span>
+            <CycleDeadline execution={item} />
             <span className="muted mono">
               {passed}/{total}
             </span>
@@ -477,10 +499,11 @@ export function ExecutionsRepo({
                         <span className="caption mono muted">
                           {passed}/{total}
                         </span>
+                        <CycleDeadline execution={item} />
                         <span
                           className={`status-dot dot-${item.status === "closed" ? "done" : "active"} caption`}
                         >
-                          {item.status}
+                          {CYCLE_LABELS[item.status] ?? item.status}
                         </span>
                         <span className="caption mono muted">
                           {(item.created_at ?? "").slice(0, 10)}

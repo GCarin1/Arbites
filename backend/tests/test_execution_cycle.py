@@ -230,3 +230,31 @@ def test_execution_json_antigo_continua_valido(ws):
         patched = client.patch("/api/v1/executions/EXEC-0001",
                                json={"starts_on": "2026-01-05"}).json()
         assert patched["starts_on"] == "2026-01-05"
+
+
+# -- AC: a lista de ciclos carrega o prazo (change 0118) ------------------
+
+
+def test_lista_de_ciclos_devolve_o_periodo_de_cada_um(client):
+    """Uma data que só aparece dentro do ciclo não responde "estamos no
+    prazo?" — que foi a pergunta que justificou criá-la."""
+    ct = make_ct(client, "Login")
+    no_prazo = make_exec(client, [ct["id"]],
+                         starts_on="2026-09-01", ends_on="2099-12-31")
+    atrasado = make_exec(client, [ct["id"]],
+                         starts_on="2026-01-01", ends_on="2026-01-15")
+
+    listados = {c["id"]: c for c in client.get("/api/v1/executions").json()}
+    assert listados[no_prazo["id"]]["ends_on"] == "2099-12-31"
+    assert listados[atrasado["id"]]["ends_on"] == "2026-01-15"
+    # os dois são distinguíveis sem abrir nenhum
+    assert listados[atrasado["id"]]["ends_on"] < listados[no_prazo["id"]]["ends_on"]
+
+
+def test_ciclo_sem_periodo_aparece_na_lista_sem_prazo(client):
+    """Um ciclo sem data não está atrasado, está sem data."""
+    ct = make_ct(client, "Login")
+    sem_data = make_exec(client, [ct["id"]])
+    listado = next(c for c in client.get("/api/v1/executions").json()
+                   if c["id"] == sem_data["id"])
+    assert listado["starts_on"] is None and listado["ends_on"] is None

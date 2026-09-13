@@ -113,7 +113,7 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.9.1",
+        "version": "0.9.2",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -1921,6 +1921,19 @@
         "specs_affected": [
           {
             "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0118-lista-ciclos-mostra-prazo",
+        "title": "lista de ciclos nao mostra prazo nem o vocabulario do ciclo, entao saber qual esta atrasado exige abrir um por um",
+        "path": ".doctrina/changes/archive/2026-09-13-0118-lista-ciclos-mostra-prazo",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
             "operation": "MODIFIED"
           }
         ]

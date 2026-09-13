@@ -361,6 +361,9 @@ export interface ExecutionSummary {
   environment: string | null;
   origin: string;
   status: string;
+  // Período do ciclo (ADR 0013) — ausente nos execution.json anteriores.
+  starts_on?: string | null;
+  ends_on?: string | null;
   created_at: string;
   closed_at: string | null;
   path: string;
