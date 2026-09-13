@@ -2,10 +2,10 @@
 
 **Capability:** executions
 **Status:** active
-**Implementation:** verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
+**Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
-**Last updated:** 2026-07-21
-**Version:** 0.6.0
+**Last updated:** 2026-09-13
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -64,6 +64,10 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   `removed` (só em a) ou `unchanged`; a UI shall oferecer um modo
   "Comparar" (selecionar duas executions) que abre o diff por categoria,
   cada CT navegável.
+- The system shall guardar no `execution.json` o período do ciclo em `starts_on` e `ends_on` (datas ISO `YYYY-MM-DD`, ambas opcionais), aceitando alteração por `PATCH /executions/{id}`.
+- The system shall guardar em cada resultado o `assignee` — o responsável por aquele caso dentro do ciclo — e expor `POST /executions/{id}/results/{ct}/assignee` para defini-lo ou limpá-lo.
+- The system shall exibir o vocabulário do ciclo como planejado (`draft`), em andamento (`in_progress`) e fechado (`closed`), mantendo no disco os valores que a máquina de estados já usa.
+- The system shall apresentar um cabeçalho de progresso do ciclo com a barra empilhada por status, um contador grande por status, o total de casos e o período com a situação do prazo.
 
 ### Event-driven
 
@@ -75,6 +79,8 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   `{at, who, event: "result", testcase_id, to}` no `history[]`.
 - When a execution é fechada, the system shall preencher `closed_at` e
   mudar `status` para `closed`.
+- When `ends_on` é anterior a `starts_on`, the system shall recusar a alteração com 422 em vez de gravar um ciclo que termina antes de começar.
+- When o responsável de um caso muda, the system shall registrar evento `{at, who, event: "assignee", testcase_id, to}` no `history[]`, pela mesma razão que status e step já registram.
 
 ### State-driven
 
@@ -87,6 +93,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
   resultado; o mesmo CT pode estar `passed` na EXEC-0001 e `failed` na
   EXEC-0002 sem contradição.
 - The system shall not exigir cadastro prévio de sprint ou ambiente.
+- The system shall not criar cadastro de sprint, release ou responsável; `sprint` e `environment` seguem texto livre e o `assignee` é o e-mail de uma conta que já existe.
 
 ### Optional
 
@@ -121,6 +128,9 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
    correta (regressed/fixed/added/removed/unchanged) — verified by
    `backend/tests/test_executions.py`
    (`test_diff_classifies_five_categories`).
+9. [verified] Uma execution nasce sem período, recebe `starts_on`/`ends_on` por PATCH e sobrevive ao reinício; um período invertido é recusado com 422 — verified by `backend/tests/test_execution_cycle.py`.
+10. [verified] Um caso recebe responsável, o evento entra no `history[]`, o índice enxerga o valor e limpar o responsável volta o caso a sem dono — verified by `backend/tests/test_execution_cycle.py`.
+11. [verified] O cabeçalho do ciclo soma os contadores por status batendo com o total de casos, e um `execution.json` antigo — sem as chaves novas — continua sendo lido como ciclo sem período e sem responsável — verified by `backend/tests/test_execution_cycle.py`.
 
 ## Maturity
 

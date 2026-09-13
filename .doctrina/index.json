@@ -113,9 +113,9 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.6.0",
-        "last_updated": "2026-07-21",
-        "implementation": "verified — M1 (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
+        "version": "0.7.0",
+        "last_updated": "2026-09-13",
+        "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
           "SC2"
         ]
@@ -353,8 +353,9 @@
         "id": "0010",
         "path": ".doctrina/decisions/0010-sprint-e-ambiente-como-texto-livre-na-v1.md",
         "title": "Sprint e ambiente como texto livre na v1",
-        "status": "accepted",
+        "status": "superseded by 0013",
         "date": "2026-07-03",
+        "superseded_by": "0013",
         "landed": "2026-07-03 — `backend/arbites/executions.py`",
         "summary": "`sprint` e `environment` são texto livre no `execution.json` na v1."
       },
@@ -374,17 +375,19 @@
         "status": "accepted",
         "date": "2026-09-13",
         "summary": "O escopo ativo do Arbites passa a ser:"
+      },
+      {
+        "id": "0013",
+        "path": ".doctrina/decisions/0013-execution-e-o-ciclo-datas-no-proprio-ciclo-e-sprint-como-rotulo.md",
+        "title": "Execution e o ciclo datas no proprio ciclo e sprint como rotulo",
+        "status": "accepted",
+        "date": "2026-09-13",
+        "supersedes": "0010",
+        "landed": "2026-09-13 — `backend/arbites/executions.py`, `backend/arbites/api.py`, `backend/tests/test_execution_cycle.py`",
+        "summary": "O ciclo é a execution, não uma entidade nova."
       }
     ],
     "changes": [
-      {
-        "id": "0111-execution-como-ciclo-de-teste",
-        "title": "Execution como ciclo de teste",
-        "path": ".doctrina/changes/0111-execution-como-ciclo-de-teste",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
       {
         "id": "0112-versionamento-dos-casos-de-teste-com-git-no",
         "title": "Versionamento dos casos de teste com git no workspace",
@@ -1852,6 +1855,19 @@
         "specs_affected": [
           {
             "capability": "profile",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0111-execution-como-ciclo-de-teste",
+        "title": "Execution como ciclo de teste",
+        "path": ".doctrina/changes/archive/2026-09-13-0111-execution-como-ciclo-de-teste",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
             "operation": "MODIFIED"
           }
         ]

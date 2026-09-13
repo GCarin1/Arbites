@@ -67,6 +67,91 @@ function ExecStackBar({ results }: { results: ResultEntry[] }) {
   );
 }
 
+// O ciclo é a execution (ADR 0013): no disco os estados continuam sendo os
+// da máquina de estados; aqui eles ganham o nome que o time usa.
+const CYCLE_LABELS: Record<string, string> = {
+  draft: "planejado",
+  in_progress: "em andamento",
+  closed: "fechado",
+};
+
+/** Dias restantes até `ends_on` — a leitura do prazo que o número sozinho não dá. */
+function deadlineNote(
+  startsOn: string | null,
+  endsOn: string | null,
+): { text: string; tone: string } | null {
+  if (!startsOn && !endsOn) return null;
+  const period = `${startsOn ?? "—"} → ${endsOn ?? "—"}`;
+  if (!endsOn) return { text: period, tone: "" };
+  // datas puras: comparadas em UTC, sem fuso, senão o "hoje" vira loteria
+  const today = new Date().toISOString().slice(0, 10);
+  const days = Math.round(
+    (Date.parse(`${endsOn}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000,
+  );
+  if (days < 0) return { text: `${period} · ${-days}d em atraso`, tone: "late" };
+  if (days === 0) return { text: `${period} · termina hoje`, tone: "due" };
+  return { text: `${period} · faltam ${days}d`, tone: "" };
+}
+
+/**
+ * Cabeçalho de progresso do ciclo, no padrão do Xray: a barra empilhada, um
+ * contador grande por status, o total e a situação do prazo — o número e a
+ * leitura dele no mesmo lugar.
+ */
+function CycleHeader({
+  results,
+  status,
+  startsOn,
+  endsOn,
+}: {
+  results: ResultEntry[];
+  status: string;
+  startsOn: string | null;
+  endsOn: string | null;
+}) {
+  const counts: Record<string, number> = {};
+  for (const r of results) {
+    const key = r.column || r.status;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  const total = results.length;
+  const done = STACK_ORDER.filter((k) => k !== "pending" && k !== "in_progress").reduce(
+    (sum, k) => sum + (counts[k] ?? 0),
+    0,
+  );
+  const deadline = deadlineNote(startsOn, endsOn);
+  return (
+    <div className="cycle-header card block">
+      <div className="cycle-header-top">
+        <span className={`status-dot dot-${status === "closed" ? "done" : "active"}`}>
+          {CYCLE_LABELS[status] ?? status}
+        </span>
+        {deadline && (
+          <span className={`caption cycle-deadline ${deadline.tone}`}>
+            {deadline.text}
+          </span>
+        )}
+        <span className="spacer" />
+        <span className="cycle-total">
+          <strong>{done}</strong>
+          <span className="caption muted">/{total} casos</span>
+        </span>
+      </div>
+      <ExecStackBar results={results} />
+      <div className="cycle-counters">
+        {COLUMNS.map((col) => (
+          <div key={col.key} className="cycle-counter">
+            <span className={`cycle-count col-text-${col.key}`}>
+              {counts[col.key] ?? 0}
+            </span>
+            <span className="caption muted">{col.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const COLUMNS: { key: string; label: string }[] = [
   { key: "pending", label: "Pending" },
   { key: "in_progress", label: "In Progress" },
@@ -740,8 +825,14 @@ export function ExecutionBoard({
     ? execution.results.filter((r) => squadOf[r.testcase_id] === squadFilter)
     : execution.results;
 
-  const total = visible.length;
-  const passed = visible.filter((r) => (r.column || r.status) === "passed").length;
+  async function savePeriod(patch: { starts_on?: string | null; ends_on?: string | null }) {
+    try {
+      setExecution(await api.patchExecution(execution!.id, patch));
+    } catch (e) {
+      // período invertido volta 422 do backend: a mensagem é a do servidor
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   return (
     <div>
@@ -755,6 +846,21 @@ export function ExecutionBoard({
           <span className="caption">
             {execution.sprint ?? "—"} · {execution.environment ?? "—"}
           </span>
+          {/* O período mora no ciclo (ADR 0013); `sprint` ficou só como rótulo. */}
+          <input
+            type="date"
+            aria-label="Início do ciclo"
+            value={execution.starts_on ?? ""}
+            disabled={closed}
+            onChange={(e) => void savePeriod({ starts_on: e.target.value || null })}
+          />
+          <input
+            type="date"
+            aria-label="Fim do ciclo"
+            value={execution.ends_on ?? ""}
+            disabled={closed}
+            onChange={(e) => void savePeriod({ ends_on: e.target.value || null })}
+          />
           {squadsInExec.length > 0 && (
             <select
               value={squadFilter}
@@ -769,9 +875,6 @@ export function ExecutionBoard({
               ))}
             </select>
           )}
-          <span className={`status-dot dot-${closed ? "done" : "active"}`}>
-            {execution.status}
-          </span>
           {execution.results.some((r) =>
             ["failed", "blocked"].includes(r.column || r.status),
           ) && (
@@ -843,12 +946,12 @@ export function ExecutionBoard({
         />
       )}
 
-      <div className="exec-progress">
-        <ExecStackBar results={visible} />
-        <span className="caption mono">
-          {passed}/{total} passed
-        </span>
-      </div>
+      <CycleHeader
+        results={visible}
+        status={execution.status}
+        startsOn={execution.starts_on ?? null}
+        endsOn={execution.ends_on ?? null}
+      />
 
       <div className="kanban">
         {COLUMNS.map((col) => (
@@ -891,8 +994,15 @@ export function ExecutionBoard({
                     <div className="kanban-card-title">{titleOf[result.testcase_id]}</div>
                   )}
                   <StepBar steps={result.steps} />
-                  {(result.evidences.length > 0 || result.defects.length > 0) && (
+                  {(result.assignee ||
+                    result.evidences.length > 0 ||
+                    result.defects.length > 0) && (
                     <div className="kanban-card-meta caption muted">
+                      {result.assignee && (
+                        <span className="assignee" title={`responsável: ${result.assignee}`}>
+                          {result.assignee.split("@")[0]}
+                        </span>
+                      )}
                       {result.evidences.length > 0 && <span>{result.evidences.length} evid.</span>}
                       {result.defects.length > 0 && (
                         <span className="mono">{result.defects.join(", ")}</span>
@@ -942,6 +1052,7 @@ function ResultPanel({
   onError: (message: string) => void;
 }) {
   const [note, setNote] = useState("");
+  const [assignee, setAssignee] = useState(result.assignee ?? "");
   const [comment, setComment] = useState(result.comment ?? "");
   const [savingComment, setSavingComment] = useState(false);
   const [creatingDefect, setCreatingDefect] = useState(false);
@@ -952,6 +1063,7 @@ function ResultPanel({
   // fundo (ou outra ação) reescreve o campo por baixo do que o usuário digitou.
   useEffect(() => {
     setComment(result.comment ?? "");
+    setAssignee(result.assignee ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result.testcase_id]);
 
@@ -960,6 +1072,15 @@ function ResultPanel({
   async function markStep(step: number, status: string) {
     try {
       onUpdate(await api.stepStatus(execution.id, result.testcase_id, step, status));
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function saveAssignee(value: string) {
+    setAssignee(value);
+    try {
+      onUpdate(await api.resultAssignee(execution.id, result.testcase_id, value || null));
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
     }
@@ -1039,6 +1160,22 @@ function ResultPanel({
 
   return (
     <div className="result-panel">
+      <h4>Responsável no ciclo</h4>
+      <div className="toolbar">
+        <input
+          value={assignee}
+          onChange={(e) => setAssignee(e.target.value)}
+          onBlur={(e) => {
+            if (e.target.value !== (result.assignee ?? "")) void saveAssignee(e.target.value);
+          }}
+          placeholder="e-mail de quem vai executar este caso"
+          disabled={closed}
+        />
+        {result.assignee && !closed && (
+          <button onClick={() => void saveAssignee("")}>Liberar caso</button>
+        )}
+      </div>
+
       <h4>Passos</h4>
       {result.steps.length === 0 && <p className="muted">CT sem passos estruturados.</p>}
       {result.steps.map((step) => (

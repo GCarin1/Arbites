@@ -59,10 +59,10 @@ CREATE TABLE IF NOT EXISTS scenarios(
 CREATE TABLE IF NOT EXISTS executions(
   id TEXT PRIMARY KEY, name TEXT, owner TEXT, sprint TEXT, environment TEXT,
   origin TEXT, status TEXT, created_at TEXT, closed_at TEXT, path TEXT,
-  squad TEXT);
+  squad TEXT, starts_on TEXT, ends_on TEXT);
 CREATE TABLE IF NOT EXISTS results(
   execution_id TEXT, testcase_id TEXT, status TEXT, executed_at TEXT,
-  duration_seconds REAL, PRIMARY KEY(execution_id, testcase_id));
+  duration_seconds REAL, assignee TEXT, PRIMARY KEY(execution_id, testcase_id));
 CREATE TABLE IF NOT EXISTS result_events(
   execution_id TEXT, testcase_id TEXT, status TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS evidences(
@@ -107,6 +107,9 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE testcases ADD COLUMN squad_effective TEXT",
         "ALTER TABLE requirements ADD COLUMN squad TEXT",
         "ALTER TABLE executions ADD COLUMN squad TEXT",
+        "ALTER TABLE executions ADD COLUMN starts_on TEXT",
+        "ALTER TABLE executions ADD COLUMN ends_on TEXT",
+        "ALTER TABLE results ADD COLUMN assignee TEXT",
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
         "ALTER TABLE testcases ADD COLUMN created TEXT",
         "ALTER TABLE requirements ADD COLUMN created TEXT",
@@ -718,8 +721,8 @@ def _index_execution(
     conn.execute(
         "INSERT OR REPLACE INTO executions"
         "(id, name, owner, sprint, environment, origin, status, created_at, closed_at, path,"
-        " squad)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        " squad, starts_on, ends_on)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             exec_id,
             data.get("name"),
@@ -732,19 +735,22 @@ def _index_execution(
             data.get("closed_at"),
             rel,
             (str(data.get("squad")).strip() or None) if data.get("squad") else None,
+            data.get("starts_on"),
+            data.get("ends_on"),
         ),
     )
     for result in data.get("results") or []:
         conn.execute(
             "INSERT OR REPLACE INTO results"
-            "(execution_id, testcase_id, status, executed_at, duration_seconds)"
-            " VALUES (?,?,?,?,?)",
+            "(execution_id, testcase_id, status, executed_at, duration_seconds, assignee)"
+            " VALUES (?,?,?,?,?,?)",
             (
                 exec_id,
                 result.get("testcase_id"),
                 result.get("status", "pending"),
                 result.get("executed_at"),
                 result.get("duration_seconds"),
+                result.get("assignee"),
             ),
         )
         for evidence in result.get("evidences") or []:

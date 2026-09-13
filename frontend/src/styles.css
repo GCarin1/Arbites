@@ -1300,6 +1300,59 @@ table.dense tbody tr:hover td {
 .exec-seg.col-retest { background: var(--retest); }
 .exec-seg.col-passed { background: var(--success); }
 
+/* Cabeçalho do ciclo (change 0111): a barra empilhada com os contadores
+   grandes por status e a situação do prazo — o número e a leitura dele no
+   mesmo lugar, no padrão do Xray. */
+.cycle-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.cycle-header-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.cycle-total strong {
+  font-size: var(--fs-h2);
+}
+.cycle-deadline.late {
+  color: var(--danger);
+}
+.cycle-deadline.due {
+  color: var(--warning);
+}
+.cycle-counters {
+  display: flex;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.cycle-counter {
+  display: flex;
+  flex-direction: column;
+  min-width: 64px;
+}
+.cycle-count {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.col-text-pending { color: var(--text-subtle); }
+.col-text-in_progress { color: var(--primary); }
+.col-text-blocked { color: var(--warning); }
+.col-text-failed { color: var(--danger); }
+.col-text-retest { color: var(--retest); }
+.col-text-passed { color: var(--success); }
+
+/* Responsável pelo caso dentro do ciclo, no card do Kanban. */
+.kanban-card-meta .assignee {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 /* ------------------------------------------------- Activity heatmap */
 /* Preenche a largura do card: colunas flexíveis (flex:1) e células que
    escalam por aspect-ratio — card maior = quadrados maiores. */

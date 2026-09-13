@@ -155,6 +155,9 @@ class ExecutionCreate(BaseModel):
     sprint: str | None = None
     environment: str | None = None
     squad: str | None = None
+    # O ciclo e a execution (ADR 0013): o periodo mora aqui, opcional.
+    starts_on: str | None = None
+    ends_on: str | None = None
     testcase_ids: list[str]
     # Mantido por compatibilidade de contrato; o valor e ignorado — a
     # autoria vem da sessao (capability profile).
@@ -166,6 +169,13 @@ class ExecutionPatch(BaseModel):
     sprint: str | None = None
     environment: str | None = None
     status: str | None = Field(default=None, pattern="^(draft|in_progress)$")
+    starts_on: str | None = None
+    ends_on: str | None = None
+
+
+class AssigneeIn(BaseModel):
+    # Vazio limpa o responsavel: o caso volta a ser de quem pegar.
+    assignee: str | None = None
 
 
 class ResultStatusIn(BaseModel):
@@ -1313,6 +1323,7 @@ def _register_routes(app: FastAPI) -> None:
         execution = exec_ops.create(
             ws, payload.name, author_of(request), payload.sprint,
             payload.environment, testcases, squad=payload.squad,
+            starts_on=payload.starts_on, ends_on=payload.ends_on,
         )
         _save_and_index(ws, conn, execution)
         return execution
@@ -1373,7 +1384,10 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
-        return exec_ops.load(ws_of(request), exec_id)
+        """O progresso vem derivado dos resultados a cada leitura, e nao
+        guardado: contador gravado e contador que diverge do que ele conta."""
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return {**execution, "progress": exec_ops.progress(execution)}
 
     @app.delete(API_PREFIX + "/executions/{exec_id}", status_code=204)
     async def delete_execution(request: Request, exec_id: str):
@@ -1398,8 +1412,18 @@ def _register_routes(app: FastAPI) -> None:
         execution = exec_ops.load(ws, exec_id)
         if execution["status"] == "closed":
             raise _error(409, "execution_closed", f"{exec_id} está fechada")
-        for key, value in payload.model_dump(exclude_unset=True).items():
+        fields = payload.model_dump(exclude_unset=True)
+        period = {k: fields.pop(k) for k in ("starts_on", "ends_on") if k in fields}
+        for key, value in fields.items():
             execution[key] = value
+        if period:
+            # O periodo passa pela validacao do modulo (ADR 0013): um ciclo
+            # que termina antes de comecar e erro de digitacao, nao estado.
+            exec_ops.set_period(
+                execution,
+                period.get("starts_on", execution.get("starts_on")),
+                period.get("ends_on", execution.get("ends_on")),
+            )
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1423,6 +1447,18 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
         exec_ops.set_step_status(execution, ct_id, step_index, payload.status, payload.who)
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/assignee")
+    async def post_result_assignee(
+        request: Request, exec_id: str, ct_id: str, payload: AssigneeIn
+    ):
+        """Responsavel por um caso dentro do ciclo (ADR 0013): e o que divide
+        uma regressao entre duas ou mais pessoas sem duplicar a execution."""
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.set_assignee(execution, ct_id, payload.assignee, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 

@@ -116,3 +116,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0108-caminho-sem-dominio-no-guia — Caminho sem dominio no guia
 - 2026-09-13 — 0109-refoco-do-produto-e-congelamento-da-periferia — Refoco do produto e congelamento da periferia (specs: businessmap REMOVED, ci-automation MODIFIED, daily MODIFIED, decisions MODIFIED, local-automation MODIFIED, meetings MODIFIED, project-memory MODIFIED, risk-map MODIFIED, xray-migration MODIFIED)
 - 2026-09-13 — 0110-navegacao-e-identidade-no-padrao-github — Navegacao e identidade no padrao GitHub (specs: profile MODIFIED)
+- 2026-09-13 — 0111-execution-como-ciclo-de-teste — Execution como ciclo de teste (specs: executions MODIFIED)

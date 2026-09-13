@@ -241,6 +241,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  // -- ciclo de teste (change 0111 / ADR 0013) -----------------------------
+  patchExecution: (id: string, body: object) =>
+    request<Execution>(`/executions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  resultAssignee: (execId: string, ctId: string, assignee: string | null) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/assignee`, {
+      method: "POST",
+      body: JSON.stringify({ assignee }),
+    }),
   stepStatus: (execId: string, ctId: string, step: number, status: string) =>
     request<Execution>(`/executions/${execId}/results/${ctId}/steps/${step}`, {
       method: "POST",

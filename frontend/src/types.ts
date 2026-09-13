@@ -305,6 +305,9 @@ export interface ResultEntry {
   testcase_id: string;
   status: string;
   column: string;
+  // Responsável por ESTE caso dentro do ciclo (ADR 0013): é o que divide uma
+  // regressão entre duas ou mais pessoas sem duplicar a execution.
+  assignee?: string | null;
   executed_by: string | null;
   executed_at: string | null;
   duration_seconds: number | null;
@@ -325,9 +328,18 @@ export interface Execution {
   origin: string;
   squad: string | null;
   created_at: string;
+  // Período do ciclo (ADR 0013) — ausente nos execution.json anteriores.
+  starts_on?: string | null;
+  ends_on?: string | null;
   closed_at: string | null;
   status: "draft" | "in_progress" | "closed";
   results: ResultEntry[];
+  progress?: {
+    counts: Record<string, number>;
+    total: number;
+    done: number;
+    percent: number;
+  };
   history: { at: string; who: string; event: string; [k: string]: unknown }[];
 }
 
