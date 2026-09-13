@@ -45,7 +45,7 @@ def cenario(client):
     for ct, status in zip(cts, ["passed", "failed"]):
         client.post(
             f"/api/v1/executions/{execution['id']}/results/{ct['id']}/status",
-            json={"status": status, "column": status, "who": "carini"},
+            json={"status": status, "column": status},
         )
     return execution, cts
 

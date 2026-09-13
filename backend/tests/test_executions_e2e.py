@@ -48,21 +48,21 @@ def test_full_manual_regression_20_cts(client):
         for step in (1, 2, 3):
             client.post(
                 f"/api/v1/executions/{exec_id}/results/{ct_id}/steps/{step}",
-                json={"status": "passed", "who": "carini"},
+                json={"status": "passed"},
             )
         client.post(
             f"/api/v1/executions/{exec_id}/results/{ct_id}/status",
-            json={"status": "passed", "who": "carini"},
+            json={"status": "passed"},
         )
 
     failed_ct = ct_ids[19]
     client.post(
         f"/api/v1/executions/{exec_id}/results/{failed_ct}/steps/2",
-        json={"status": "failed", "who": "carini"},
+        json={"status": "failed"},
     )
     client.post(
         f"/api/v1/executions/{exec_id}/results/{failed_ct}/status",
-        json={"status": "failed", "who": "carini", "comment": "erro 500 no login"},
+        json={"status": "failed", "comment": "erro 500 no login"},
     )
     evidence = client.post(
         f"/api/v1/executions/{exec_id}/results/{failed_ct}/evidences",

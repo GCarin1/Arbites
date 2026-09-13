@@ -49,7 +49,7 @@ def proximo_pendente(execution, atual):
 def resolver(client, exec_id, ct_id, status="passed"):
     return client.post(
         f"/api/v1/executions/{exec_id}/results/{ct_id}/status",
-        json={"status": status, "column": status, "who": "carini"},
+        json={"status": status, "column": status},
     )
 
 
@@ -95,11 +95,11 @@ def test_evidencia_e_comentario_do_caso_ativo_gravam_sem_modal(client):
     exec_id, ct_id = execution["id"], cts[0]["id"]
 
     client.post(f"/api/v1/executions/{exec_id}/results/{ct_id}/steps/1",
-                json={"status": "passed", "who": "carini"})
+                json={"status": "passed"})
     enviado = client.post(
         f"/api/v1/executions/{exec_id}/results/{ct_id}/evidences",
         files={"file": ("tela.png", b"\x89PNG\r\n\x1a\n", "image/png")},
-        data={"who": "carini"},
+        data={},
     )
     assert enviado.status_code == 201
 

@@ -30,7 +30,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from . import agent_pack as agent_pack_ops
@@ -179,21 +179,27 @@ class AssigneeIn(BaseModel):
     assignee: str | None = None
 
 
+# `who` NAO entra por estes modelos (change 0115): a autoria vem da sessao,
+# como o author_of() diz. `extra="forbid"` faz o cliente que insiste receber
+# 422 em vez de mandar um campo que o servidor ignora em silencio.
 class ResultStatusIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
     comment: str | None = None
     column: str | None = None
-    who: str = "local"
 
 
 class StepStatusIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
-    who: str = "local"
 
 
 class DefectLinkIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     defect_id: str
-    who: str = "local"
 
 
 class LocalRunIn(BaseModel):
@@ -1509,7 +1515,8 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
         exec_ops.set_result_status(
-            execution, ct_id, payload.status, payload.who, payload.comment, payload.column
+            execution, ct_id, payload.status, author_of(request),
+            payload.comment, payload.column
         )
         _save_and_index(ws, conn, execution)
         clear_needs_rerun(ws, conn, ct_id)  # resultado novo → limpa re-execução (0090)
@@ -1521,7 +1528,9 @@ def _register_routes(app: FastAPI) -> None:
     ):
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
-        exec_ops.set_step_status(execution, ct_id, step_index, payload.status, payload.who)
+        exec_ops.set_step_status(
+            execution, ct_id, step_index, payload.status, author_of(request)
+        )
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1546,8 +1555,9 @@ def _register_routes(app: FastAPI) -> None:
         ct_id: str,
         file: UploadFile = File(...),
         note: str | None = Form(default=None),
-        who: str = Form(default="local"),
     ):
+        # Sem `who` no form (change 0115): quem anexou a evidencia e quem
+        # esta logado, e nao quem o cliente disser que e.
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
         content = await file.read()
@@ -1559,7 +1569,7 @@ def _register_routes(app: FastAPI) -> None:
             content,
             file.content_type,
             note,
-            who,
+            author_of(request),
         )
         _save_and_index(ws, conn, execution)
         return evidence
@@ -1579,7 +1589,7 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         _find_path(conn, "defects", payload.defect_id)  # 404 se o defeito não existe
         execution = exec_ops.load(ws, exec_id)
-        exec_ops.link_defect(execution, ct_id, payload.defect_id, payload.who)
+        exec_ops.link_defect(execution, ct_id, payload.defect_id, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1587,7 +1597,7 @@ def _register_routes(app: FastAPI) -> None:
     async def delete_link_defect(request: Request, exec_id: str, ct_id: str, defect_id: str):
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
-        exec_ops.unlink_defect(execution, ct_id, defect_id, "local")
+        exec_ops.unlink_defect(execution, ct_id, defect_id, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -3037,7 +3047,7 @@ def _register_routes(app: FastAPI) -> None:
         reindex_file(ws, conn, path)
         if payload.execution and payload.testcase:
             execution = exec_ops.load(ws, payload.execution)
-            exec_ops.link_defect(execution, payload.testcase, defect_id, "local")
+            exec_ops.link_defect(execution, payload.testcase, defect_id, author_of(request))
             _save_and_index(ws, conn, execution)
         return _defect_out(conn, ws, defect_id)
 

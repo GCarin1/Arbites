@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-09-13
-**Version:** 0.8.0
+**Version:** 0.9.0
 
 ## Purpose
 
@@ -71,6 +71,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall oferecer, ao lado do Kanban, um modo guiado em três painéis — ciclos, casos do ciclo e caso ativo — operando sobre a mesma execution, sem nenhum endpoint novo.
 - The system shall permitir no painel do caso ativo marcar cada passo, anexar evidência, escrever comentário e dar o resultado, sem abrir modal e sem sair da tela.
 - The system shall exibir no rodapé do modo guiado a posição do caso ativo no ciclo, o avanço para o próximo caso e o atalho que dá resultado e avança num gesto só.
+- The system shall preencher a autoria de toda escrita num resultado — `executed_by` e o `who` de cada evento do `history[]` — a partir da sessão, nas rotas de status do resultado, status do passo, evidência e vínculo de defeito.
 
 ### Event-driven
 
@@ -99,6 +100,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall not exigir cadastro prévio de sprint ou ambiente.
 - The system shall not criar cadastro de sprint, release ou responsável; `sprint` e `environment` seguem texto livre e o `assignee` é o e-mail de uma conta que já existe.
 - The system shall not substituir o Kanban pelo modo guiado; os dois modos leem e escrevem a mesma execution e a escolha é de quem executa.
+- The system shall not aceitar `who` no corpo dessas rotas; um cliente que envie o campo recebe 422, porque ignorá-lo em silêncio deixa no contrato uma promessa que o servidor não cumpre.
 
 ### Optional
 
@@ -138,6 +140,8 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 11. [verified] O cabeçalho do ciclo soma os contadores por status batendo com o total de casos, e um `execution.json` antigo — sem as chaves novas — continua sendo lido como ciclo sem período e sem responsável — verified by `backend/tests/test_execution_cycle.py`.
 12. [verified] O modo guiado percorre os casos de um ciclo na ordem, dá resultado e avança sem sair da tela, e o que ele grava é a mesma execution que o Kanban lê — verified by `backend/tests/test_executions_guided.py`.
 13. [verified] Dar resultado no último caso pendente encerra a fila em vez de voltar ao começo, e um ciclo fechado é percorrível mas não gravável — verified by `backend/tests/test_executions_guided.py`.
+14. [verified] Resultado, passo, evidência e defeito gravam como autor o e-mail da sessão, mesmo quando o corpo não traz autoria nenhuma — verified by `backend/tests/test_authorship_executions.py`.
+15. [verified] Um cliente que tenta forjar a autoria de um resultado é recusado com 422 e nada é gravado, e o mesmo caso executado por duas contas registra cada resultado em nome de quem o executou — verified by `backend/tests/test_authorship_executions.py`.
 
 ## Maturity
 

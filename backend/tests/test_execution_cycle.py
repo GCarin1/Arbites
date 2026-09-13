@@ -160,7 +160,7 @@ def test_ciclo_fechado_nao_aceita_troca_de_responsavel(client):
     execution = make_exec(client, [ct["id"]])
     exec_id = execution["id"]
     client.post(f"/api/v1/executions/{exec_id}/results/{ct['id']}/status",
-                json={"status": "passed", "who": "carini"})
+                json={"status": "passed"})
     client.post(f"/api/v1/executions/{exec_id}/close")
     resp = client.post(f"/api/v1/executions/{exec_id}/results/{ct['id']}/assignee",
                        json={"assignee": "ana@arbites.test"})
@@ -176,7 +176,7 @@ def test_contadores_do_cabecalho_fecham_com_o_total(client):
     exec_id = execution["id"]
     for ct, status in zip(cts, ["passed", "failed", "blocked"]):
         client.post(f"/api/v1/executions/{exec_id}/results/{ct['id']}/status",
-                    json={"status": status, "who": "carini"})
+                    json={"status": status})
 
     header = client.get(f"/api/v1/executions/{exec_id}").json()["progress"]
     assert header["total"] == 4
