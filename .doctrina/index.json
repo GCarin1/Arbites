@@ -2230,6 +2230,12 @@
         "last_updated": "2026-07-17"
       },
       {
+        "id": "responsividade-se-verifica-no-navegador-nao-no-css",
+        "path": ".doctrina/skills/responsividade-se-verifica-no-navegador-nao-no-css.md",
+        "description": "Responsividade não se confere lendo CSS nem confiando no build — abra o app no viewport alvo e meça `scrollWidth` contra `innerWidth` tela a tela; o que quebra são sobras de layout que o CSS não denuncia.",
+        "last_updated": "2026-09-13"
+      },
+      {
         "id": "rota-estatica-antes-da-dinamica",
         "path": ".doctrina/skills/rota-estatica-antes-da-dinamica.md",
         "description": "No FastAPI/Starlette, rotas estáticas (/x/folders) devem ser registradas ANTES das dinâmicas (/x/{id}) — senão o path param captura o segmento fixo e devolve 404.",
