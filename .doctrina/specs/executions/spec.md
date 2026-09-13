@@ -5,7 +5,7 @@
 **Implementation:** verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)
 **Realizes:** SC2
 **Last updated:** 2026-09-13
-**Version:** 0.9.4
+**Version:** 0.10.0
 
 ## Purpose
 
@@ -74,6 +74,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 - The system shall preencher a autoria de toda escrita num resultado — `executed_by` e o `who` de cada evento do `history[]` — a partir da sessão, nas rotas de status do resultado, status do passo, evidência e vínculo de defeito.
 - The system shall resolver os títulos dos casos de um ciclo com uma única leitura de `GET /testcases`, tanto no Kanban quanto no modo guiado, em vez de uma requisição por caso.
 - The system shall exibir na lista de ciclos o prazo de cada um e a situação dele — no prazo, termina hoje ou em atraso —, e o estado no vocabulário do ciclo, o mesmo que o cabeçalho usa.
+- The system shall apresentar o periodo do ciclo como um campo unico rotulado, com inicio e fim ligados e do mesmo tamanho, que nao se separa ao quebrar linha; e omitir sprint e ambiente por inteiro quando nenhum dos dois esta preenchido, em vez de desenhar tracos no lugar deles.
 
 ### Event-driven
 
@@ -150,6 +151,7 @@ resultados dentro de uma execution — nunca sobre o documento do CT.
 17. [verified] A lista de ciclos devolve o período de cada um, e um ciclo com prazo vencido é distinguível de um no prazo sem abrir nenhum dos dois — verified by `backend/tests/test_execution_cycle.py`.
 18. [verified] Um caso arrastado para uma coluna diferente do seu status é contado na coluna em que está, e o progresso do ciclo bate com o que o quadro mostra — verified by `backend/tests/test_execution_cycle.py`.
 19. [verified] Seis evidências enviadas ao mesmo tempo para o mesmo resultado são todas registradas no `execution.json`, com um arquivo em disco para cada — verified by `backend/tests/test_executions_concurrency.py`.
+20. [unverified] Em 390 px o rotulo do periodo e as duas datas ficam no mesmo grupo de quebra e as caixas tem a mesma largura; um ciclo sem sprint e sem ambiente nao desenha nada no lugar deles — verified by `frontend/src/components/Executions.tsx` + `frontend/src/styles.css`.
 
 ## Maturity
 

@@ -904,24 +904,34 @@ export function ExecutionBoard({
         </h1>
         <span className="spacer" />
         <div className="head-controls">
-          <span className="caption">
-            {execution.sprint ?? "—"} · {execution.environment ?? "—"}
+          {/* `— · —` não informava nada: ausência de rótulo se mostra não
+              mostrando (0139). Com um só preenchido, mostra-se aquele. */}
+          {(execution.sprint || execution.environment) && (
+            <span className="caption">
+              {[execution.sprint, execution.environment].filter(Boolean).join(" · ")}
+            </span>
+          )}
+          {/* O período mora no ciclo (ADR 0013); `sprint` ficou só como rótulo.
+              As duas pontas são UM campo: soltas e sem rótulo, ninguém sabia
+              que aquelas duas caixas eram início e fim do mesmo intervalo. */}
+          <span className="field-group">
+            <span className="field-group-label">Período</span>
+            <input
+              type="date"
+              aria-label="Início do ciclo"
+              value={execution.starts_on ?? ""}
+              disabled={closed}
+              onChange={(e) => void savePeriod({ starts_on: e.target.value || null })}
+            />
+            <span aria-hidden="true" className="field-group-sep">→</span>
+            <input
+              type="date"
+              aria-label="Fim do ciclo"
+              value={execution.ends_on ?? ""}
+              disabled={closed}
+              onChange={(e) => void savePeriod({ ends_on: e.target.value || null })}
+            />
           </span>
-          {/* O período mora no ciclo (ADR 0013); `sprint` ficou só como rótulo. */}
-          <input
-            type="date"
-            aria-label="Início do ciclo"
-            value={execution.starts_on ?? ""}
-            disabled={closed}
-            onChange={(e) => void savePeriod({ starts_on: e.target.value || null })}
-          />
-          <input
-            type="date"
-            aria-label="Fim do ciclo"
-            value={execution.ends_on ?? ""}
-            disabled={closed}
-            onChange={(e) => void savePeriod({ ends_on: e.target.value || null })}
-          />
           {squadsInExec.length > 0 && (
             <select
               value={squadFilter}

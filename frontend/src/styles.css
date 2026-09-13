@@ -780,6 +780,45 @@ button.nav-group-title:hover {
   min-width: 140px;
 }
 
+/* Par de controles que é UM campo (0139). Duas caixas soltas no cabeçalho
+   não dizem que são as duas pontas do mesmo intervalo — e, ao quebrar
+   linha, apareciam em linhas diferentes e com larguras diferentes, uma de
+   cada lado de um botão. O grupo tem rótulo, não se parte na quebra, e as
+   pontas dividem a largura por igual. */
+.field-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  flex: 0 1 auto;
+  min-width: 0;
+  /* se nem encolhendo couber, o grupo quebra DENTRO de si — o rótulo em
+     cima, o par embaixo — em vez de transbordar a tela */
+  flex-wrap: wrap;
+}
+.field-group-label {
+  font-size: var(--fs-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.field-group-sep {
+  color: var(--text-subtle);
+  flex: 0 0 auto;
+}
+/* as duas pontas do mesmo intervalo têm o mesmo tamanho — a regra de
+   `min-width: 140px` do cabeçalho de página as deixava com 231 e 195. O
+   `:not()` repetido é para bater a especificidade daquela regra, não
+   enfeite: sem ele o mínimo de 140 px continua valendo e o grupo transborda
+   a tela estreita em vez de encolher. */
+.page-head .head-controls .field-group input:not([type="checkbox"]):not([type="radio"]),
+.field-group input,
+.field-group select {
+  width: auto;
+  /* piso real de uma caixa de data: dd/mm/aaaa mais o ícone do seletor */
+  min-width: 118px;
+  flex: 1 1 0;
+}
+
 .section-title {
   font-size: var(--fs-caption);
   text-transform: uppercase;
@@ -2266,12 +2305,9 @@ table.dense tbody tr:hover td {
 .step-actions {
   display: flex;
   gap: 6px;
+  flex: 0 0 auto;
 }
-.step-actions button {
-  height: 28px;
-  padding: 0 10px;
-  font-size: var(--fs-caption);
-}
+
 
 .ct-picker {
   border: 1px solid var(--border);

@@ -113,7 +113,7 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.9.4",
+        "version": "0.10.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -389,9 +389,9 @@
     ],
     "changes": [
       {
-        "id": "0139-periodo-ciclo-cabecalho-execucao",
-        "title": "periodo do ciclo no cabecalho da execucao e duas caixas de data sem rotulo e de larguras diferentes, precedidas de um traco solto quando sprint e ambiente estao vazios",
-        "path": ".doctrina/changes/0139-periodo-ciclo-cabecalho-execucao",
+        "id": "0140-passos-modal-resultado-desalinhados",
+        "title": "passos do modal de resultado desalinhados em 390px: o texto do passo espremido em tres linhas ao lado dos botoes e o status solto na linha seguinte, e o envio de evidencia mostra o input de arquivo cru do sistema",
+        "path": ".doctrina/changes/0140-passos-modal-resultado-desalinhados",
         "status": "proposed",
         "opened": "2026-09-13",
         "lane": "product (uncertain)"
@@ -2203,6 +2203,19 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0139-periodo-ciclo-cabecalho-execucao",
+        "title": "periodo do ciclo no cabecalho da execucao e duas caixas de data sem rotulo e de larguras diferentes, precedidas de um traco solto quando sprint e ambiente estao vazios",
+        "path": ".doctrina/changes/archive/2026-09-13-0139-periodo-ciclo-cabecalho-execucao",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
             "operation": "MODIFIED"
           }
         ]
