@@ -3714,6 +3714,84 @@ button.link-chip-btn:disabled {
     flex: 1 1 auto;
   }
 
+  /* Tabela densa vira LISTA DE CARTÕES em tela estreita (0142).
+     `.table-wrap` rola de lado, então numa tabela de ~700 px a última
+     coluna — a das AÇÕES — nunca aparecia sem rolar, e as ações de liberar
+     e desativar conta pareciam não existir. Cada linha vira um cartão, cada
+     célula carrega o rótulo da sua coluna (`data-label`) e as ações caem no
+     pé do cartão. Opt-in por classe: tabela que ninguém rotulou continua
+     tabela. */
+  .table-wrap:has(> .stack-narrow) {
+    overflow-x: visible;
+    border: none;
+    background: none;
+  }
+  table.dense.stack-narrow,
+  table.dense.stack-narrow tbody,
+  table.dense.stack-narrow tr,
+  table.dense.stack-narrow td {
+    display: block;
+  }
+  table.dense.stack-narrow thead {
+    /* o rótulo de cada coluna passa a viajar com a célula */
+    display: none;
+  }
+  table.dense.stack-narrow tr {
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    padding: var(--s1h);
+    margin-bottom: var(--s1h);
+  }
+  /* GRID, não flex: a célula de conta tem nome + `<br>` + e-mail, e no flex
+     cada um vira um item próprio — o e-mail saía da caixa numa terceira
+     coluna. No grid, todo o conteúdo inline contíguo vira UM item anônimo e
+     quebra linha como texto normal. */
+  table.dense.stack-narrow td {
+    border-bottom: none;
+    padding: 3px 0;
+    display: grid;
+    grid-template-columns: 34% minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--s1);
+  }
+  /* o `<span>` do e-mail é um ELEMENTO, então vira item próprio do grid e
+     caía na coluna do rótulo; preso à coluna 2, ele desce como segunda
+     linha do valor, que é o que a tabela larga já mostra */
+  table.dense.stack-narrow td > * {
+    grid-column: 2;
+  }
+  table.dense.stack-narrow td::before {
+    content: attr(data-label);
+    grid-column: 1;
+    color: var(--text-muted);
+    font-size: var(--fs-caption);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  /* célula de ações: sem rótulo, ocupando a largura, botões quebrando */
+  table.dense.stack-narrow td[data-label=""] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: var(--s1);
+    margin-top: 2px;
+    border-top: 1px solid var(--border);
+  }
+  table.dense.stack-narrow td[data-label=""]::before {
+    content: none;
+  }
+  /* controle dentro do cartão tem a largura da sua coluna, não a da tela */
+  table.dense.stack-narrow td select,
+  table.dense.stack-narrow td input {
+    width: 100%;
+    min-width: 0;
+  }
+  /* célula sem conteúdo não vira linha de cartão vazia */
+  table.dense.stack-narrow td:empty {
+    display: none;
+  }
+
   /* o menu da conta não pode sangrar pela direita */
   .account-dropdown {
     right: 0;

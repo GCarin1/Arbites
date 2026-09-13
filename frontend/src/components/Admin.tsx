@@ -8,15 +8,16 @@ import type {
   Role,
   Switch,
 } from "../types";
+import { TabBar } from "./TabBar";
 import { useToast } from "./Toast";
 
 type Pane = "users" | "access" | "activity" | "system";
 
-const PANES: { key: Pane; label: string }[] = [
-  { key: "users", label: "Usuários" },
-  { key: "access", label: "Acessos" },
-  { key: "activity", label: "Atividade" },
-  { key: "system", label: "Sistema" },
+const PANE_TABS: readonly (readonly [Pane, string])[] = [
+  ["users", "Usuários"],
+  ["access", "Acessos"],
+  ["activity", "Atividade"],
+  ["system", "Sistema"],
 ];
 
 const ROLES: Role[] = ["admin", "editor", "viewer"];
@@ -86,19 +87,19 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
 
   return (
     <div>
-      <div className="card-head block">
-        <h3>Administração</h3>
-        <span className="spacer" />
-        {PANES.map((p) => (
-          <button
-            key={p.key}
-            className={pane === p.key ? "primary" : ""}
-            onClick={() => setPane(p.key)}
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="page-head">
+        <h1 className="page-title">Administração</h1>
       </div>
+      {/* A faixa canônica rola dentro de si (0135). Como botões soltos num
+          `card-head`, as quatro abas empurravam a largura da PÁGINA em
+          390 px e a tela inteira rolava de lado (0142). */}
+      <TabBar
+        tabs={PANE_TABS}
+        value={pane}
+        onChange={setPane}
+        className="block"
+        label="Seções da administração"
+      />
 
       {pane === "users" && (
         <>
@@ -113,7 +114,7 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
               </p>
             ) : (
               <div className="table-wrap">
-                <table className="dense">
+                <table className="dense stack-narrow">
                 <thead>
                   <tr>
                     <th>Conta</th>
@@ -125,13 +126,13 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
                 <tbody>
                   {pending.map((u) => (
                     <tr key={u.id}>
-                      <td>
+                      <td data-label="Conta">
                         {u.name || "—"}
                         <br />
                         <span className="muted">{u.email}</span>
                       </td>
-                      <td>{when(u.created_at)}</td>
-                      <td>
+                      <td data-label="Cadastro">{when(u.created_at)}</td>
+                      <td data-label="Papel na liberação">
                         <select
                           value={pendingRole[u.id] ?? "viewer"}
                           onChange={(e) =>
@@ -148,7 +149,7 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td data-label="">
                         <button
                           className="primary"
                           onClick={() =>
@@ -186,7 +187,7 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
               <h3>Contas</h3>
             </div>
             <div className="table-wrap">
-              <table className="dense">
+              <table className="dense stack-narrow">
               <thead>
                 <tr>
                   <th>Conta</th>
@@ -202,12 +203,12 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
                   const isSelf = u.id === currentUserId;
                   return (
                     <tr key={u.id}>
-                      <td>
+                      <td data-label="Conta">
                         {u.name || "—"}
                         <br />
                         <span className="muted">{u.email}</span>
                       </td>
-                      <td>
+                      <td data-label="Papel">
                         <select
                           value={u.role}
                           disabled={isSelf}
@@ -225,10 +226,10 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
                           ))}
                         </select>
                       </td>
-                      <td>{STATUS_LABEL[u.status] ?? u.status}</td>
-                      <td>{when(u.last_login_at)}</td>
-                      <td>{u.open_sessions}</td>
-                      <td>
+                      <td data-label="Status">{STATUS_LABEL[u.status] ?? u.status}</td>
+                      <td data-label="Último login">{when(u.last_login_at)}</td>
+                      <td data-label="Sessões">{u.open_sessions}</td>
+                      <td data-label="">
                         {isSelf ? (
                           <span className="muted">esta é a sua conta</span>
                         ) : (
@@ -307,7 +308,7 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
             <h3>Tentativas de autenticação</h3>
           </div>
           <div className="table-wrap">
-            <table className="dense">
+            <table className="dense stack-narrow">
             <thead>
               <tr>
                 <th>Quando</th>
@@ -320,9 +321,9 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
             <tbody>
               {attempts.map((a, i) => (
                 <tr key={`${a.at}-${i}`}>
-                  <td>{when(a.at)}</td>
-                  <td>{a.email}</td>
-                  <td>
+                  <td data-label="Quando">{when(a.at)}</td>
+                  <td data-label="Conta informada">{a.email}</td>
+                  <td data-label="Resultado">
                     <span
                       className={`status-dot ${
                         a.ok ? "dot-col-passed" : "dot-col-failed"
@@ -369,7 +370,7 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
             </div>
           </div>
           <div className="table-wrap">
-            <table className="dense">
+            <table className="dense stack-narrow">
               <thead>
                 <tr>
                   <th>Quando</th>
@@ -381,12 +382,12 @@ export function Admin({ currentUserId }: { currentUserId: number }) {
               <tbody>
                 {activity.map((e, i) => (
                   <tr key={`${e.at}-${i}`}>
-                    <td>{when(e.at)}</td>
-                    <td>{e.user_email}</td>
-                    <td className="mono">
+                    <td data-label="Quando">{when(e.at)}</td>
+                    <td data-label="Autor">{e.user_email}</td>
+                    <td className="mono" data-label="Ação">
                       {e.method} {e.path}
                     </td>
-                    <td className="mono">{e.ip || "—"}</td>
+                    <td className="mono" data-label="IP">{e.ip || "—"}</td>
                   </tr>
                 ))}
               </tbody>

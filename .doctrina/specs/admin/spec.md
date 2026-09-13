@@ -12,7 +12,7 @@
 **Implementation:** verified — `backend/arbites/api.py` (rotas /admin/*), `frontend/src/components/Admin.tsx`
 **Realizes:** SC16
 **Last updated:** 2026-09-12
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -52,6 +52,7 @@ histórica das execuções; apagar reescreveria o passado.
   somente ao papel `admin`, com as abas Usuários, Acessos e Sistema.
 - The system shall destacar a fila de cadastros pendentes na aba Usuários,
   porque é o único item da tela que bloqueia outra pessoa de trabalhar.
+- The system shall manter toda acao de conta do painel de administracao — liberar, recusar, desativar, reativar, encerrar sessoes e definir senha — alcancavel sem rolagem lateral em tela estreita, apresentando cada linha de tabela como um cartao com o rotulo da coluna junto de cada valor.
 
 ### Event-driven
 
@@ -112,6 +113,7 @@ histórica das execuções; apagar reescreveria o passado.
 7. [verified] `GET /admin/overview` responde contagem por status, estado
    do índice, tamanho da lixeira e versão — verified by
    `backend/tests/test_admin_panel.py`.
+8. [unverified] Em 390 px nenhuma aba do painel faz a pagina rolar de lado e todo botao de acao de conta esta dentro da largura da tela; em 1440 px as tabelas seguem tabelas com cabecalho — verified by `frontend/src/components/Admin.tsx` + `frontend/src/styles.css`.
 
 ## Maturity
 

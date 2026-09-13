@@ -15,7 +15,7 @@
         "id": "admin",
         "path": ".doctrina/specs/admin/spec.md",
         "status": "active",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "last_updated": "2026-09-12",
         "implementation": "verified — `backend/arbites/api.py` (rotas /admin/*), `frontend/src/components/Admin.tsx`",
         "realizes": [
@@ -2231,6 +2231,19 @@
         "status": "applied",
         "applied": "2026-09-13",
         "specs_affected": []
+      },
+      {
+        "id": "0142-abas-admin-cabem-px",
+        "title": "abas do admin nao cabem em 390px e geram rolagem lateral da pagina inteira, e as tabelas densas do admin escondem a coluna de acoes, o que faz as acoes de liberar e desativar cadastro parecerem inexistentes",
+        "path": ".doctrina/changes/archive/2026-09-13-0142-abas-admin-cabem-px",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "admin",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
