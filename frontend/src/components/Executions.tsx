@@ -121,25 +121,37 @@ function CycleDeadline({ execution }: { execution: ExecutionSummary }) {
  */
 function CycleHeader({
   results,
+  progress,
   status,
   startsOn,
   endsOn,
 }: {
   results: ResultEntry[];
+  progress?: Execution["progress"];
   status: string;
   startsOn: string | null;
   endsOn: string | null;
 }) {
-  const counts: Record<string, number> = {};
-  for (const r of results) {
-    const key = r.column || r.status;
-    counts[key] = (counts[key] ?? 0) + 1;
+  // A contagem vem do servidor (change 0122). Recalcular aqui mantinha uma
+  // segunda contagem viva no cliente, e duas contagens da mesma pergunta
+  // divergem no primeiro caso arrastado. O cálculo local só entra quando o
+  // filtro de squad esconde parte dos casos — aí o total exibido é o do
+  // recorte, não o do ciclo.
+  const filtrado = progress === undefined || results.length !== progress.total;
+  const counts: Record<string, number> = { ...(filtrado ? {} : progress.counts) };
+  if (filtrado) {
+    for (const r of results) {
+      const key = r.column || r.status;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
   }
-  const total = results.length;
-  const done = STACK_ORDER.filter((k) => k !== "pending" && k !== "in_progress").reduce(
-    (sum, k) => sum + (counts[k] ?? 0),
-    0,
-  );
+  const total = filtrado ? results.length : progress.total;
+  const done = filtrado
+    ? STACK_ORDER.filter((k) => k !== "pending" && k !== "in_progress").reduce(
+        (sum, k) => sum + (counts[k] ?? 0),
+        0,
+      )
+    : progress.done;
   const deadline = deadlineNote(startsOn, endsOn);
   return (
     <div className="cycle-header card block">
@@ -971,6 +983,7 @@ export function ExecutionBoard({
 
       <CycleHeader
         results={visible}
+        progress={execution.progress}
         status={execution.status}
         startsOn={execution.starts_on ?? null}
         endsOn={execution.ends_on ?? null}

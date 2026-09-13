@@ -113,7 +113,7 @@
         "id": "executions",
         "path": ".doctrina/specs/executions/spec.md",
         "status": "active",
-        "version": "0.9.2",
+        "version": "0.9.3",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1 + ciclo com datas e responsável por caso (backend/arbites/executions.py, backend/arbites/api.py, frontend/src/components/Executions.tsx)",
         "realizes": [
@@ -1973,6 +1973,19 @@
         "specs_affected": [
           {
             "capability": "testcases",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0122-progresso-ciclo-conta-status",
+        "title": "progresso do ciclo conta por status enquanto o quadro conta por coluna e os dois numeros divergem",
+        "path": ".doctrina/changes/archive/2026-09-13-0122-progresso-ciclo-conta-status",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "executions",
             "operation": "MODIFIED"
           }
         ]

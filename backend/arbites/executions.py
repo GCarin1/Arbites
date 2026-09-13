@@ -264,12 +264,20 @@ def set_assignee(
 
 
 def progress(execution: dict[str, Any]) -> dict[str, Any]:
-    """Cabeçalho de progresso do ciclo: contagem por status e total. Derivado
-    dos resultados a cada leitura — número guardado é número que diverge."""
-    counts = {status: 0 for status in KANBAN_COLUMNS}
+    """Cabeçalho de progresso do ciclo: contagem por COLUNA e total.
+
+    Pela coluna, não pelo status cru: a ADR 0005 separou os dois de propósito
+    e é a coluna que o time olha e move. Contar por status faria um caso
+    arrastado para "Retest" aparecer na coluna Retest do quadro e como
+    `passed` no progresso da mesma execution (change 0122).
+
+    Derivado dos resultados a cada leitura — número guardado é número que
+    diverge do que ele conta.
+    """
+    counts = {column: 0 for column in KANBAN_COLUMNS}
     for result in execution.get("results") or []:
-        status = result.get("status", "pending")
-        counts[status] = counts.get(status, 0) + 1
+        column = result.get("column") or result.get("status", "pending")
+        counts[column] = counts.get(column, 0) + 1
     total = sum(counts.values())
     done = sum(counts.get(s, 0) for s in FINAL_STATUSES)
     return {

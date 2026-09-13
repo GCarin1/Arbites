@@ -258,3 +258,44 @@ def test_ciclo_sem_periodo_aparece_na_lista_sem_prazo(client):
     listado = next(c for c in client.get("/api/v1/executions").json()
                    if c["id"] == sem_data["id"])
     assert listado["starts_on"] is None and listado["ends_on"] is None
+
+
+# -- AC: o progresso conta pela coluna, como o quadro (change 0122) ------
+
+
+def test_caso_arrastado_e_contado_na_coluna_em_que_esta(client):
+    """A ADR 0005 separou status e coluna de propósito: arrastar para
+    "Retest" muda a coluna sem mentir sobre o que aconteceu na última
+    execução. Contar por status fazia o caso aparecer na coluna Retest do
+    quadro e como `passed` no progresso da MESMA execution."""
+    cts = [make_ct(client, f"Caso {i}") for i in range(3)]
+    execution = make_exec(client, [c["id"] for c in cts])
+    exec_id = execution["id"]
+
+    client.post(f"/api/v1/executions/{exec_id}/results/{cts[0]['id']}/status",
+                json={"status": "passed", "column": "passed"})
+    # passou, mas foi arrastado para Retest: coluna e status divergem
+    client.post(f"/api/v1/executions/{exec_id}/results/{cts[1]['id']}/status",
+                json={"status": "passed", "column": "retest"})
+
+    lido = client.get(f"/api/v1/executions/{exec_id}").json()
+    contagem = lido["progress"]["counts"]
+    assert contagem["retest"] == 1
+    assert contagem["passed"] == 1
+    assert contagem["pending"] == 1
+
+    # e bate com o que o quadro mostra: a coluna de cada resultado
+    do_quadro: dict[str, int] = {}
+    for r in lido["results"]:
+        coluna = r["column"] or r["status"]
+        do_quadro[coluna] = do_quadro.get(coluna, 0) + 1
+    assert {k: v for k, v in contagem.items() if v} == do_quadro
+
+
+def test_resultado_sem_coluna_cai_no_status(client):
+    """`execution.json` anterior ao campo `column` continua sendo contado."""
+    assert progress({"results": [{"status": "failed"}, {"status": "passed"}]}) == {
+        "counts": {"pending": 0, "in_progress": 0, "blocked": 0,
+                   "failed": 1, "retest": 0, "passed": 1},
+        "total": 2, "done": 2, "percent": 100,
+    }
