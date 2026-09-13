@@ -142,3 +142,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0134-falha-rede-fetch-chega — falha de rede no fetch chega a tela como Failed to fetch em ingles sem dizer o que fazer (specs: design-system MODIFIED)
 - 2026-09-13 — 0137-cenario-interrompido-timeout-cancelamento — cenario interrompido por timeout ou cancelamento e gravado como passed porque o fecho do progresso ao vivo trata ausencia de falha como aprovacao (specs: local-automation MODIFIED)
 - 2026-09-13 — 0135-barra-sub-abas-ia-transborda — barra de sub-abas da IA transborda a viewport em 390px: a aba Configuracao fica cortada na borda direita sem nenhum sinal de rolagem (specs: design-system MODIFIED)
+- 2026-09-13 — 0136-linha-arvore-requisitos-execucoes — linha de arvore de requisitos e de execucoes desenha os rotulos uns por cima dos outros em 390px: id, cobertura, status e data se sobrepoem porque o flex encolhe todos abaixo do proprio texto (specs: design-system MODIFIED)

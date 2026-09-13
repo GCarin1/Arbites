@@ -2754,6 +2754,22 @@ a {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Quem NÃO recorta, NÃO encolhe (0136).
+   `.repo-row` é um flex de irmãos soltos — selo de cobertura, selo de
+   status, data, ações. Nenhum declarava `flex-shrink`, então faltando
+   largura o navegador encolhia TODOS por igual; só o título sabe ceder
+   (tem `min-width: 0` + reticências), os outros têm `nowrap` e nenhum
+   recorte, então o texto saía da caixa e era DESENHADO POR CIMA do
+   vizinho — `ST-0001` em cima de "sem cobertura" em cima de "active".
+   Aqui só `.repo-file-main` cede; o resto guarda o seu tamanho. */
+.repo-row > *:not(.repo-file-main) {
+  flex: 0 0 auto;
+}
+/* o identificador dentro do botão também não encolhe: ele é o que
+   identifica a linha, e `CT-0…` não identifica nada */
+.repo-file-main > .mono {
+  flex: 0 0 auto;
+}
 .repo-file.dragging {
   opacity: 0.4;
 }
@@ -3537,9 +3553,42 @@ button.link-chip-btn:disabled {
   .repo-row {
     gap: 4px;
     padding: 1px 4px;
+    /* Com a sobreposição resolvida, os metadados ainda espremiam o título
+       até `Lo…`. Em tela estreita a linha vira DUAS, e em DUAS mesmo — não
+       em quantas o conteúdo pedir. A quebra é explícita: um item vazio de
+       largura total entre a identidade e o resto, posicionado por `order`.
+       Assim a primeira linha é sempre conector + id + título e a segunda é
+       sempre o resto, por mais selo que a linha ganhe depois. Nada é
+       escondido — o que não cabe desce. */
+    flex-wrap: wrap;
+    row-gap: 2px;
+    align-items: baseline;
+  }
+  .repo-row > .tree-prefix,
+  .repo-row > .expand-btn,
+  .repo-row > input[type="checkbox"],
+  .repo-row > .repo-file-main,
+  .repo-row > .repo-folder-name {
+    order: 1;
+  }
+  .repo-row::after {
+    content: "";
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+  }
+  .repo-row > * {
+    order: 3;
   }
   .repo-file-main {
     gap: 6px;
+    flex: 1 1 auto;
+  }
+  /* ação de linha não depende de hover num aparelho sem cursor, e segue o
+     resto dos metadados em vez de ser empurrada para a direita — empurrada,
+     ela não cabia e virava uma TERCEIRA linha */
+  .repo-row .repo-actions {
+    opacity: 1;
   }
 
   /* o menu da conta não pode sangrar pela direita */
