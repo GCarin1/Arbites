@@ -49,11 +49,29 @@
   --fs-caption: 12px;
 
   /* Spacing scale (8px grid) */
+  /* Escala de espaçamento. Os degraus abaixo de 8px existem porque a
+     interface os usa: sem eles, 87 valores acabaram decididos caso a caso
+     no CSS de cada componente (change 0126). */
+  --s0: 4px;
   --s1: 8px;
+  --s1h: 12px;
   --s2: 16px;
   --s3: 24px;
   --s4: 32px;
   --s6: 48px;
+
+  /* Densidade de leitura (change 0126). A mesma tela serve a duas perguntas
+     opostas — "quantos casos há neste ciclo" e "o que diz este caso" — e o
+     fator muda o que determina quantas linhas cabem: o respiro das linhas e
+     a altura dos controles. A separação entre seções fica de fora: ela é
+     estrutura, e encolhê-la não faz caber mais nada. */
+  --density: 1;
+  --row-pad-y: calc(4px * var(--density));
+  --row-gap: calc(2px * var(--density));
+  /* A entrelinha entra junto: sem ela o conteúdo da linha domina o respiro
+     e a densidade compacta quase não compacta. Entrelinha não é tamanho de
+     fonte — o texto continua com 14px em qualquer densidade. */
+  --row-line: 1.5;
 
   /* Radii */
   --r-control: 6px;
@@ -62,7 +80,7 @@
   /* Sizing */
   --h-header: 56px;
   --w-sidebar: 240px;
-  --h-control: 36px;
+  --h-control: calc(36px * var(--density));
   /* Ponto de quebra único da casca (change 0125): abaixo dele a lateral
      sai do fluxo. 860px porque é onde 240 de menu + o conteúdo mínimo
      legível deixam de caber lado a lado. */
@@ -70,6 +88,18 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* As três densidades (change 0126). Só o fator muda: tudo que respira lê
+   `--row-pad-y`, `--row-gap` e `--h-control`, então nenhum componente
+   precisa saber que a densidade existe. */
+:root[data-density="compact"] {
+  --density: 0.7;
+  --row-line: 1.2;
+}
+:root[data-density="comfortable"] {
+  --density: 1.4;
+  --row-line: 1.75;
 }
 
 * {
@@ -179,8 +209,10 @@ button.danger:hover:not(:disabled) {
 
 /* Small inline button (step actions, table row actions) */
 button.btn-sm {
-  height: 28px;
-  padding: 0 10px;
+  /* Ação de linha acompanha a densidade: é ela que segura a altura das
+     linhas da árvore e da tabela (change 0126). */
+  height: calc(28px * var(--density));
+  padding: 0 var(--s1h);
   font-size: var(--fs-caption);
 }
 
@@ -388,7 +420,7 @@ button.nav-group-title:hover {
   height: var(--h-control);
   justify-content: flex-start;
   width: 100%;
-  padding: 0 10px;
+  padding: 0 var(--s1h);
   background: none;
   border: none;
   border-radius: var(--r-control);
@@ -451,11 +483,12 @@ button.nav-group-title:hover {
 }
 .list-item {
   display: flex;
-  gap: 8px;
+  line-height: var(--row-line);
+  gap: var(--s1);
   align-items: center;
   width: 100%;
   height: auto;
-  min-height: 32px;
+  min-height: calc(32px * var(--density));
   text-align: left;
   background: none;
   border: none;
@@ -1114,7 +1147,8 @@ table.dense thead th {
 table.dense th,
 table.dense td {
   text-align: left;
-  padding: 10px 12px;
+  line-height: var(--row-line);
+  padding: calc(var(--row-pad-y) * 2.5) var(--s1h);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -1243,10 +1277,11 @@ table.dense tbody tr:hover td {
   text-align: center;
 }
 .kanban-card {
+  line-height: var(--row-line);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-control);
-  padding: 8px 10px;
+  padding: calc(var(--row-pad-y) * 2) calc(var(--row-pad-y) * 2.5);
   font-size: var(--fs-body);
   cursor: grab;
   transition: border-color 0.12s, background 0.12s;
@@ -1384,7 +1419,7 @@ table.dense tbody tr:hover td {
   background: none;
   border: 1px solid transparent;
   border-radius: var(--r-control);
-  padding: 6px var(--s1);
+  padding: calc(var(--row-pad-y) * 1.5) var(--s1);
   width: 100%;
 }
 .guided-cycle {
@@ -2438,9 +2473,10 @@ a {
 .repo-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 1px 8px;
+  line-height: var(--row-line);
+  gap: var(--s0);
+  min-height: calc(30px * var(--density));
+  padding: var(--row-gap) var(--s1);
   border-radius: var(--r-control);
 }
 /* conectores de árvore (box-drawing) — monospace p/ alinhamento exato */
@@ -2478,7 +2514,7 @@ a {
   flex: 1;
   min-width: 0;
   height: auto;
-  padding: 4px 0;
+  padding: var(--row-pad-y) 0;
   background: none;
   border: none;
   text-align: left;

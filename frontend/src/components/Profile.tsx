@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { AccountAvatar, bumpAvatarVersion } from "./AccountMenu";
+import {
+  DENSITIES,
+  DENSITY_LABELS,
+  loadDensity,
+  saveDensity,
+  type Density,
+} from "../density";
 import { api } from "../api";
 import type { SessionUser } from "../types";
 
@@ -30,6 +37,7 @@ export function Profile({
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [density, setDensity] = useState<Density>(loadDensity);
   const [name, setName] = useState("");
   const [memory, setMemory] = useState("");
   const [saving, setSaving] = useState(false);
@@ -137,6 +145,37 @@ export function Profile({
               placeholder="Seu nome"
             />
           </div>
+        </div>
+      </div>
+
+      <div className="card block">
+        <div className="card-head">
+          <h3>Densidade de leitura</h3>
+          <span className="spacer" />
+          <span className="caption muted">
+            vale neste navegador — é como você lê, não como o time trabalha
+          </span>
+        </div>
+        <p className="caption muted" style={{ marginBottom: "var(--s1)" }}>
+          Muda o respiro das linhas e a altura dos controles nas telas de
+          lista, árvore e quadro. A separação entre seções não muda: encolhê-la
+          não faz caber mais nada.
+        </p>
+        <div className="toolbar" role="radiogroup" aria-label="Densidade de leitura">
+          {DENSITIES.map((option) => (
+            <button
+              key={option}
+              className={option === density ? "primary" : ""}
+              role="radio"
+              aria-checked={option === density}
+              onClick={() => {
+                setDensity(option);
+                saveDensity(option);
+              }}
+            >
+              {DENSITY_LABELS[option]}
+            </button>
+          ))}
         </div>
       </div>
 

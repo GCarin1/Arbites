@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -78,6 +78,9 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall reduzir o cabeçalho em tela estreita ao essencial — marca, busca e conta —, escondendo contadores do workspace, caminho do diretório e reindexar, que são controles de quem administra a instância.
 - The system shall dar rolagem horizontal com encaixe por coluna ao Kanban em tela estreita, em vez de espremer as seis colunas na largura disponível.
 - The system shall garantir alvo de toque de no mínimo 44 px de altura nos itens de navegação e nas ações de linha quando o ponteiro for grosseiro.
+- The system shall oferecer degraus de espaçamento de 4px e 12px na escala de tokens, para que não haja valor de espaçamento decidido fora dela.
+- The system shall oferecer três densidades de leitura — compacta, padrão e confortável — que alteram o respiro das linhas e a altura dos controles, preservando a separação entre seções.
+- The system shall guardar a densidade escolhida no navegador de quem escolheu, por ser preferência de leitura de uma pessoa num aparelho, e não configuração do workspace.
 
 ### State-driven
 
@@ -90,6 +93,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall not exibir blocos de texto longos onde a interface já é
   autoexplicativa — a ajuda é curta e contextual.
 - The system shall not servir uma interface reduzida em funcionalidade na tela estreita; o que muda é a forma, e nenhuma tela deixa de ser alcançável.
+- The system shall not deixar a densidade compacta reduzir um alvo interativo abaixo do mínimo de toque quando o ponteiro for grosseiro.
 
 ## Acceptance criteria
 
@@ -136,6 +140,8 @@ e prova a sua fatia, citando o teste/artefato. -->
    `npm run build` limpo.
 7. [verified] A casca declara o ponto de quebra, a gaveta e o cabeçalho enxuto, e nenhuma tela fica inalcançável em largura de celular — verified by `frontend/src/App.tsx` + `frontend/src/styles.css`.
 8. [verified] Nenhuma tela em largura de 390 px transborda horizontalmente, e o que é largo por natureza rola dentro do próprio bloco — verified by `frontend/src/styles.css`.
+9. [verified] As três densidades mudam quantas linhas cabem na mesma altura de tela, e a compacta não reduz nenhum alvo de toque abaixo do mínimo — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
+10. [verified] A escala de espaçamento cobre os degraus usados pela interface, e a densidade escolhida sobrevive ao recarregamento da página — verified by `frontend/src/styles.css` + `frontend/src/components/Profile.tsx`.
 
 ## Maturity
 
