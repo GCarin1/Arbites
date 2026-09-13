@@ -1300,6 +1300,219 @@ table.dense tbody tr:hover td {
 .exec-seg.col-retest { background: var(--retest); }
 .exec-seg.col-passed { background: var(--success); }
 
+/* Dashboard: o número primeiro, a leitura do número logo abaixo
+   (change 0114). A linha de KPIs abre a tela; o bloco de atenção explica o
+   que os números querem dizer — com IA quando há provider, com os achados
+   determinísticos quando não há. */
+.kpi-row {
+  margin-bottom: var(--s2);
+}
+.attention-block .attention-prose {
+  white-space: pre-wrap;
+  margin: 0;
+}
+.attention-list {
+  list-style: none;
+  margin: var(--s1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.attention-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  font-size: var(--fs-body);
+}
+
+/* Modo guiado (change 0113): sentar e executar. Três painéis lado a lado —
+   ciclos, casos do ciclo e caso ativo — com o rodapé que avança sem sair da
+   tela. Complementa o Kanban; não o substitui. */
+.guided {
+  display: grid;
+  grid-template-columns: 200px 260px minmax(0, 1fr);
+  gap: var(--s2);
+  align-items: start;
+}
+.guided-cycles,
+.guided-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 200px);
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding-right: var(--s1);
+}
+.guided-panel-title {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.guided-cycle,
+.guided-case {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  padding: 6px var(--s1);
+  width: 100%;
+}
+.guided-cycle {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+.guided-cycle:hover:not(:disabled),
+.guided-case:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.guided-cycle.active,
+.guided-case.active {
+  background: var(--selected);
+  border-color: var(--selected-border);
+}
+.guided-cycle-name,
+.guided-case-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guided-case.done .guided-case-title {
+  color: var(--text-muted);
+}
+.guided-active-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.guided-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+  margin-top: var(--s2);
+  padding: var(--s1) 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* Telas estreitas: os painéis viram uma coluna só, em vez de três colunas
+   ilegíveis. */
+@media (max-width: 1100px) {
+  .guided {
+    grid-template-columns: 1fr;
+  }
+  .guided-cycles,
+  .guided-cases {
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+  }
+}
+
+/* Versões do caso de teste no git do workspace (change 0112). */
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.version-row {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+}
+.version-row:first-child {
+  border-top: none;
+}
+.version-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+.version-message {
+  font-size: var(--fs-body);
+}
+.version-diff {
+  margin: var(--s1) 0 0;
+  padding: var(--s1);
+  max-height: 320px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  white-space: pre;
+}
+
+/* Cabeçalho do ciclo (change 0111): a barra empilhada com os contadores
+   grandes por status e a situação do prazo — o número e a leitura dele no
+   mesmo lugar, no padrão do Xray. */
+.cycle-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.cycle-header-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.cycle-total strong {
+  font-size: var(--fs-h2);
+}
+.cycle-deadline.late {
+  color: var(--danger);
+}
+.cycle-deadline.due {
+  color: var(--warning);
+}
+.cycle-counters {
+  display: flex;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.cycle-counter {
+  display: flex;
+  flex-direction: column;
+  min-width: 64px;
+}
+.cycle-count {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.col-text-pending { color: var(--text-subtle); }
+.col-text-in_progress { color: var(--primary); }
+.col-text-blocked { color: var(--warning); }
+.col-text-failed { color: var(--danger); }
+.col-text-retest { color: var(--retest); }
+.col-text-passed { color: var(--success); }
+
+/* Responsável pelo caso dentro do ciclo, no card do Kanban. */
+.kanban-card-meta .assignee {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 /* ------------------------------------------------- Activity heatmap */
 /* Preenche a largura do card: colunas flexíveis (flex:1) e células que
    escalam por aspect-ratio — card maior = quadrados maiores. */
@@ -2786,6 +2999,83 @@ button.link-chip-btn:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Avatar da conta no canto superior direito (change 0110): presença
+   permanente da identidade, no padrão GitHub. */
+.account-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.account-trigger {
+  padding: 2px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid transparent;
+  line-height: 0;
+}
+.account-trigger:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: none;
+}
+.account-avatar-img,
+.identicon {
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
+}
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s1) 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.account-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px var(--s2) var(--s1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+.account-head strong,
+.account-head .caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-dropdown button {
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 6px var(--s2);
+  color: var(--text);
+}
+.account-dropdown button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+/* Editor do avatar na tela de Perfil. */
+.avatar-editor {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  margin-bottom: var(--s2);
+}
+.avatar-editor > svg,
+.avatar-editor > img {
+  flex: none;
 }
 
 /* Capability congelada (ADR 0012): presente e funcional, mas fora do foco.

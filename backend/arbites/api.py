@@ -38,6 +38,7 @@ from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
 from . import executions as exec_ops
+from . import versioning
 from . import project_memory as memory_ops
 from . import risk_map as risk_map_ops
 from . import metrics as metrics_ops
@@ -155,6 +156,9 @@ class ExecutionCreate(BaseModel):
     sprint: str | None = None
     environment: str | None = None
     squad: str | None = None
+    # O ciclo e a execution (ADR 0013): o periodo mora aqui, opcional.
+    starts_on: str | None = None
+    ends_on: str | None = None
     testcase_ids: list[str]
     # Mantido por compatibilidade de contrato; o valor e ignorado — a
     # autoria vem da sessao (capability profile).
@@ -166,6 +170,13 @@ class ExecutionPatch(BaseModel):
     sprint: str | None = None
     environment: str | None = None
     status: str | None = Field(default=None, pattern="^(draft|in_progress)$")
+    starts_on: str | None = None
+    ends_on: str | None = None
+
+
+class AssigneeIn(BaseModel):
+    # Vazio limpa o responsavel: o caso volta a ser de quem pegar.
+    assignee: str | None = None
 
 
 class ResultStatusIn(BaseModel):
@@ -1108,6 +1119,11 @@ def _register_routes(app: FastAPI) -> None:
         path = target_dir / f"{new_id}-{slugify(payload.title)}.md"
         _write_doc(path, meta, payload.body if payload.body is not None else DEFAULT_TC_BODY)
         reindex_file(ws, conn, path)
+        # Um commit por ACAO (change 0112), nao por gravacao — e nunca
+        # derrubando a escrita do usuario se o git falhar.
+        versioning.commit_paths(
+            ws, [path], f"cria {new_id}: {payload.title}", author_of(request)
+        )
         return _tc_out(conn, ws, new_id)
 
     # -- repositório de pastas (doc de ajustes §1.1) ------------------------
@@ -1204,6 +1220,10 @@ def _register_routes(app: FastAPI) -> None:
         meta["updated"] = date.today().isoformat()
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
+        versioning.commit_paths(
+            ws, [ws.root / rel],
+            f"edita {entity_id}: {meta.get('title') or rel}", author_of(request),
+        )
         return _tc_out(conn, ws, entity_id)
 
     @app.delete(API_PREFIX + "/testcases/{entity_id}", status_code=204)
@@ -1213,6 +1233,11 @@ def _register_routes(app: FastAPI) -> None:
         path = ws.root / rel
         ws.trash(path)
         reindex_file(ws, conn, path)
+        # O arquivo foi para a lixeira, nao para o vazio: o commit registra
+        # que saiu, e o historico continua servindo para recupera-lo.
+        versioning.commit_paths(
+            ws, [path], f"exclui {entity_id}", author_of(request)
+        )
 
     @app.get(API_PREFIX + "/testcases/{entity_id}/raw", response_class=PlainTextResponse)
     async def get_testcase_raw(request: Request, entity_id: str):
@@ -1243,6 +1268,10 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "testcases", entity_id)
         (ws.root / rel).write_text(payload.content, encoding="utf-8")
         reindex_file(ws, conn, ws.root / rel)
+        versioning.commit_paths(
+            ws, [ws.root / rel], f"edita {entity_id} (markdown cru)",
+            author_of(request),
+        )
         return _tc_out(conn, ws, entity_id)
 
     @app.post(API_PREFIX + "/testcases/{entity_id}/move")
@@ -1259,6 +1288,62 @@ def _register_routes(app: FastAPI) -> None:
             src.rename(dest)
             reindex_file(ws, conn, src)   # remove o caminho antigo do índice
             reindex_file(ws, conn, dest)  # indexa o novo
+            # As duas pontas no MESMO commit: e o que faz o `--follow` do
+            # historico enxergar a mudanca de pasta como renomeacao.
+            versioning.commit_paths(
+                ws, [src, dest],
+                f"move {entity_id} para {payload.folder or 'testcases/'}",
+                author_of(request),
+            )
+        return _tc_out(conn, ws, entity_id)
+
+    # -- versões do caso de teste (change 0112) ----------------------------
+
+    def _tc_rel(request: Request, entity_id: str) -> str:
+        return _find_path(conn_of(request), "testcases", entity_id)
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions")
+    async def list_versions(request: Request, entity_id: str, limit: int = 50):
+        """Antes de responder, recolhe o que foi editado por fora: quem
+        mexeu no arquivo no Obsidian tambem merece aparecer no historico."""
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        versioning.commit_external_edits(ws, rel)
+        return {"versions": versioning.history(ws, rel, limit=limit)}
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions/diff",
+             response_class=PlainTextResponse)
+    async def diff_versions(request: Request, entity_id: str, a: str, b: str = ""):
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            return versioning.diff(ws, rel, a, b or None)
+        except versioning.GitUnavailable as exc:
+            raise _error(422, "git_failed", str(exc)) from None
+
+    @app.get(API_PREFIX + "/testcases/{entity_id}/versions/{sha}",
+             response_class=PlainTextResponse)
+    async def version_content(request: Request, entity_id: str, sha: str):
+        ws = ws_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            return versioning.content_at(ws, sha, rel)
+        except versioning.GitUnavailable:
+            raise _error(404, "version_not_found",
+                         f"{sha} nao tem este arquivo") from None
+
+    @app.post(API_PREFIX + "/testcases/{entity_id}/versions/{sha}/restore")
+    async def restore_version(request: Request, entity_id: str, sha: str):
+        """Restaurar grava um commit NOVO: o historico entre a versao
+        restaurada e hoje continua la para quem for entender por que."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _tc_rel(request, entity_id)
+        try:
+            versioning.restore(ws, sha, rel, author_of(request))
+        except versioning.GitUnavailable:
+            raise _error(404, "version_not_found",
+                         f"{sha} nao tem este arquivo") from None
+        reindex_file(ws, conn, ws.root / rel)
         return _tc_out(conn, ws, entity_id)
 
     # -- executions (M1) ---------------------------------------------------
@@ -1313,6 +1398,7 @@ def _register_routes(app: FastAPI) -> None:
         execution = exec_ops.create(
             ws, payload.name, author_of(request), payload.sprint,
             payload.environment, testcases, squad=payload.squad,
+            starts_on=payload.starts_on, ends_on=payload.ends_on,
         )
         _save_and_index(ws, conn, execution)
         return execution
@@ -1373,7 +1459,10 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/executions/{exec_id}")
     async def get_execution(request: Request, exec_id: str):
-        return exec_ops.load(ws_of(request), exec_id)
+        """O progresso vem derivado dos resultados a cada leitura, e nao
+        guardado: contador gravado e contador que diverge do que ele conta."""
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return {**execution, "progress": exec_ops.progress(execution)}
 
     @app.delete(API_PREFIX + "/executions/{exec_id}", status_code=204)
     async def delete_execution(request: Request, exec_id: str):
@@ -1398,8 +1487,18 @@ def _register_routes(app: FastAPI) -> None:
         execution = exec_ops.load(ws, exec_id)
         if execution["status"] == "closed":
             raise _error(409, "execution_closed", f"{exec_id} está fechada")
-        for key, value in payload.model_dump(exclude_unset=True).items():
+        fields = payload.model_dump(exclude_unset=True)
+        period = {k: fields.pop(k) for k in ("starts_on", "ends_on") if k in fields}
+        for key, value in fields.items():
             execution[key] = value
+        if period:
+            # O periodo passa pela validacao do modulo (ADR 0013): um ciclo
+            # que termina antes de comecar e erro de digitacao, nao estado.
+            exec_ops.set_period(
+                execution,
+                period.get("starts_on", execution.get("starts_on")),
+                period.get("ends_on", execution.get("ends_on")),
+            )
         _save_and_index(ws, conn, execution)
         return execution
 
@@ -1423,6 +1522,18 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         execution = exec_ops.load(ws, exec_id)
         exec_ops.set_step_status(execution, ct_id, step_index, payload.status, payload.who)
+        _save_and_index(ws, conn, execution)
+        return execution
+
+    @app.post(API_PREFIX + "/executions/{exec_id}/results/{ct_id}/assignee")
+    async def post_result_assignee(
+        request: Request, exec_id: str, ct_id: str, payload: AssigneeIn
+    ):
+        """Responsavel por um caso dentro do ciclo (ADR 0013): e o que divide
+        uma regressao entre duas ou mais pessoas sem duplicar a execution."""
+        ws, conn = ws_of(request), conn_of(request)
+        execution = exec_ops.load(ws, exec_id)
+        exec_ops.set_assignee(execution, ct_id, payload.assignee, author_of(request))
         _save_and_index(ws, conn, execution)
         return execution
 

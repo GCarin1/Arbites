@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { api } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
+import { AccountMenu } from "./components/AccountMenu";
 import type { SessionUser, Switch, TreeNode, Warning, WorkspaceInfo } from "./types";
 
 const Home = lazy(() =>
@@ -30,6 +31,9 @@ const ExecutionCreate = lazy(() =>
 );
 const ExecutionsRepo = lazy(() =>
   import("./components/Executions").then((m) => ({ default: m.ExecutionsRepo }))
+);
+const ExecutionGuided = lazy(() =>
+  import("./components/ExecutionGuided").then((m) => ({ default: m.ExecutionGuided }))
 );
 const Dashboard = lazy(() =>
   import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
@@ -286,6 +290,8 @@ export default function App({
   const [selectedDefect, setSelectedDefect] = useState<string | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
   const [execCreating, setExecCreating] = useState(false);
+  // modo guiado (change 0113): complementa o Kanban, não o substitui
+  const [execGuided, setExecGuided] = useState(false);
   const [cmdkOpen, setCmdkOpen] = useState(false);
   // runs de automação ativos → dot pulsante no item Automação (0076)
   const [activeRuns, setActiveRuns] = useState(0);
@@ -470,10 +476,12 @@ export default function App({
         <button onClick={() => void reindex()} disabled={reindexing}>
           {reindexing ? "Reindexando…" : "Reindexar"}
         </button>
-        <span className="session-identity" title={`${user.email} · ${user.role}`}>
-          {user.name || user.email} · {user.role}
-        </span>
-        <button onClick={onLogout}>Sair</button>
+        <AccountMenu
+          user={user}
+          onProfile={() => selectTab("profile")}
+          onAdmin={() => selectTab("admin")}
+          onLogout={onLogout}
+        />
       </header>
       {cmdkOpen && (
         <Suspense fallback={null}>
@@ -636,7 +644,7 @@ export default function App({
             </Suspense>
           ) : tab === "profile" ? (
             <Suspense fallback={<p className="empty">Carregando perfil…</p>}>
-              <Profile onError={setError} />
+              <Profile user={user} onError={setError} />
             </Suspense>
           ) : tab === "admin" ? (
             <Suspense fallback={<p className="empty">Carregando administração…</p>}>
@@ -647,7 +655,23 @@ export default function App({
               <XrayImport onImported={() => void refresh()} onError={setError} />
             </Suspense>
           ) : tab === "executions" ? (
-            execCreating ? (
+            execGuided ? (
+              <Suspense fallback={<p className="empty">Carregando modo guiado…</p>}>
+                <div className="back-bar">
+                  <button onClick={() => setExecGuided(false)}>← Voltar</button>
+                  <span className="crumbs caption">
+                    <span className="muted">Execuções</span>
+                    <span className="crumb-sep">/</span>
+                    <span>modo guiado</span>
+                  </span>
+                </div>
+                <ExecutionGuided
+                  initialId={selectedExec}
+                  onChanged={refresh}
+                  onError={setError}
+                />
+              </Suspense>
+            ) : execCreating ? (
               <Suspense fallback={<p className="empty">Carregando criação…</p>}>
                 <div className="back-bar">
                   <button onClick={() => setExecCreating(false)}>← Voltar</button>
@@ -676,10 +700,20 @@ export default function App({
                     <span className="mono">{selectedExec}</span>
                   </span>
                 </div>
+                <div className="toolbar">
+                  <button onClick={() => setExecGuided(true)}>
+                    Modo guiado (sentar e executar)
+                  </button>
+                </div>
                 <ExecutionBoard id={selectedExec} onChanged={refresh} onError={setError} />
               </Suspense>
             ) : (
               <Suspense fallback={<p className="empty">Carregando execuções…</p>}>
+                <div className="toolbar">
+                  <button onClick={() => setExecGuided(true)}>
+                    Modo guiado (sentar e executar)
+                  </button>
+                </div>
                 <ExecutionsRepo
                   version={reqVersion}
                   onOpen={(id) => {

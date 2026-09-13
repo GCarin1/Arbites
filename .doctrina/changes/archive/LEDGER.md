@@ -115,3 +115,8 @@ One line per archived change, newest last. Appended by
   - 2026-09-13 — 0108-caminho-sem-dominio-no-guia — forced archive past 1 blocker (verification: 1 unmet verification item in proposal.md (## Verification))
 - 2026-09-13 — 0108-caminho-sem-dominio-no-guia — Caminho sem dominio no guia
 - 2026-09-13 — 0109-refoco-do-produto-e-congelamento-da-periferia — Refoco do produto e congelamento da periferia (specs: businessmap REMOVED, ci-automation MODIFIED, daily MODIFIED, decisions MODIFIED, local-automation MODIFIED, meetings MODIFIED, project-memory MODIFIED, risk-map MODIFIED, xray-migration MODIFIED)
+- 2026-09-13 — 0110-navegacao-e-identidade-no-padrao-github — Navegacao e identidade no padrao GitHub (specs: profile MODIFIED)
+- 2026-09-13 — 0111-execution-como-ciclo-de-teste — Execution como ciclo de teste (specs: executions MODIFIED)
+- 2026-09-13 — 0112-versionamento-dos-casos-de-teste-com-git-no — Versionamento dos casos de teste com git no workspace (specs: testcases MODIFIED)
+- 2026-09-13 — 0113-tela-de-execucao-guiada-em-tres-paineis — Tela de execucao guiada em tres paineis (specs: executions MODIFIED)
+- 2026-09-13 — 0114-dashboard-com-kpis-e-o-que-precisa-de-atencao — Dashboard com KPIs e o que precisa de atencao (specs: reporting MODIFIED)

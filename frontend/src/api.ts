@@ -26,6 +26,7 @@ import type {
   RiskMap,
   SavedDaily,
   TestCaseResult,
+  TestCaseVersion,
   TimelineEntry,
   Execution,
   ExecutionSummary,
@@ -193,6 +194,17 @@ export const api = {
   deleteTestcase: (id: string) =>
     request<void>(`/testcases/${id}`, { method: "DELETE" }),
   testcaseRaw: (id: string) => request<string>(`/testcases/${id}/raw`),
+
+  // -- versões do caso de teste (change 0112) ------------------------------
+  testcaseVersions: (id: string) =>
+    request<{ versions: TestCaseVersion[] }>(`/testcases/${id}/versions`),
+  testcaseVersionDiff: (id: string, a: string, b = "") =>
+    request<string>(
+      `/testcases/${id}/versions/diff?a=${encodeURIComponent(a)}` +
+        (b ? `&b=${encodeURIComponent(b)}` : ""),
+    ),
+  restoreTestcaseVersion: (id: string, sha: string) =>
+    request<TestCase>(`/testcases/${id}/versions/${sha}/restore`, { method: "POST" }),
   moveTestcase: (id: string, folder: string) =>
     request<TestCase>(`/testcases/${id}/move`, {
       method: "POST",
@@ -240,6 +252,17 @@ export const api = {
     request<Execution>(`/executions/${execId}/results/${ctId}/status`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  // -- ciclo de teste (change 0111 / ADR 0013) -----------------------------
+  patchExecution: (id: string, body: object) =>
+    request<Execution>(`/executions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  resultAssignee: (execId: string, ctId: string, assignee: string | null) =>
+    request<Execution>(`/executions/${execId}/results/${ctId}/assignee`, {
+      method: "POST",
+      body: JSON.stringify({ assignee }),
     }),
   stepStatus: (execId: string, ctId: string, step: number, status: string) =>
     request<Execution>(`/executions/${execId}/results/${ctId}/steps/${step}`, {
@@ -308,6 +331,23 @@ export const api = {
   audit: (id: string) => request<AuditReport>(`/audit/${id}`),
 
   profile: () => request<{ name: string; memory: string }>("/profile"),
+
+  // -- avatar da conta (change 0110) ---------------------------------------
+  // O GET nao passa por aqui: a imagem e servida direto no `src` da <img>,
+  // que ja cai no identicon quando o backend responde 404.
+  putAvatar: async (file: File): Promise<{ ok: boolean; format: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const resp = await fetch(`${BASE}/profile/avatar`, {
+      method: "PUT",
+      credentials: "same-origin",
+      body: form,
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error?.message ?? `${resp.status}`);
+    return data;
+  },
+  deleteAvatar: () => request<void>("/profile/avatar", { method: "DELETE" }),
 
   memoryTimeline: (kinds = "", limit = 50, dateFrom = "", dateTo = "") => {
     const qs = new URLSearchParams({ kinds, limit: String(limit) });

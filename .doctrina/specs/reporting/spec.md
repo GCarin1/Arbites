@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
-**Last updated:** 2026-07-21
-**Version:** 0.13.0
+**Last updated:** 2026-09-13
+**Version:** 0.14.0
 
 ## Purpose
 
@@ -95,6 +95,8 @@ export PDF e Markdown (para colar no Confluence).
   recomendadas (achados do auditor reformulados como "faça X") e a última
   atualização dos dados (`last_reindex`). Não coleta nada novo — orquestra
   `audit`, `automation_report`, `defects_report` e `health_score`.
+- The system shall abrir o dashboard por uma linha de indicadores — cobertura de requisito, cobertura de execução, pass rate, taxa de bloqueio, retrabalho e health score —, todos derivados dos números que o produto já apura, sem métrica nova.
+- The system shall apresentar, logo abaixo dos indicadores, um bloco "O que precisa de atenção" em prosa, com a síntese, os riscos e as ações recomendadas do período filtrado.
 
 ### Event-driven
 
@@ -111,6 +113,7 @@ export PDF e Markdown (para colar no Confluence).
 - While nenhuma meta está configurada para uma métrica, the system shall
   reportar `status: none` e não colorir o card (número e fórmula seguem
   visíveis).
+- While não houver provider de IA configurado, the system shall preencher o bloco de atenção com os alertas e as ações recomendadas determinísticos de `GET /metrics/dashboard`, em vez de esconder o bloco ou deixá-lo vazio.
 
 ### Unwanted-behavior (must-not)
 
@@ -131,6 +134,7 @@ export PDF e Markdown (para colar no Confluence).
   suficiente como zero; o componente fica `value: null` e é excluído do
   cálculo, com os pesos restantes renormalizados. Em workspace sem nenhuma
   atividade de QA, o `score` geral é `null`.
+- The system shall not condicionar nenhum número do dashboard à disponibilidade da IA; o indicador é apurado do índice e continua correto com a IA desligada.
 
 ### Optional
 
@@ -208,6 +212,8 @@ export PDF e Markdown (para colar no Confluence).
     reais injetados no contexto (a IA não inventa) e o export inclui a seção
     inicial quando aceita; sem provider devolve 409 e o export segue
     íntegro — verified by `backend/tests/test_reporting_summary.py`.
+16. [verified] O contexto do bloco de atenção traz os indicadores do período filtrado e as ações recomendadas, e nenhum deles depende de provider de IA configurado — verified by `backend/tests/test_dashboard_attention.py`.
+17. [verified] Com a IA desligada o dashboard responde inteiro e o bloco de atenção é preenchido pelos achados determinísticos; com provider, o resumo narrado é gerado a partir dos mesmos números — verified by `backend/tests/test_dashboard_attention.py`.
 
 ## Maturity
 

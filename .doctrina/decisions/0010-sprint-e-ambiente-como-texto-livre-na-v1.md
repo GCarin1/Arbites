@@ -1,10 +1,10 @@
 # ADR 0010 — Sprint e ambiente como texto livre na v1
 
-- **Status:** accepted
+- **Status:** superseded by 0013
 - **Date:** 2026-07-03
 - **Deciders:** Gcarini
 - **Supersedes:** —
-- **Superseded by:** —
+- **Superseded by:** 0013
 - **Evidence:** n/a — decisão de modelo de dados do intake; nenhuma implementação ainda (landará com o M1)
 - **Landed:** 2026-07-03 — `backend/arbites/executions.py`
 
