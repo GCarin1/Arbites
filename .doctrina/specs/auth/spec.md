@@ -12,7 +12,7 @@
 **Implementation:** verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`
 **Realizes:** SC15
 **Last updated:** 2026-09-12
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -66,6 +66,8 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 - The system shall expor `GET /admin/switches` (estado de todos, legível por qualquer sessão para que a UI esconda o que está desligado) e `PUT /admin/switches/{name}` (apenas `admin`), registrando quem alterou e quando.
 - The system shall ler um arquivo de ambiente do diretorio de execucao no arranque, dando precedencia as variaveis ja definidas no processo, para que a configuracao funcione igual dentro e fora de container.
 - The system shall oferecer um comando local para descartar o historico de tentativas de login, para que o bloqueio por tentativas nao deixe o dono da instancia sem saida na propria maquina.
+- The system shall oferecer um comando local que informe as contas existentes com papel e status, e que avise quando nao existe conta alguma, porque a recusa de login e indistinguivel de fora e de dentro da maquina a pessoa tem direito a resposta.
+- The system shall permitir criar ou redefinir localmente a conta de administrador, reativando-a e descartando o bloqueio por tentativas, sem nunca expor senha nem hash na saida.
 
 ### Event-driven
 
@@ -157,6 +159,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 10. [verified] Desligar `local_runner` faz `POST /runs/local` responder 403 `feature_disabled` citando o interruptor, e religá-lo devolve a rota, sem reiniciar o processo — verified by `backend/tests/test_authorization.py`.
 11. [verified] Os interruptores nascem todos ligados, sobrevivem ao reinício do processo e só o `admin` os altera — verified by `backend/tests/test_authorization.py`.
 12. [unverified] O arquivo de ambiente e aplicado sem sobrepor variavel ja exportada e sem expor valores; arranque sem admin e sem credencial registra erro nomeando as variaveis; o comando de destrave libera o login e pode alcancar uma conta so — verified by `backend/tests/test_primeira_execucao.py`.
+13. [unverified] Workspace sem conta explica o 401 e ensina o comando; criar e redefinir permitem entrar; conta pendente volta a ativa; senha curta e recusada sem tocar na conta; a listagem nunca mostra senha nem hash — verified by `backend/tests/test_recuperar_admin.py`.
 
 ## Maturity
 

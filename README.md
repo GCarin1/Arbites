@@ -68,6 +68,63 @@ Duas coisas que vale saber:
 > que a change 0165 corrigiu foi o caminho sem container, onde `python -m
 > arbites serve` ignorava o arquivo e a instância subia sem admin.
 
+### O `arbites.yaml`: o que é configurável
+
+Ele nasce **comentado** na primeira execução, dentro do workspace, cobrindo
+todos os blocos que o produto lê. Abrir o arquivo é a documentação.
+
+**Segredo não entra nele** — ele fica dentro do workspace, que é versionável e
+feito para ser compartilhado (ADR 0008). Chave de IA vai para o cofre do SO
+(pela tela IA → Providers) e o token do GitHub vai para o cofre ou para o
+`.env` (ADR 0017).
+
+| bloco | para quê | default |
+|---|---|---|
+| `workspace.id_prefixes` | prefixo de ID por tipo (`CT`, `ST`, …) | os embutidos |
+| `squads` | squads declarados, para os filtros sugerirem | vazio |
+| `automation_targets` | projetos de automação; o sub-bloco `github` liga o disparo e a coleta | vazio |
+| `risk_repos` | repositórios do mapa de risco | vazio |
+| `ai` | provider, modelo e URL base — **nunca a chave** | nenhum |
+| `observability` | de onde puxar CI, metas por sinal e retenção | nada vigiado |
+| `audit.auto_interval_hours` | de quanto em quanto tempo uma rodada nova dispara | 24 |
+| `requirements.vague_terms` | termos que o lint EARS marca como vagos | a lista embutida |
+| `metric_thresholds` | semáforo do dashboard: `{warn, bad, direction}` | sem semáforo |
+| `health_score.weights` | pesos da nota de saúde, renormalizados para 1.0 | 0.30 / 0.25 / 0.25 / 0.20 |
+| `ci_monitoring.name_pattern` | como reconhecer execução de CI pelo nome | sem separação |
+
+> Se o seu workspace é antigo, o arquivo dele continua como está — `ensure` só
+> escreve quando não existe. Para ver o novo, crie um workspace vazio e copie
+> os blocos que interessam.
+
+> **Cuidado ao editar `automation_targets` à mão:** salvar os targets pela tela
+> (Automação → Configurar) reescreve o bloco inteiro e **apaga o sub-bloco
+> `github:`** escrito à mão, sem avisar. Hoje os dois caminhos são
+> incompatíveis; está registrado para correção.
+
+### Não consigo entrar
+
+O login responde **401 "e-mail ou senha inválidos"** para três situações
+diferentes — conta inexistente, senha errada e conta não-ativa — e isso é
+deliberado: distinguir "não existe" de "senha errada" entrega uma lista de
+contas válidas a quem tenta adivinhar. De dentro da sua máquina, porém, você
+tem direito à resposta:
+
+```
+python -m arbites admin
+```
+
+Ele diz quantas contas existem, com papel e status — ou avisa que **não existe
+conta nenhuma**, que é o motivo mais comum do 401 numa instalação nova. Para
+criar a primeira conta, ou redefinir a senha de uma que já existe:
+
+```
+python -m arbites admin --email voce@exemplo.com --password uma-senha-de-12-ou-mais
+```
+
+> **O caminho traiçoeiro:** se a conta já existe, o bootstrap por ambiente
+> **nunca mais toca nela** — mudar `ARBITES_ADMIN_PASSWORD` no `.env` não muda
+> a senha de uma conta criada antes. É para isso que serve o comando acima.
+
 **Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
 e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
 ou destravar na hora:
@@ -76,6 +133,9 @@ ou destravar na hora:
 python -m arbites unlock                      # todas as contas
 python -m arbites unlock --email voce@exemplo.com
 ```
+
+(Redefinir a senha pelo `admin` já destrava a conta junto — quem chegou lá
+provavelmente errou a senha algumas vezes.)
 
 ### 3. Subir a plataforma (um comando sobe tudo)
 

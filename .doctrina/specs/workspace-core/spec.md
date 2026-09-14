@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)
 **Realizes:** SC1
 **Last updated:** 2026-07-20
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -40,6 +40,8 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
   ou à pasta do tipo quando a origem não foi registrada — sufixando em
   colisão, e reindexa o que voltou) e `DELETE /trash` (esvaziar). A UI
   oferece listar/restaurar/esvaziar na aba Problemas.
+- The system shall gerar o arquivo de configuracao inicial comentado e cobrindo todos os blocos que o produto consulta, incluindo os opcionais, porque configuracao que nao aparece no arquivo e configuracao que ninguem descobre.
+- The system shall declarar no proprio arquivo de configuracao que segredo nao entra nele e onde ele mora, ja que o arquivo fica dentro do workspace versionavel.
 
 ### Event-driven
 
@@ -85,6 +87,7 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
    restaurar devolve o arquivo ao caminho original e ao índice sem
    sobrescrever (sufixa em colisão); esvaziar limpa a lixeira — verified by
    `backend/tests/test_trash.py`.
+6. [unverified] O arquivo gerado traz os onze blocos consultados pelo codigo, nasce comentado, avisa que segredo nao entra nele, carrega como a configuracao padrao e nao sobrescreve um arquivo existente — verified by `backend/tests/test_config_padrao.py`.
 
 ## Maturity
 
