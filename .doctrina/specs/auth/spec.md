@@ -12,7 +12,7 @@
 **Implementation:** verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`
 **Realizes:** SC15
 **Last updated:** 2026-09-12
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -64,6 +64,8 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 - The system shall exigir papel `admin` nas superfícies governadas: `PUT /targets` (define o executável e o diretório do subprocess), `GET /automation/browse-features` (navega o filesystem do servidor), `GET|PUT /targets/{name}/env` e `GET /env/catalog` (segredos do projeto-alvo), `PUT /settings/github/token` e as chaves de IA, e `POST /import/xray` e `POST /import/xray/confirm`.
 - The system shall manter um registro de interruptores administráveis — `local_runner`, `filesystem_browse`, `target_env`, `ai` e `xray_import` — persistido no mesmo banco durável das contas, cada um ligado por padrão para não alterar em silêncio o comportamento da instalação local.
 - The system shall expor `GET /admin/switches` (estado de todos, legível por qualquer sessão para que a UI esconda o que está desligado) e `PUT /admin/switches/{name}` (apenas `admin`), registrando quem alterou e quando.
+- The system shall ler um arquivo de ambiente do diretorio de execucao no arranque, dando precedencia as variaveis ja definidas no processo, para que a configuracao funcione igual dentro e fora de container.
+- The system shall oferecer um comando local para descartar o historico de tentativas de login, para que o bloqueio por tentativas nao deixe o dono da instancia sem saida na propria maquina.
 
 ### Event-driven
 
@@ -99,6 +101,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 - While `ARBITES_SIGNUP` vale `off`, the system shall recusar
   `POST /auth/register` com 403 e código `signup_disabled`.
 - While o papel da sessão não alcança a rota, the system shall responder 403 com código `forbidden` — nunca 404, para não transformar autorização em adivinhação de rota.
+- While nao existe administrador ativo e o ambiente nao traz credencial de bootstrap, the system shall registrar um erro dizendo que ninguem consegue entrar e como corrigir, em vez de subir em silencio.
 
 ### Unwanted-behavior (must-not)
 
@@ -153,6 +156,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 9. [verified] Um `editor` cria artefatos e dispara um run local, mas recebe 403 em `PUT /targets`, no navegador de filesystem, no `.env` do alvo, no token do GitHub e no import Xray — verified by `backend/tests/test_authorization.py`.
 10. [verified] Desligar `local_runner` faz `POST /runs/local` responder 403 `feature_disabled` citando o interruptor, e religá-lo devolve a rota, sem reiniciar o processo — verified by `backend/tests/test_authorization.py`.
 11. [verified] Os interruptores nascem todos ligados, sobrevivem ao reinício do processo e só o `admin` os altera — verified by `backend/tests/test_authorization.py`.
+12. [unverified] O arquivo de ambiente e aplicado sem sobrepor variavel ja exportada e sem expor valores; arranque sem admin e sem credencial registra erro nomeando as variaveis; o comando de destrave libera o login e pode alcancar uma conta so — verified by `backend/tests/test_primeira_execucao.py`.
 
 ## Maturity
 

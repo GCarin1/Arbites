@@ -684,6 +684,19 @@ def create_app(
                     "conta admin de bootstrap criada para %s — troque a senha"
                     " no primeiro login", created["email"],
                 )
+            elif auth_ops.count_active_admins(app.state.auth) == 0:
+                # Antes isto era um no-op SILENCIOSO: a instância subia sem
+                # conta nenhuma e a pessoa ia tentar entrar numa conta que
+                # nunca existiu, até se trancar por tentativas (change 0165).
+                # Um arranque que não pode dar certo precisa dizer isso.
+                log.error(
+                    "NENHUMA conta de administrador existe e o ambiente nao traz"
+                    " credencial de bootstrap: ninguem consegue entrar. Defina"
+                    " ARBITES_ADMIN_EMAIL e ARBITES_ADMIN_PASSWORD (a senha"
+                    " precisa de %d caracteres ou mais) num arquivo .env no"
+                    " diretorio onde voce roda o comando, ou no ambiente do"
+                    " processo, e suba de novo.", auth_ops.MIN_PASSWORD_LEN,
+                )
         else:
             log.warning(
                 "ARBITES_AUTH=off — a API esta SEM autenticacao. Nao exponha"

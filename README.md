@@ -43,6 +43,40 @@ npm install
 npm run build                  # gera frontend/dist, servido pelo backend
 ```
 
+### 2.5. O `.env` (fora do Docker também)
+
+O Arbites lê um arquivo `.env` **no diretório de onde você roda o comando**:
+
+```
+ARBITES_ADMIN_EMAIL=voce@exemplo.com
+ARBITES_ADMIN_PASSWORD=uma-senha-longa-de-bootstrap
+ARBITES_SIGNUP=off
+ARBITES_GITHUB_TOKEN=github_pat_...      # opcional (ADR 0017)
+```
+
+Duas coisas que vale saber:
+
+- **A variável de ambiente do processo ganha do arquivo.** Quem exportou na
+  mão quis aquele valor agora; um `.env` esquecido no diretório não vence uma
+  variável exportada.
+- **Sem `ARBITES_ADMIN_EMAIL` e `ARBITES_ADMIN_PASSWORD`, nenhuma conta é
+  criada** — e sem conta ninguém entra. O arranque diz isso em voz alta no
+  log; antes ele falhava calado (change 0165). A senha precisa ter 12
+  caracteres ou mais, e a conta nasce com troca obrigatória no primeiro login.
+
+> Em Docker, quem lê o `.env` é o **Compose** — o arquivo já funcionava lá. O
+> que a change 0165 corrigiu foi o caminho sem container, onde `python -m
+> arbites serve` ignorava o arquivo e a instância subia sem admin.
+
+**Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
+e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
+ou destravar na hora:
+
+```
+python -m arbites unlock                      # todas as contas
+python -m arbites unlock --email voce@exemplo.com
+```
+
 ### 3. Subir a plataforma (um comando sobe tudo)
 
 ```powershell
