@@ -17,6 +17,7 @@ import type { Notification, NotificationTarget } from "../types";
 
 const ROTULO: Record<string, { label: string; dot: string }> = {
   problema: { label: "problema", dot: "dot-col-failed" },
+  prazo: { label: "prazo", dot: "dot-col-blocked" },
   observabilidade: { label: "observabilidade", dot: "dot-col-blocked" },
   feito: { label: "concluído", dot: "dot-col-passed" },
   info: { label: "log", dot: "dot-col-pending" },

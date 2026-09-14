@@ -429,6 +429,34 @@ isso com o remédio. Tentar salvar o token pela tela responde `409` explicando
 a saída, em vez de falhar depois. O valor nunca volta em resposta nenhuma, e
 nunca toca o disco do workspace.
 
+## Afazeres e listas de To Do
+
+Duas coisas diferentes na mesma página, em abas:
+
+- **Afazer** é a nota adesiva: uma coisa a fazer, com prazo, status e **cor na
+  borda inteira** — trocar o status muda a cor do cartão.
+- **Lista de To Do** é o roteiro: passos que só fazem sentido juntos, com prazo
+  **da lista**.
+
+A linha da lista **não tem prazo próprio**, e é isso que dá sentido ao vínculo:
+quando uma linha precisa de prazo, de status e de aparecer no sino, você a
+vincula a um afazer. **O afazer traz a data; a linha traz o passo.**
+
+O vínculo é **um-para-um** e é gravado só na linha — guardá-lo dos dois lados
+abriria a chance de se contradizerem, e aí alguém teria de decidir qual está
+certo sem ter como. A linha mostra o afazer resolvido (prazo e status, sem
+trocar de tela) e o afazer mostra de que linha participa.
+
+A lista é um arquivo em `workspace/todolists/`, com as linhas no frontmatter —
+editável num editor de texto como todo o resto.
+
+```
+GET/POST  /api/v1/todolists                       # listar e criar
+PUT/DELETE /api/v1/todolists/{id}                 # editar e mover para a lixeira
+POST      /api/v1/todolists/{id}/items            # {"text": "...", "todo": "TD-0007"}
+PUT/DELETE /api/v1/todolists/{id}/items/{item_id}
+```
+
 ## O sino: o que mudou enquanto você não estava olhando
 
 No canto superior direito, ao lado da busca. O número no ícone é quanto há de
@@ -450,6 +478,7 @@ Quatro origens:
 
 | origem | o que traz |
 |---|---|
+| **prazo** | afazer e lista que **vencem hoje** ou já venceram. Vencido é problema; vence hoje é atenção. O vencido volta a não-lido a cada dia: silenciar para sempre algo atrasado é o contrário do que um lembrete faz |
 | **problema** | os avisos do índice e da credencial — a aba **Problemas** vira uma das fontes do sino, e continua existindo: o sino é ambiente, a aba é triagem |
 | **observabilidade** | o que mudou sozinho: quebrou, virou instável, o silêncio da ingestão, sinal que regrediu |
 | **concluído** | ação do **sistema** que deu certo: ingestão trouxe execuções, rodada de auditoria, ciclo fechado. São as que acontecem sem ninguém olhando — por isso "criei um CT agora" não entra |

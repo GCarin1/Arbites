@@ -212,6 +212,17 @@ export interface Todo {
   created: string | null;
   path: string;
   body?: string;
+  /** De que linha de lista este afazer participa (change 0164). É CONSULTA:
+   *  o vínculo mora na linha, e guardá-lo aqui também abriria a chance de os
+   *  dois se contradizerem. */
+  list_item?: {
+    list_id: string;
+    item_id: string;
+    text: string;
+    done: boolean;
+    list_title: string;
+    list_due: string | null;
+  } | null;
 }
 
 export interface DailyMetricDiff {
@@ -914,7 +925,7 @@ export interface NotificationTarget {
 
 export interface Notification {
   id: string;
-  kind: "problema" | "observabilidade" | "feito" | "info";
+  kind: "problema" | "prazo" | "observabilidade" | "feito" | "info";
   severity: "problem" | "attention" | "done" | "info";
   /** O nome do arquivo/card, separado da frase para poder ir em destaque. */
   subject: string;
@@ -929,4 +940,27 @@ export interface NotificationsResponse {
   items: Notification[];
   unread: number;
   cleared_at: string;
+}
+
+// -- listas de To Do (change 0164) ------------------------------------------
+
+export interface TodoListItem {
+  id: string;
+  text: string;
+  done: boolean;
+  /** O afazer vinculado — o vínculo mora AQUI, na linha, e só aqui. */
+  todo: string | null;
+  todo_ref?: { id: string; title: string; status: string; due: string | null } | null;
+}
+
+export interface TodoList {
+  id: string;
+  title: string;
+  status: "active" | "done" | "archived";
+  due: string | null;
+  created: string | null;
+  path: string;
+  items: TodoListItem[];
+  progress: { total: number; done: number; open: number };
+  body: string;
 }

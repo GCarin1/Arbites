@@ -204,7 +204,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.19.1",
+        "version": "0.20.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -256,7 +256,7 @@
         "id": "todos",
         "path": ".doctrina/specs/todos/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-06",
         "implementation": "verified — M10 + M10.1 (busca/autocomplete, export MD/XML, seleção múltipla, descrição com menções); backend/arbites/api.py, backend/arbites/indexer.py, backend/arbites/workspace.py; frontend Todos.tsx, Autocomplete.tsx. ID `TD-`, arquivos em `todos/`",
         "realizes": [
@@ -2555,6 +2555,32 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0163-sino-avisava-sobre-afazer",
+        "title": "sino nao avisava sobre afazer vencido nem sobre afazer que vence hoje",
+        "path": ".doctrina/changes/archive/2026-09-14-0163-sino-avisava-sobre-afazer",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0164-listas-como-artefato-proprio",
+        "title": "listas de to do como artefato proprio com vinculo um a um entre afazer e linha da lista, e borda do afazer pela cor do status",
+        "path": ".doctrina/changes/archive/2026-09-14-0164-listas-como-artefato-proprio",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "todos",
             "operation": "MODIFIED"
           }
         ]
