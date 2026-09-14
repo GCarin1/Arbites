@@ -155,7 +155,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.13.0",
+        "version": "0.14.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -204,7 +204,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.16.0",
+        "version": "0.17.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -456,22 +456,6 @@
         "status": "proposed",
         "opened": "2026-09-13",
         "lane": "product (uncertain)"
-      },
-      {
-        "id": "0156-retencao-artefato-sinal-print",
-        "title": "retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar",
-        "path": ".doctrina/changes/0156-retencao-artefato-sinal-print",
-        "status": "proposed",
-        "opened": "2026-09-14",
-        "lane": "runtime (confident; signals: log) — opened anyway (--force)"
-      },
-      {
-        "id": "0157-credencial-github-expira-revogada",
-        "title": "credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio",
-        "path": ".doctrina/changes/0157-credencial-github-expira-revogada",
-        "status": "proposed",
-        "opened": "2026-09-14",
-        "lane": "runtime (confident; signals: em silencio) — opened anyway (--force)"
       }
     ],
     "changes_archive": [
@@ -2457,6 +2441,32 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0156-retencao-artefato-sinal-print",
+        "title": "retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar",
+        "path": ".doctrina/changes/archive/2026-09-14-0156-retencao-artefato-sinal-print",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0157-credencial-github-expira-revogada",
+        "title": "credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio",
+        "path": ".doctrina/changes/archive/2026-09-14-0157-credencial-github-expira-revogada",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
             "operation": "MODIFIED"
           }
         ]

@@ -229,6 +229,10 @@ observability:
     lcp_ms: { direction: lower, goal: 2500 }
     violacoes_axe: { direction: lower, goal: 0 }
     success_rate: { goal: 95 }
+  # Sinal e anexo têm valores de vida diferentes — veja abaixo.
+  retention:
+    signals_days: 730       # dois anos
+    attachments_days: 90    # um trimestre
 ```
 
 Depois:
@@ -314,10 +318,57 @@ Emitir o manifesto no fim do seu workflow é uma linha:
             run.log
 ```
 
-> O token é o mesmo PAT já guardado no keyring do SO (ADR 0008) — nunca no
-> YAML, nunca no índice, nunca logado. Se ele expirar ou for revogado, a
-> ingestão para: é por isso que o run traz `ingested_at`, e um período sem
-> run é visível na série em vez de passar por "semana tranquila".
+### Retenção: o print some, a série fica
+
+Um cron diário com prints enche disco — é aritmética, não hipótese. Por isso
+a retenção é decidida junto com a ingestão, e **sinal e anexo têm janelas
+independentes**:
+
+- **Sinal** é barato (um número) e é o que faz a série: **730 dias** por padrão.
+- **Anexo** (print, log, artifact) é caro e só interessa perto do evento:
+  **90 dias** por padrão, e some primeiro.
+
+O resultado é o trade-off certo: *"a acessibilidade regrediu em agosto?"*
+continua respondida muito depois do print daquele dia ter ido embora.
+
+O bloco **Espaço e retenção**, no fim da aba Observabilidade, mostra quanto
+está ocupado e **o que a próxima limpeza levaria, antes de levar** — limpeza
+que só conta o que fez depois de feita obriga a confiar sem poder conferir. O
+removido vai para `.arbites/trash/` e volta enquanto a lixeira não for
+esvaziada. Aplicar exige papel `admin`; ver a prévia, não.
+
+```
+GET  /api/v1/ci/retention          # ocupação + prévia do que sairia
+POST /api/v1/ci/retention/apply    # executa exatamente a prévia, para a lixeira
+```
+
+Uma execução que passa até da janela do **sinal** sai inteira, anexos junto.
+
+### A credencial vai falhar um dia — e isso não pode ser em silêncio
+
+Não há data de descontinuação anunciada para o PAT classic; o GitHub apenas
+recomenda o fine-grained. O risco real é outro: o fine-grained **expira em no
+máximo 366 dias** e a organização pode **revogá-lo** a qualquer momento. Ou
+seja, a credencial falha por desenho — e com a ingestão contínua ela pararia
+sem ninguém notar, até alguém reparar que a observabilidade congelou.
+
+Ao salvar o token em **Automação → Configurar** há um campo de **validade**
+(opcional). Ela não é segredo — é uma data, e existe para o Arbites avisar
+**antes**:
+
+- faltando 14 dias ou menos, aparece em **Problemas** com o prazo;
+- um `401`, ou um `403` que não é limite de taxa, vira um problema em
+  **Problemas** com o motivo que o próprio GitHub deu (`Bad credentials` e
+  `Resource not accessible by personal access token` pedem ações diferentes);
+- a ingestão informa que parou **por credencial** — estado diferente de "não
+  há execução nova", que na tela se parecem e pedem ações opostas.
+
+Repor o token retoma do ponto em que parou: a marca d'água é o disco, então o
+intervalo perdido volta inteiro.
+
+> O token continua só no keyring do SO (ADR 0008) — nunca no YAML, nunca no
+> índice, nunca logado. E um período sem run é visível na série em vez de
+> passar por "semana tranquila".
 
 ## Rodadas de auditoria: elas se acumulam sozinhas
 

@@ -44,7 +44,8 @@ class FakeGitHub:
         self.runs: list[dict] = []
         self.artifacts: dict[int, bytes] = {}
         self.chamadas_de_download = 0
-        self.falhar_em: set[int] = set()  # run_ids que respondem limite de taxa
+        self.falhar_em: set[int] = set()  # run_ids que respondem com erro
+        self.erro: CIError | None = None  # qual erro (padrão: limite de taxa)
 
     def adicionar(self, run_id: int, *, event="schedule", conclusion="success",
                   artifact: bytes | None = None, started="2026-09-10T03:00:00Z"):
@@ -65,7 +66,7 @@ class FakeGitHub:
 
     def list_artifacts(self, repo, run_id):
         if run_id in self.falhar_em:
-            raise CIError("rate_limited", "limite de taxa persistente")
+            raise self.erro or CIError("rate_limited", "limite de taxa persistente")
         if run_id not in self.artifacts:
             return []
         return [{"id": run_id, "name": "observabilidade", "expired": False}]

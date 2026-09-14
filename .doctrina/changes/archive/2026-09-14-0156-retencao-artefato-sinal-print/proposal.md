@@ -1,6 +1,7 @@
 # Change 0156-retencao-artefato-sinal-print — retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-14
 - **Owner:**
 - **Lane:** runtime (confident; signals: log) — opened anyway (--force)
@@ -47,14 +48,14 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Sinal e anexo têm janelas de retenção independentes e configuráveis.
-- [ ] A tela mostra quanto está ocupado e o que a próxima limpeza levaria,
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Sinal e anexo têm janelas de retenção independentes e configuráveis.
+- [x] A tela mostra quanto está ocupado e o que a próxima limpeza levaria,
       antes de levar.
-- [ ] Anexo expirado some e a série temporal do mesmo período continua
+- [x] Anexo expirado some e a série temporal do mesmo período continua
       respondendo.
-- [ ] Limpeza é para a lixeira e é reversível enquanto a lixeira não é
+- [x] Limpeza é para a lixeira e é reversível enquanto a lixeira não é
       esvaziada.
 
 ## Open questions

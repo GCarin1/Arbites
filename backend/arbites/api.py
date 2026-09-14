@@ -48,8 +48,9 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import ci_ingest
+from . import ci_ingest, ci_retencao
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
+from .ci_credential import CredentialState
 from .ci_ingest import CIIngestor, IngestError
 from .executions import ExecutionError
 from . import feature_sync as feature_sync_ops
@@ -276,6 +277,10 @@ relevantes. Mantenha vivo — remova o que ficou desatualizado. -->
 
 class TokenIn(BaseModel):
     token: str
+    # Validade informada por quem criou o token: o provedor não conta ao
+    # cliente quando o token expira (change 0157). Opcional — quem usa um
+    # classic sem expiração simplesmente não informa.
+    expires_at: str | None = None
 
 
 class AIProviderConfig(BaseModel):
@@ -574,6 +579,11 @@ def create_app(
         reindex_full(ws, app.state.conn)
         app.state.runner = RunManager(ws, app.state.conn)
         app.state.tokens = tokens
+        app.state.credential = CredentialState(ws)
+        # O cliente real ganha memória da recusa; um fake de teste não tem o
+        # atributo e segue como antes.
+        if hasattr(github, "credential") and github.credential is None:
+            github.credential = app.state.credential
         app.state.ci = CIManager(ws, app.state.conn, github, tokens)
         app.state.ci_ingest = CIIngestor(ws, app.state.conn, github)
         app.state.ai_keys = ai_keys
@@ -638,7 +648,7 @@ def create_app(
 
     @app.exception_handler(IngestError)
     async def _ingest_error(request: Request, exc: IngestError):
-        status = 409 if exc.code == "no_sources" else 422
+        status = {"no_sources": 409, "not_found": 404}.get(exc.code, 422)
         return JSONResponse(
             status_code=status,
             content={"error": {"code": exc.code, "message": exc.message}},
@@ -807,13 +817,22 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/warnings")
     async def get_warnings(request: Request):
-        return [
+        avisos = [
             dict(row)
             for row in conn_of(request).execute(
                 "SELECT source_path, code, message, created_at FROM warnings"
                 " ORDER BY source_path, code"
             )
         ]
+        # O problema da credencial é DERIVADO a cada leitura, não guardado na
+        # tabela acima: aquela tabela é do índice, e um reindex a esvazia — o
+        # problema voltaria a ser invisível justamente no cenário que a change
+        # 0157 existe para cobrir. Vem primeiro porque bloqueia a ingestão
+        # inteira, enquanto um aviso de integridade é de um arquivo só.
+        credencial: CredentialState = request.app.state.credential
+        return credencial.problemas(
+            request.app.state.tokens.get() is not None
+        ) + avisos
 
     # -- lixeira (0081) ---------------------------------------------------
 
@@ -2643,6 +2662,19 @@ def _register_routes(app: FastAPI) -> None:
             raise _error(422, "invalid_period", "days deve estar entre 1 e 365")
         return ci_ingest.painel(ws_of(request), conn_of(request), days)
 
+    @app.get(API_PREFIX + "/ci/retention")
+    async def ci_retention_preview(request: Request):
+        """O que está ocupado e o que a próxima limpeza levaria — ANTES de
+        levar. Limpeza que só diz o que fez depois de feita obriga a confiar
+        sem poder conferir (change 0156)."""
+        return await asyncio.to_thread(ci_retencao.previa, ws_of(request))
+
+    @app.post(API_PREFIX + "/ci/retention/apply")
+    async def ci_retention_apply(request: Request):
+        return await asyncio.to_thread(
+            ci_retencao.aplicar, ws_of(request), conn_of(request)
+        )
+
     @app.get(API_PREFIX + "/ci/runs/{run_id}")
     async def ci_run_detail(request: Request, run_id: str):
         return ci_ingest.run_detalhado(ws_of(request), conn_of(request), run_id)
@@ -2799,12 +2831,20 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/settings/github/token")
     async def github_token_status(request: Request):
-        return request.app.state.tokens.status()  # status apenas, nunca o valor
+        # Status apenas, nunca o valor. A VALIDADE não é segredo — é uma data,
+        # e existe para ser vista antes de passar (change 0157).
+        credencial: CredentialState = request.app.state.credential
+        return credencial.status(request.app.state.tokens.get() is not None)
 
     @app.put(API_PREFIX + "/settings/github/token")
     async def github_token_set(request: Request, payload: TokenIn):
         request.app.state.tokens.set(payload.token)
-        return request.app.state.tokens.status()
+        # O provedor não conta ao cliente quando o token expira: quem o criou
+        # informa. Sem isso o Arbites só descobre a expiração quando ela já
+        # aconteceu — tarde demais para pedir a renovação a tempo.
+        credencial: CredentialState = request.app.state.credential
+        credencial.registrar_token(payload.expires_at)
+        return credencial.status(True)
 
     # -- migração Xray (M2) -------------------------------------------------
 
@@ -4227,6 +4267,10 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # Excluir rodada de auditoria e mais perto de destruir registro do que de
     # descartar rascunho: e um retrato do estado de qualidade num momento
     # (0151). Rodar e ler continuam abertos a qualquer papel.
+    # Aplicar retenção remove anexo e run: é destrutivo, mesmo indo para a
+    # lixeira. LER a prévia continua aberto — ver o que seria removido é o
+    # que permite alguém discordar antes de acontecer.
+    (r"/ci/retention/apply$", {"POST"}, "admin", None),
     (r"/audit$", {"DELETE"}, "admin", None),
     (r"/audit/[^/]+$", {"DELETE"}, "admin", None),
     (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),

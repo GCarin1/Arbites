@@ -19,8 +19,8 @@ export function WarningsView({
         <h1 className="page-title">Problemas ({warnings.length})</h1>
       </div>
       <p className="subtitle">
-        Avisos de integridade do índice e a lixeira do workspace — nada é
-        apagado de vez sem você mandar.
+        Avisos de integridade do índice, da credencial do provedor de CI e a
+        lixeira do workspace — nada é apagado de vez sem você mandar.
       </p>
 
       {warnings.length === 0 ? (
@@ -35,7 +35,7 @@ export function WarningsView({
           <table className="dense">
             <thead>
               <tr>
-                <th>Arquivo</th>
+                <th>Origem</th>
                 <th>Código</th>
                 <th>Mensagem</th>
               </tr>

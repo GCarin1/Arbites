@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC5
 **Last updated:** 2026-07-21
-**Version:** 0.13.0
+**Version:** 0.14.0
 
 ## Purpose
 
@@ -88,6 +88,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - The system shall ingerir execucoes de CI que nao foram disparadas por ele, descobrindo-as por consulta periodica ao provedor, com idempotencia por identificador de run.
 - The system shall representar toda medida vinda de uma execucao de CI como sinal generico com nome, valor, unidade e instante, sem conhecer de antemao o tipo da medida, para que o pipeline possa emitir medida nova sem alteracao de codigo.
 - The system shall aceitar do artifact um manifesto que declara os sinais produzidos e onde estao, e tratar artefato que nao e medida — captura de tela, log, analise em texto — como anexo da execucao e nao como sinal.
+- The system shall distinguir ingestao parada por credencial de ausencia de execucao nova, porque os dois estados parecem iguais e pedem acoes opostas.
 
 ### Event-driven
 
@@ -129,6 +130,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - While uma aba está sem dados (sem target configurado, sem run
   disparado), the system shall exibir um empty state com a instrução do
   próximo passo e um atalho para a aba correspondente.
+- While a credencial do provedor de CI esta perto de expirar ou foi recusada, the system shall registrar um problema visivel com o motivo, em vez de deixar a ingestao parar em silencio.
 
 ### Unwanted-behavior (must-not)
 
@@ -224,6 +226,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 20. [unverified] Um cenario morto no meio por timeout nunca chega a execution como `passed`; chega `blocked` com `error: "timeout"` — verified by `backend/tests/test_local_runs.py`.
 21. [unverified] Run criado por agendamento no provedor aparece sem disparo local, ingerir duas vezes nao duplica, e retomar apos parada traz o intervalo completo — verified by `backend/tests/test_ci_ingest.py`.
 22. [unverified] Um sinal nunca visto e ingerido sem mudanca de codigo e fica consultavel por nome e periodo; artifact sem manifesto cai no modo convencao e anuncia que caiu — verified by `backend/tests/test_ci_ingest.py`.
+23. [unverified] Credencial perto de expirar aparece em Problemas antes de expirar, recusa do provedor vira problema com motivo, e repor a credencial retoma a ingestao sem perder o intervalo — verified by `backend/tests/test_credencial_ci.py`.
 
 ## Maturity
 

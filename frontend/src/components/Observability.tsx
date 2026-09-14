@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { EmptyState } from "./EmptyState";
 import { DocBody } from "./ReadView";
-import type { CiRun, CiSignalSeries, Observability as Painel } from "../types";
+import type {
+  CiRetention,
+  CiRun,
+  CiSignalSeries,
+  Observability as Painel,
+} from "../types";
 
 /**
  * Observabilidade — o que mudou, quando e por quê (change 0155, ADR 0016).
@@ -36,6 +41,27 @@ function formatarData(iso: string | null | undefined): string {
   return Number.isNaN(d.getTime())
     ? "—"
     : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+/**
+ * Plural em português não é sufixo: "execução" vira "execuções", trocando o
+ * radical. Concatenar "ões" produz "execuçãoões" — e isso foi para a tela
+ * antes de alguém medir.
+ */
+function plural(n: number, singular: string, plural_: string): string {
+  return `${n} ${n === 1 ? singular : plural_}`;
+}
+
+function formatarBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const unidades = ["KB", "MB", "GB"];
+  let valor = bytes / 1024;
+  let i = 0;
+  while (valor >= 1024 && i < unidades.length - 1) {
+    valor /= 1024;
+    i += 1;
+  }
+  return `${valor.toFixed(valor >= 10 ? 0 : 1)} ${unidades[i]}`;
 }
 
 function formatarValor(valor: number | null, unidade: string | null): string {
@@ -259,6 +285,138 @@ function Descida({ run, onFechar }: { run: CiRun; onFechar: () => void }) {
   );
 }
 
+/**
+ * Retenção (change 0156) — a prévia ANTES da limpeza.
+ *
+ * Duas coisas que não são negociáveis aqui: a tela diz o que a limpeza
+ * levaria antes de levar (limpeza que só conta o que fez depois de feita
+ * obriga a confiar sem poder conferir), e o removido vai para a lixeira,
+ * como todo o resto do produto.
+ *
+ * A regra que o texto precisa deixar clara para quem clica: **o sinal fica,
+ * o anexo vai.** A série continua respondendo sobre agosto depois que o
+ * print de agosto já foi descartado — é esse o trade-off.
+ */
+function Retencao({
+  onError,
+  onLimpou,
+}: {
+  onError: (message: string) => void;
+  onLimpou: () => void;
+}) {
+  const [dados, setDados] = useState<CiRetention | null>(null);
+  const [aberto, setAberto] = useState(false);
+  const [limpando, setLimpando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    try {
+      setDados(await api.ciRetention());
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  }, [onError]);
+
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
+  if (!dados) return null;
+  const { usage: uso, would_remove: alvo, retention: janelas } = dados;
+
+  return (
+    <section className="card obs-retencao">
+      <div className="obs-retencao-topo">
+        <div>
+          <h3>Espaço e retenção</h3>
+          <p className="obs-pergunta">
+            Quanto isto ocupa, e o que a próxima limpeza levaria.
+          </p>
+        </div>
+        <button type="button" className="btn-sm" onClick={() => setAberto((v) => !v)}>
+          {aberto ? "Ocultar" : "Detalhar"}
+        </button>
+      </div>
+
+      <p className="obs-retencao-linha">
+        <strong>{formatarBytes(uso.total_bytes)}</strong> em{" "}
+        {plural(uso.runs, "execução", "execuções")} —{" "}
+        {formatarBytes(uso.attachments_bytes)} são anexos (print, log) e{" "}
+        {formatarBytes(uso.documents_bytes)} são os documentos com os sinais.
+      </p>
+      <p className="caption muted">
+        Anexo é guardado por {janelas.attachments_days} dias; sinal, por{" "}
+        {janelas.signals_days}. O anexo é caro e só interessa perto do evento; o
+        sinal é barato e é o que faz a série — por isso o print some primeiro e a
+        pergunta sobre aquele mês continua respondida.
+      </p>
+
+      {alvo.bytes === 0 ? (
+        <p className="muted">
+          Nada passou das janelas ainda — não há o que limpar.
+        </p>
+      ) : (
+        <>
+          <p className="obs-retencao-alvo">
+            A próxima limpeza levaria <strong>{formatarBytes(alvo.bytes)}</strong>:
+            anexos de {plural(alvo.attachments.length, "execução", "execuções")}
+            {alvo.runs.length > 0 && (
+              <>
+                {" "}e{" "}
+                {plural(
+                  alvo.runs.length,
+                  "execução inteira",
+                  "execuções inteiras",
+                )}{" "}
+                (essas passaram até da janela do sinal)
+              </>
+            )}
+            . Tudo vai para a lixeira e volta enquanto ela não for esvaziada.
+          </p>
+          {aberto && (
+            <ul className="obs-retencao-lista">
+              {alvo.attachments.map((item) => (
+                <li key={item.path}>
+                  <span className="obs-medida-nome">anexos</span> {item.id} ·{" "}
+                  {formatarData(item.at)} ·{" "}
+                  {plural(item.files, "arquivo", "arquivos")} ·{" "}
+                  {formatarBytes(item.bytes)}
+                </li>
+              ))}
+              {alvo.runs.map((item) => (
+                <li key={item.path}>
+                  <span className="obs-medida-nome">execução inteira</span> {item.id}{" "}
+                  · {formatarData(item.at)} · {formatarBytes(item.bytes)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            className="danger"
+            disabled={limpando}
+            onClick={() => {
+              void (async () => {
+                setLimpando(true);
+                try {
+                  await api.ciRetentionApply();
+                  await carregar();
+                  onLimpou();
+                } catch (e) {
+                  onError((e as Error).message);
+                } finally {
+                  setLimpando(false);
+                }
+              })();
+            }}
+          >
+            {limpando ? "Limpando…" : "Limpar para a lixeira"}
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 export function Observability({ onError }: { onError: (message: string) => void }) {
   const [dias, setDias] = useState(30);
   const [painel, setPainel] = useState<Painel | null>(null);
@@ -296,7 +454,16 @@ export function Observability({ onError }: { onError: (message: string) => void 
     setIngerindo(true);
     try {
       const r = await api.ciIngest();
-      if (r.errors?.length) onError(r.errors[0].message);
+      // "Parado por credencial" NÃO é "não há run novo": os dois parecem
+      // iguais (nenhum dado novo) e pedem ações opostas (change 0157).
+      if (r.stopped === "bad_credential") {
+        onError(
+          "a ingestão parou porque o GitHub recusou a credencial — reponha o"
+          + " token em Automação → Configurar. O intervalo perdido volta inteiro.",
+        );
+      } else if (r.errors?.length) {
+        onError(r.errors[0].message);
+      }
       await carregar();
     } catch (e) {
       onError((e as Error).message);
@@ -516,6 +683,8 @@ export function Observability({ onError }: { onError: (message: string) => void 
               </table>
             </div>
           </section>
+
+          <Retencao onError={onError} onLimpou={() => void carregar()} />
         </>
       )}
     </div>

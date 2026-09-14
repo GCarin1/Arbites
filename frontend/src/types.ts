@@ -852,3 +852,27 @@ export interface Observability {
   changes: CiChange[];
   runs: CiRun[];
 }
+
+export interface GithubTokenStatus {
+  configured: boolean;
+  expires_at: string | null;
+  days_until_expiry: number | null;
+  last_refusal: { at: string; status: number; message: string } | null;
+  last_success_at: string | null;
+  healthy: boolean;
+}
+
+export interface CiRetention {
+  retention: { signals_days: number; attachments_days: number };
+  usage: {
+    runs: number;
+    documents_bytes: number;
+    attachments_bytes: number;
+    total_bytes: number;
+  };
+  would_remove: {
+    attachments: { id: string; path: string; at: string; bytes: number; files: number }[];
+    runs: { id: string; path: string; at: string; bytes: number }[];
+    bytes: number;
+  };
+}

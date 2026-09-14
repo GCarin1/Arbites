@@ -161,3 +161,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0154-modelo-sinal-generico-manifesto — modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo (specs: local-automation MODIFIED)
   - 2026-09-14 — 0155-aba-observabilidade-eixo-temporal — forced archive past 1 blocker (verification: 1 unchecked task in tasks.md (closing steps count))
 - 2026-09-14 — 0155-aba-observabilidade-eixo-temporal — aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor (specs: reporting MODIFIED)
+- 2026-09-14 — 0156-retencao-artefato-sinal-print — retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar (specs: reporting MODIFIED)
+- 2026-09-14 — 0157-credencial-github-expira-revogada — credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio (specs: local-automation MODIFIED)

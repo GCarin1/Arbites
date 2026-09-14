@@ -1,6 +1,7 @@
 # Change 0157-credencial-github-expira-revogada — credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-14
 - **Owner:**
 - **Lane:** runtime (confident; signals: em silencio) — opened anyway (--force)
@@ -57,12 +58,12 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Credencial perto de expirar aparece em Problemas antes de expirar.
-- [ ] `401`/`403` do provedor viram problema com o motivo, e a ingestão
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Credencial perto de expirar aparece em Problemas antes de expirar.
+- [x] `401`/`403` do provedor viram problema com o motivo, e a ingestão
       informa que parou por credencial — não fica igual a "sem run novo".
-- [ ] Repor a credencial retoma a ingestão do ponto em que parou, sem perder
+- [x] Repor a credencial retoma a ingestão do ponto em que parou, sem perder
       o intervalo.
 
 ## Open questions

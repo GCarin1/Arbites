@@ -332,6 +332,14 @@ class CIIngestor:
             self._ingerir_fonte(fonte, limite, resumo)
         return resumo
 
+    @staticmethod
+    def _motivo_da_parada(code: str) -> str:
+        """"Parado por credencial" e "sem run novo" parecem iguais na tela —
+        nenhum dado novo — e pedem ações opostas (change 0157)."""
+        if code == "bad_credential":
+            return "bad_credential"
+        return "rate_limited" if code in ("rate_limited", "github_error") else code
+
     def _pendentes(self, fonte: dict, limite: int) -> list[dict]:
         """Percorre as páginas do provedor até só encontrar run já ingerido.
 
@@ -372,6 +380,7 @@ class CIIngestor:
         except CIError as e:
             resumo["errors"].append({"repo": fonte["repo"], "code": e.code,
                                      "message": e.message})
+            resumo["stopped"] = self._motivo_da_parada(e.code)
             return
 
         for bruto in pendentes:
@@ -383,8 +392,7 @@ class CIIngestor:
                 # d'água é o disco, então a próxima chamada recomeça daqui.
                 resumo["errors"].append({"run": chave, "code": e.code,
                                          "message": e.message})
-                resumo["stopped"] = "rate_limited" if e.code in (
-                    "rate_limited", "github_error") else e.code
+                resumo["stopped"] = self._motivo_da_parada(e.code)
                 return
             except IngestError as e:
                 # Artifact quebrado é problema DAQUELE run, não da ingestão:

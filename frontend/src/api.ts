@@ -15,6 +15,7 @@ import type {
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
+  CiRetention,
   CiRun,
   DailyContext,
   DailyDigestResult,
@@ -144,6 +145,11 @@ export const api = {
   ciIngest: () =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
               stopped?: string }>("/ci/ingest", { method: "POST" }),
+  ciRetention: () => request<CiRetention>("/ci/retention"),
+  ciRetentionApply: () =>
+    request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(
+      "/ci/retention/apply", { method: "POST" },
+    ),
   ciAttachmentUrl: (path: string) =>
     `${BASE}/ci/attachment?path=${encodeURIComponent(path)}`,
 

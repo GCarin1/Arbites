@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-09-13
-**Version:** 0.16.0
+**Version:** 0.17.0
 
 ## Purpose
 
@@ -100,6 +100,8 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall garantir um tamanho minimo de celula na grade de atividade e rolar a grade horizontalmente dentro do card quando o periodo inteiro nao couber, mantendo a coluna de dias da semana parada e alinhada com as linhas da grade.
 - The system shall oferecer uma area de observabilidade separada do painel de indicadores, com o tempo como eixo primario, comparacao com o periodo anterior e descida do agregado ate a execucao, o job e o anexo.
 - The system shall declarar em cada bloco da area de observabilidade a pergunta que ele responde, e nao exibir bloco que nao responda a uma pergunta acionavel.
+- The system shall aplicar retencao independente a sinal e a anexo de execucao de CI, guardando o sinal por muito mais tempo que o anexo, para que a serie temporal continue respondendo depois que a captura daquele dia ja foi descartada.
+- The system shall exibir o espaco ocupado e uma previa do que a proxima limpeza removeria antes de remover, e mover o removido para a lixeira em vez de apagar direto.
 
 ### Event-driven
 
@@ -219,6 +221,7 @@ export PDF e Markdown (para colar no Confluence).
 17. [verified] Com a IA desligada o dashboard responde inteiro e o bloco de atenção é preenchido pelos achados determinísticos; com provider, o resumo narrado é gerado a partir dos mesmos números — verified by `backend/tests/test_dashboard_attention.py`.
 18. [unverified] Em 390 px a celula da grade de atividade mede ao menos 10 px de lado, a grade rola dentro do card e a coluna de dias tem a mesma altura da grade; em 1440 px a celula volta a crescer para preencher o card, sem rolagem — verified by `frontend/src/styles.css` + `frontend/src/components/ActivityHeatmap.tsx`.
 19. [unverified] De um ponto da serie temporal chega-se a execucao, ao job e ao anexo sem sair da aba; periodo sem dado mostra estado vazio util; em 390 px a pagina nao rola de lado — verified by `backend/tests/test_observability.py`.
+20. [unverified] Anexo expirado e removido para a lixeira e a serie temporal do mesmo periodo continua respondendo; a previa da limpeza corresponde ao que e removido — verified by `backend/tests/test_retencao_ci.py`.
 
 ## Maturity
 
