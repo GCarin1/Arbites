@@ -48,9 +48,11 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import ci_ingest, ci_retencao
+from . import ci_ingest, ci_retencao, integrations_file as file_ops, mcp_write
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .ci_credential import CredentialState
+from .integrations_file import ArquivoErro
+from .mcp_write import WriteRecusada
 from .ci_ingest import CIIngestor, IngestError
 from .executions import ExecutionError
 from . import feature_sync as feature_sync_ops
@@ -273,6 +275,54 @@ relevantes. Mantenha vivo — remova o que ficou desatualizado. -->
 
 -
 """
+
+
+class McpTestcaseIn(BaseModel):
+    """Escrita de caso vinda do agente. `system` + `remote_id` são o que
+    tornam a chamada idempotente: com eles, repetir ATUALIZA."""
+    title: str
+    system: str | None = None
+    remote_id: str | None = None
+    revision: str | None = None
+    type: str | None = None
+    priority: str | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+    story: str | None = None
+    squad: str | None = None
+    folder: str | None = None
+    body: str | None = None
+
+
+class McpEvidenceIn(BaseModel):
+    filename: str
+    content_base64: str
+    mime: str | None = None
+    note: str | None = None
+
+
+class McpResultIn(BaseModel):
+    execution_id: str
+    testcase_id: str
+    status: str
+    comment: str | None = None
+    steps: dict[str, str] | None = None
+    evidence: list[McpEvidenceIn] | None = None
+
+
+class FileImportIn(BaseModel):
+    """Importação por arquivo: o conteúdo vem no corpo, não como upload, para
+    o agente MCP poder usar a mesma rota que a tela."""
+    content: str
+    system: str = "file"
+
+
+class McpLinkIn(BaseModel):
+    entity_id: str
+    system: str
+    remote_id: str
+    kind: str = "testcase"
+    revision: str | None = None
 
 
 class TokenIn(BaseModel):
@@ -641,6 +691,20 @@ def create_app(
 
     @app.exception_handler(CIError)
     async def _ci_error(request: Request, exc: CIError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(ArquivoErro)
+    async def _arquivo_erro(request: Request, exc: ArquivoErro):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(WriteRecusada)
+    async def _write_recusada(request: Request, exc: WriteRecusada):
         return JSONResponse(
             status_code=exc.status,
             content={"error": {"code": exc.code, "message": exc.message}},
@@ -2799,6 +2863,177 @@ def _register_routes(app: FastAPI) -> None:
         path = ws.root / rel
         _write_doc(path, meta, corpo)
         reindex_file(ws, conn, path)
+
+    # -- escritas do agente (change 0147) -----------------------------------
+    #
+    # Prévia e gravação em ROTAS SEPARADAS, não num `apply` no corpo: o log de
+    # atividade registra o caminho, e um booleano no corpo não apareceria lá.
+    # O registro precisa distinguir "o agente olhou" de "o agente gravou".
+
+    @app.post(API_PREFIX + "/integrations/write/testcase/preview")
+    async def mcp_preview_testcase(request: Request, payload: McpTestcaseIn):
+        return mcp_write.previa_testcase(
+            ws_of(request), conn_of(request), payload.model_dump())
+
+    @app.post(API_PREFIX + "/integrations/write/testcase")
+    async def mcp_write_testcase(request: Request, payload: McpTestcaseIn):
+        ws, conn = ws_of(request), conn_of(request)
+        resultado = mcp_write.aplicar_testcase(
+            ws, conn, payload.model_dump(), author_of(request),
+            _write_doc, reindex_file,
+        )
+        await asyncio.to_thread(
+            versioning.commit_paths, ws, [ws.root / resultado["path"]],
+            f"{resultado['action']} {resultado['entity_id']} via agente",
+            author_of(request),
+        )
+        return resultado
+
+    @app.post(API_PREFIX + "/integrations/write/result/preview")
+    async def mcp_preview_result(request: Request, payload: McpResultIn):
+        return mcp_write.previa_resultado(
+            ws_of(request), conn_of(request), payload.model_dump(), exec_ops.load)
+
+    @app.post(API_PREFIX + "/integrations/write/result")
+    async def mcp_write_result(request: Request, payload: McpResultIn):
+        return mcp_write.aplicar_resultado(
+            ws_of(request), conn_of(request), payload.model_dump(),
+            author_of(request), exec_ops, reindex_file,
+        )
+
+    @app.post(API_PREFIX + "/integrations/write/link/preview")
+    async def mcp_preview_link(request: Request, payload: McpLinkIn):
+        return mcp_write.previa_vinculo(
+            ws_of(request), conn_of(request), payload.model_dump(),
+            _find_path, _load_doc,
+        )
+
+    @app.post(API_PREFIX + "/integrations/write/link")
+    async def mcp_write_link(request: Request, payload: McpLinkIn):
+        return mcp_write.aplicar_vinculo(
+            ws_of(request), conn_of(request), payload.model_dump(),
+            _find_path, _load_doc, _write_doc, reindex_file,
+        )
+
+    # -- intercâmbio por arquivo (change 0148) ------------------------------
+    #
+    # O adaptador que funciona com QUALQUER ferramenta: toda ferramenta de
+    # teste do mercado importa CSV, e nenhuma exige credencial para isso. É
+    # também o SEGUNDO adaptador — e é ele que prova que a porta da change
+    # 0145 não saiu com o formato de uma ferramenta só.
+
+    @app.get(API_PREFIX + "/integrations/file/testcases")
+    async def exportar_casos_csv(request: Request, system: str = "file",
+                                 folder: str = ""):
+        ws, conn = ws_of(request), conn_of(request)
+        linhas = []
+        for row in conn.execute("SELECT id, path FROM testcases ORDER BY id"):
+            if folder and not row["path"].startswith(f"testcases/{folder}"):
+                continue
+            try:
+                meta, corpo = _load_doc(ws, row["path"])
+            except (OSError, ValueError):
+                continue
+            linhas.append({"meta": meta, "body": corpo})
+        csv_texto = file_ops.exportar_casos(linhas, system)
+        return Response(
+            content=csv_texto, media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition":
+                     'attachment; filename="arbites-testcases.csv"'},
+        )
+
+    @app.get(API_PREFIX + "/integrations/file/results")
+    async def exportar_resultados_csv(request: Request, execution: str = "",
+                                      system: str = "file"):
+        ws, conn = ws_of(request), conn_of(request)
+        ids = ([execution] if execution else
+               [r["id"] for r in conn.execute(
+                   "SELECT id FROM executions ORDER BY created_at DESC LIMIT 200")])
+        execucoes = []
+        for exec_id in ids:
+            try:
+                execucoes.append(exec_ops.load(ws, exec_id))
+            except Exception:  # noqa: BLE001 — ciclo removido do disco
+                continue
+        csv_texto = file_ops.exportar_resultados(execucoes, system)
+        return Response(
+            content=csv_texto, media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition":
+                     'attachment; filename="arbites-results.csv"'},
+        )
+
+    @app.post(API_PREFIX + "/integrations/file/testcases/preview")
+    async def previa_import_casos(request: Request, payload: FileImportIn):
+        ws, conn = ws_of(request), conn_of(request)
+        linhas = file_ops.ler_csv(payload.content, ["title"])
+
+        def achar(system: str, remote_id: str):
+            achado = mcp_write.achar_por_vinculo(
+                ws, conn, "testcases", system, remote_id)
+            return achado[0] if achado else None
+
+        return file_ops.previa_importacao(linhas, payload.system, achar)
+
+    @app.post(API_PREFIX + "/integrations/file/testcases")
+    async def importar_casos(request: Request, payload: FileImportIn):
+        """Importa. A idempotência vem do `external_id`, não da ordem: o mesmo
+        arquivo importado de novo ATUALIZA o que já entrou."""
+        ws, conn = ws_of(request), conn_of(request)
+        linhas = file_ops.ler_csv(payload.content, ["title"])
+
+        def achar(system: str, remote_id: str):
+            achado = mcp_write.achar_por_vinculo(
+                ws, conn, "testcases", system, remote_id)
+            return achado[0] if achado else None
+
+        plano = file_ops.previa_importacao(linhas, payload.system, achar)
+        ignoradas = {d["line"] for d in plano["skipped_duplicates"]}
+        criados, atualizados = [], []
+        for numero, linha in enumerate(linhas, start=2):
+            if numero in ignoradas:
+                continue
+            pedido = {
+                "title": (linha.get("title") or "").strip(),
+                "body": linha.get("body") or "",
+                "type": (linha.get("type") or "").strip() or None,
+                "priority": (linha.get("priority") or "").strip() or None,
+                "status": (linha.get("status") or "").strip() or None,
+                "story": (linha.get("story") or "").strip() or None,
+                "folder": (linha.get("folder") or "").strip() or None,
+                "tags": [t for t in (linha.get("tags") or "").split(
+                    file_ops.SEPARADOR_LISTA) if t.strip()] or None,
+            }
+            externo = (linha.get("external_id") or "").strip()
+            if externo:
+                pedido["system"] = payload.system
+                pedido["remote_id"] = externo
+            feito = mcp_write.aplicar_testcase(
+                ws, conn, pedido, author_of(request), _write_doc, reindex_file)
+            (criados if feito["action"] == "create" else atualizados).append(
+                feito["entity_id"])
+        return {"created": criados, "updated": atualizados, "plan": plano}
+
+    @app.post(API_PREFIX + "/integrations/file/cucumber/preview")
+    async def previa_cucumber(request: Request, payload: FileImportIn):
+        """Os cenários do arquivo e a que caso cada um se liga pela tag."""
+        cenarios = file_ops.ler_cucumber(payload.content)
+        conn = conn_of(request)
+        conhecidos, orfaos = [], []
+        for cenario in cenarios:
+            ct = cenario.get("testcase_id")
+            existe = bool(ct) and conn.execute(
+                "SELECT 1 FROM testcases WHERE id = ?", (ct,)).fetchone()
+            (conhecidos if existe else orfaos).append(cenario)
+        return {
+            "scenarios": cenarios,
+            "matched": conhecidos,
+            "unmatched": orfaos,
+            "warnings": (
+                [f"{len(orfaos)} cenário(s) sem tag @CT-XXXX que resolva para um"
+                 " caso daqui — sem a tag não há como ligar resultado a caso"
+                 " (ADR 0003)"] if orfaos else []
+            ),
+        }
 
     @app.get(API_PREFIX + "/integrations/capabilities")
     async def integration_capabilities(request: Request):

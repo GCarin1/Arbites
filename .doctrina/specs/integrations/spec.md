@@ -5,7 +5,7 @@
 **Implementation:** planned — a identidade externa landa na change 0145; a porta e os adaptadores nas 0148 e 0150
 **Realizes:** [SC4] parcialmente (o resgate do Xray foi pontual; aqui o vinculo com o sistema oficial vira permanente) e a decisao de escopo da ADR 0015
 **Last updated:** 2026-09-13
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -50,6 +50,7 @@ existe so para volume e recorrencia.
   todas.
 - The system shall recusar em voz alta, no preview, tudo o que a ferramenta
   de destino nao consegue representar, nomeando o que ficara de fora.
+- The system shall oferecer intercambio por arquivo em CSV e Cucumber JSON, nos dois sentidos, como adaptador que implementa a mesma porta dos demais e funciona com qualquer ferramenta que importe planilha, sem credencial e sem chamada de rede.
 
 ### Event-driven
 
@@ -95,6 +96,7 @@ existe so para volume e recorrencia.
 5. [unverified] O preview de uma ferramenta sem suporte a evidencia nomeia
    explicitamente que a evidencia ficara de fora — verified by
    `backend/tests/test_integrations.py`.
+6. [unverified] Exportar e reimportar o mesmo arquivo nao cria duplicata, um CSV com coluna faltando falha nomeando a coluna, e o preview declara que evidencia sai como caminho e nao como anexo — verified by `backend/tests/test_integrations_file.py`.
 
 ## Maturity
 

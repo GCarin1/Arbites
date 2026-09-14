@@ -5,7 +5,7 @@
 **Implementation:** planned — leituras na change 0146, escritas na 0147, tela na 0149
 **Realizes:** a decisao de escopo da ADR 0015 — o agente e a ponte, e o Arbites expoe em vez de transportar
 **Last updated:** 2026-09-13
-**Version:** 0.1.0
+**Version:** 0.2.0
 
 ## Purpose
 
@@ -45,6 +45,7 @@ alguem aparece na auditoria como qualquer outra escrita.
 - The system shall exigir escopo (epic, story ou squad) nas ferramentas que
   montam contexto, pela mesma razao que o `context-pack` ja exige: pacote do
   workspace inteiro nao cabe em janela nenhuma e nao ajuda ninguem.
+- The system shall expor ferramentas MCP de escrita para caso de teste, resultado de execucao e vinculo externo, cada uma devolvendo um preview do que mudaria antes de aplicar e declarada como escrita para que o cliente peca confirmacao humana.
 
 ### Event-driven
 
@@ -52,6 +53,7 @@ alguem aparece na auditoria como qualquer outra escrita.
   system shall responder os casos ligados por tag de cenario (ADR 0003) e os
   casos correlacionados pelo mapa de risco, distinguindo as duas origens —
   vinculo explicito e correlacao sao confiancas diferentes.
+- When uma escrita MCP alcanca um artefato que ja tem vinculo com o sistema informado, the system shall atualizar o artefato existente em vez de criar outro, para que a mesma chamada repetida nao duplique.
 
 ### State-driven
 
@@ -66,6 +68,7 @@ alguem aparece na auditoria como qualquer outra escrita.
   atividade precisa dizer em nome de quem o agente agiu.
 - The system shall not devolver o workspace inteiro em nenhuma ferramenta de
   contexto.
+- The system shall not aceitar escrita MCP em artefato com conflito de sincronia aberto, recusando com o motivo em vez de escolher um lado.
 
 ## Acceptance criteria
 
@@ -82,6 +85,7 @@ alguem aparece na auditoria como qualquer outra escrita.
    a originou — verified by `backend/tests/test_mcp_server.py`.
 5. [unverified] Ferramenta de contexto sem escopo recusa, como o
    `context-pack` ja recusa — verified by `backend/tests/test_mcp_server.py`.
+6. [unverified] Duas chamadas iguais de criacao com o mesmo vinculo produzem um unico artefato, escrita em artefato em conflito e recusada, e toda escrita aparece no log de atividade com a conta de origem — verified by `backend/tests/test_mcp_server.py`.
 
 ## Maturity
 

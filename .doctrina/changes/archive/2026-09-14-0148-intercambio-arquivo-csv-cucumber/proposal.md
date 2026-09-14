@@ -1,6 +1,7 @@
 # Change 0148-intercambio-arquivo-csv-cucumber — intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-13
 - **Owner:**
 - **Lane:** product (uncertain)
@@ -53,13 +54,13 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Exportar casos e resultados e reimportar o mesmo arquivo não cria
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Exportar casos e resultados e reimportar o mesmo arquivo não cria
       duplicata — a idempotência vem do vínculo externo (0145).
-- [ ] O preview nomeia explicitamente que evidência sai como caminho e não
+- [x] O preview nomeia explicitamente que evidência sai como caminho e não
       como anexo.
-- [ ] Um CSV com coluna faltando falha com mensagem que diz qual, em vez
+- [x] Um CSV com coluna faltando falha com mensagem que diz qual, em vez
       de importar pela metade.
 
 ## Open questions

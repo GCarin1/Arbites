@@ -1,6 +1,7 @@
 # Change 0147-ferramentas-mcp-escrita-preview — ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-13
 - **Owner:**
 - **Lane:** product (uncertain)
@@ -56,13 +57,13 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Chamar `create_or_update_testcase` duas vezes com o mesmo vínculo
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Chamar `create_or_update_testcase` duas vezes com o mesmo vínculo
       cria UM caso, não dois — a prova de idempotência.
-- [ ] Escrita num artefato em conflito é recusada nomeando o conflito.
-- [ ] Toda escrita aparece no log de atividade com a conta de origem.
-- [ ] O preview mostra o que mudaria antes de qualquer gravação.
+- [x] Escrita num artefato em conflito é recusada nomeando o conflito.
+- [x] Toda escrita aparece no log de atividade com a conta de origem.
+- [x] O preview mostra o que mudaria antes de qualquer gravação.
 
 ## Open questions
 

@@ -135,6 +135,42 @@ repositório — um espelho da REST não agregaria nada:
 | `context_pack` | o pacote de contexto de um escopo (exige epic, story ou squad) |
 | `execution_report` | resultado, passos e evidências de um ciclo |
 | `external_links` | o que já está ligado a um sistema externo — a consulta que evita criar duplicata |
+| `integration_capabilities` | o que cada sistema externo consegue representar, e o que ele **não** guarda |
+
+**As três escritas** (change 0147), disponíveis só com `mcp_write` ligado:
+
+| ferramenta | faz |
+|---|---|
+| `create_or_update_testcase` | grava o caso em BDD. **Idempotente pelo vínculo**: com o mesmo `system` + `remote_id`, a segunda chamada atualiza o caso existente em vez de criar outro |
+| `record_result` | resultado de um caso num ciclo **aberto**, com passos e evidência em base64 |
+| `link_external` | registra que CT-0007 ↔ CARD-4821 no sistema X |
+
+Cada uma tem uma gêmea `*_preview` que **calcula e não grava**: o agente a
+chama primeiro, mostra o plano (`action` diz `create` ou `update`, `changes`
+diz o que muda) e só grava depois da sua confirmação. As duas são caminhos
+diferentes na API de propósito — assim o log de atividade distingue quem
+olhou de quem gravou.
+
+`link_external` parece a menor das três e é a mais importante: sem ela o
+agente não tem como saber, numa conversa nova, que já criou aquele card — e
+recria. Com ela o fluxo vira *"o que daqui ainda não está lá?"* → resposta
+determinística → age só no delta.
+
+Três recusas que valem conhecer:
+
+- **meio vínculo** (`system` sem `remote_id`, ou o contrário) é recusado: não
+  é idempotente, e é assim que a duplicata nasce;
+- **conflito** — o artefato mudou dos dois lados desde a última sincronia —
+  é recusado nomeando o conflito. Escolher um lado aqui apagaria o outro em
+  silêncio. A detecção depende do agente informar `revision` (a revisão atual
+  do lado de lá): o Arbites não fala com o sistema externo, então sem isso ele
+  só consegue responder *"mudou aqui?"*, e não finge saber mais;
+- **`remote_id` já usado** por outro artefato daqui: dois casos apontando
+  para o mesmo card tornam a próxima sincronia indecidível.
+
+Evidência vai em **base64**, nunca como caminho no disco: um caminho vindo do
+agente seria uma primitiva de leitura de arquivo arbitrário na máquina de
+quem hospeda.
 
 Casos também são expostos como recurso (`arbites://testcase/CT-0007`), para
 o agente referenciar sem recolar o corpo na conversa.
@@ -369,6 +405,48 @@ intervalo perdido volta inteiro.
 > O token continua só no keyring do SO (ADR 0008) — nunca no YAML, nunca no
 > índice, nunca logado. E um período sem run é visível na série em vez de
 > passar por "semana tranquila".
+
+## Intercâmbio por arquivo: o piso que funciona com qualquer ferramenta
+
+Adaptador por API só existe onde há API **e permissão** — e permissão, numa
+empresa, é pedido que demora. Arquivo existe sempre: toda ferramenta de teste
+do mercado importa CSV. Sem credencial, sem MCP, sem pedir nada para a TI.
+
+```
+GET  /api/v1/integrations/file/testcases          # exporta casos em CSV
+GET  /api/v1/integrations/file/results?execution= # exporta resultados em CSV
+POST /api/v1/integrations/file/testcases/preview  # {"content": "<csv>"} → o plano
+POST /api/v1/integrations/file/testcases          # importa
+POST /api/v1/integrations/file/cucumber/preview   # {"content": "<json>"} → cenários e a que CT ligam
+```
+
+O formato é **neutro** — não é o CSV de nenhuma ferramenta específica, é o que
+sobrevive à ida e à volta sem perder identidade:
+
+```
+external_id,id,title,type,priority,status,story,tags,folder,body
+```
+
+`external_id` é o que dá a **idempotência**: exportar e reimportar o mesmo
+arquivo atualiza no lugar em vez de duplicar. Linha sem `external_id` é
+importada, mas a prévia avisa que a volta vai duplicar — sem identidade
+externa não há como reconhecer o que já entrou.
+
+Três coisas que a prévia diz **antes**, e não depois:
+
+- **evidência sai como caminho relativo, não como anexo.** Um CSV com print em
+  base64 fica intratável em qualquer planilha;
+- **linha sem `title`** falha nomeando o número da linha, e o cabeçalho é
+  validado antes de qualquer linha — importar 40 de 50 e calar sobre as 10 é
+  pior do que não importar, porque o buraco não aparece;
+- **`external_id` repetido no mesmo arquivo** é ignorado e contado: duas
+  linhas para o mesmo item tornam indecidível qual vale.
+
+Para o Cucumber JSON, a ligação cenário ↔ caso é a tag `@CT-XXXX` (ADR 0003);
+cenário sem tag aparece em `unmatched`, com aviso.
+
+> Por enquanto essas rotas não têm tela: são API. O uso previsto é pela linha
+> de comando ou pelo agente MCP, que alcança as mesmas rotas.
 
 ## Rodadas de auditoria: elas se acumulam sozinhas
 

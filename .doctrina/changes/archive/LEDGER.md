@@ -163,3 +163,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0155-aba-observabilidade-eixo-temporal — aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor (specs: reporting MODIFIED)
 - 2026-09-14 — 0156-retencao-artefato-sinal-print — retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar (specs: reporting MODIFIED)
 - 2026-09-14 — 0157-credencial-github-expira-revogada — credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio (specs: local-automation MODIFIED)
+- 2026-09-14 — 0147-ferramentas-mcp-escrita-preview — ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo (specs: mcp-server MODIFIED)
+- 2026-09-14 — 0148-intercambio-arquivo-csv-cucumber — intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API (specs: integrations MODIFIED)

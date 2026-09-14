@@ -16,18 +16,35 @@ from arbites.mcp_server import ArbitesClient, McpRecusado, build_server
 
 
 class ClienteDeTeste(ArbitesClient):
-    """Fala com o `TestClient` em vez de abrir socket — mesma superfície."""
+    """Fala com o `TestClient` em vez de abrir socket — mesma superfície.
 
-    def __init__(self, http, token):
+    SEM o cookie de sessão, e isso não é detalhe: um cliente que carrega o
+    cookie do navegador resolve a sessão pelo cookie e o Bearer nunca é
+    consultado — o teste passaria exercitando o caminho do humano e achando
+    que provou o do agente. Um agente de verdade não tem cookie nenhum.
+    """
+
+    def __init__(self, app, token):
         super().__init__("http://testserver", token)
-        self.http = http
+        from fastapi.testclient import TestClient
+
+        self.http = TestClient(app)
+
+    async def post(self, path, corpo):
+        return self._ou_recusa(self.http.post(
+            "/api/v1" + path, json=corpo,
+            headers={"Authorization": f"Bearer {self.token}"},
+        ))
 
     async def get(self, path, **params):
         limpos = {k: v for k, v in params.items() if v not in ("", None)}
-        r = self.http.get(
+        return self._ou_recusa(self.http.get(
             "/api/v1" + path, params=limpos,
             headers={"Authorization": f"Bearer {self.token}"},
-        )
+        ))
+
+    @staticmethod
+    def _ou_recusa(r):
         if r.status_code >= 400:
             try:
                 erro = r.json()["error"]
@@ -45,8 +62,9 @@ def _token(client) -> str:
 
 @pytest.fixture()
 def mcp(client):
-    """Servidor MCP montado sobre a sessão de teste, com credencial real."""
-    return build_server(ClienteDeTeste(client, _token(client)))
+    """Servidor MCP sobre a MESMA instância, mas com credencial de agente e
+    sem cookie — o caminho que o Cursor percorre."""
+    return build_server(ClienteDeTeste(client.app, _token(client)))
 
 
 def _chamar(servidor, nome, **args):
@@ -103,17 +121,31 @@ def test_bearer_invalido_nao_entra(client):
 # -- as ferramentas ----------------------------------------------------------
 
 
-def test_ferramentas_sao_seis_e_todas_declaram_leitura(mcp):
-    nomes = {t.name for t in asyncio.run(mcp.list_tools())}
-    assert nomes == {
-        "coverage_gaps", "impact_of_files", "pending_rerun",
-        "context_pack", "execution_report", "external_links",
-        "integration_capabilities",
-    }
-    assert all(
-        t.annotations and t.annotations.read_only_hint
-        for t in asyncio.run(mcp.list_tools())
-    ), "leitura precisa se declarar para o cliente não pedir confirmação à toa"
+LEITURAS = {
+    "coverage_gaps", "impact_of_files", "pending_rerun", "context_pack",
+    "execution_report", "external_links", "integration_capabilities",
+    # as prévias NÃO gravam nada: são leitura, e declarar o contrário faria o
+    # cliente pedir confirmação para um cálculo
+    "create_or_update_testcase_preview", "record_result_preview",
+    "link_external_preview",
+}
+ESCRITAS = {"create_or_update_testcase", "record_result", "link_external"}
+
+
+def test_cada_ferramenta_declara_se_le_ou_escreve(mcp):
+    """A anotação é o que faz o cliente MCP pedir confirmação humana. Errá-la
+    em qualquer direção estraga o fluxo: leitura anotada como escrita irrita,
+    escrita anotada como leitura grava sem ninguém ver."""
+    ferramentas = {t.name: t for t in asyncio.run(mcp.list_tools())}
+    assert set(ferramentas) == LEITURAS | ESCRITAS
+
+    for nome in LEITURAS:
+        assert ferramentas[nome].annotations.read_only_hint is True, nome
+    for nome in ESCRITAS:
+        anot = ferramentas[nome].annotations
+        assert anot.read_only_hint is False, nome
+        assert anot.destructive_hint is False, nome  # cria ou atualiza; não apaga
+        assert anot.idempotent_hint is True, nome    # literal: vem do vínculo
 
 
 def test_coverage_gaps_devolve_os_criterios_descobertos_e_nao_so_a_contagem(
@@ -256,3 +288,226 @@ def test_agente_em_somente_leitura_le_mas_nao_escreve(client):
     assert client.post(
         "/api/v1/testcases", json={"title": "pelo humano", "body": "## Passos\n\n1. x\n"}
     ).status_code == 201
+
+
+# -- escrita (change 0147) ---------------------------------------------------
+#
+# O teste que importa aqui é o da DUPLICATA. Integração com sistema externo
+# não costuma morrer por não conseguir criar: morre por criar duas vezes.
+
+
+@pytest.fixture()
+def mcp_escrita(client):
+    """Servidor MCP com a escrita do agente LIGADA — ela nasce desligada."""
+    client.put("/api/v1/admin/switches/mcp_write", json={"enabled": True})
+    return build_server(ClienteDeTeste(client.app, _token(client)))
+
+
+CORPO = "## Passos\n\n1. abrir a tela\n\n## Resultado esperado\n\nabre\n"
+
+
+def test_mesma_chamada_duas_vezes_cria_um_caso_so(client, mcp_escrita):
+    """A prova de idempotência. A chave é o vínculo, não a memória de quem
+    chamou: numa conversa nova o agente não lembra de nada, e é aí que a
+    duplicata nasce."""
+    args = dict(title="Login com senha válida", system="businessmap",
+                remote_id="CARD-4821", body=CORPO)
+
+    primeira = _chamar(mcp_escrita, "create_or_update_testcase", **args)
+    assert primeira["action"] == "create"
+    criado = primeira["entity_id"]
+
+    segunda = _chamar(mcp_escrita, "create_or_update_testcase",
+                      **{**args, "title": "Login com senha válida (revisado)"})
+    assert segunda["action"] == "update"
+    assert segunda["entity_id"] == criado
+
+    casos = client.get("/api/v1/testcases").json()
+    ligados = [c for c in casos if c["id"] == criado]
+    assert len(ligados) == 1
+    assert ligados[0]["title"] == "Login com senha válida (revisado)"
+
+
+def test_a_previa_mostra_o_que_mudaria_e_nao_grava(client, mcp_escrita):
+    antes = len(client.get("/api/v1/testcases").json())
+
+    plano = _chamar(mcp_escrita, "create_or_update_testcase_preview",
+                    title="Só olhando", system="businessmap", remote_id="CARD-1")
+    assert plano["action"] == "create"
+    assert any(m["field"] == "title" for m in plano["changes"])
+    assert len(client.get("/api/v1/testcases").json()) == antes
+
+    _chamar(mcp_escrita, "create_or_update_testcase",
+            title="Só olhando", system="businessmap", remote_id="CARD-1", body=CORPO)
+
+    # e agora a prévia mostra ATUALIZAR, com o diff real
+    plano2 = _chamar(mcp_escrita, "create_or_update_testcase_preview",
+                     title="Outro título", system="businessmap", remote_id="CARD-1")
+    assert plano2["action"] == "update"
+    assert plano2["changes"] == [
+        {"field": "title", "from": "Só olhando", "to": "Outro título"}
+    ]
+
+
+def test_previa_de_chamada_identica_diz_que_nao_muda_nada(mcp_escrita):
+    args = dict(title="Estável", system="businessmap", remote_id="CARD-9", body=CORPO)
+    _chamar(mcp_escrita, "create_or_update_testcase", **args)
+
+    plano = _chamar(mcp_escrita, "create_or_update_testcase_preview", **args)
+    assert plano["action"] == "update"
+    assert plano["no_op"] is True
+
+
+def test_meio_vinculo_e_recusado(mcp_escrita):
+    """`system` sem `remote_id` não é idempotente — e é assim que a duplicata
+    nasce, então a recusa é na entrada."""
+    r = _chamar(mcp_escrita, "create_or_update_testcase",
+                title="Meio ligado", system="businessmap", body=CORPO)
+    assert "incomplete_link" in r["refused"]
+
+
+def test_escrita_em_artefato_em_conflito_e_recusada_nomeando_o_conflito(
+    client, mcp_escrita
+):
+    """Conflito é decisão de pessoa: escolher um lado aqui apagaria o outro
+    em silêncio, que numa ferramenta de rastreabilidade é o pior defeito.
+
+    A revisão remota vem do AGENTE — o Arbites não fala com o sistema externo
+    (ADR 0015), então quem acabou de olhar o card é quem sabe em que revisão
+    ele está.
+    """
+    criado = _chamar(mcp_escrita, "create_or_update_testcase",
+                     title="Disputado", system="businessmap",
+                     remote_id="CARD-77", body=CORPO)
+    ct = criado["entity_id"]
+
+    # a última sincronia ficou em v9, com um corpo que não é mais o de agora
+    client.put(
+        f"/api/v1/integrations/links/testcase/{ct}",
+        json={"system": "businessmap", "id": "CARD-77", "revision": "v9",
+              "synced_hash": "hash-de-uma-versao-antiga"},
+    )
+    # o agente chega dizendo que lá está em v10 (mudou do lado de lá) e traz
+    # um corpo novo (mudou do lado de cá) — os dois lados
+    r = _chamar(mcp_escrita, "create_or_update_testcase",
+                title="Disputado", system="businessmap", remote_id="CARD-77",
+                revision="v10", body=CORPO + "\n2. e mais um passo\n")
+    assert "sync_conflict" in r["refused"]
+    assert ct in r["refused"]
+
+    # e sem a revisão remota o Arbites NÃO finge saber: ele só consegue
+    # responder "mudou aqui?", então a escrita passa
+    ok = _chamar(mcp_escrita, "create_or_update_testcase",
+                 title="Disputado", system="businessmap", remote_id="CARD-77",
+                 body=CORPO + "\n2. e mais um passo\n")
+    assert ok["applied"] is True
+
+
+def test_link_external_recusa_id_remoto_ja_usado_por_outro(client, mcp_escrita):
+    """Dois artefatos daqui apontando para o mesmo item lá tornam a próxima
+    sincronia indecidível."""
+    a = _chamar(mcp_escrita, "create_or_update_testcase",
+                title="Primeiro", system="businessmap", remote_id="CARD-500",
+                body=CORPO)["entity_id"]
+    b = client.post("/api/v1/testcases",
+                    json={"title": "Segundo", "body": CORPO}).json()["id"]
+
+    r = _chamar(mcp_escrita, "link_external", entity_id=b,
+                system="businessmap", remote_id="CARD-500")
+    assert "remote_id_taken" in r["refused"]
+    assert a in r["refused"]
+
+
+def test_link_external_registra_o_vinculo_e_a_consulta_o_enxerga(client, mcp_escrita):
+    ct = client.post("/api/v1/testcases",
+                     json={"title": "Para ligar", "body": CORPO}).json()["id"]
+
+    plano = _chamar(mcp_escrita, "link_external_preview", entity_id=ct,
+                    system="businessmap", remote_id="CARD-31")
+    assert plano["action"] == "link"
+
+    _chamar(mcp_escrita, "link_external", entity_id=ct,
+            system="businessmap", remote_id="CARD-31")
+
+    ligados = _chamar(mcp_escrita, "external_links", system="businessmap")
+    assert any(v["entity_id"] == ct and v["remote_id"] == "CARD-31"
+               for v in ligados["links"])
+
+
+def test_record_result_recusa_ciclo_fechado_e_caso_de_fora(client, mcp_escrita):
+    ct = client.post("/api/v1/testcases",
+                     json={"title": "No ciclo", "body": CORPO}).json()["id"]
+    outro = client.post("/api/v1/testcases",
+                        json={"title": "Fora do ciclo", "body": CORPO}).json()["id"]
+    execucao = client.post("/api/v1/executions", json={
+        "name": "Ciclo do agente", "owner": "qa", "testcase_ids": [ct],
+    }).json()["id"]
+
+    fora = _chamar(mcp_escrita, "record_result", execution_id=execucao,
+                   testcase_id=outro, status="passed")
+    assert "not_in_execution" in fora["refused"]
+
+    ok = _chamar(mcp_escrita, "record_result", execution_id=execucao,
+                 testcase_id=ct, status="passed", comment="pelo agente")
+    assert ok["applied"] is True
+
+    client.post(f"/api/v1/executions/{execucao}/close")
+    fechado = _chamar(mcp_escrita, "record_result", execution_id=execucao,
+                      testcase_id=ct, status="failed")
+    assert "execution_closed" in fechado["refused"]
+
+
+def test_evidencia_entra_em_base64_e_nao_como_caminho_no_disco(client, mcp_escrita):
+    """Caminho vindo do agente seria leitura de arquivo arbitrário na máquina
+    de quem hospeda. base64 não alcança nada que o chamador já não tenha."""
+    import base64
+
+    ct = client.post("/api/v1/testcases",
+                     json={"title": "Com evidência", "body": CORPO}).json()["id"]
+    execucao = client.post("/api/v1/executions", json={
+        "name": "Ciclo com print", "owner": "qa", "testcase_ids": [ct],
+    }).json()["id"]
+
+    png = b"\x89PNG\r\n\x1a\nconteudo-de-teste"
+    r = _chamar(mcp_escrita, "record_result", execution_id=execucao,
+                testcase_id=ct, status="failed",
+                evidence=[{"filename": "falha.png",
+                           "content_base64": base64.b64encode(png).decode()}])
+    assert r["evidence_paths"]
+
+    detalhe = client.get(f"/api/v1/executions/{execucao}").json()
+    resultado = next(x for x in detalhe["results"] if x["testcase_id"] == ct)
+    assert len(resultado["evidences"]) == 1
+    assert resultado["evidences"][0]["sha256"]
+
+    ruim = _chamar(mcp_escrita, "record_result", execution_id=execucao,
+                   testcase_id=ct, status="failed",
+                   evidence=[{"filename": "x.png", "content_base64": "não é base64!"}])
+    assert "invalid_evidence" in ruim["refused"]
+
+
+def test_toda_escrita_do_agente_entra_no_log_com_a_conta_de_origem(
+    client, mcp_escrita
+):
+    """E a prévia entra como um caminho DIFERENTE: o registro precisa poder
+    distinguir quem olhou de quem gravou."""
+    _chamar(mcp_escrita, "create_or_update_testcase_preview",
+            title="Auditada", system="businessmap", remote_id="CARD-88")
+    _chamar(mcp_escrita, "create_or_update_testcase",
+            title="Auditada", system="businessmap", remote_id="CARD-88", body=CORPO)
+
+    caminhos = [e["path"] for e in client.get("/api/v1/admin/activity").json()["entries"]]
+    assert "/api/v1/integrations/write/testcase" in caminhos
+    assert "/api/v1/integrations/write/testcase/preview" in caminhos
+
+    dono = {e["user_email"] for e in client.get("/api/v1/admin/activity").json()["entries"]
+            if e["path"].startswith("/api/v1/integrations/write/")}
+    assert dono == {"admin@arbites.test"}  # a conta que gerou a credencial
+
+
+def test_escrita_do_agente_segue_barrada_com_o_interruptor_desligado(client, mcp):
+    """`mcp` (sem o interruptor) é o estado de fábrica."""
+    r = _chamar(mcp, "create_or_update_testcase",
+                title="Não deveria entrar", system="businessmap",
+                remote_id="CARD-000", body=CORPO)
+    assert "agent_write_disabled" in r["refused"]

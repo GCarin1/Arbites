@@ -34,6 +34,13 @@ from mcp.types import ToolAnnotations
 API = "/api/v1"
 
 SOMENTE_LEITURA = ToolAnnotations(readOnlyHint=True)
+# Declarada como escrita para o cliente MCP pedir confirmação humana.
+# `destructiveHint=False` porque nada aqui apaga: cria ou atualiza.
+# `idempotentHint=True` é literal, não aspiracional — a idempotência vem do
+# vínculo externo, então repetir a mesma chamada converge no mesmo artefato.
+ESCRITA = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=True,
+)
 
 INSTRUCOES = """\
 Arbites — plataforma local de gestão e rastreabilidade de testes.
@@ -48,6 +55,18 @@ Regras que valem para todas:
 - Um resultado com a chave `refused` significa que o servidor recusou — em
   geral porque o administrador desligou aquele módulo. Leia o motivo e pare;
   repetir não muda a resposta.
+
+Para as ferramentas que ESCREVEM (`create_or_update_testcase`, `record_result`,
+`link_external`), o fluxo é sempre o mesmo e não tem atalho:
+
+1. chame a versão `..._preview` PRIMEIRO;
+2. mostre o plano à pessoa — o campo `action` diz se vai criar ou atualizar,
+   e `changes` diz exatamente o que muda;
+3. só depois da confirmação dela chame a ferramenta que grava.
+
+Antes de criar qualquer coisa num sistema externo, chame `external_links` para
+saber o que já existe. É essa consulta que impede a duplicata: sua memória não
+sobrevive à troca de conversa, o vínculo sobrevive.
 """
 
 
@@ -62,6 +81,15 @@ class ArbitesClient:
         self.base = base.rstrip("/")
         self.token = token
 
+    async def post(self, path: str, corpo: dict[str, Any]) -> Any:
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(
+                f"{self.base}{API}{path}",
+                json=corpo,
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+        return self._ler(r)
+
     async def get(self, path: str, **params: Any) -> Any:
         limpos = {k: v for k, v in params.items() if v not in ("", None)}
         url = f"{self.base}{API}{path}"
@@ -69,6 +97,10 @@ class ArbitesClient:
             url += "?" + urlencode(limpos)
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.get(url, headers={"Authorization": f"Bearer {self.token}"})
+        return self._ler(r)
+
+    @staticmethod
+    def _ler(r) -> Any:
         if r.status_code >= 400:
             try:
                 erro = r.json()["error"]
@@ -189,6 +221,136 @@ def build_server(cli: ArbitesClient) -> MCPServer:
     )
     async def integration_capabilities() -> dict:
         return await _ou_recusa(lambda: cli.get("/integrations/capabilities"))
+
+    # -- escrita (change 0147) ----------------------------------------------
+    #
+    # Cada escrita é um PAR: a de prévia calcula e não grava; a outra grava.
+    # O par existe para que a confirmação humana caia entre as duas — e para
+    # que o log de atividade da instância registre as duas como caminhos
+    # diferentes, distinguindo quem olhou de quem gravou.
+
+    def _corpo_testcase(**campos) -> dict:
+        return {k: v for k, v in campos.items() if v not in ("", None, [])}
+
+    @server.tool(
+        annotations=SOMENTE_LEITURA,
+        description=(
+            "O que `create_or_update_testcase` FARIA, sem gravar nada. "
+            "`action` responde a pergunta que importa: `create` ou `update`. "
+            "Se vier `update`, é porque já existe caso daqui ligado a esse "
+            "`remote_id` — criar outro seria a duplicata. Chame isto SEMPRE "
+            "antes de gravar, e mostre o resultado à pessoa."
+        ),
+    )
+    async def create_or_update_testcase_preview(
+        title: str, system: str = "", remote_id: str = "", body: str = "",
+        type: str = "", priority: str = "", status: str = "", story: str = "",
+        tags: list[str] | None = None, folder: str = "",
+    ) -> dict:
+        return await _ou_recusa(lambda: cli.post(
+            "/integrations/write/testcase/preview",
+            _corpo_testcase(title=title, system=system, remote_id=remote_id,
+                            body=body, type=type, priority=priority,
+                            status=status, story=story, tags=tags, folder=folder),
+        ))
+
+    @server.tool(
+        annotations=ESCRITA,
+        description=(
+            "Grava o caso de teste. IDEMPOTENTE pelo vínculo externo: com o "
+            "mesmo `system` + `remote_id`, a segunda chamada ATUALIZA o caso "
+            "que já existe em vez de criar um segundo. Informe os dois juntos "
+            "ou nenhum — meio vínculo não é idempotente e é assim que a "
+            "duplicata nasce. Recusa se o caso mudou dos dois lados desde a "
+            "última sincronia: conflito é decisão de pessoa. "
+            "Chame o `_preview` antes e confirme com a pessoa."
+        ),
+    )
+    async def create_or_update_testcase(
+        title: str, system: str = "", remote_id: str = "", body: str = "",
+        type: str = "", priority: str = "", status: str = "", story: str = "",
+        tags: list[str] | None = None, folder: str = "", revision: str = "",
+    ) -> dict:
+        return await _ou_recusa(lambda: cli.post(
+            "/integrations/write/testcase",
+            _corpo_testcase(title=title, system=system, remote_id=remote_id,
+                            body=body, type=type, priority=priority,
+                            status=status, story=story, tags=tags,
+                            folder=folder, revision=revision),
+        ))
+
+    @server.tool(
+        annotations=SOMENTE_LEITURA,
+        description=(
+            "O que `record_result` faria, sem gravar. Recusa cedo — e diz o "
+            "motivo — se o ciclo está fechado ou se o caso não faz parte dele."
+        ),
+    )
+    async def record_result_preview(
+        execution_id: str, testcase_id: str, status: str, comment: str = "",
+    ) -> dict:
+        return await _ou_recusa(lambda: cli.post(
+            "/integrations/write/result/preview",
+            {"execution_id": execution_id, "testcase_id": testcase_id,
+             "status": status, "comment": comment or None},
+        ))
+
+    @server.tool(
+        annotations=ESCRITA,
+        description=(
+            "Registra o resultado de um caso num ciclo ABERTO, com passos e "
+            "evidência. Evidência vai em base64 dentro de `evidence` "
+            "(`filename` + `content_base64`), NÃO como caminho no disco: "
+            "caminho daqui seria leitura de arquivo arbitrário no computador "
+            "de quem hospeda. Ciclo fechado é recusado — resultado em ciclo "
+            "fechado reescreve um retrato que já foi usado para decidir."
+        ),
+    )
+    async def record_result(
+        execution_id: str, testcase_id: str, status: str, comment: str = "",
+        steps: dict[str, str] | None = None,
+        evidence: list[dict[str, str]] | None = None,
+    ) -> dict:
+        return await _ou_recusa(lambda: cli.post(
+            "/integrations/write/result",
+            {"execution_id": execution_id, "testcase_id": testcase_id,
+             "status": status, "comment": comment or None,
+             "steps": steps or None, "evidence": evidence or None},
+        ))
+
+    @server.tool(
+        annotations=SOMENTE_LEITURA,
+        description="O que `link_external` faria, sem gravar.",
+    )
+    async def link_external_preview(
+        entity_id: str, system: str, remote_id: str, kind: str = "testcase",
+    ) -> dict:
+        return await _ou_recusa(lambda: cli.post(
+            "/integrations/write/link/preview",
+            {"entity_id": entity_id, "system": system,
+             "remote_id": remote_id, "kind": kind},
+        ))
+
+    @server.tool(
+        annotations=ESCRITA,
+        description=(
+            "Registra que um artefato daqui é o mesmo item de lá — por "
+            "exemplo CT-0007 ↔ CARD-4821 no businessmap. É a MAIS "
+            "importante das escritas, e parece a menor: sem ela você não tem "
+            "como saber, numa conversa nova, que já criou aquele card — e "
+            "recria. Chame-a logo depois de criar algo no sistema externo, "
+            "sempre. Recusa se o `remote_id` já pertence a outro artefato."
+        ),
+    )
+    async def link_external(
+        entity_id: str, system: str, remote_id: str, kind: str = "testcase",
+        revision: str = "",
+    ) -> dict:
+        return await _ou_recusa(lambda: cli.post(
+            "/integrations/write/link",
+            {"entity_id": entity_id, "system": system, "remote_id": remote_id,
+             "kind": kind, "revision": revision or None},
+        ))
 
     @server.resource(
         "arbites://testcase/{testcase_id}",

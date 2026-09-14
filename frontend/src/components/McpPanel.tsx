@@ -18,9 +18,9 @@ const LEITURAS: [string, string][] = [
 ];
 
 const ESCRITAS: [string, string][] = [
-  ["create_or_update_testcase", "grava o caso em BDD, idempotente pelo vínculo"],
-  ["record_result", "resultado de um caso num ciclo, com passos e evidência"],
-  ["link_external", "registra que este caso corresponde àquele card"],
+  ["create_or_update_testcase", "grava o caso em BDD; com o mesmo vínculo, a segunda chamada ATUALIZA em vez de criar outro"],
+  ["record_result", "resultado de um caso num ciclo aberto, com passos e evidência em base64"],
+  ["link_external", "registra que este caso corresponde àquele card — é o que impede a duplicata"],
 ];
 
 const CLIENTES: { key: string; label: string; hint: string }[] = [
@@ -352,6 +352,13 @@ export function McpPanel({
           ))}
         </ul>
         <p className="caption muted">
+          Cada uma tem uma gêmea <span className="mono">_preview</span> que
+          calcula o que mudaria e <strong>não grava</strong>: é ela que o
+          agente chama primeiro, para você confirmar antes. As duas entram no
+          log de atividade por caminhos diferentes, então o registro distingue
+          quem olhou de quem gravou.
+        </p>
+        <p className="caption muted">
           Com a escrita desligada, qualquer alteração vinda do agente é
           recusada pelo servidor — inclusive por caminhos que ainda não
           existem.
@@ -367,8 +374,12 @@ export function McpPanel({
           de criar, ele pergunta o que já está ligado.
         </p>
         <div className="mcp-links-summary">
-          <span className="status-dot dot-col-passed">{ligados} ligado(s)</span>
-          <span className="status-dot dot-col-pending">{nunca} nunca sincronizado(s)</span>
+          <span className="status-dot dot-col-passed">
+            {ligados} {ligados === 1 ? "ligado" : "ligados"}
+          </span>
+          <span className="status-dot dot-col-pending">
+            {nunca} nunca {nunca === 1 ? "sincronizado" : "sincronizados"}
+          </span>
           <span className={`status-dot ${conflitos ? "dot-col-failed" : "dot-col-passed"}`}>
             {conflitos} em conflito
           </span>
