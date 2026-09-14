@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-13",
+  "last_updated": "2026-09-14",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.17.0",
+        "version": "0.18.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2347,6 +2347,19 @@
         "specs_affected": [
           {
             "capability": "audit",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0152-requisitos-sai-grupo-testes",
+        "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
+        "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]
