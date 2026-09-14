@@ -1,6 +1,7 @@
 # Change 0149-pagina-mcp-aba-ia — pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-13
 - **Owner:**
 - **Lane:** product (uncertain)
@@ -37,6 +38,19 @@ religar.
 
 **Afeta spec:** `ai-assist`. **ADR:** 0014 (interruptor), 0015 (integração).
 
+### O que mudou em relação ao desenho
+
+**`mcp_write` também virou interruptor de verdade, e não só um estado de
+tela.** O desenho previa "um toggle de permissão"; a implementação o colocou
+no gate, valendo para QUALQUER método que altere vindo do agente — inclusive
+os caminhos que a change 0147 ainda vai escrever. Um interruptor que só
+muda a aparência da lista não desliga nada.
+
+**Ele nasce desligado, e para isso o default dos interruptores deixou de ser
+único.** Quase todo interruptor nasce ligado, para preservar o
+comportamento de quem já instalou; a exceção é o que CONCEDE poder novo.
+`SWITCHES_DEFAULT_OFF` marca essa diferença.
+
 ## Scope boundaries
 
 - Não é console de MCP: não se chama ferramenta na mão por aqui. Quem chama
@@ -55,16 +69,16 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] O bloco de configuração é copiável e traz o endereço real da
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] O bloco de configuração é copiável e traz o endereço real da
       instância, não um placeholder.
-- [ ] A credencial aparece uma única vez e pode ser revogada sem derrubar a
+- [x] A credencial aparece uma única vez e pode ser revogada sem derrubar a
       sessão do navegador.
-- [ ] Com "permitir escrita" desligado, uma ferramenta de escrita é recusada.
-- [ ] Conta não-admin vê o estado e as ferramentas, e não consegue mudar o
+- [x] Com "permitir escrita" desligado, uma ferramenta de escrita é recusada.
+- [x] Conta não-admin vê o estado e as ferramentas, e não consegue mudar o
       interruptor nem gerar credencial — com o motivo escrito.
-- [ ] Em 390 px o bloco de configuração rola dentro de si e a página não
+- [x] Em 390 px o bloco de configuração rola dentro de si e a página não
       rola de lado.
 
 ## Open questions

@@ -143,6 +143,67 @@ Um resultado com a chave `refused` significa que o servidor recusou — em
 geral porque o administrador desligou aquele módulo em Administração →
 Sistema. O motivo vem junto.
 
+**Os dois interruptores do MCP** ficam na própria página (IA → MCP) e em
+Administração → Sistema:
+
+| interruptor | padrão | o que faz quando desligado |
+|---|---|---|
+| `mcp_server` | **ligado** | nenhuma credencial de agente funciona; a sua sessão no navegador não é afetada |
+| `mcp_write` | **desligado** | o agente lê mas não altera nada — qualquer método de escrita vindo dele é recusado com `agent_write_disabled` |
+
+`mcp_write` nasce desligado de propósito: quase todo interruptor do Arbites
+nasce ligado para preservar o comportamento de quem já instalou, mas o que
+**concede poder novo** segue o contrário — quem quer conceder liga de
+propósito.
+
+**Gerenciar credenciais:**
+
+```
+GET    /api/v1/profile/agent-tokens         # lista (nome, criada, último uso)
+POST   /api/v1/profile/agent-tokens         # {"name": "cursor"} → token em claro, uma vez
+DELETE /api/v1/profile/agent-tokens/{id}    # revoga
+```
+
+Revogar a credencial do agente **não** derruba a sua sessão no navegador, e
+sair do navegador não derruba o agente — são credenciais diferentes, de
+propósito.
+
+## Vínculo com o sistema oficial
+
+Um caso de teste ou requisito pode guardar a que ele corresponde num sistema
+externo. O vínculo mora no **frontmatter do próprio arquivo**, não só no
+índice — o índice é descartável, e um reindex não pode apagar a memória do
+que já foi sincronizado:
+
+```yaml
+external:
+  - system: businessmap
+    id: "CARD-4821"
+    revision: "17"           # o que o remoto tinha na última sincronia
+    synced_hash: "a3f01e…"   # o que NÓS tínhamos naquele momento
+    synced_at: "2026-09-14T19:40:00Z"
+```
+
+Mais de um sistema por artefato é suportado de propósito: numa migração
+corporativa os dois convivem, e perder o vínculo antigo enquanto o novo
+nasce é perder o rastro quando ele mais importa.
+
+`synced_hash` é o que permite responder **"mudou?"** — data só responde
+"quando". Com ele o Arbites classifica cada vínculo em `never_synced`,
+`in_sync`, `local_changed`, `remote_changed` ou `conflict`.
+
+```
+GET    /api/v1/integrations/links?system=&state=      # o que está ligado, e em que estado
+PUT    /api/v1/integrations/links/{kind}/{id}         # registra/atualiza o vínculo de UM sistema
+DELETE /api/v1/integrations/links/{kind}/{id}/{sys}   # desliga de um sistema
+GET    /api/v1/integrations/capabilities              # o que cada sistema consegue representar
+```
+
+**Conflito nunca é resolvido sozinho.** Quando os dois lados mudaram desde a
+última sincronia, nenhum é sobrescrito — último-que-escreve-vence é perda
+silenciosa de dado, e numa ferramenta de rastreabilidade é o pior defeito
+possível.
+
 ## Rodadas de auditoria: elas se acumulam sozinhas
 
 A aba **Auditoria** dispara uma rodada nova sempre que a última passou de

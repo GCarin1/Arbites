@@ -837,7 +837,11 @@ export default function App({
             </Suspense>
           ) : tab === "ia" ? (
             <Suspense fallback={<p className="empty">Carregando IA…</p>}>
-              <AiAssist onChanged={() => void refresh()} onError={setError} />
+              <AiAssist
+                onChanged={() => void refresh()}
+                onError={setError}
+                isAdmin={user.role === "admin"}
+              />
             </Suspense>
           ) : tab === "defects" ? (
             <Suspense fallback={<p className="empty">Carregando defeitos…</p>}>

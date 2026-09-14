@@ -1454,6 +1454,38 @@ table.dense tbody tr:hover td {
   margin-top: var(--s1);
 }
 
+/* Página do MCP (change 0149). O bloco de configuração é CÓDIGO: ele não
+   quebra linha, então rola dentro de si pelo utilitário `.scroll-x` em vez
+   de empurrar a página. */
+.mcp-config {
+  margin: 0 0 var(--s1h);
+  padding: var(--s1h);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+  --scroll-x-bg: var(--surface);
+}
+.mcp-tools {
+  list-style: none;
+  margin: 0 0 var(--s2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-caption);
+}
+/* escrita bloqueada: a lista continua legível, mas não parece disponível */
+.mcp-tools-off {
+  opacity: 0.55;
+}
+.mcp-links-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
 /* Interruptor de módulo/superfície (change 0143). Um `switch` mostra o
    ESTADO; o botão "Desligar" que havia antes mostrava a AÇÃO, e para saber
    se a feature estava ligada era preciso ler o rótulo ao contrário. */

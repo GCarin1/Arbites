@@ -26,7 +26,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.14.0",
+        "version": "0.15.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -138,6 +138,17 @@
         "realizes": [
           "SC1",
           "SC8"
+        ]
+      },
+      {
+        "id": "integrations",
+        "path": ".doctrina/specs/integrations/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-09-13",
+        "implementation": "planned — a identidade externa landa na change 0145; a porta e os adaptadores nas 0148 e 0150",
+        "realizes": [
+          "SC4"
         ]
       },
       {
@@ -415,14 +426,6 @@
     ],
     "changes": [
       {
-        "id": "0145-identidade-externa-frontmatter-vinculo",
-        "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
-        "path": ".doctrina/changes/0145-identidade-externa-frontmatter-vinculo",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
         "id": "0147-ferramentas-mcp-escrita-preview",
         "title": "ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo",
         "path": ".doctrina/changes/0147-ferramentas-mcp-escrita-preview",
@@ -434,14 +437,6 @@
         "id": "0148-intercambio-arquivo-csv-cucumber",
         "title": "intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API",
         "path": ".doctrina/changes/0148-intercambio-arquivo-csv-cucumber",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0149-pagina-mcp-aba-ia",
-        "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
-        "path": ".doctrina/changes/0149-pagina-mcp-aba-ia",
         "status": "proposed",
         "opened": "2026-09-13",
         "lane": "product (uncertain)"
@@ -2352,6 +2347,19 @@
         ]
       },
       {
+        "id": "0145-identidade-externa-frontmatter-vinculo",
+        "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
+        "path": ".doctrina/changes/archive/2026-09-14-0145-identidade-externa-frontmatter-vinculo",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "integrations",
+            "operation": "ADDED"
+          }
+        ]
+      },
+      {
         "id": "0146-servidor-mcp-local-expondo",
         "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
         "path": ".doctrina/changes/archive/2026-09-14-0146-servidor-mcp-local-expondo",
@@ -2373,6 +2381,19 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0149-pagina-mcp-aba-ia",
+        "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
+        "path": ".doctrina/changes/archive/2026-09-14-0149-pagina-mcp-aba-ia",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
             "operation": "MODIFIED"
           }
         ]

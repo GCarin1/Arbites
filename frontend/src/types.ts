@@ -26,6 +26,26 @@ export interface Switch {
   updated_by: string | null;
 }
 
+/** Credencial do agente MCP (change 0146) — separada da sessão do navegador. */
+export interface AgentToken {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+/** Vínculo com um sistema externo (change 0145). */
+export interface ExternalLink {
+  kind: string;
+  entity_id: string;
+  title: string;
+  system: string | null;
+  remote_id: string | null;
+  revision: string | null;
+  synced_at: string | null;
+  state: "never_synced" | "in_sync" | "local_changed" | "remote_changed" | "conflict";
+}
+
 export interface ManagedUser extends SessionUser {
   open_sessions: number;
 }

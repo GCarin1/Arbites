@@ -165,26 +165,30 @@ def build_server(cli: ArbitesClient) -> MCPServer:
     @server.tool(
         annotations=SOMENTE_LEITURA,
         description=(
-            "O que daqui já está ligado a um sistema externo. É a consulta que "
-            "torna qualquer escrita idempotente: antes de criar lá, pergunte o "
-            "que já existe. `linked=false` devolve o que ainda não foi ligado."
+            "O que daqui já está ligado a um sistema externo, e em que estado "
+            "de sincronia. É a consulta que torna qualquer escrita "
+            "idempotente: antes de criar lá, pergunte o que já existe. "
+            "`state` filtra — `local_changed` é o que falta empurrar, "
+            "`never_synced` é o que nunca foi, `conflict` é o que mudou dos "
+            "DOIS lados e precisa de uma pessoa."
         ),
     )
-    async def external_links(linked: bool | None = None) -> dict:
-        async def corpo():
-            casos = await cli.get("/testcases")
-            ligados = [
-                {"testcase_id": c["id"], "title": c.get("title"),
-                 "external_key": c.get("external_key")}
-                for c in casos
-            ]
-            if linked is True:
-                ligados = [c for c in ligados if c["external_key"]]
-            elif linked is False:
-                ligados = [c for c in ligados if not c["external_key"]]
-            return {"links": ligados, "count": len(ligados)}
+    async def external_links(system: str = "", state: str = "") -> dict:
+        return await _ou_recusa(
+            lambda: cli.get("/integrations/links", system=system, state=state)
+        )
 
-        return await _ou_recusa(corpo)
+    @server.tool(
+        annotations=SOMENTE_LEITURA,
+        description=(
+            "O que cada sistema externo consegue representar. Consulte ANTES "
+            "de sincronizar: o Businessmap é um quadro Kanban e não tem caso "
+            "de teste nem evidência como conceito nativo, e o que ele não "
+            "guarda precisa ser dito antes, não descoberto depois."
+        ),
+    )
+    async def integration_capabilities() -> dict:
+        return await _ou_recusa(lambda: cli.get("/integrations/capabilities"))
 
     @server.resource(
         "arbites://testcase/{testcase_id}",

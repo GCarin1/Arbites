@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from . import agent_pack as agent_pack_ops
+from . import integrations as integ_ops
 from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
@@ -150,6 +151,18 @@ class FolderMoveIn(BaseModel):
 
 class MoveIn(BaseModel):
     folder: str = ""  # destino relativo (vazio = raiz)
+
+
+class ExternalLinkIn(BaseModel):
+    """Vínculo com um sistema externo (change 0145)."""
+
+    model_config = ConfigDict(extra="forbid")
+    system: str
+    id: str
+    revision: str | None = None
+    # quando ausente, o servidor carimba o hash do conteúdo ATUAL: é o caso
+    # normal — quem acabou de sincronizar mandou o que está aqui agora
+    synced_hash: str | None = None
 
 
 class AgentTokenIn(BaseModel):
@@ -2591,6 +2604,110 @@ def _register_routes(app: FastAPI) -> None:
         ci: CIManager = request.app.state.ci
         return await asyncio.to_thread(ci.collect, exec_id)
 
+    # -- identidade externa (change 0145, ADR 0015) -------------------------
+    #
+    # O vínculo mora no FRONTMATTER, não só no índice: o índice é descartável
+    # (ADR 0001) e um reindex apagaria a memória do que já foi sincronizado —
+    # e aí a próxima sincronia recriaria no sistema oficial tudo o que já
+    # existe lá.
+
+    _VINCULAVEIS = {"testcase": "testcases", "requirement": "requirements"}
+
+    def _tabela_de(kind: str) -> str:
+        if kind not in _VINCULAVEIS:
+            raise _error(
+                422, "unlinkable_kind",
+                "só caso de teste e requisito têm vínculo externo; recebido: %s" % kind,
+            )
+        return _VINCULAVEIS[kind]
+
+    @app.get(API_PREFIX + "/integrations/links")
+    async def external_links(request: Request, system: str = "", state: str = ""):
+        """O que daqui está ligado a quê lá, e em que estado.
+
+        É a consulta que torna qualquer escrita idempotente: antes de criar
+        no sistema oficial, pergunte o que já existe. `state` filtra por
+        pendência — `local_changed` é o que falta empurrar."""
+        ws, conn = ws_of(request), conn_of(request)
+        saida = []
+        for kind, tabela in _VINCULAVEIS.items():
+            for row in conn.execute(
+                f"SELECT id, title, path FROM {tabela} ORDER BY id"
+            ).fetchall():
+                try:
+                    meta, corpo = _load_doc(ws, row["path"])
+                except (OSError, ValueError):
+                    continue
+                agora = integ_ops.content_hash(corpo)
+                vinculos = integ_ops.read_links(meta)
+                if system:
+                    vinculos = [v for v in vinculos if v["system"] == system]
+                for v in vinculos:
+                    estado = integ_ops.sync_state(v, agora)
+                    if state and estado != state:
+                        continue
+                    saida.append({
+                        "kind": kind, "entity_id": row["id"], "title": row["title"],
+                        "system": v["system"], "remote_id": v["id"],
+                        "revision": v.get("revision"),
+                        "synced_at": v.get("synced_at"), "state": estado,
+                    })
+                # Artefato sem vínculo TAMBÉM é resposta: ele é o
+                # `never_synced`, e é justamente o que alguém pede quando
+                # pergunta "o que ainda não foi para lá?". Filtrar por
+                # sistema o exclui — ele não pertence a sistema nenhum.
+                if not vinculos and not system and state in ("", "never_synced"):
+                    saida.append({
+                        "kind": kind, "entity_id": row["id"], "title": row["title"],
+                        "system": None, "remote_id": None, "revision": None,
+                        "synced_at": None, "state": "never_synced",
+                    })
+        return {"links": saida, "count": len(saida)}
+
+    @app.put(API_PREFIX + "/integrations/links/{kind}/{entity_id}")
+    async def set_external_link(
+        request: Request, kind: str, entity_id: str, payload: ExternalLinkIn
+    ):
+        """Registra (ou atualiza) o vínculo de UM sistema, preservando os
+        outros: numa migração corporativa os dois convivem, e perder o antigo
+        enquanto o novo nasce é perder o rastro quando ele mais importa."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, _tabela_de(kind), entity_id)
+        meta, corpo = _load_doc(ws, rel)
+        meta[integ_ops.CAMPO] = integ_ops.upsert_link(
+            meta, payload.system, payload.id, payload.revision,
+            payload.synced_hash or integ_ops.content_hash(corpo),
+            datetime.now(timezone.utc).isoformat(),
+        )
+        path = ws.root / rel
+        _write_doc(path, meta, corpo)
+        reindex_file(ws, conn, path)
+        return {"entity_id": entity_id, "external": meta[integ_ops.CAMPO]}
+
+    @app.delete(API_PREFIX + "/integrations/links/{kind}/{entity_id}/{system}",
+                status_code=204)
+    async def delete_external_link(
+        request: Request, kind: str, entity_id: str, system: str
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, _tabela_de(kind), entity_id)
+        meta, corpo = _load_doc(ws, rel)
+        restantes = integ_ops.remove_link(meta, system)
+        if restantes:
+            meta[integ_ops.CAMPO] = restantes
+        else:
+            meta.pop(integ_ops.CAMPO, None)
+        path = ws.root / rel
+        _write_doc(path, meta, corpo)
+        reindex_file(ws, conn, path)
+
+    @app.get(API_PREFIX + "/integrations/capabilities")
+    async def integration_capabilities(request: Request):
+        """O que cada adaptador consegue representar. O que ele NÃO representa
+        precisa ser dito em voz alta antes de sincronizar, não descoberto
+        depois (ADR 0015)."""
+        return {"adapters": [c.as_dict() for c in integ_ops.ADAPTADORES.values()]}
+
     # -- credencial do agente (MCP, change 0146) ----------------------------
 
     @app.get(API_PREFIX + "/profile/agent-tokens")
@@ -4131,11 +4248,15 @@ def _register_auth(app: FastAPI) -> None:
         if user is None:
             header = request.headers.get("authorization") or ""
             if header.lower().startswith("bearer "):
-                user = auth_ops.resolve_agent_token(
-                    request.app.state.auth, header[7:].strip()
-                )
-                if user is not None:
-                    request.state.via_agent = True
+                # O interruptor `mcp_server` desliga a superfície do agente
+                # INTEIRA (change 0149): sem ele a credencial não resolve, e
+                # o navegador segue intacto — são credenciais diferentes.
+                if auth_ops.switch_enabled(request.app.state.auth, "mcp_server"):
+                    user = auth_ops.resolve_agent_token(
+                        request.app.state.auth, header[7:].strip()
+                    )
+                    if user is not None:
+                        request.state.via_agent = True
         request.state.user = user
         if path in _PUBLIC_PATHS:
             return await call_next(request)
@@ -4147,6 +4268,20 @@ def _register_auth(app: FastAPI) -> None:
             )
             response.delete_cookie(auth_ops.SESSION_COOKIE, path="/")
             return response
+        # "Ele mexe ou só olha?" é UMA pergunta com duas respostas — por isso
+        # um interruptor, e não um por ferramenta (change 0149). Vale para
+        # qualquer método que altere, inclusive os que ainda não existem.
+        if (getattr(request.state, "via_agent", False)
+                and request.method not in ("GET", "HEAD", "OPTIONS")
+                and not auth_ops.switch_enabled(request.app.state.auth, "mcp_write")):
+            return JSONResponse(
+                status_code=403,
+                content={"error": {
+                    "code": "agent_write_disabled",
+                    "message": "o agente está em modo somente-leitura;"
+                               " ligue a escrita em IA → MCP",
+                }},
+            )
         if user["must_change_password"] and path not in _PASSWORD_CHANGE_PATHS:
             return JSONResponse(
                 status_code=403,

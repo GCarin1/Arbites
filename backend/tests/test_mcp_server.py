@@ -108,6 +108,7 @@ def test_ferramentas_sao_seis_e_todas_declaram_leitura(mcp):
     assert nomes == {
         "coverage_gaps", "impact_of_files", "pending_rerun",
         "context_pack", "execution_report", "external_links",
+        "integration_capabilities",
     }
     assert all(
         t.annotations and t.annotations.read_only_hint
@@ -163,16 +164,30 @@ def test_context_pack_sem_escopo_e_recusado(mcp):
     assert "scope_required" in saida["refused"]
 
 
-def test_external_links_separa_ligado_de_nao_ligado(client, mcp):
-    client.post(
+def test_external_links_diz_o_estado_de_sincronia(client, mcp):
+    """Depois da change 0145 a ferramenta fala de VÍNCULO, não de campo de
+    texto: o agente pergunta o que falta empurrar e age só no delta."""
+    ct = client.post(
         "/api/v1/testcases",
         json={"title": "Sem vínculo", "body": "## Passos\n\n1. x\n"},
+    ).json()
+    soltos = _chamar(mcp, "external_links", state="never_synced")
+    assert any(x["entity_id"] == ct["id"] for x in soltos["links"])
+
+    client.put(
+        f"/api/v1/integrations/links/testcase/{ct['id']}",
+        json={"system": "businessmap", "id": "CARD-7"},
     )
-    todos = _chamar(mcp, "external_links")
-    soltos = _chamar(mcp, "external_links", linked=False)
-    assert todos["count"] >= 1
-    assert soltos["count"] >= 1
-    assert all(c["external_key"] in (None, "") for c in soltos["links"])
+    ligados = _chamar(mcp, "external_links", system="businessmap")
+    meu = [x for x in ligados["links"] if x["entity_id"] == ct["id"]][0]
+    assert meu["remote_id"] == "CARD-7" and meu["state"] == "in_sync"
+
+
+def test_capacidades_dizem_o_que_a_ferramenta_nao_guarda(mcp):
+    saida = _chamar(mcp, "integration_capabilities")
+    por_sistema = {a["system"]: a for a in saida["adapters"]}
+    assert por_sistema["businessmap"]["supports"]["testcase"] == "card"
+    assert por_sistema["file"]["supports"]["evidence"] == "path"
 
 
 def test_modulo_desligado_recusa_a_ferramenta_com_o_motivo(client, mcp):
@@ -188,3 +203,56 @@ def test_chamada_do_agente_entra_no_log_de_atividade(client, mcp):
     _chamar(mcp, "coverage_gaps")
     entradas = client.get("/api/v1/admin/activity").json()["entries"]
     assert entradas is not None  # leitura não escreve; o que importa é existir
+
+
+# -- os dois interruptores (change 0149) -------------------------------------
+
+
+def test_mcp_server_desligado_apaga_a_superficie_do_agente(client):
+    """Desligar o servidor derruba a CREDENCIAL, não a sessão do navegador."""
+    bruto = _token(client)
+    anon = client.__class__(client.app)
+    cab = {"Authorization": f"Bearer {bruto}"}
+    assert anon.get("/api/v1/testcases", headers=cab).status_code == 200
+
+    client.put("/api/v1/admin/switches/mcp_server", json={"enabled": False})
+    assert anon.get("/api/v1/testcases", headers=cab).status_code == 401
+    # e quem está no navegador nem percebe
+    assert client.get("/api/v1/testcases").status_code == 200
+
+    client.put("/api/v1/admin/switches/mcp_server", json={"enabled": True})
+    assert anon.get("/api/v1/testcases", headers=cab).status_code == 200
+
+
+def test_escrita_do_agente_nasce_desligada(client):
+    """O default seguro: quem concede poder liga de propósito."""
+    switches = {s["name"]: s for s in client.get("/api/v1/admin/switches").json()["switches"]}
+    assert switches["mcp_write"]["enabled"] is False
+    assert switches["mcp_server"]["enabled"] is True
+
+
+def test_agente_em_somente_leitura_le_mas_nao_escreve(client):
+    """Uma decisão, não uma por ferramenta — e vale para QUALQUER método que
+    altere, inclusive os que ainda não foram escritos."""
+    bruto = _token(client)
+    anon = client.__class__(client.app)
+    cab = {"Authorization": f"Bearer {bruto}"}
+
+    assert anon.get("/api/v1/testcases", headers=cab).status_code == 200
+    negado = anon.post(
+        "/api/v1/testcases", headers=cab,
+        json={"title": "pelo agente", "body": "## Passos\n\n1. x\n"},
+    )
+    assert negado.status_code == 403
+    assert negado.json()["error"]["code"] == "agent_write_disabled"
+
+    client.put("/api/v1/admin/switches/mcp_write", json={"enabled": True})
+    liberado = anon.post(
+        "/api/v1/testcases", headers=cab,
+        json={"title": "agora vai", "body": "## Passos\n\n1. x\n"},
+    )
+    assert liberado.status_code == 201
+    # e a sessão do navegador nunca foi afetada por esse interruptor
+    assert client.post(
+        "/api/v1/testcases", json={"title": "pelo humano", "body": "## Passos\n\n1. x\n"}
+    ).status_code == 201

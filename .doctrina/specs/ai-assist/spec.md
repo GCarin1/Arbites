@@ -5,7 +5,7 @@
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
 **Last updated:** 2026-07-20
-**Version:** 0.14.0
+**Version:** 0.15.0
 
 ## Purpose
 
@@ -58,6 +58,8 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   provável e um DRAFT de defeito (título/severidade/descrição já vinculado
   ao CT e à execution) — preview; o aceite é o `POST /defects` normal.
   Execution sem falhas → `422 no_failures`.
+- The system shall oferecer no assistente de IA uma secao de MCP com o estado do servidor, o bloco de configuracao pronto para colar no cliente com o endereco real da instancia, a credencial do agente com revogacao, a lista do que o agente alcanca separada entre leitura e escrita, e as ultimas chamadas recebidas.
+- The system shall tratar a permissao do agente como uma unica decisao entre somente-leitura e leitura-e-escrita, com escrita desligada por padrao, em vez de um interruptor por ferramenta.
 
 ### Event-driven
 
@@ -125,6 +127,7 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   apenas por ação explícita do usuário (botão "Enviar"), nunca no simples
   `onChange` de seleção de arquivo, e sinalizar que modelos locais de
   raciocínio podem levar minutos (timeout do cliente HTTP ≥ 300 s).
+- While a conta nao e administradora, the system shall exibir o estado e as ferramentas do MCP em modo de leitura, sem permitir mudar o interruptor nem gerar credencial, explicando o motivo.
 
 ### Unwanted-behavior (must-not)
 
@@ -222,6 +225,7 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     defeito vinculado ao CT/execution para execution com falha; sem falhas
     → 422; execution inexistente → 404; o aceite do draft cria o defeito
     vinculado — verified by `backend/tests/test_ai_analyze_run.py`.
+16. [unverified] O bloco de configuracao traz o endereco real e e copiavel, a credencial aparece uma vez e revoga sem derrubar a sessao do navegador, escrita desligada recusa ferramenta de escrita, e conta nao-admin ve sem poder mudar — verified by `frontend/src/components/AiAssist.tsx` + `backend/tests/test_mcp_server.py`.
 
 ## Maturity
 

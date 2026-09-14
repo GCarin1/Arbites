@@ -142,14 +142,25 @@ def test_put_targets_e_privativo_do_admin(editor):
 # -- AC3 e AC4: interruptores -----------------------------------------------
 
 
-def test_interruptores_nascem_todos_ligados(client):
+def test_interruptores_nascem_ligados_menos_os_que_concedem_poder(client):
+    """O default preserva o comportamento de quem já instalou — quase sempre.
+
+    A exceção é o interruptor que CONCEDE poder novo (change 0149): aí o
+    default seguro é o contrário, e quem quer conceder liga de propósito.
+    Antes desta change a suíte afirmava que todos nasciam ligados; isso
+    deixou de ser verdade no dia em que `mcp_write` existiu.
+    """
     switches = client.get("/api/v1/admin/switches").json()["switches"]
     # Duas famílias na mesma lista (ADR 0014): superfície perigosa governa
     # uma CAPACIDADE técnica, módulo governa uma TELA e os caminhos dela.
     assert {s["name"] for s in switches} == set(auth_ops.SWITCHES) | set(
         auth_ops.MODULES
     )
-    assert all(s["enabled"] for s in switches)
+    nascem_desligados = auth_ops.SWITCHES_DEFAULT_OFF
+    for s in switches:
+        esperado = s["name"] not in nascem_desligados
+        assert s["enabled"] is esperado, s["name"]
+    assert nascem_desligados, "se ninguém nasce desligado, este teste não prova nada"
     assert all(s["updated_at"] is None for s in switches)
     por_nome = {s["name"]: s for s in switches}
     assert por_nome["ai"]["kind"] == "surface"

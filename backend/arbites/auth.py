@@ -593,6 +593,13 @@ SWITCHES: dict[str, str] = {
     "target_env": "Leitura e escrita do .env dos projetos-alvo",
     "ai": "Chamadas aos providers de IA",
     "xray_import": "Importação de XML do Xray",
+    # Publicar o workspace para um processo externo é CAPACIDADE, não tela
+    # (ADR 0014) — por isso superfície e não módulo. E a tela do MCP precisa
+    # continuar visível justamente para poder religar.
+    "mcp_server": "Servidor MCP (workspace exposto a um agente)",
+    # Escrita do agente: a pergunta real é "ele mexe ou só olha?", e ela tem
+    # DUAS respostas, não uma por ferramenta. Nasce desligada (change 0149).
+    "mcp_write": "Escrita pelo agente MCP",
 }
 
 # MÓDULOS do produto (ADR 0014). Um módulo é uma TELA mais os caminhos de API
@@ -659,9 +666,19 @@ def _all_switch_labels() -> dict[str, tuple[str, str, str | None]]:
     return out
 
 
+# Quase todo interruptor nasce LIGADO: o default preserva o comportamento de
+# quem já instalou. A exceção é o que CONCEDE poder novo — aí o default
+# seguro é o contrário, e quem quer conceder liga de propósito.
+SWITCHES_DEFAULT_OFF = frozenset({"mcp_write"})
+
+
+def _default_de(name: str) -> bool:
+    return name not in SWITCHES_DEFAULT_OFF
+
+
 def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    """Estado de todos os interruptores conhecidos. Ausente no banco = ligado:
-    o default preserva o comportamento da instalação local."""
+    """Estado de todos os interruptores conhecidos. Ausente no banco = o
+    default do interruptor (ligado, salvo os que concedem poder)."""
     stored = {
         row["name"]: row
         for row in conn.execute("SELECT * FROM switches").fetchall()
@@ -676,7 +693,7 @@ def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             # produto respondem a perguntas diferentes (ADR 0014)
             "kind": kind,
             "tab": tab,
-            "enabled": bool(row["enabled"]) if row is not None else True,
+            "enabled": bool(row["enabled"]) if row is not None else _default_de(name),
             "updated_at": row["updated_at"] if row is not None else None,
             "updated_by": row["updated_by"] if row is not None else None,
         })
@@ -687,7 +704,7 @@ def switch_enabled(conn: sqlite3.Connection, name: str) -> bool:
     row = conn.execute(
         "SELECT enabled FROM switches WHERE name = ?", (name,)
     ).fetchone()
-    return True if row is None else bool(row["enabled"])
+    return _default_de(name) if row is None else bool(row["enabled"])
 
 
 def set_switch(

@@ -1,6 +1,7 @@
 # Change 0145-identidade-externa-frontmatter-vinculo — identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-13
 - **Owner:**
 - **Lane:** product (uncertain)
@@ -67,15 +68,15 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] O vínculo sobrevive a `reindex_full` — o teste apaga o índice e
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] O vínculo sobrevive a `reindex_full` — o teste apaga o índice e
       relê do arquivo.
-- [ ] Dois sistemas no mesmo artefato, e a consulta por sistema não vaza o
+- [x] Dois sistemas no mesmo artefato, e a consulta por sistema não vaza o
       vínculo do outro.
-- [ ] Editar artefato sincronizado o coloca em `unsynced`; sincronizar de
+- [x] Editar artefato sincronizado o coloca em `unsynced`; sincronizar de
       novo o tira.
-- [ ] Mudança dos dois lados vira conflito, e nenhum lado é sobrescrito.
+- [x] Mudança dos dois lados vira conflito, e nenhum lado é sobrescrito.
 
 ## Open questions
 

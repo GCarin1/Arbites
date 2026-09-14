@@ -1,6 +1,8 @@
 import type {
   ActivityEntry,
   AdminOverview,
+  AgentToken,
+  ExternalLink,
   LoginAttempt,
   ManagedUser,
   Role,
@@ -132,6 +134,25 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- MCP (changes 0146/0149) ---------------------------------------------
+  agentTokens: () =>
+    request<{ tokens: AgentToken[] }>("/profile/agent-tokens"),
+  // o token em claro vem UMA vez: quem não guardar, gera outro
+  createAgentToken: (name: string) =>
+    request<{ token: string; name: string; created_at: string }>(
+      "/profile/agent-tokens",
+      { method: "POST", body: JSON.stringify({ name }) },
+    ),
+  revokeAgentToken: (id: string) =>
+    request<void>(`/profile/agent-tokens/${id}`, { method: "DELETE" }),
+  externalLinks: (params: { system?: string; state?: string } = {}) =>
+    request<{ links: ExternalLink[]; count: number }>(
+      "/integrations/links?" +
+        new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v) as [string, string][],
+        ),
+    ),
 
   // -- painel de administração (capability admin) --------------------------
   adminUsers: () => request<{ users: ManagedUser[] }>("/admin/users"),

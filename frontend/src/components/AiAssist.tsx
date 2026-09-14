@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { SingleRefInput } from "./Autocomplete";
 import { DocBody } from "./ReadView";
+import { McpPanel } from "./McpPanel";
 import { TabBar } from "./TabBar";
 import { useToast } from "./Toast";
 import type {
@@ -24,21 +25,26 @@ const KINDS = [
   "vllm",
 ];
 
-type AiTab = "gerar" | "revisar" | "pack" | "config";
+type AiTab = "gerar" | "revisar" | "pack" | "mcp" | "config";
 
 const AI_TABS: [AiTab, string][] = [
   ["gerar", "Gerar"],
   ["revisar", "Revisar"],
   ["pack", "Context Pack"],
+  // MCP mora aqui porque responde a mesma pergunta das outras: como a IA
+  // alcança o meu trabalho? (change 0149)
+  ["mcp", "MCP"],
   ["config", "Configuração"],
 ];
 
 export function AiAssist({
   onChanged,
   onError,
+  isAdmin = false,
 }: {
   onChanged: () => void;
   onError: (message: string) => void;
+  isAdmin?: boolean;
 }) {
   const [info, setInfo] = useState<AiProvidersInfo | null>(null);
   // Reformulação (0078): sub-abas Gerar · Revisar · Context Pack ·
@@ -111,6 +117,7 @@ export function AiAssist({
         <ReviewCard provider={provider} onChanged={onChanged} onError={onError} />
       )}
       {tab === "pack" && <ContextPackCard />}
+      {tab === "mcp" && <McpPanel isAdmin={isAdmin} onError={onError} />}
       {tab === "config" && <ProvidersCard info={info} onSaved={load} onError={onError} />}
 
       {enabled && work && <AssistHistoryCard />}
