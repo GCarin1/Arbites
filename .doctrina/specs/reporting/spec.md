@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-09-13
-**Version:** 0.18.0
+**Version:** 0.19.0
 
 ## Purpose
 
@@ -103,6 +103,9 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall aplicar retencao independente a sinal e a anexo de execucao de CI, guardando o sinal por muito mais tempo que o anexo, para que a serie temporal continue respondendo depois que a captura daquele dia ja foi descartada.
 - The system shall exibir o espaco ocupado e uma previa do que a proxima limpeza removeria antes de remover, e mover o removido para a lixeira em vez de apagar direto.
 - The system shall ingerir o resultado por cenario do Cucumber JSON presente no artifact da execucao de CI, ligando cada cenario ao caso de teste pela tag, porque medida agregada nao responde qual teste especifico esta instavel.
+- The system shall apresentar um sino de notificacoes no cabecalho com a quantidade de itens nao lidos, derivando a lista do estado vivo das fontes existentes em vez de manter uma caixa de entrada gravada, para que um motivo resolvido saia da lista sozinho.
+- The system shall guardar por usuario apenas o que foi lido e ate onde foi limpo, com identificador estavel por notificacao, para que a marca de leitura sobreviva ao recalculo da lista.
+- The system shall levar da notificacao ao artefato de origem, e apresentar o nome do arquivo ou do item em destaque separado do texto da mensagem.
 
 ### Event-driven
 
@@ -121,6 +124,7 @@ export PDF e Markdown (para colar no Confluence).
   reportar `status: none` e não colorir o card (número e fórmula seguem
   visíveis).
 - While não houver provider de IA configurado, the system shall preencher o bloco de atenção com os alertas e as ações recomendadas determinísticos de `GET /metrics/dashboard`, em vez de esconder o bloco ou deixá-lo vazio.
+- While o interruptor de log esta desligado ou o usuario nao e administrador, the system shall not incluir o log de atividade no sino.
 
 ### Unwanted-behavior (must-not)
 
@@ -225,6 +229,7 @@ export PDF e Markdown (para colar no Confluence).
 19. [unverified] De um ponto da serie temporal chega-se a execucao, ao job e ao anexo sem sair da aba; periodo sem dado mostra estado vazio util; em 390 px a pagina nao rola de lado — verified by `backend/tests/test_observability.py`.
 20. [unverified] Anexo expirado e removido para a lixeira e a serie temporal do mesmo periodo continua respondendo; a previa da limpeza corresponde ao que e removido — verified by `backend/tests/test_retencao_ci.py`.
 21. [unverified] Cucumber do artifact vira resultado por cenario; cenario que passa e falha no periodo aparece como instavel; so o que estava estavel antes entra em "o que mudou"; cenario que falha sempre nao e chamado de instavel — verified by `backend/tests/test_instabilidade.py`.
+22. [unverified] Problema resolvido sai do sino mesmo sem leitura; o sino e a tela de problemas leem a mesma lista; lido e por pessoa e sobrevive ao recalculo; limpar e marca d'agua; log de atividade so alcanca admin com o interruptor ligado — verified by `backend/tests/test_notificacoes.py`.
 
 ## Maturity
 

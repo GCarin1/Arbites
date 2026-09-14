@@ -204,7 +204,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.18.0",
+        "version": "0.19.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -2529,6 +2529,19 @@
         "specs_affected": [
           {
             "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0161-sino-notificacoes-cabecalho-derivado",
+        "title": "sino de notificacoes no cabecalho derivado do estado vivo: problemas, observabilidade, acoes do sistema e log info para admin, com lido nao lido por usuario e navegacao para a origem",
+        "path": ".doctrina/changes/archive/2026-09-14-0161-sino-notificacoes-cabecalho-derivado",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]

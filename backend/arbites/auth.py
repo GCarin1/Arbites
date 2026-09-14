@@ -142,6 +142,11 @@ def connect_auth(ws: Workspace) -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
+    # O estado por usuário do sino (change 0161): só "o que li" e "até onde
+    # limpei". A LISTA é derivada e não mora em tabela nenhuma.
+    from .notifications import SCHEMA as SCHEMA_NOTIFICACOES
+
+    conn.executescript(SCHEMA_NOTIFICACOES)
     conn.commit()
     return conn
 
@@ -600,6 +605,10 @@ SWITCHES: dict[str, str] = {
     # Escrita do agente: a pergunta real é "ele mexe ou só olha?", e ela tem
     # DUAS respostas, não uma por ferramenta. Nasce desligada (change 0149).
     "mcp_write": "Escrita pelo agente MCP",
+    # O log de atividade no sino (change 0161). Nasce DESLIGADO: é o único
+    # volume capaz de inundar a lista, e quem quer o ruído liga de propósito.
+    # Só alcança quem é admin, mesmo ligado.
+    "notifications_info": "Log de atividade no sino de notificações (admin)",
 }
 
 # MÓDULOS do produto (ADR 0014). Um módulo é uma TELA mais os caminhos de API
@@ -674,7 +683,7 @@ def _all_switch_labels() -> dict[str, tuple[str, str, str | None]]:
 # Quase todo interruptor nasce LIGADO: o default preserva o comportamento de
 # quem já instalou. A exceção é o que CONCEDE poder novo — aí o default
 # seguro é o contrário, e quem quer conceder liga de propósito.
-SWITCHES_DEFAULT_OFF = frozenset({"mcp_write"})
+SWITCHES_DEFAULT_OFF = frozenset({"mcp_write", "notifications_info"})
 
 
 def _default_de(name: str) -> bool:

@@ -42,6 +42,8 @@ const PATHS: Record<string, string> = {
   automation: "M8.5 2 4 9h3.5L7 14l4.5-7H8L8.5 2Z",
   migration: "M8 2.5v7 M5 7l3 3 3-3 M3 12.5h10",
   profile: "M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M2.5 14c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5",
+  // sino — notificações (change 0161)
+  bell: "M8 2.5a4 4 0 0 0-4 4c0 3-1 4-1 4h10s-1-1-1-4a4 4 0 0 0-4-4Z M6.75 13a1.5 1.5 0 0 0 2.5 0",
   // setas em ciclo — reindexar
   reindex: "M13.5 8a5.5 5.5 0 0 1-9.4 3.9 M2.5 8a5.5 5.5 0 0 1 9.4-3.9 M12 2v2.5H9.5 M4 14v-2.5h2.5",
 };

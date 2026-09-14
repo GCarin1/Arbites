@@ -4162,3 +4162,88 @@ button.link-chip-btn:disabled {
   border-color: color-mix(in srgb, var(--warning) 45%, transparent);
   background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
+
+/* -- o sino (change 0161) -------------------------------------------------- */
+.sino { position: relative; display: inline-flex; }
+.sino-btn { position: relative; }
+/* O contador vive NO ícone, não ao lado: ao lado ele viraria mais um número
+ * no topo, e o pedido era saber quantas são sem parar para ler. */
+.sino-contador {
+  position: absolute; top: 1px; right: 0px;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: 0.62rem; font-weight: 700; line-height: 15px; text-align: center;
+  border: 2px solid var(--surface);
+}
+.sino-painel {
+  position: absolute; top: calc(100% + 0.4rem); right: 0; z-index: 60;
+  overflow-x: hidden;
+  width: min(380px, calc(100vw - 1.5rem));
+  max-height: min(70vh, 520px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+.sino-topo {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.sino-topo .spacer { flex: 1; }
+.sino-vazio {
+  margin: 0; padding: 1rem 0.9rem; font-size: 0.83rem;
+  color: var(--text-muted);
+}
+.sino-lista { list-style: none; margin: 0; padding: 0; }
+.sino-item {
+  display: flex; align-items: flex-start; gap: 0.3rem; min-width: 0;
+  border-bottom: 1px solid var(--border);
+}
+.sino-item:last-child { border-bottom: 0; }
+/* Não lida tem uma barra à esquerda; lida perde a barra e esmaece. Cor
+ * sozinha não distinguiria para quem não separa bem os tons. */
+.sino-item { border-left: 3px solid var(--accent, #58a6ff); }
+.sino-lida { border-left-color: transparent; opacity: 0.62; }
+.sino-corpo {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.6rem 0.2rem 0.6rem 0.6rem; background: none; border: 0;
+  text-align: left; cursor: pointer; color: inherit; font: inherit;
+  /* O `button` global é `white-space: nowrap` e altura fixa — desenhado para
+   * rótulo curto. Aqui dentro vai uma FRASE: sem desfazer os dois, o texto
+   * vira uma linha só, estoura o painel e empurra o "lida" para fora. */
+  white-space: normal;
+  height: auto;
+  align-items: flex-start;
+}
+.sino-corpo:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.sino-linha1 { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+.sino-quando { margin-left: auto; white-space: nowrap; }
+.sino-texto { font-size: 0.83rem; line-height: 1.4; overflow-wrap: anywhere; }
+/* O nome do arquivo/card em destaque em relação ao resto da mensagem. */
+.sino-assunto {
+  display: inline-block; margin-right: 0.35rem; padding: 0 0.3rem;
+  border-radius: 4px; font-weight: 600; font-size: 0.78rem;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.sino-marcar {
+  flex: 0 0 auto; align-self: flex-start; height: auto;
+  padding: 0.6rem 0.6rem 0.6rem 0.2rem; font-size: 0.74rem; white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  /* Ancorado à TELA, não ao botão: 380px a partir do botão estouraria a borda
+     num aparelho estreito.
+     `fixed` e não `static` no pai: tornar `.sino` estático tira a referência
+     do `top: 100%`, que passa a valer sobre a página inteira e joga o painel
+     para baixo da dobra — ele ficava lá, invisível, com as coordenadas
+     horizontais certinhas. `fixed` mede a viewport e não depende de ancestral
+     nenhum. */
+  .sino-painel {
+    position: fixed;
+    top: calc(var(--h-header) + 0.4rem);
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    max-height: calc(100vh - var(--h-header) - 1.5rem);
+  }
+}

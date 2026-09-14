@@ -49,6 +49,7 @@ from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from . import ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import notifications as notif_ops
 from . import integrations_file as file_ops, mcp_write
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .ci_credential import CredentialState
@@ -310,6 +311,10 @@ class McpResultIn(BaseModel):
     comment: str | None = None
     steps: dict[str, str] | None = None
     evidence: list[McpEvidenceIn] | None = None
+
+
+class NotificationIdsIn(BaseModel):
+    ids: list[str] = []
 
 
 class FileImportIn(BaseModel):
@@ -893,8 +898,13 @@ def _register_routes(app: FastAPI) -> None:
     async def post_reindex(request: Request):
         return reindex_full(ws_of(request), conn_of(request))
 
-    @app.get(API_PREFIX + "/warnings")
-    async def get_warnings(request: Request):
+    def _avisos_compostos(request: Request) -> list[dict[str, Any]]:
+        """Os problemas do índice MAIS os derivados da credencial.
+
+        Uma função só porque o sino (change 0161) e a aba Problemas leem daqui:
+        duas listas montadas em lugares diferentes divergiriam no primeiro
+        aviso novo, e o sino passaria a mostrar coisa que a aba não mostra.
+        """
         avisos = [
             dict(row)
             for row in conn_of(request).execute(
@@ -913,6 +923,59 @@ def _register_routes(app: FastAPI) -> None:
             tokens.get() is not None,
             gravavel=tokens.available(), origem=tokens.source(),
         ) + avisos
+
+    @app.get(API_PREFIX + "/warnings")
+    async def get_warnings(request: Request):
+        return _avisos_compostos(request)
+
+    # -- o sino (change 0161) -----------------------------------------------
+    #
+    # A lista é DERIVADA das fontes que já são verdade; o que se grava é só o
+    # que cada pessoa leu e até onde limpou. Caixa de entrada gravada criaria
+    # um segundo estado, e o segundo estado diverge: o aviso corrigido
+    # continuaria na lista e alguém agiria sobre um buraco que não existe.
+
+    @app.get(API_PREFIX + "/notifications")
+    async def listar_notificacoes(request: Request, days: int = 14):
+        usuario = current_user(request)
+        com_log = (
+            usuario.get("role") == "admin"
+            and auth_ops.switch_enabled(request.app.state.auth, "notifications_info")
+        )
+        try:
+            painel = ci_ingest.painel(ws_of(request), conn_of(request), days)
+        except Exception:  # noqa: BLE001 — observabilidade é UMA fonte
+            # Se ela falhar, o sino ainda serve as outras. Um sino que morre
+            # inteiro porque uma fonte tropeçou é pior do que um sino parcial.
+            painel = None
+        return notif_ops.listar(
+            conn_of(request), request.app.state.auth, usuario,
+            _avisos_compostos(request), painel, com_log,
+        )
+
+    @app.post(API_PREFIX + "/notifications/{notification_id}/read")
+    async def marcar_lida(request: Request, notification_id: str):
+        notif_ops.marcar(request.app.state.auth, current_user(request)["id"],
+                         notification_id, True)
+        return {"id": notification_id, "read": True}
+
+    @app.delete(API_PREFIX + "/notifications/{notification_id}/read")
+    async def marcar_nao_lida(request: Request, notification_id: str):
+        notif_ops.marcar(request.app.state.auth, current_user(request)["id"],
+                         notification_id, False)
+        return {"id": notification_id, "read": False}
+
+    @app.post(API_PREFIX + "/notifications/read-all")
+    async def marcar_todas_lidas(request: Request, payload: NotificationIdsIn):
+        return {"marked": notif_ops.marcar_todas(
+            request.app.state.auth, current_user(request)["id"], payload.ids)}
+
+    @app.post(API_PREFIX + "/notifications/clear")
+    async def limpar_notificacoes(request: Request):
+        """Limpar é marca d'água, não DELETE: não há o que apagar, a lista é
+        derivada. Grava-se "vi tudo até aqui"."""
+        return {"cleared_at": notif_ops.limpar(
+            request.app.state.auth, current_user(request)["id"])}
 
     # -- lixeira (0081) ---------------------------------------------------
 
