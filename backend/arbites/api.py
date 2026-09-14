@@ -908,8 +908,10 @@ def _register_routes(app: FastAPI) -> None:
         # 0157 existe para cobrir. Vem primeiro porque bloqueia a ingestão
         # inteira, enquanto um aviso de integridade é de um arquivo só.
         credencial: CredentialState = request.app.state.credential
+        tokens = request.app.state.tokens
         return credencial.problemas(
-            request.app.state.tokens.get() is not None
+            tokens.get() is not None,
+            gravavel=tokens.available(), origem=tokens.source(),
         ) + avisos
 
     # -- lixeira (0081) ---------------------------------------------------
@@ -3155,7 +3157,11 @@ def _register_routes(app: FastAPI) -> None:
         # Status apenas, nunca o valor. A VALIDADE não é segredo — é uma data,
         # e existe para ser vista antes de passar (change 0157).
         credencial: CredentialState = request.app.state.credential
-        return credencial.status(request.app.state.tokens.get() is not None)
+        tokens = request.app.state.tokens
+        return credencial.status(
+            tokens.get() is not None,
+            gravavel=tokens.available(), origem=tokens.source(),
+        )
 
     @app.put(API_PREFIX + "/settings/github/token")
     async def github_token_set(request: Request, payload: TokenIn):
@@ -3165,7 +3171,9 @@ def _register_routes(app: FastAPI) -> None:
         # aconteceu — tarde demais para pedir a renovação a tempo.
         credencial: CredentialState = request.app.state.credential
         credencial.registrar_token(payload.expires_at)
-        return credencial.status(True)
+        tokens = request.app.state.tokens
+        return credencial.status(
+            True, gravavel=tokens.available(), origem=tokens.source())
 
     # -- migração Xray (M2) -------------------------------------------------
 

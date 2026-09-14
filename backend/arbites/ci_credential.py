@@ -98,7 +98,8 @@ class CredentialState:
 
     # -- leitura -----------------------------------------------------------
 
-    def status(self, configurada: bool) -> dict[str, Any]:
+    def status(self, configurada: bool, *, gravavel: bool = True,
+               origem: str | None = None) -> dict[str, Any]:
         dados = self._ler()
         expira = dados.get("expires_at")
         dias = None
@@ -109,6 +110,11 @@ class CredentialState:
                 dias = None
         return {
             "configured": configurada,
+            # Onde a credencial mora e se dá para GUARDAR uma nova aqui
+            # (change 0160): num container não há cofre do SO, e a tela
+            # precisa dizer isso antes de alguém digitar num campo que recusa.
+            "storable": gravavel,
+            "source": origem,
             "expires_at": expira,
             "days_until_expiry": dias,
             "last_refusal": dados.get("last_refusal"),
@@ -117,22 +123,23 @@ class CredentialState:
             and (dias is None or dias > 0),
         }
 
-    def problemas(self, configurada: bool) -> list[dict[str, str]]:
+    def problemas(self, configurada: bool, *, gravavel: bool = True,
+                  origem: str | None = None) -> list[dict[str, str]]:
         """Os problemas da credencial, DERIVADOS a cada leitura.
 
         Derivados e não gravados na tabela de avisos porque aquela tabela é
         do índice, e um reindex a esvazia: o problema voltaria a ser
         invisível exatamente no cenário que esta change existe para cobrir.
         """
-        estado = self.status(configurada)
+        estado = self.status(configurada, gravavel=gravavel, origem=origem)
         saida: list[dict[str, str]] = []
-        origem = "Credencial do GitHub"
+        origem_rotulo = "Credencial do GitHub"
 
         recusa = estado["last_refusal"]
         if recusa:
             quando = str(recusa.get("at", ""))[:10]
             saida.append({
-                "source_path": origem,
+                "source_path": origem_rotulo,
                 "code": "ci_credential_refused",
                 "message": (
                     f"o provedor recusou a credencial em {quando}"
@@ -146,6 +153,24 @@ class CredentialState:
 
         def dia_ou_dias(n: int) -> str:
             return "dia" if abs(n) == 1 else "dias"
+
+        # Sem cofre e sem variável de ambiente, a automação de CI não tem
+        # como funcionar — e isso precisa aparecer como problema, não como um
+        # campo que recusa em silêncio quando alguém tenta usar (change 0160).
+        if not gravavel and not configurada:
+            saida.append({
+                "source_path": origem_rotulo,
+                "code": "ci_credential_no_store",
+                "message": (
+                    "esta instância não tem cofre do sistema operacional"
+                    " (típico de container), então o token do GitHub não pode"
+                    " ser guardado por aqui. Defina ARBITES_GITHUB_TOKEN no"
+                    " ambiente do processo — no docker-compose.yml, do mesmo"
+                    " jeito que a senha de bootstrap do admin. Sem isso a"
+                    " automação de CI e a observabilidade ficam sem credencial."
+                ),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
 
         dias = estado["days_until_expiry"]
         if configurada and dias is not None and dias <= AVISO_DIAS:
@@ -164,7 +189,7 @@ class CredentialState:
                     " depende do dono da organização — peça agora."
                 )
             saida.append({
-                "source_path": origem,
+                "source_path": origem_rotulo,
                 "code": "ci_credential_expiring",
                 "message": texto,
                 "created_at": datetime.now(timezone.utc).isoformat(),

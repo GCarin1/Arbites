@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-07-09
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -40,6 +40,7 @@ workflow/jobs/steps do workflow.
 - The system shall aceitar em `POST /runs/ci` os parâmetros opcionais
   `feature`, `environment (dev|cer|prd)`, `browser` e `source_repo`,
   repassando-os como inputs do workflow_dispatch quando informados.
+- The system shall aceitar a credencial de CI pela variavel de ambiente do processo onde o cofre do sistema operacional nao existe, com precedencia sobre o cofre, sem nunca devolver o valor nem grava-lo no workspace.
 
 ### Event-driven
 
@@ -51,11 +52,13 @@ workflow/jobs/steps do workflow.
   `results[]`.
 - When a API do GitHub retorna rate limit, the system shall aplicar
   backoff no polling.
+- When alguem tenta guardar a credencial numa instancia sem cofre, the system shall recusar explicando a saida, em vez de aceitar em silencio ou falhar depois.
 
 ### State-driven
 
 - While o job está em andamento, the system shall exibir apenas o status
   dos steps do workflow (não dos steps Gherkin — indisponíveis ao vivo).
+- While a instancia nao tem cofre de credenciais do sistema operacional, the system shall responder que nao ha credencial em vez de falhar, mantendo a aplicacao inteira utilizavel.
 
 ### Unwanted-behavior (must-not)
 
@@ -81,6 +84,7 @@ workflow/jobs/steps do workflow.
 
 4. [verified] Inputs opcionais do dispatch (feature/environment/browser/
    source_repo) chegam ao workflow — verified by `backend/tests/test_ci_runs.py`.
+5. [unverified] Instancia sem cofre responde a tela de problemas e o status do token sem erro, anuncia a falta com o remedio, recusa a gravacao explicando, e aceita a credencial pelo ambiente sem vazar o valor nem toca-lo no disco — verified by `backend/tests/test_sem_cofre.py`.
 
 ## Maturity
 
