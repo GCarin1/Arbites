@@ -204,6 +204,93 @@ GET    /api/v1/integrations/capabilities              # o que cada sistema conse
 silenciosa de dado, e numa ferramenta de rastreabilidade é o pior defeito
 possível.
 
+## Observabilidade: trazer para cá o que roda no GitHub
+
+O Arbites puxa do GitHub Actions os runs que **ninguém disparou daqui** — o
+`schedule` que roda de madrugada colhendo telemetria, log, acessibilidade e
+print. Puxa, não recebe por webhook: uma instância local não é alcançável
+pela internet, e puxar dá de graça a retomada (ficar dias desligado traz o
+intervalo inteiro, não só o run mais recente).
+
+Declare as fontes no `arbites.yaml` do workspace:
+
+```yaml
+observability:
+  sources:
+    - provider: github
+      repo: org/app
+      workflow: qa-nightly.yml   # opcional; sem isso, todos os workflows
+      artifact: observabilidade  # opcional; sem isso, todos os artifacts
+  max_runs_per_poll: 50
+```
+
+Depois:
+
+```
+POST /api/v1/ci/ingest            # puxa o que ainda não está no disco
+GET  /api/v1/ci/runs?limit=50     # runs ingeridos, com sinais e anexos
+GET  /api/v1/ci/signals           # que sinais existem (descobertos, não fixos)
+GET  /api/v1/ci/signals/{name}?since=&until=   # a série de um sinal no tempo
+```
+
+Cada run vira um **arquivo** em `workspace/ci/<ano>/<provider>-<run_id>.md`,
+com os sinais no frontmatter e os anexos ao lado, hasheados. O índice SQLite
+é descartável (ADR 0001): apagá-lo e reconstruir devolve meses de série.
+Ingerir duas vezes o mesmo run não duplica — a marca d'água é o disco, não um
+contador guardado à parte.
+
+### O manifesto: seu pipeline declara o que produziu
+
+Coloque um `arbites.json` na raiz do artifact. É ele que faz um sinal **novo**
+entrar sem mudança de código no Arbites:
+
+```json
+{
+  "version": 1,
+  "signals": [
+    {"kind": "perf",  "name": "lcp_ms",         "value": 2431, "unit": "ms"},
+    {"kind": "a11y",  "name": "violacoes_axe",  "value": 7,    "unit": "count"},
+    {"kind": "test",  "name": "cenarios_falhos","value": 2,    "unit": "count"}
+  ],
+  "attachments": [
+    {"kind": "analysis",   "path": "analysis.md", "title": "Análise da IA"},
+    {"kind": "screenshot", "path": "shots/home.png"},
+    {"kind": "log",        "path": "run.log"}
+  ]
+}
+```
+
+- **Sinal** é `(kind, name, value, unit, at)` e nada mais. O Arbites não sabe
+  que `lcp_ms` maior é pior — direção e meta são configuração de quem instala,
+  não semântica embutida no código.
+- **Anexo** é o que não é número: print, log e o `.md` da análise. O anexo de
+  `kind: analysis` vira o **corpo** do documento do run — a análise que a sua
+  automação já escreveu não é reescrita aqui.
+- **Sem manifesto** o Arbites reconhece anexo por convenção de nome
+  (`*.log`, `*.png`, `analysis.md`, `cucumber.json`), **não extrai sinal
+  nenhum** e marca o run com um aviso (`ingest_warning`). Convenção acerta
+  hoje e quebra calada no dia em que alguém renomeia um arquivo — por isso ela
+  avisa em vez de fingir que deu certo.
+
+Emitir o manifesto no fim do seu workflow é uma linha:
+
+```yaml
+      - run: python gera_manifesto.py > arbites.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: observabilidade
+          path: |
+            arbites.json
+            analysis.md
+            shots/
+            run.log
+```
+
+> O token é o mesmo PAT já guardado no keyring do SO (ADR 0008) — nunca no
+> YAML, nunca no índice, nunca logado. Se ele expirar ou for revogado, a
+> ingestão para: é por isso que o run traz `ingested_at`, e um período sem
+> run é visível na série em vez de passar por "semana tranquila".
+
 ## Rodadas de auditoria: elas se acumulam sozinhas
 
 A aba **Auditoria** dispara uma rodada nova sempre que a última passou de

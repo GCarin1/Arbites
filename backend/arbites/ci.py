@@ -64,6 +64,8 @@ class GitHubClient(Protocol):
     def dispatch_workflow(self, repo: str, workflow: str, ref: str,
                           inputs: dict[str, str]) -> None: ...
     def list_recent_dispatch_runs(self, repo: str, workflow: str) -> list[dict]: ...
+    def list_workflow_runs(self, repo: str, workflow: str | None,
+                           page: int, per_page: int) -> list[dict]: ...
     def get_run(self, repo: str, run_id: int) -> dict: ...
     def get_jobs(self, repo: str, run_id: int) -> list[dict]: ...
     def list_artifacts(self, repo: str, run_id: int) -> list[dict]: ...
@@ -112,6 +114,24 @@ class HttpxGitHub:
             "GET",
             f"/repos/{repo}/actions/workflows/{workflow}/runs"
             "?event=workflow_dispatch&per_page=10",
+        )
+        return resp.json().get("workflow_runs", [])
+
+    def list_workflow_runs(self, repo, workflow=None, page=1, per_page=50):
+        """Runs CONCLUÍDOS do repositório, do mais novo para o mais velho.
+
+        Diferente de `list_recent_dispatch_runs`, aqui NÃO se filtra por
+        `event=workflow_dispatch`: o run que interessa à observabilidade é
+        justamente o que ninguém daqui disparou — o `schedule` que roda de
+        madrugada. Paginado porque voltar depois de uma semana fora tem de
+        trazer a semana inteira, não a primeira página dela.
+        """
+        alvo = (
+            f"/repos/{repo}/actions/workflows/{workflow}/runs"
+            if workflow else f"/repos/{repo}/actions/runs"
+        )
+        resp = self._request(
+            "GET", f"{alvo}?status=completed&per_page={per_page}&page={page}"
         )
         return resp.json().get("workflow_runs", [])
 

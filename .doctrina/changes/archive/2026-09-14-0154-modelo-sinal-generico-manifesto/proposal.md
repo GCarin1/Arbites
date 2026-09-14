@@ -1,6 +1,7 @@
 # Change 0154-modelo-sinal-generico-manifesto — modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-14
 - **Owner:**
 - **Lane:** product (uncertain; signals: declarar)
@@ -55,14 +56,14 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Um artifact com manifesto produz sinais consultáveis por nome e
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Um artifact com manifesto produz sinais consultáveis por nome e
       período, sem o Arbites conhecer o tipo de antemão.
-- [ ] Um sinal novo, nunca visto, é ingerido sem mudança de código.
-- [ ] Print, log e `.md` chegam como anexo da run, hasheados, e não como
+- [x] Um sinal novo, nunca visto, é ingerido sem mudança de código.
+- [x] Print, log e `.md` chegam como anexo da run, hasheados, e não como
       sinal.
-- [ ] Artifact sem manifesto cai no modo convenção e **diz** que caiu.
+- [x] Artifact sem manifesto cai no modo convenção e **diz** que caiu.
 
 ## Open questions
 

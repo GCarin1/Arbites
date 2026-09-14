@@ -155,7 +155,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.11.0",
+        "version": "0.13.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -456,22 +456,6 @@
         "status": "proposed",
         "opened": "2026-09-13",
         "lane": "product (uncertain)"
-      },
-      {
-        "id": "0153-ingestao-runs-github-actions",
-        "title": "ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada",
-        "path": ".doctrina/changes/0153-ingestao-runs-github-actions",
-        "status": "proposed",
-        "opened": "2026-09-14",
-        "lane": "runtime (confident; signals: github actions) — opened anyway (--force)"
-      },
-      {
-        "id": "0154-modelo-sinal-generico-manifesto",
-        "title": "modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo",
-        "path": ".doctrina/changes/0154-modelo-sinal-generico-manifesto",
-        "status": "proposed",
-        "opened": "2026-09-14",
-        "lane": "product (uncertain; signals: declarar)"
       },
       {
         "id": "0155-aba-observabilidade-eixo-temporal",
@@ -2442,6 +2426,32 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0153-ingestao-runs-github-actions",
+        "title": "ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada",
+        "path": ".doctrina/changes/archive/2026-09-14-0153-ingestao-runs-github-actions",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0154-modelo-sinal-generico-manifesto",
+        "title": "modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo",
+        "path": ".doctrina/changes/archive/2026-09-14-0154-modelo-sinal-generico-manifesto",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
             "operation": "MODIFIED"
           }
         ]

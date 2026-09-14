@@ -1,6 +1,7 @@
 # Change 0153-ingestao-runs-github-actions — ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-14
 - **Owner:**
 - **Lane:** runtime (confident; signals: github actions) — opened anyway (--force)
@@ -47,13 +48,13 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Um run criado por `schedule` no GitHub aparece no Arbites sem
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Um run criado por `schedule` no GitHub aparece no Arbites sem
       ninguém ter disparado nada.
-- [ ] Ingerir duas vezes o mesmo run não duplica.
-- [ ] Com a ingestão parada por 3 runs, religar traz os 3 — não só o último.
-- [ ] Resposta de limite de taxa recua e retoma sem perder run.
+- [x] Ingerir duas vezes o mesmo run não duplica.
+- [x] Com a ingestão parada por 3 runs, religar traz os 3 — não só o último.
+- [x] Resposta de limite de taxa recua e retoma sem perder run.
 
 ## Open questions
 

@@ -157,3 +157,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0146-servidor-mcp-local-expondo — servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho (specs: mcp-server ADDED)
 - 2026-09-14 — 0145-identidade-externa-frontmatter-vinculo — identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial (specs: integrations ADDED)
 - 2026-09-14 — 0149-pagina-mcp-aba-ia — pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos (specs: ai-assist MODIFIED)
+- 2026-09-14 — 0153-ingestao-runs-github-actions — ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada (specs: local-automation MODIFIED)
+- 2026-09-14 — 0154-modelo-sinal-generico-manifesto — modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo (specs: local-automation MODIFIED)

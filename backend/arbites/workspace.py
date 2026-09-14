@@ -36,12 +36,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "automation_targets": [],
     "risk_repos": [],
     "ai": {"default_provider": None, "providers": []},
+    # Observabilidade (ADR 0016): de onde puxar execução de CI que o Arbites
+    # não disparou. Vazio = ninguém é vigiado; ingestão não inventa origem.
+    "observability": {"sources": [], "max_runs_per_poll": 50},
 }
 
 SUBDIRS = [
     "requirements", "testcases", "executions", "defects", "todos",
     "dailies", "metrics", "meetings", "decisions", "audits", "agent_log",
-    ".arbites",
+    "ci", ".arbites",
 ]
 
 # Sidecar da lixeira (0081): guarda a origem para o restore devolver ao lugar.

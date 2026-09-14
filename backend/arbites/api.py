@@ -48,7 +48,9 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
+from . import ci_ingest
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
+from .ci_ingest import CIIngestor, IngestError
 from .executions import ExecutionError
 from . import feature_sync as feature_sync_ops
 from .gherkin_scan import (
@@ -573,6 +575,7 @@ def create_app(
         app.state.runner = RunManager(ws, app.state.conn)
         app.state.tokens = tokens
         app.state.ci = CIManager(ws, app.state.conn, github, tokens)
+        app.state.ci_ingest = CIIngestor(ws, app.state.conn, github)
         app.state.ai_keys = ai_keys
         app.state.ai_transport = ai_transport
         # Banco de contas: conexao propria e duravel, jamais a do indice
@@ -630,6 +633,14 @@ def create_app(
     async def _ci_error(request: Request, exc: CIError):
         return JSONResponse(
             status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(IngestError)
+    async def _ingest_error(request: Request, exc: IngestError):
+        status = 409 if exc.code == "no_sources" else 422
+        return JSONResponse(
+            status_code=status,
             content={"error": {"code": exc.code, "message": exc.message}},
         )
 
@@ -2603,6 +2614,34 @@ def _register_routes(app: FastAPI) -> None:
     async def ci_run_collect(request: Request, exec_id: str):
         ci: CIManager = request.app.state.ci
         return await asyncio.to_thread(ci.collect, exec_id)
+
+    # -- observabilidade: runs ingeridos (changes 0153/0154, ADR 0016) ------
+    #
+    # Puxar, não receber: a instância é local e não é alcançável da internet.
+    # O que já foi ingerido é respondido pelo DISCO, então repetir a ingestão
+    # não duplica e uma semana desligado volta inteira.
+
+    @app.post(API_PREFIX + "/ci/ingest")
+    async def ci_ingest_now(request: Request, limit: int | None = None):
+        ingestor: CIIngestor = request.app.state.ci_ingest
+        return await asyncio.to_thread(ingestor.ingerir, limit)
+
+    @app.get(API_PREFIX + "/ci/runs")
+    async def ci_runs(request: Request, limit: int = 50,
+                      workflow: str | None = None):
+        return {"runs": ci_ingest.listar_runs(conn_of(request), limit, workflow)}
+
+    @app.get(API_PREFIX + "/ci/signals")
+    async def ci_signal_names(request: Request):
+        """Os sinais que EXISTEM — descobertos do que chegou, não de uma lista
+        fixa no código: um sinal novo aparece aqui sem deploy."""
+        return {"signals": ci_ingest.nomes_de_sinal(conn_of(request))}
+
+    @app.get(API_PREFIX + "/ci/signals/{name}")
+    async def ci_signal_series(request: Request, name: str,
+                               since: str | None = None,
+                               until: str | None = None):
+        return ci_ingest.serie(conn_of(request), name, since, until)
 
     # -- identidade externa (change 0145, ADR 0015) -------------------------
     #
