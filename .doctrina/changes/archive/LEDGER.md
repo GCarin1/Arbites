@@ -176,3 +176,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0165-primeira-execucao-fora-container — primeira execucao fora do container: o .env nunca era lido, entao nenhum admin era criado e a pessoa se trancava fora por tentativas (specs: auth MODIFIED)
 - 2026-09-14 — 0166-login-saida-propria-maquina — 401 no login sem saida na propria maquina: conta inexistente senha errada e conta inativa respondem igual e nao havia como diagnosticar nem redefinir (specs: auth MODIFIED)
 - 2026-09-14 — 0167-arbites-yaml-gerado-mostrava — arbites.yaml gerado mostrava cinco blocos enquanto o produto le onze, e o env de exemplo nao cobria o uso fora do container (specs: workspace-core MODIFIED)
+- 2026-09-14 — 0168-cadastro-formulario-fica-pendente — cadastro pelo formulario fica pendente mesmo sem nenhum admin ativo para aprovar, e a tela nao avisa disso (specs: auth MODIFIED)

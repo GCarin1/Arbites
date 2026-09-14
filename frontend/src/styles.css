@@ -3545,6 +3545,32 @@ button.link-chip-btn:disabled {
   border-color: var(--success);
   background: rgba(63, 185, 80, 0.1);
 }
+/* Aviso de instancia sem admin: quem cadastra precisa saber ANTES que o
+   pedido nao tem quem aprove (change 0168). */
+.login-sem-admin {
+  border: 1px solid var(--warning, #d29922);
+  background: rgba(210, 153, 34, 0.1);
+  border-radius: var(--r-card);
+  padding: 10px 12px;
+  font-size: var(--fs-caption);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.login-sem-admin p {
+  margin: 0;
+}
+.login-sem-admin pre {
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--r-input, 6px);
+  background: var(--bg-inset, rgba(0, 0, 0, 0.25));
+  font-size: 11px;
+  /* O comando e mais largo que o cartao em telefone: rola sozinho em vez
+     de empurrar a tela inteira. */
+  overflow-x: auto;
+  white-space: pre;
+}
 .login-submit {
   width: 100%;
   justify-content: center;

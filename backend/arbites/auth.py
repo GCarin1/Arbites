@@ -503,6 +503,35 @@ def bootstrap_admin(conn: sqlite3.Connection) -> dict[str, Any] | None:
     )
 
 
+def owner_email_from_env() -> str:
+    """O e-mail que o operador declarou no ambiente, normalizado."""
+    return os.environ.get("ARBITES_ADMIN_EMAIL", "").strip().lower()
+
+
+def no_active_admin(conn: sqlite3.Connection) -> bool:
+    """Ninguém pode aprovar cadastro nesta instância neste momento."""
+    return count_active_admins(conn) == 0
+
+
+def claims_instance(conn: sqlite3.Connection, email: str) -> bool:
+    """Este cadastro nasce admin ativo em vez de pendente?
+
+    Só quando as DUAS coisas valem: não existe admin ativo — ou seja, um
+    cadastro pendente aqui não teria quem o aprovasse, um beco sem saída —
+    e o e-mail é exatamente o que o operador declarou em
+    `ARBITES_ADMIN_EMAIL`. Sem a segunda condição, quem batesse primeiro
+    na porta de uma instância recém-subida levaria a instância junto; com
+    ela, quem decide é quem controla o ambiente do processo, a mesma mão
+    do `bootstrap_admin` e da credencial de CI (ADR 0017).
+    """
+    dono = owner_email_from_env()
+    if not dono:
+        return False
+    if (email or "").strip().lower() != dono:
+        return False
+    return no_active_admin(conn)
+
+
 def authenticate(
     conn: sqlite3.Connection, email: str, password: str, ip: str = "",
     user_agent: str = "",

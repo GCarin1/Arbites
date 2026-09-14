@@ -11,8 +11,8 @@
 **Status:** active
 **Implementation:** verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`
 **Realizes:** SC15
-**Last updated:** 2026-09-12
-**Version:** 0.4.0
+**Last updated:** 2026-09-14
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -71,9 +71,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 
 ### Event-driven
 
-- When um cadastro é submetido, the system shall criar a conta com status
-  `pending` e papel `viewer`, sem abrir sessão — conta pendente não
-  autentica.
+- When um cadastro é submetido, the system shall criar a conta com status `pending` e papel `viewer`, sem abrir sessão — exceto quando não existe nenhum admin ativo e o e-mail informado é exatamente `ARBITES_ADMIN_EMAIL`, caso em que a conta nasce `admin` e `active` com a senha escolhida no próprio cadastro.
 - When um admin aprova uma conta pendente, the system shall marcá-la
   `active`; ao recusar, `rejected`.
 - When o processo sobe e não existe nenhuma conta com papel `admin`, the
@@ -104,6 +102,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
   `POST /auth/register` com 403 e código `signup_disabled`.
 - While o papel da sessão não alcança a rota, the system shall responder 403 com código `forbidden` — nunca 404, para não transformar autorização em adivinhação de rota.
 - While nao existe administrador ativo e o ambiente nao traz credencial de bootstrap, the system shall registrar um erro dizendo que ninguem consegue entrar e como corrigir, em vez de subir em silencio.
+- While não existe nenhum admin ativo, the system shall informar esse estado em `GET /auth/me` a quem ainda não tem sessão, junto com a indicação de haver ou não `ARBITES_ADMIN_EMAIL` declarado, para que a tela diga qual das duas saídas serve antes de alguém se cadastrar em vão.
 
 ### Unwanted-behavior (must-not)
 
@@ -124,6 +123,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
   atacante finalmente entra.
 - The system shall not permitir que `PUT /targets` seja alcançado por papel diferente de `admin`; um alvo define o binário e o diretório de trabalho de um subprocess, então configurá-lo equivale a executar código no servidor.
 - The system shall not deixar um interruptor desligado ser contornado por outra rota que faça a mesma coisa; o interruptor governa a capacidade, não a URL.
+- The system shall not deixar o e-mail de `ARBITES_ADMIN_EMAIL` nascer `admin` enquanto existir ao menos um admin ativo; a posse da instância órfã acontece uma vez, não é uma porta permanente.
 
 ### Optional
 
@@ -160,6 +160,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 11. [verified] Os interruptores nascem todos ligados, sobrevivem ao reinício do processo e só o `admin` os altera — verified by `backend/tests/test_authorization.py`.
 12. [unverified] O arquivo de ambiente e aplicado sem sobrepor variavel ja exportada e sem expor valores; arranque sem admin e sem credencial registra erro nomeando as variaveis; o comando de destrave libera o login e pode alcancar uma conta so — verified by `backend/tests/test_primeira_execucao.py`.
 13. [unverified] Workspace sem conta explica o 401 e ensina o comando; criar e redefinir permitem entrar; conta pendente volta a ativa; senha curta e recusada sem tocar na conta; a listagem nunca mostra senha nem hash — verified by `backend/tests/test_recuperar_admin.py`.
+14. [verified] Sem admin ativo, `GET /auth/me` responde `no_admin` e a tela avisa antes do cadastro; o e-mail de `ARBITES_ADMIN_EMAIL` nasce admin ativo sem troca de senha obrigatória e entra no login seguinte, e qualquer outro e-mail continua pendente; com um admin ativo o mesmo e-mail volta a nascer pendente — verified by `backend/tests/test_primeiro_dono.py`.
 
 ## Maturity
 

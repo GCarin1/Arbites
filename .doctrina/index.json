@@ -45,8 +45,8 @@
         "id": "auth",
         "path": ".doctrina/specs/auth/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-09-12",
+        "version": "0.5.0",
+        "last_updated": "2026-09-14",
         "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
         "realizes": [
           "SC15"
@@ -439,6 +439,15 @@
         "date": "2026-09-14",
         "landed": "2026-09-14",
         "summary": "Onde não há cofre do SO, a credencial de CI pode vir da variável de ambiente"
+      },
+      {
+        "id": "0018",
+        "path": ".doctrina/decisions/0018-instancia-sem-admin-ativo-revela-o-estado-e-o-e-mail-do-ambiente-vira-dono-no-cadastro.md",
+        "title": "Instancia sem admin ativo revela o estado e o e-mail do ambiente vira dono no cadastro",
+        "status": "accepted",
+        "date": "2026-09-14",
+        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas",
+        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`"
       }
     ],
     "changes": [],
@@ -2623,6 +2632,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0168-cadastro-formulario-fica-pendente",
+        "title": "cadastro pelo formulario fica pendente mesmo sem nenhum admin ativo para aprovar, e a tela nao avisa disso",
+        "path": ".doctrina/changes/archive/2026-09-14-0168-cadastro-formulario-fica-pendente",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2907,6 +2929,12 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "replace-requirement-troca-so-a-primeira-linha",
+        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
+        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
+        "last_updated": "2026-09-14"
       }
     ],
     "contracts": [

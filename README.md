@@ -125,6 +125,18 @@ python -m arbites admin --email voce@exemplo.com --password uma-senha-de-12-ou-m
 > **nunca mais toca nela** — mudar `ARBITES_ADMIN_PASSWORD` no `.env` não muda
 > a senha de uma conta criada antes. É para isso que serve o comando acima.
 
+> **Me cadastrei pela tela e a conta ficou `viewer`/`pending`.** É o esperado:
+> todo cadastro pelo formulário nasce pendente, aguardando um admin liberar.
+> A armadilha é a instância que subiu **sem nenhum admin ativo** — aí não há
+> quem aprove. Duas saídas, e a tela de login agora avisa qual delas serve:
+>
+> - com `ARBITES_ADMIN_EMAIL` declarado, **cadastre-se com exatamente esse
+>   e-mail**: enquanto não existir admin ativo, essa conta nasce
+>   `admin`/`active` com a senha que você escolher no cadastro. Assim que
+>   existe um admin ativo, esse mesmo e-mail volta a nascer pendente;
+> - sem nada declarado, use o `python -m arbites admin --email ... --password
+>   ...` acima, que promove a conta que já existe e destrava o login junto.
+
 **Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
 e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
 ou destravar na hora:
