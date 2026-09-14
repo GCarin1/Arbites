@@ -2352,19 +2352,6 @@
         ]
       },
       {
-        "id": "0152-requisitos-sai-grupo-testes",
-        "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
-        "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
-        "status": "applied",
-        "applied": "2026-09-14",
-        "specs_affected": [
-          {
-            "capability": "design-system",
-            "operation": "MODIFIED"
-          }
-        ]
-      },
-      {
         "id": "0146-servidor-mcp-local-expondo",
         "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
         "path": ".doctrina/changes/archive/2026-09-14-0146-servidor-mcp-local-expondo",
@@ -2374,6 +2361,19 @@
           {
             "capability": "mcp-server",
             "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0152-requisitos-sai-grupo-testes",
+        "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
+        "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
           }
         ]
       }
