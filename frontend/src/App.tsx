@@ -79,6 +79,11 @@ const Profile = lazy(() =>
 const Admin = lazy(() =>
   import("./components/Admin").then((m) => ({ default: m.Admin }))
 );
+const NotificationBell = lazy(() =>
+  import("./components/NotificationBell").then((m) => ({
+    default: m.NotificationBell,
+  }))
+);
 const CommandPalette = lazy(() =>
   import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette }))
 );
@@ -159,7 +164,11 @@ const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   // item sob "Testes" afirmava o contrário, e menu que mente sobre a dona da
   // coisa ensina o modelo errado para quem chega.
   { title: "Negócio", keys: ["requirements"] },
-  { title: "Testes", keys: ["testcases", "executions"] },
+  // Automação entra aqui, e não em "Mais" (change 0161): rodar o teste É
+  // trabalho de teste. A ADR 0012 congelou a PERIFERIA para focar em
+  // repositório, ciclo e execução — automação é o braço da execução, então
+  // ela estava do lado errado da régua, não do lado certo.
+  { title: "Testes", keys: ["testcases", "executions", "automation"] },
   {
     title: "Acompanhamento",
     // Observabilidade fica ao lado do Dashboard, e não dentro dele: a
@@ -185,7 +194,7 @@ const NAV_LOOSE: Tab[] = ["ia"];
 // ele é.
 const NAV_FROZEN_GROUP = {
   title: "Mais",
-  keys: ["decisions", "memory", "daily", "meetings", "automation", "migration"] as Tab[],
+  keys: ["decisions", "memory", "daily", "meetings", "migration"] as Tab[],
 };
 
 // Rodapé da navegação: o que é de manutenção, não de trabalho do dia, fica
@@ -197,7 +206,7 @@ const NAV_FOOTER: Tab[] = ["problems", "admin"];
 // Capabilities congeladas: o grupo "Mais" nasce recolhido, e cada item leva
 // a marca para que ninguém confunda "está aqui" com "é para usar".
 const FROZEN_TABS: Tab[] = [
-  "decisions", "memory", "daily", "meetings", "automation", "migration",
+  "decisions", "memory", "daily", "meetings", "migration",
 ];
 
 const NAV_BY_KEY = Object.fromEntries(NAV.map((n) => [n.key, n])) as Record<
@@ -491,6 +500,28 @@ export default function App({
     }
   }, []);
 
+  /**
+   * Leva para a ORIGEM de uma notificação (change 0161).
+   *
+   * Quando o alvo traz um ID, cai no item; quando traz só a aba, cai na aba.
+   * Parar na lista e obrigar a procurar de novo é metade de um link — e o
+   * pedido era justamente poder clicar e chegar onde a coisa está.
+   */
+  const goToTarget = useCallback(
+    (target: { tab: string; id?: string; run?: string; atab?: string }) => {
+      if (target.id) {
+        navigateTo(target.id);
+        if (target.tab) setTab(target.tab as Tab);
+        setNavOpen(false);
+        return;
+      }
+      setTab(target.tab as Tab);
+      setHashParams(target.atab ? { atab: target.atab } : {});
+      setNavOpen(false);
+    },
+    [navigateTo],
+  );
+
   async function createTestcase(title: string, folder: string) {
     try {
       const created = await api.createTestcase({ title, folder });
@@ -617,6 +648,9 @@ export default function App({
           <span>Buscar…</span>
           <kbd>Ctrl K</kbd>
         </button>
+        <Suspense fallback={null}>
+          <NotificationBell onGo={goToTarget} onError={setError} />
+        </Suspense>
         <button
           className="header-icon-btn wide-only"
           onClick={() => void reindex()}

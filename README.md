@@ -429,6 +429,40 @@ isso com o remédio. Tentar salvar o token pela tela responde `409` explicando
 a saída, em vez de falhar depois. O valor nunca volta em resposta nenhuma, e
 nunca toca o disco do workspace.
 
+## O sino: o que mudou enquanto você não estava olhando
+
+No canto superior direito, ao lado da busca. O número no ícone é quanto há de
+não lido.
+
+**A lista é o estado de AGORA, não uma caixa de entrada.** Ela é calculada das
+fontes que já são verdade — os avisos do índice, a credencial, o painel de
+observabilidade, os registros no disco. A consequência é deliberada: **um
+problema resolvido some do sino mesmo sem ter sido lido**, porque deixou de
+existir. Uma caixa de entrada gravada criaria um segundo estado, e o segundo
+diverge do primeiro: o aviso corrigido ficaria na lista e quem clicasse não
+acharia nada lá.
+
+O que o Arbites guarda por pessoa é só **o que você leu** e **até onde
+limpou**. Cada item tem um id estável, então "lido" gruda mesmo quando a lista
+inteira é recalculada.
+
+Quatro origens:
+
+| origem | o que traz |
+|---|---|
+| **problema** | os avisos do índice e da credencial — a aba **Problemas** vira uma das fontes do sino, e continua existindo: o sino é ambiente, a aba é triagem |
+| **observabilidade** | o que mudou sozinho: quebrou, virou instável, o silêncio da ingestão, sinal que regrediu |
+| **concluído** | ação do **sistema** que deu certo: ingestão trouxe execuções, rodada de auditoria, ciclo fechado. São as que acontecem sem ninguém olhando — por isso "criei um CT agora" não entra |
+| **log** | o log de atividade, **só admin** e só com o interruptor `notifications_info` ligado. Nasce desligado: é o único volume capaz de inundar a lista |
+
+Clicar leva à **origem** — ao item, não à lista dele, quando o nome do arquivo
+carrega um ID. Cada item tem *lida / não lida*, e há *marcar todas como lidas*
+e *limpar*.
+
+**Limpar é marca d'água, não exclusão.** Não há o que apagar: a lista é
+derivada. Grava-se "vi tudo até aqui" — e o motivo que continua valendo volta a
+aparecer quando voltar a acontecer.
+
 ## Intercâmbio por arquivo: o piso que funciona com qualquer ferramenta
 
 Adaptador por API só existe onde há API **e permissão** — e permissão, numa

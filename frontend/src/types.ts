@@ -901,3 +901,32 @@ export interface CiRetention {
     bytes: number;
   };
 }
+
+// -- o sino (change 0161) ---------------------------------------------------
+
+export interface NotificationTarget {
+  tab: string;
+  id?: string;
+  path?: string;
+  run?: string;
+  atab?: string;
+}
+
+export interface Notification {
+  id: string;
+  kind: "problema" | "observabilidade" | "feito" | "info";
+  severity: "problem" | "attention" | "done" | "info";
+  /** O nome do arquivo/card, separado da frase para poder ir em destaque. */
+  subject: string;
+  subject_full: string;
+  message: string;
+  at: string;
+  target: NotificationTarget;
+  read: boolean;
+}
+
+export interface NotificationsResponse {
+  items: Notification[];
+  unread: number;
+  cleared_at: string;
+}

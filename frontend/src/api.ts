@@ -39,6 +39,7 @@ import type {
   GeneratePreview,
   HealthScore,
   MetricsSummary,
+  NotificationsResponse,
   Observability,
   Criterion,
   Requirement,
@@ -137,6 +138,22 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- o sino (change 0161) ------------------------------------------------
+  notifications: (days = 14) =>
+    request<NotificationsResponse>(`/notifications?days=${days}`),
+  markNotification: (id: string, read: boolean) =>
+    request<{ id: string; read: boolean }>(
+      `/notifications/${encodeURIComponent(id)}/read`,
+      { method: read ? "POST" : "DELETE" },
+    ),
+  markAllNotifications: (ids: string[]) =>
+    request<{ marked: number }>("/notifications/read-all", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+  clearNotifications: () =>
+    request<{ cleared_at: string }>("/notifications/clear", { method: "POST" }),
 
   // -- Observabilidade (changes 0153/0154/0155) ----------------------------
   observability: (days: number) =>
