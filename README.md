@@ -68,6 +68,39 @@ Duas coisas que vale saber:
 > que a change 0165 corrigiu foi o caminho sem container, onde `python -m
 > arbites serve` ignorava o arquivo e a instância subia sem admin.
 
+### O `arbites.yaml`: o que é configurável
+
+Ele nasce **comentado** na primeira execução, dentro do workspace, cobrindo
+todos os blocos que o produto lê. Abrir o arquivo é a documentação.
+
+**Segredo não entra nele** — ele fica dentro do workspace, que é versionável e
+feito para ser compartilhado (ADR 0008). Chave de IA vai para o cofre do SO
+(pela tela IA → Providers) e o token do GitHub vai para o cofre ou para o
+`.env` (ADR 0017).
+
+| bloco | para quê | default |
+|---|---|---|
+| `workspace.id_prefixes` | prefixo de ID por tipo (`CT`, `ST`, …) | os embutidos |
+| `squads` | squads declarados, para os filtros sugerirem | vazio |
+| `automation_targets` | projetos de automação; o sub-bloco `github` liga o disparo e a coleta | vazio |
+| `risk_repos` | repositórios do mapa de risco | vazio |
+| `ai` | provider, modelo e URL base — **nunca a chave** | nenhum |
+| `observability` | de onde puxar CI, metas por sinal e retenção | nada vigiado |
+| `audit.auto_interval_hours` | de quanto em quanto tempo uma rodada nova dispara | 24 |
+| `requirements.vague_terms` | termos que o lint EARS marca como vagos | a lista embutida |
+| `metric_thresholds` | semáforo do dashboard: `{warn, bad, direction}` | sem semáforo |
+| `health_score.weights` | pesos da nota de saúde, renormalizados para 1.0 | 0.30 / 0.25 / 0.25 / 0.20 |
+| `ci_monitoring.name_pattern` | como reconhecer execução de CI pelo nome | sem separação |
+
+> Se o seu workspace é antigo, o arquivo dele continua como está — `ensure` só
+> escreve quando não existe. Para ver o novo, crie um workspace vazio e copie
+> os blocos que interessam.
+
+> **Cuidado ao editar `automation_targets` à mão:** salvar os targets pela tela
+> (Automação → Configurar) reescreve o bloco inteiro e **apaga o sub-bloco
+> `github:`** escrito à mão, sem avisar. Hoje os dois caminhos são
+> incompatíveis; está registrado para correção.
+
 ### Não consigo entrar
 
 O login responde **401 "e-mail ou senha inválidos"** para três situações

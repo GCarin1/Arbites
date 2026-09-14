@@ -267,7 +267,7 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
@@ -2607,6 +2607,19 @@
         "specs_affected": [
           {
             "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0167-arbites-yaml-gerado-mostrava",
+        "title": "arbites.yaml gerado mostrava cinco blocos enquanto o produto le onze, e o env de exemplo nao cobria o uso fora do container",
+        "path": ".doctrina/changes/archive/2026-09-14-0167-arbites-yaml-gerado-mostrava",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
             "operation": "MODIFIED"
           }
         ]

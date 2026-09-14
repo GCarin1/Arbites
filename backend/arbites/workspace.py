@@ -36,11 +36,138 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "automation_targets": [],
     "risk_repos": [],
+    "squads": [],
     "ai": {"default_provider": None, "providers": []},
     # Observabilidade (ADR 0016): de onde puxar execução de CI que o Arbites
     # não disparou. Vazio = ninguém é vigiado; ingestão não inventa origem.
     "observability": {"sources": [], "max_runs_per_poll": 50},
+    "audit": {},
+    "requirements": {},
+    "metric_thresholds": {},
+    "health_score": {},
+    "ci_monitoring": {},
 }
+
+# O arquivo ESCRITO na primeira execução (change 0167).
+#
+# Um `yaml.safe_dump` do dicionário acima produz um arquivo mudo: cinco chaves
+# sem uma linha de explicação, enquanto o produto lê ONZE. Seis funcionalidades
+# existiam e ninguém descobria — configuração que não aparece é configuração
+# que não existe.
+#
+# Por isso o arquivo nasce de um template com comentários, e não de um dump.
+# O risco de template e default divergirem é real: `test_config_padrao.py`
+# compara os dois a cada execução da suíte.
+CONFIG_TEMPLATE = """\
+# Arbites — configuração do workspace.
+#
+# SEGREDO NÃO ENTRA AQUI. Este arquivo é versionável e feito para ser
+# compartilhado com o time: chave de IA e token do GitHub vão para o cofre do
+# sistema operacional ou para o `.env` do processo (ADRs 0008 e 0017).
+#
+# Tudo abaixo é opcional: um bloco vazio ou ausente usa o default indicado.
+
+workspace:
+  name: Arbites
+  # Prefixo de ID por tipo de artefato. Mudar depois NÃO renomeia o que já
+  # existe — o ID mora no frontmatter de cada arquivo (ADR 0002).
+  id_prefixes:
+    epic: EP
+    story: ST
+    testcase: CT
+    execution: EXEC
+    defect: DF
+    todo: TD
+    todolist: TDL
+    meeting: MTG
+    decision: DEC
+    audit: AUD
+    agent_event: AGT
+
+# Squads declarados. A lista alimenta os filtros; um squad usado num artefato
+# e não declarado aqui continua funcionando, só não aparece como sugestão.
+squads: []
+
+# Projetos de automação que esta instância roda ou acompanha.
+# O bloco `github` é lido pelo disparo e pela coleta por artifact.
+automation_targets: []
+#   - name: frontend-web
+#     kind: behave
+#     local_path: /home/voce/repos/qa-automation
+#     features_glob: features/**/*.feature
+#     github:
+#       repo: org/qa-automation
+#       workflow: qa-nightly.yml
+#       ref: main
+#       artifact_name: cucumber-report
+
+# Repositórios para o mapa de risco (quais casos um diff afeta por
+# correlação). Vazio = a correlação por risco não é oferecida.
+risk_repos: []
+
+# Provedores de IA. A CHAVE de cada um vai para o cofre do SO pela tela
+# IA → Providers, nunca para este arquivo.
+ai:
+  default_provider: null
+  providers: []
+#   - name: openai
+#     kind: openai_compatible
+#     model: gpt-4o-mini
+#   - name: local
+#     kind: openai_compatible
+#     model: llama3
+#     base_url: http://127.0.0.1:11434/v1
+
+# Observabilidade (ADR 0016): de onde PUXAR execução de CI que o Arbites não
+# disparou. Vazio = ninguém é vigiado; a ingestão não inventa origem.
+observability:
+  sources: []
+#     - provider: github
+#       repo: org/qa-automation
+#       workflow: qa-nightly.yml
+#       artifact: observabilidade
+  max_runs_per_poll: 50
+  # Direção e meta de cada sinal. Sem isto o Arbites diz que o sinal SUBIU,
+  # nunca que piorou: ele não sabe que lcp_ms maior é pior.
+#   goals:
+#     lcp_ms: { direction: lower, goal: 2500 }
+#     success_rate: { goal: 95 }
+  # Sinal é barato e faz a série; anexo é caro e só interessa perto do
+  # evento. Defaults: 730 e 90 dias.
+#   retention:
+#     signals_days: 730
+#     attachments_days: 90
+
+# Rodadas de auditoria. Uma nova é disparada quando a última passou deste
+# intervalo — inclusive só por alguém abrir a aba. Default: 24.
+audit: {}
+#   auto_interval_hours: 24
+
+# Lint de critérios EARS. Sem `vague_terms`, vale a lista embutida
+# ("rápido", "adequado", "fácil"...).
+requirements: {}
+#   vague_terms: [rápido, adequado, fácil]
+
+# Semáforo das métricas do dashboard: {warn, bad, direction}.
+# `direction: up` = maior é melhor (default); `down` = menor é melhor.
+metric_thresholds: {}
+#   pass_rate: { warn: 90, bad: 75 }
+#   blocked_rate: { warn: 5, bad: 15, direction: down }
+
+# Pesos da nota de saúde. São renormalizados para somar 1.0.
+# Defaults: coverage 0.30, defects 0.25, automation 0.25, debt 0.20.
+health_score: {}
+#   weights:
+#     coverage: 0.30
+#     defects: 0.25
+#     automation: 0.25
+#     debt: 0.20
+
+# Como reconhecer uma execução vinda de CI pelo NOME, para separá-la das
+# manuais nos relatórios. Vazio = nenhuma separação.
+ci_monitoring: {}
+#   name_pattern: "^CI "
+"""
 
 SUBDIRS = [
     "requirements", "testcases", "executions", "defects", "todos",
@@ -78,10 +205,9 @@ class Workspace:
         for sub in SUBDIRS:
             (self.root / sub).mkdir(exist_ok=True)
         if not self.config_path.exists():
-            self.config_path.write_text(
-                yaml.safe_dump(DEFAULT_CONFIG, allow_unicode=True, sort_keys=False),
-                encoding="utf-8",
-            )
+            # O template comentado, não um dump mudo do dicionário: o arquivo
+            # é a única documentação que a pessoa encontra sem procurar.
+            self.config_path.write_text(CONFIG_TEMPLATE, encoding="utf-8")
         if not self.counters_path.exists():
             self._write_counters({})
 
