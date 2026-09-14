@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 # Quanto do passado o sino enxerga. Não é retenção — nada é apagado aqui;
@@ -158,6 +158,85 @@ def _da_observabilidade(painel: dict[str, Any]) -> list[dict[str, Any]]:
     return saida
 
 
+def _dos_prazos(conn) -> list[dict[str, Any]]:
+    """Afazer vencido e afazer que vence hoje.
+
+    Faltava, e era o buraco mais óbvio: o produto tem prazo desde sempre e o
+    sino não olhava para ele. Um aviso que chega depois do prazo não é aviso.
+
+    O id inclui o DIA de hoje de propósito: um afazer vencido volta a não-lido
+    a cada dia que passa. Silenciar para sempre algo que está vencido é o
+    contrário do que um lembrete faz — e quanto mais atrasado, mais ele deve
+    incomodar, não menos. O que vence hoje aparece uma vez, porque `hoje` e o
+    prazo são o mesmo dia.
+    """
+    hoje = _agora().date().isoformat()
+    saida = []
+    for linha in conn.execute(
+        "SELECT id, title, due, status, path FROM todos"
+        " WHERE due IS NOT NULL AND due <> '' AND COALESCE(status, '') <> 'done'"
+        " AND due <= ? ORDER BY due", (hoje,),
+    ):
+        vencido = linha["due"] < hoje
+        if vencido:
+            try:
+                dias = (date.fromisoformat(hoje)
+                        - date.fromisoformat(linha["due"])).days
+            except ValueError:
+                dias = 0
+            texto = (f"venceu ontem" if dias == 1
+                     else f"venceu há {dias} dias") + f" ({linha['due']})"
+        else:
+            texto = "vence HOJE"
+        saida.append({
+            "id": _id("todo_due", linha["id"], linha["due"], hoje),
+            "kind": "prazo",
+            # Vencido é problema; vence hoje ainda dá tempo, é atenção.
+            "severity": "problem" if vencido else "attention",
+            "subject": linha["id"],
+            "subject_full": linha["path"] or linha["id"],
+            "message": f"{linha['title']} — {texto}",
+            # O instante é HOJE, e não o prazo: com o prazo no passado, a
+            # marca d'água de "limpar" o esconderia para sempre.
+            "at": hoje + "T00:00:00+00:00",
+            "target": {"tab": "todos", "id": linha["id"]},
+        })
+
+    # A LISTA também tem prazo (change 0164). A linha não tem: quando ela
+    # precisa de um, liga-se a um afazer — que já está no laço acima.
+    for linha in conn.execute(
+        "SELECT id, title, due, path,"
+        " (SELECT COUNT(*) FROM todolist_items i"
+        "   WHERE i.list_id = todolists.id AND COALESCE(i.done, 0) = 0) AS abertas"
+        " FROM todolists WHERE due IS NOT NULL AND due <> ''"
+        " AND COALESCE(status, '') = 'active' AND due <= ? ORDER BY due", (hoje,),
+    ):
+        vencida = linha["due"] < hoje
+        abertas = linha["abertas"] or 0
+        if abertas == 0:
+            # Lista sem linha aberta não cobra prazo: o prazo dela já foi
+            # cumprido, ainda que ninguém tenha marcado a lista como concluída.
+            continue
+        try:
+            dias = (date.fromisoformat(hoje) - date.fromisoformat(linha["due"])).days
+        except ValueError:
+            dias = 0
+        quando = ("vence HOJE" if not vencida else
+                  "venceu ontem" if dias == 1 else f"venceu há {dias} dias")
+        restam = ("1 linha aberta" if abertas == 1 else f"{abertas} linhas abertas")
+        saida.append({
+            "id": _id("list_due", linha["id"], linha["due"], hoje),
+            "kind": "prazo",
+            "severity": "problem" if vencida else "attention",
+            "subject": linha["id"],
+            "subject_full": linha["path"] or linha["id"],
+            "message": f"{linha['title']} — {quando}, com {restam}",
+            "at": hoje + "T00:00:00+00:00",
+            "target": {"tab": "todos", "atab": "listas", "id": linha["id"]},
+        })
+    return saida
+
+
 def _do_sistema(conn, desde: str) -> list[dict[str, Any]]:
     """Ação do sistema que deu certo — a que aconteceu sem ninguém olhando."""
     saida: list[dict[str, Any]] = []
@@ -258,7 +337,7 @@ def listar(
     limpo_ate = _limpo_ate(auth_conn, user["id"])
     desde = max(desde_janela, limpo_ate) if limpo_ate else desde_janela
 
-    itens = _dos_problemas(avisos) + _do_sistema(conn, desde)
+    itens = _dos_problemas(avisos) + _dos_prazos(conn) + _do_sistema(conn, desde)
     if painel is not None:
         itens += _da_observabilidade(painel)
     if com_log:

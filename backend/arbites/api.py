@@ -50,10 +50,12 @@ from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from . import ci_ingest, ci_retencao, integrations_bulk as bulk_ops
 from . import notifications as notif_ops
+from . import todolists as list_ops
 from . import integrations_file as file_ops, mcp_write
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .ci_credential import CredentialState
 from .integrations_bulk import LoteErro
+from .todolists import ListaErro
 from .integrations_file import ArquivoErro
 from .mcp_write import WriteRecusada
 from .ci_ingest import CIIngestor, IngestError
@@ -473,6 +475,32 @@ class TodoUpdate(BaseModel):
     body: str | None = None
 
 
+class TodoListIn(BaseModel):
+    title: str
+    due: str | None = None
+    body: str = ""
+
+
+class TodoListUpdate(BaseModel):
+    title: str | None = None
+    status: str | None = Field(default=None, pattern="^(active|done|archived)$")
+    due: str | None = None
+    body: str | None = None
+
+
+class TodoListItemIn(BaseModel):
+    text: str
+    done: bool = False
+    # O vínculo com o afazer mora AQUI, na linha, e só aqui (change 0164).
+    todo: str | None = None
+
+
+class TodoListItemUpdate(BaseModel):
+    text: str | None = None
+    done: bool | None = None
+    todo: str | None = None
+
+
 class DailyIn(BaseModel):
     body: str = ""
     action_items: list[str] = []
@@ -656,6 +684,19 @@ def create_app(
                     "conta admin de bootstrap criada para %s — troque a senha"
                     " no primeiro login", created["email"],
                 )
+            elif auth_ops.count_active_admins(app.state.auth) == 0:
+                # Antes isto era um no-op SILENCIOSO: a instância subia sem
+                # conta nenhuma e a pessoa ia tentar entrar numa conta que
+                # nunca existiu, até se trancar por tentativas (change 0165).
+                # Um arranque que não pode dar certo precisa dizer isso.
+                log.error(
+                    "NENHUMA conta de administrador existe e o ambiente nao traz"
+                    " credencial de bootstrap: ninguem consegue entrar. Defina"
+                    " ARBITES_ADMIN_EMAIL e ARBITES_ADMIN_PASSWORD (a senha"
+                    " precisa de %d caracteres ou mais) num arquivo .env no"
+                    " diretorio onde voce roda o comando, ou no ambiente do"
+                    " processo, e suba de novo.", auth_ops.MIN_PASSWORD_LEN,
+                )
         else:
             log.warning(
                 "ARBITES_AUTH=off — a API esta SEM autenticacao. Nao exponha"
@@ -698,6 +739,13 @@ def create_app(
 
     @app.exception_handler(CIError)
     async def _ci_error(request: Request, exc: CIError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(ListaErro)
+    async def _lista_erro(request: Request, exc: ListaErro):
         return JSONResponse(
             status_code=exc.status,
             content={"error": {"code": exc.code, "message": exc.message}},
@@ -3958,6 +4006,21 @@ def _register_routes(app: FastAPI) -> None:
                 return {"id": link_id, "kind": kind, "title": row["v"]}
         return {"id": link_id, "kind": None, "title": None}  # link pendente
 
+    def _linha_do_afazer(conn, todo_id: str) -> dict | None:
+        """De que linha de lista este afazer participa.
+
+        É CONSULTA, não um segundo dado: o vínculo mora só na linha (change
+        0164). Guardá-lo também no afazer abriria a chance de os dois se
+        contradizerem, e aí alguém teria de decidir qual está certo sem ter
+        como.
+        """
+        linha = conn.execute(
+            "SELECT i.list_id, i.item_id, i.text, i.done, l.title AS list_title,"
+            " l.due AS list_due FROM todolist_items i"
+            " JOIN todolists l ON l.id = i.list_id WHERE i.todo_id = ?",
+            (todo_id,)).fetchone()
+        return dict(linha) if linha else None
+
     def _todo_out(conn, ws: Workspace, todo_id: str) -> dict:
         row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
         if not row:
@@ -3965,6 +4028,7 @@ def _register_routes(app: FastAPI) -> None:
         out = dict(row)
         link_ids = [x for x in (row["links"] or "").split(",") if x]
         out["links"] = [_resolve_link(conn, x) for x in link_ids]
+        out["list_item"] = _linha_do_afazer(conn, todo_id)
         _, out["body"] = _load_doc(ws, row["path"])
         return out
 
@@ -4001,8 +4065,126 @@ def _register_routes(app: FastAPI) -> None:
             item = dict(row)
             link_ids = [x for x in (row["links"] or "").split(",") if x]
             item["links"] = [_resolve_link(conn, x) for x in link_ids]
+            item["list_item"] = _linha_do_afazer(conn, row["id"])
             out.append(item)
         return out
+
+    # -- listas de To Do (change 0164) --------------------------------------
+    #
+    # O afazer é a nota adesiva: uma coisa a fazer, com prazo e status. A lista
+    # é o roteiro: passos que só fazem sentido juntos, com prazo DA LISTA. E é
+    # isso que dá sentido ao vínculo — quando uma linha precisa de prazo, de
+    # status e de aparecer no sino, ela se liga a um afazer: o afazer traz a
+    # data, a linha traz o passo.
+
+    def _lista_out(conn, ws: Workspace, list_id: str) -> dict:
+        row = conn.execute(
+            "SELECT * FROM todolists WHERE id = ?", (list_id,)).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{list_id} não encontrado")
+        meta, corpo = list_ops.ler(ws, row["path"])
+        itens = []
+        for item in meta.get("items") or []:
+            saida = dict(item)
+            if item.get("todo"):
+                # O afazer vinculado vem RESOLVIDO: a linha mostra o prazo e o
+                # status dele sem quem lê precisar abrir outra tela.
+                afazer = conn.execute(
+                    "SELECT id, title, status, due FROM todos WHERE id = ?",
+                    (item["todo"],)).fetchone()
+                saida["todo_ref"] = dict(afazer) if afazer else None
+            itens.append(saida)
+        return {
+            "id": row["id"], "title": row["title"], "status": row["status"],
+            "due": row["due"], "created": row["created"], "path": row["path"],
+            "items": itens, "progress": list_ops.progresso(itens), "body": corpo,
+        }
+
+    @app.get(API_PREFIX + "/todolists")
+    async def listar_listas(request: Request, status: str = ""):
+        ws, conn = ws_of(request), conn_of(request)
+        sql = "SELECT id FROM todolists"
+        args: list[Any] = []
+        if status:
+            sql += " WHERE status = ?"
+            args.append(status)
+        sql += " ORDER BY due IS NULL, due, id"
+        return [_lista_out(conn, ws, r["id"]) for r in conn.execute(sql, args)]
+
+    @app.post(API_PREFIX + "/todolists", status_code=201)
+    async def criar_lista(request: Request, payload: TodoListIn):
+        ws, conn = ws_of(request), conn_of(request)
+        caminho, meta = list_ops.criar(ws, payload.title, payload.due, payload.body)
+        reindex_file(ws, conn, caminho)
+        return _lista_out(conn, ws, meta["id"])
+
+    @app.get(API_PREFIX + "/todolists/{list_id}")
+    async def obter_lista(request: Request, list_id: str):
+        return _lista_out(conn_of(request), ws_of(request), list_id)
+
+    @app.put(API_PREFIX + "/todolists/{list_id}")
+    async def atualizar_lista(request: Request, list_id: str,
+                              payload: TodoListUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "todolists", list_id)
+        meta, corpo = list_ops.ler(ws, rel)
+        mudancas = payload.model_dump(exclude_unset=True)
+        corpo = mudancas.pop("body", corpo)
+        meta.update({k: v for k, v in mudancas.items()})
+        meta["updated"] = date.today().isoformat()
+        list_ops.gravar(ws, ws.root / rel, meta, corpo)
+        reindex_file(ws, conn, ws.root / rel)
+        return _lista_out(conn, ws, list_id)
+
+    @app.delete(API_PREFIX + "/todolists/{list_id}", status_code=204)
+    async def excluir_lista(request: Request, list_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        caminho = ws.root / _find_path(conn, "todolists", list_id)
+        ws.trash(caminho)
+        reindex_file(ws, conn, caminho)
+
+    @app.post(API_PREFIX + "/todolists/{list_id}/items", status_code=201)
+    async def criar_item(request: Request, list_id: str, payload: TodoListItemIn):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "todolists", list_id)
+        meta, corpo = list_ops.ler(ws, rel)
+        novo_id = list_ops.proximo_item_id(meta)
+        list_ops.validar_vinculo(conn, payload.todo, list_id, novo_id)
+        meta["items"].append(list_ops.normalizar_item(
+            {**payload.model_dump(), "id": novo_id}, len(meta["items"])))
+        list_ops.gravar(ws, ws.root / rel, meta, corpo)
+        reindex_file(ws, conn, ws.root / rel)
+        return _lista_out(conn, ws, list_id)
+
+    @app.put(API_PREFIX + "/todolists/{list_id}/items/{item_id}")
+    async def atualizar_item(request: Request, list_id: str, item_id: str,
+                             payload: TodoListItemUpdate):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "todolists", list_id)
+        meta, corpo = list_ops.ler(ws, rel)
+        alvo = next((i for i in meta["items"] if i["id"] == item_id), None)
+        if alvo is None:
+            raise _error(404, "not_found", f"linha {item_id} não existe em {list_id}")
+        mudancas = payload.model_dump(exclude_unset=True)
+        if "todo" in mudancas:
+            list_ops.validar_vinculo(conn, mudancas["todo"], list_id, item_id)
+        alvo.update(mudancas)
+        list_ops.gravar(ws, ws.root / rel, meta, corpo)
+        reindex_file(ws, conn, ws.root / rel)
+        return _lista_out(conn, ws, list_id)
+
+    @app.delete(API_PREFIX + "/todolists/{list_id}/items/{item_id}")
+    async def excluir_item(request: Request, list_id: str, item_id: str):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, "todolists", list_id)
+        meta, corpo = list_ops.ler(ws, rel)
+        antes = len(meta["items"])
+        meta["items"] = [i for i in meta["items"] if i["id"] != item_id]
+        if len(meta["items"]) == antes:
+            raise _error(404, "not_found", f"linha {item_id} não existe em {list_id}")
+        list_ops.gravar(ws, ws.root / rel, meta, corpo)
+        reindex_file(ws, conn, ws.root / rel)
+        return _lista_out(conn, ws, list_id)
 
     @app.get(API_PREFIX + "/todos/export")
     async def export_todos(

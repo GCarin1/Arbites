@@ -5,7 +5,7 @@
 **Implementation:** verified — M10 + M10.1 (busca/autocomplete, export MD/XML, seleção múltipla, descrição com menções); backend/arbites/api.py, backend/arbites/indexer.py, backend/arbites/workspace.py; frontend Todos.tsx, Autocomplete.tsx. ID `TD-`, arquivos em `todos/`
 **Realizes:** SC11
 **Last updated:** 2026-07-06
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -37,6 +37,9 @@ por IA é M11.
 - The system shall exportar afazeres em Markdown e XML via
   `GET /todos/export?format=`, respeitando os filtros atuais ou uma lista de
   ids selecionados.
+- The system shall oferecer listas de To Do como artefato proprio do workspace, cada uma com titulo, prazo da lista, estado e linhas verificaveis, mantendo o arquivo legivel e editavel por uma pessoa.
+- The system shall permitir vincular uma linha de lista a um afazer, gravando o vinculo apenas na linha e expondo o sentido inverso como consulta, para que os dois lados nunca possam se contradizer.
+- The system shall apresentar o afazer com a cor do seu estado na borda inteira do cartao, para que a mudanca de estado seja vista.
 
 ### Event-driven
 
@@ -47,6 +50,7 @@ por IA é M11.
   teclado ou mouse.
 - When o usuário seleciona vários afazeres e pede excluir, the system shall
   pedir confirmação informando a quantidade antes de excluir em massa.
+- When uma lista com prazo tem linha em aberto e o prazo chega ou passa, the system shall anuncia-la no sino informando quantas linhas restam.
 
 ### State-driven
 
@@ -61,6 +65,7 @@ por IA é M11.
   consultável por data (histórico).
 - The system shall not habilitar a edição individual enquanto houver mais de
   um afazer selecionado.
+- The system shall not aceitar o mesmo afazer vinculado a mais de uma linha, recusando com o motivo, porque a pergunta sobre a conclusao dele passaria a depender de varias linhas.
 
 ### Optional
 
@@ -81,6 +86,7 @@ por IA é M11.
    kind — verified by `backend/tests/test_todos.py`.
 6. [verified] Afazeres são exportáveis em Markdown e XML, respeitando
    filtros ou uma seleção de ids — verified by `backend/tests/test_todos.py`.
+7. [unverified] Lista vira arquivo com id proprio e linhas; id de linha nunca e reaproveitado; um afazer se vincula a uma linha so e a recusa nomeia a lista ocupada; o afazer sabe de que linha participa sem guardar o vinculo duas vezes; lista com prazo e linha aberta aparece no sino — verified by `backend/tests/test_listas_todo.py`.
 
 ## Maturity
 

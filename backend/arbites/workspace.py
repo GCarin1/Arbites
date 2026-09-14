@@ -27,6 +27,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "execution": "EXEC",
             "defect": "DF",
             "todo": "TD",
+            "todolist": "TDL",
             "meeting": "MTG",
             "decision": "DEC",
             "audit": "AUD",
@@ -44,7 +45,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 SUBDIRS = [
     "requirements", "testcases", "executions", "defects", "todos",
     "dailies", "metrics", "meetings", "decisions", "audits", "agent_log",
-    "ci", ".arbites",
+    "todolists", "ci", ".arbites",
 ]
 
 # Sidecar da lixeira (0081): guarda a origem para o restore devolver ao lugar.
@@ -53,7 +54,8 @@ _TRASH_META_SUFFIX = ".arbtrash"
 # (itens da lixeira anteriores ao 0081).
 _PREFIX_FOLDER = {
     "CT": "testcases", "EP": "requirements", "ST": "requirements",
-    "DF": "defects", "TD": "todos", "DEC": "decisions", "AUD": "audits",
+    "DF": "defects", "TD": "todos", "TDL": "todolists",
+    "DEC": "decisions", "AUD": "audits",
     "AGT": "agent_log", "EXEC": "executions", "MTG": "meetings",
 }
 

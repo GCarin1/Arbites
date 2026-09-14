@@ -3160,10 +3160,33 @@ a {
   outline: 2px solid var(--primary);
   outline-offset: -1px;
 }
-.todo-card.note-open { border-left-color: var(--text-subtle); }
-.todo-card.note-doing { border-left-color: var(--primary); }
-.todo-card.note-blocked { border-left-color: var(--warning); }
-.todo-card.note-done { border-left-color: var(--success); opacity: 0.75; }
+/* A cor do status vai na borda INTEIRA, não só numa faixa de 3px à esquerda
+ * (change 0164). A faixa existia e passava despercebida — a referência é uma
+ * nota adesiva, e nota adesiva tem cor por inteiro. O fundo recebe um tom da
+ * mesma cor, fraco o bastante para o texto continuar legível nos dois temas. */
+.todo-card.note-open {
+  border-color: var(--text-subtle);
+  border-left-color: var(--text-subtle);
+}
+.todo-card.note-doing {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+.todo-card.note-blocked {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  border-left-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+.todo-card.note-done {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  border-left-color: var(--success);
+  background: color-mix(in srgb, var(--success) 6%, var(--surface));
+  opacity: 0.75;
+}
+/* A transição faz a mudança de status ser VISTA: trocar no select e a cor
+ * saltar sem aviso não confirma que a ação pegou. */
+.todo-card { transition: border-color 0.18s, background 0.18s; }
 .todo-card-head {
   display: flex;
   align-items: center;
@@ -4272,4 +4295,72 @@ button.link-chip-btn:disabled {
     width: auto;
     max-height: calc(100vh - var(--h-header) - 1.5rem);
   }
+}
+
+/* -- listas de To Do (change 0164) ----------------------------------------- */
+.lista-nova { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.lista-nova input:first-child { flex: 1; min-width: 220px; }
+.listas { display: flex; flex-direction: column; gap: var(--s2); }
+.lista { display: flex; flex-direction: column; gap: 0.6rem; }
+.lista-archived { opacity: 0.6; }
+.lista-topo {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+}
+.lista-titulo { display: flex; flex-direction: column; min-width: 0; }
+.lista-titulo h3 { margin: 0; }
+/* O prazo que vence hoje não pode parecer um prazo qualquer: ele é o único
+ * que ainda dá para cumprir. */
+.vence-hoje { color: var(--warning); font-weight: 600; }
+.lista-progresso { display: flex; align-items: center; gap: 0.5rem; }
+.lista-barra {
+  flex: 1; height: 6px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.lista-barra span {
+  display: block; height: 100%; background: var(--success);
+  transition: width 0.2s;
+}
+.lista-linhas { list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; }
+.lista-linha {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+  padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+}
+.lista-linha:last-child { border-bottom: 0; }
+.lista-feita .lista-texto { text-decoration: line-through; color: var(--text-muted); }
+.listas-topo { display: flex; justify-content: flex-end; padding-bottom: var(--s1); }
+.lista-texto {
+  flex: 1; min-width: 140px; background: none; border: 0;
+  padding: 0.1rem 0; height: auto; white-space: normal; color: inherit;
+  font: inherit; cursor: text;
+  /* O `button` global centraliza o conteúdo — desenhado para rótulo curto.
+   * Aqui dentro vai o texto de um item de lista, que se lê da esquerda. */
+  text-align: left;
+  justify-content: flex-start;
+}
+.lista-texto:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.lista-editar { flex: 1; min-width: 140px; }
+/* O afazer vinculado aparece resolvido — prazo e status sem trocar de tela.
+ * É o ponto do vínculo: sem isso ele seria só um campo guardado. */
+.lista-afazer {
+  display: inline-flex; align-items: center; gap: 0.35rem; height: auto;
+  padding: 0.1rem 0.4rem; font-size: 0.75rem; white-space: nowrap;
+  border: 1px solid var(--border); border-radius: var(--r-control);
+  background: var(--surface);
+}
+.lista-vincular { max-width: 190px; font-size: 0.78rem; }
+.lista-remover { padding: 0 0.5rem; }
+.lista-adicionar input { width: 100%; }
+/* No card do afazer: de que linha ele participa. */
+.todo-lista-ref {
+  display: inline-flex; gap: 0.3rem; height: auto; padding: 0.05rem 0.35rem;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid var(--border); border-radius: var(--r-control);
+  background: none; color: var(--text-muted); font-size: 0.72rem;
+}
+.todo-lista-ref:hover { color: var(--text); border-color: var(--border-strong); }
+
+@media (max-width: 860px) {
+  .lista-vincular { max-width: none; flex: 1; }
+  .lista-topo .status-select { flex: 1; }
 }

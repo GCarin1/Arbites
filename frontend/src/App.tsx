@@ -925,7 +925,12 @@ export default function App({
             </Suspense>
           ) : tab === "todos" ? (
             <Suspense fallback={<p className="empty">Carregando afazeres…</p>}>
-              <Todos onError={setError} onNavigate={navigateTo} />
+              <Todos
+                onError={setError}
+                onNavigate={navigateTo}
+                innerTab={hashParams.atab}
+                onInnerTabChange={(v) => setHashParam("atab", v)}
+              />
             </Suspense>
           ) : tab === "daily" ? (
             <Suspense fallback={<p className="empty">Carregando daily…</p>}>

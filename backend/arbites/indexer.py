@@ -76,6 +76,12 @@ CREATE TABLE IF NOT EXISTS defects(
 CREATE TABLE IF NOT EXISTS todos(
   id TEXT PRIMARY KEY, title TEXT, status TEXT, due TEXT, squad TEXT,
   links TEXT, created TEXT, path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS todolists(
+  id TEXT PRIMARY KEY, title TEXT, status TEXT, due TEXT, created TEXT,
+  path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS todolist_items(
+  list_id TEXT, item_id TEXT, ord INTEGER, text TEXT, done INTEGER,
+  todo_id TEXT, PRIMARY KEY (list_id, item_id));
 CREATE TABLE IF NOT EXISTS meetings(
   id TEXT PRIMARY KEY, title TEXT, date TEXT, summary TEXT, path TEXT, mtime REAL);
 CREATE TABLE IF NOT EXISTS decisions(
@@ -179,6 +185,8 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM result_events")
     conn.execute("DELETE FROM evidences")
     conn.execute("DELETE FROM todos")
+    conn.execute("DELETE FROM todolists")
+    conn.execute("DELETE FROM todolist_items")
     conn.execute("DELETE FROM meetings")
     conn.execute("DELETE FROM decisions")
     conn.execute("DELETE FROM audits")
@@ -265,6 +273,13 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
         _flush_doc_warnings(conn, doc, rel)
         if doc.id and track_id(doc, rel):
             _insert_todo(conn, doc, rel)
+
+    for path, text, error in read_all(ws.root / "todolists"):
+        doc = parse_one(path, text, error)
+        rel = ws.relpath(path)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id and track_id(doc, rel):
+            _insert_todolist(conn, doc, rel)
 
     for path, text, error in read_all(ws.root / "meetings"):
         doc = parse_one(path, text, error)
@@ -404,6 +419,9 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
         conn.execute("DELETE FROM ci_scenarios WHERE run_id = ?", (row["id"],))
         conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (row["id"],))
     conn.execute("DELETE FROM ci_runs WHERE path = ?", (rel,))
+    for row in conn.execute("SELECT id FROM todolists WHERE path = ?", (rel,)):
+        conn.execute("DELETE FROM todolist_items WHERE list_id = ?", (row["id"],))
+    conn.execute("DELETE FROM todolists WHERE path = ?", (rel,))
     for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
             if table == "testcases":
@@ -437,6 +455,8 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
                 _insert_defect(conn, doc, rel)
             elif top == "todos":
                 _insert_todo(conn, doc, rel)
+            elif top == "todolists":
+                _insert_todolist(conn, doc, rel)
             elif top == "meetings":
                 _insert_meeting(conn, doc, rel)
             elif top == "decisions":
@@ -456,7 +476,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
 
 
 def _find_id(conn: sqlite3.Connection, entity_id: str) -> str | None:
-    for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
+    for table in ("requirements", "testcases", "defects", "todos", "todolists", "meetings", "decisions", "audits", "agent_events"):
         row = conn.execute(f"SELECT path FROM {table} WHERE id = ?", (entity_id,)).fetchone()
         if row:
             return row["path"]
@@ -653,6 +673,31 @@ def _insert_todo(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             doc.path.stat().st_mtime,
         ),
     )
+
+
+def _insert_todolist(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    """A lista e suas linhas. O vínculo com o afazer vem da LINHA e só dela —
+    guardar dos dois lados abriria a chance de se contradizerem."""
+    meta = doc.meta
+    list_id = str(doc.id)
+    conn.execute(
+        "INSERT OR REPLACE INTO todolists(id, title, status, due, created,"
+        " path, mtime) VALUES (?,?,?,?,?,?,?)",
+        (list_id, meta.get("title"), meta.get("status") or "active",
+         str(meta.get("due") or "") or None, str(meta.get("created") or "") or None,
+         rel, doc.path.stat().st_mtime),
+    )
+    conn.execute("DELETE FROM todolist_items WHERE list_id = ?", (list_id,))
+    for ordem, item in enumerate(meta.get("items") or []):
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO todolist_items(list_id, item_id, ord, text,"
+            " done, todo_id) VALUES (?,?,?,?,?,?)",
+            (list_id, str(item["id"]), ordem, str(item.get("text") or ""),
+             1 if item.get("done") else 0,
+             str(item["todo"]) if item.get("todo") else None),
+        )
 
 
 def _insert_meeting(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:

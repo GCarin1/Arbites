@@ -4,8 +4,18 @@ import { LinksInput, MentionTextarea } from "./Autocomplete";
 import { EmptyState } from "./EmptyState";
 import { ConfirmModal, Modal } from "./Modal";
 import { DocBody } from "./ReadView";
+import { TabBar } from "./TabBar";
+import { TodoLists } from "./TodoLists";
 import { useToast } from "./Toast";
 import type { Todo } from "../types";
+
+/** As duas metades da página (change 0164). Afazer é a nota adesiva; lista é
+ *  o roteiro. São coisas diferentes e por isso são abas, não uma tela só. */
+const ABAS = [
+  ["afazeres", "Afazeres"],
+  ["listas", "Listas de To Do"],
+] as const;
+type Aba = (typeof ABAS)[number][0];
 
 const STATUS_DOT: Record<string, string> = {
   open: "dot-col-pending",
@@ -18,10 +28,15 @@ const STATUSES: Todo["status"][] = ["open", "doing", "blocked", "done"];
 export function Todos({
   onError,
   onNavigate,
+  innerTab,
+  onInnerTabChange,
 }: {
   onError: (message: string) => void;
   onNavigate: (id: string) => void;
+  innerTab?: string;
+  onInnerTabChange?: (v: string) => void;
 }) {
+  const aba: Aba = innerTab === "listas" ? "listas" : "afazeres";
   const [items, setItems] = useState<Todo[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [dueFrom, setDueFrom] = useState("");
@@ -136,7 +151,25 @@ export function Todos({
     onDelete: setConfirmDelete,
     onStatus: quickStatus,
     onNavigate,
+    onOpenList: () => onInnerTabChange?.("listas"),
   };
+
+  if (aba === "listas") {
+    return (
+      <div>
+        <div className="page-head">
+          <h1 className="page-title">Afazeres</h1>
+        </div>
+        <TabBar
+          tabs={ABAS}
+          value={aba}
+          onChange={(k) => onInnerTabChange?.(k === "afazeres" ? "" : k)}
+          label="Afazeres e listas"
+        />
+        <TodoLists onError={onError} onNavigate={onNavigate} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -166,6 +199,13 @@ export function Todos({
           </button>
         </div>
       </div>
+
+      <TabBar
+        tabs={ABAS}
+        value={aba}
+        onChange={(k) => onInnerTabChange?.(k === "afazeres" ? "" : k)}
+        label="Afazeres e listas"
+      />
 
       {selected.size > 0 && (
         <div className="bulk-bar">
@@ -256,6 +296,8 @@ type RowProps = {
   onDelete: (t: Todo) => void;
   onStatus: (t: Todo, s: Todo["status"]) => void;
   onNavigate: (id: string) => void;
+  /** Abre a aba de listas (change 0164). */
+  onOpenList?: (listId: string) => void;
 };
 
 /** Cards estilo bloco de anotações (doc §1.4) — substitui a tabela. */
@@ -305,6 +347,18 @@ function TodoTable({ rows, ...p }: { rows: Todo[] } & RowProps) {
                 </span>
               )}
               {t.squad && <span className="caption muted">{t.squad}</span>}
+              {/* De que linha de lista este afazer participa. O vínculo mora
+                  na linha; aqui ele é consulta, não um segundo dado. */}
+              {t.list_item && (
+                <button
+                  className="todo-lista-ref caption"
+                  title={`${t.list_item.list_title} — ${t.list_item.text}`}
+                  onClick={() => p.onOpenList?.(t.list_item!.list_id)}
+                >
+                  <span className="mono">{t.list_item.list_id}</span>{" "}
+                  {t.list_item.text}
+                </button>
+              )}
             </div>
 
             {t.links.length > 0 && (

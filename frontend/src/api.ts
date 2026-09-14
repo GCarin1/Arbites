@@ -48,6 +48,7 @@ import type {
   SearchResult,
   TestCase,
   Todo,
+  TodoList,
   TraceabilityMatrix,
   TreeNode,
   TrendPoint,
@@ -138,6 +139,38 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- listas de To Do (change 0164) ----------------------------------------
+  todoLists: () => request<TodoList[]>("/todolists"),
+  createTodoList: (title: string, due: string | null) =>
+    request<TodoList>("/todolists", {
+      method: "POST",
+      body: JSON.stringify({ title, due }),
+    }),
+  updateTodoList: (id: string, patch: Record<string, unknown>) =>
+    request<TodoList>(`/todolists/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    }),
+  deleteTodoList: (id: string) =>
+    request<void>(`/todolists/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  addTodoListItem: (id: string, text: string, todo?: string | null) =>
+    request<TodoList>(`/todolists/${encodeURIComponent(id)}/items`, {
+      method: "POST",
+      body: JSON.stringify({ text, todo: todo || null }),
+    }),
+  updateTodoListItem: (
+    id: string, itemId: string, patch: Record<string, unknown>,
+  ) =>
+    request<TodoList>(
+      `/todolists/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`,
+      { method: "PUT", body: JSON.stringify(patch) },
+    ),
+  deleteTodoListItem: (id: string, itemId: string) =>
+    request<TodoList>(
+      `/todolists/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`,
+      { method: "DELETE" },
+    ),
 
   // -- o sino (change 0161) ------------------------------------------------
   notifications: (days = 14) =>

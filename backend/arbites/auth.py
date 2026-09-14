@@ -436,6 +436,25 @@ def is_locked_out(conn: sqlite3.Connection, email: str, ip: str) -> bool:
     return False
 
 
+def clear_attempts(conn: sqlite3.Connection, email: str = "") -> int:
+    """Descarta o histórico de tentativas, destravando o bloqueio.
+
+    Apagar linha aqui é exceção deliberada ao "append-only" do registro de
+    acessos: o registro existe para mostrar ataque, e quem roda isto está com
+    o arquivo do banco na mão — já podia apagar o banco inteiro. O que não
+    pode existir é ficar trancado fora da própria máquina sem saída (change
+    0165).
+    """
+    if email.strip():
+        cursor = conn.execute(
+            "DELETE FROM login_attempts WHERE email = ? COLLATE NOCASE",
+            (email.strip(),))
+    else:
+        cursor = conn.execute("DELETE FROM login_attempts")
+    conn.commit()
+    return cursor.rowcount
+
+
 def list_attempts(
     conn: sqlite3.Connection, limit: int = 100, offset: int = 0
 ) -> list[dict[str, Any]]:

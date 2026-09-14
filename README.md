@@ -43,6 +43,40 @@ npm install
 npm run build                  # gera frontend/dist, servido pelo backend
 ```
 
+### 2.5. O `.env` (fora do Docker também)
+
+O Arbites lê um arquivo `.env` **no diretório de onde você roda o comando**:
+
+```
+ARBITES_ADMIN_EMAIL=voce@exemplo.com
+ARBITES_ADMIN_PASSWORD=uma-senha-longa-de-bootstrap
+ARBITES_SIGNUP=off
+ARBITES_GITHUB_TOKEN=github_pat_...      # opcional (ADR 0017)
+```
+
+Duas coisas que vale saber:
+
+- **A variável de ambiente do processo ganha do arquivo.** Quem exportou na
+  mão quis aquele valor agora; um `.env` esquecido no diretório não vence uma
+  variável exportada.
+- **Sem `ARBITES_ADMIN_EMAIL` e `ARBITES_ADMIN_PASSWORD`, nenhuma conta é
+  criada** — e sem conta ninguém entra. O arranque diz isso em voz alta no
+  log; antes ele falhava calado (change 0165). A senha precisa ter 12
+  caracteres ou mais, e a conta nasce com troca obrigatória no primeiro login.
+
+> Em Docker, quem lê o `.env` é o **Compose** — o arquivo já funcionava lá. O
+> que a change 0165 corrigiu foi o caminho sem container, onde `python -m
+> arbites serve` ignorava o arquivo e a instância subia sem admin.
+
+**Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
+e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
+ou destravar na hora:
+
+```
+python -m arbites unlock                      # todas as contas
+python -m arbites unlock --email voce@exemplo.com
+```
+
 ### 3. Subir a plataforma (um comando sobe tudo)
 
 ```powershell
@@ -429,6 +463,34 @@ isso com o remédio. Tentar salvar o token pela tela responde `409` explicando
 a saída, em vez de falhar depois. O valor nunca volta em resposta nenhuma, e
 nunca toca o disco do workspace.
 
+## Afazeres e listas de To Do
+
+Duas coisas diferentes na mesma página, em abas:
+
+- **Afazer** é a nota adesiva: uma coisa a fazer, com prazo, status e **cor na
+  borda inteira** — trocar o status muda a cor do cartão.
+- **Lista de To Do** é o roteiro: passos que só fazem sentido juntos, com prazo
+  **da lista**.
+
+A linha da lista **não tem prazo próprio**, e é isso que dá sentido ao vínculo:
+quando uma linha precisa de prazo, de status e de aparecer no sino, você a
+vincula a um afazer. **O afazer traz a data; a linha traz o passo.**
+
+O vínculo é **um-para-um** e é gravado só na linha — guardá-lo dos dois lados
+abriria a chance de se contradizerem, e aí alguém teria de decidir qual está
+certo sem ter como. A linha mostra o afazer resolvido (prazo e status, sem
+trocar de tela) e o afazer mostra de que linha participa.
+
+A lista é um arquivo em `workspace/todolists/`, com as linhas no frontmatter —
+editável num editor de texto como todo o resto.
+
+```
+GET/POST  /api/v1/todolists                       # listar e criar
+PUT/DELETE /api/v1/todolists/{id}                 # editar e mover para a lixeira
+POST      /api/v1/todolists/{id}/items            # {"text": "...", "todo": "TD-0007"}
+PUT/DELETE /api/v1/todolists/{id}/items/{item_id}
+```
+
 ## O sino: o que mudou enquanto você não estava olhando
 
 No canto superior direito, ao lado da busca. O número no ícone é quanto há de
@@ -450,6 +512,7 @@ Quatro origens:
 
 | origem | o que traz |
 |---|---|
+| **prazo** | afazer e lista que **vencem hoje** ou já venceram. Vencido é problema; vence hoje é atenção. O vencido volta a não-lido a cada dia: silenciar para sempre algo atrasado é o contrário do que um lembrete faz |
 | **problema** | os avisos do índice e da credencial — a aba **Problemas** vira uma das fontes do sino, e continua existindo: o sino é ambiente, a aba é triagem |
 | **observabilidade** | o que mudou sozinho: quebrou, virou instável, o silêncio da ingestão, sinal que regrediu |
 | **concluído** | ação do **sistema** que deu certo: ingestão trouxe execuções, rodada de auditoria, ciclo fechado. São as que acontecem sem ninguém olhando — por isso "criei um CT agora" não entra |
