@@ -90,6 +90,59 @@ npm --prefix frontend run build            # build + typecheck do frontend
 - Se o workspace for versionado em git, recomenda-se colocar `.arbites/`
   no `.gitignore` do workspace.
 
+## Servidor MCP: o agente alcança o workspace
+
+O Arbites publica um servidor **MCP** local, para um agente (Cursor, Claude
+Desktop, qualquer cliente MCP) consultar o workspace. Ele não é um segundo
+backend: fala HTTP com a instância, autenticado por uma credencial de agente,
+e passa pelo mesmo gate de papel, módulo desligado e log de atividade que o
+navegador.
+
+**1. Gere a credencial** (ela é separada da sessão do navegador — revogar uma
+não derruba a outra, e ela herda o papel da sua conta):
+
+```
+POST /api/v1/profile/agent-tokens   {"name": "cursor"}
+```
+
+O token em claro aparece **uma vez**. Guarde-o.
+
+**2. Aponte o cliente MCP** para o servidor:
+
+```json
+{
+  "mcpServers": {
+    "arbites": {
+      "command": "python",
+      "args": ["-m", "arbites.mcp"],
+      "env": {
+        "ARBITES_URL": "http://192.168.0.17:8347",
+        "ARBITES_TOKEN": "arb_..."
+      }
+    }
+  }
+}
+```
+
+**O que o agente ganha.** Só respostas que ele não calcula sozinho lendo o
+repositório — um espelho da REST não agregaria nada:
+
+| ferramenta | responde |
+|---|---|
+| `coverage_gaps` | o que falta cobrir, por story e **por critério EARS** — a lista, não só a contagem |
+| `impact_of_files` | quais casos um diff afeta: `by_tag` (vínculo, fato) separado de `by_risk` (correlação, palpite) |
+| `pending_rerun` | casos cujos passos mudaram depois do último resultado |
+| `context_pack` | o pacote de contexto de um escopo (exige epic, story ou squad) |
+| `execution_report` | resultado, passos e evidências de um ciclo |
+| `external_links` | o que já está ligado a um sistema externo — a consulta que evita criar duplicata |
+
+Casos também são expostos como recurso (`arbites://testcase/CT-0007`), para
+o agente referenciar sem recolar o corpo na conversa.
+
+Um resultado com a chave `refused` significa que o servidor recusou — em
+geral porque o administrador desligou aquele módulo em Administração →
+Sistema. O motivo vem junto.
+
 ## Rodadas de auditoria: elas se acumulam sozinhas
 
 A aba **Auditoria** dispara uma rodada nova sempre que a última passou de

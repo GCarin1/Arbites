@@ -152,6 +152,14 @@
         ]
       },
       {
+        "id": "mcp-server",
+        "path": ".doctrina/specs/mcp-server/spec.md",
+        "status": "active",
+        "version": "0.1.0",
+        "last_updated": "2026-09-13",
+        "implementation": "planned — leituras na change 0146, escritas na 0147, tela na 0149"
+      },
+      {
         "id": "meetings",
         "path": ".doctrina/specs/meetings/spec.md",
         "status": "deprecated",
@@ -410,14 +418,6 @@
         "id": "0145-identidade-externa-frontmatter-vinculo",
         "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
         "path": ".doctrina/changes/0145-identidade-externa-frontmatter-vinculo",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0146-servidor-mcp-local-expondo",
-        "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
-        "path": ".doctrina/changes/0146-servidor-mcp-local-expondo",
         "status": "proposed",
         "opened": "2026-09-13",
         "lane": "product (uncertain)"
@@ -2361,6 +2361,19 @@
           {
             "capability": "design-system",
             "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0146-servidor-mcp-local-expondo",
+        "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
+        "path": ".doctrina/changes/archive/2026-09-14-0146-servidor-mcp-local-expondo",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "mcp-server",
+            "operation": "ADDED"
           }
         ]
       }

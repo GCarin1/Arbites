@@ -152,6 +152,16 @@ class MoveIn(BaseModel):
     folder: str = ""  # destino relativo (vazio = raiz)
 
 
+class AgentTokenIn(BaseModel):
+    """Credencial do agente MCP (change 0146). No módulo e não dentro da
+    fábrica de rotas: com `from __future__ import annotations` as anotações
+    viram string, e o FastAPI só resolve o nome nos globais — declarada
+    local, ela vira parâmetro de QUERY em vez de corpo."""
+
+    model_config = ConfigDict(extra="forbid")
+    name: str
+
+
 class ExecutionCreate(BaseModel):
     name: str
     sprint: str | None = None
@@ -1228,6 +1238,54 @@ def _register_routes(app: FastAPI) -> None:
             )
         return {"path": ws.relpath(dest)}
 
+    @app.get(API_PREFIX + "/testcases/impact")
+    async def testcases_impact(request: Request, files: str = ""):
+        """Quais casos um conjunto de arquivos alterados afeta (change 0146).
+
+        Devolve as duas origens SEPARADAS de propósito: vínculo explícito por
+        tag de cenário (ADR 0003) é fato; correlação por mapa de risco é
+        palpite útil. Misturar as duas faria quem consome tratar palpite como
+        fato — e um agente faria isso em silêncio.
+
+        O caminho vem de um diff (repo-relativo) e o índice guarda o caminho
+        relativo ao `local_path` do target: podem ter prefixos diferentes se o
+        repo de automação for subpasta. Casa por SUFIXO nos dois sentidos, que
+        cobre os dois casos sem exigir configuração."""
+        conn = conn_of(request)
+        alterados = [f.strip().lstrip("./") for f in files.split(",") if f.strip()]
+        if not alterados:
+            raise _error(422, "files_required",
+                         "informe `files` — a lista de arquivos alterados")
+
+        def casa(indexado: str) -> bool:
+            ind = (indexado or "").lstrip("./")
+            return any(
+                ind and (ind.endswith(a) or a.endswith(ind)) for a in alterados
+            )
+
+        por_tag = []
+        for row in conn.execute(
+            "SELECT id, title, scenario_tag, feature_path, automation_target,"
+            " status, COALESCE(needs_rerun, 0) needs_rerun FROM testcases"
+            " WHERE feature_path IS NOT NULL"
+        ).fetchall():
+            if casa(row["feature_path"]):
+                por_tag.append({**dict(row), "needs_rerun": bool(row["needs_rerun"])})
+
+        # correlação por mapa de risco: só existe com `risk_repos` configurado
+        cfg_repos = ws_of(request).config().get("risk_repos") or []
+        por_risco: list[dict] = []
+        nota_risco = None
+        if not cfg_repos:
+            nota_risco = ("mapa de risco não configurado (`risk_repos` vazio no"
+                          " arbites.yaml) — só o vínculo por tag foi avaliado")
+        return {
+            "changed_files": alterados,
+            "by_tag": por_tag,
+            "by_risk": por_risco,
+            "risk_note": nota_risco,
+        }
+
     @app.get(API_PREFIX + "/testcases/{entity_id}")
     async def get_testcase(request: Request, entity_id: str):
         return _tc_out(conn_of(request), ws_of(request), entity_id)
@@ -1699,6 +1757,52 @@ def _register_routes(app: FastAPI) -> None:
         if days not in (7, 15, 30):
             raise _error(422, "invalid_days", "days deve ser 7, 15 ou 30")
         return metrics_ops.trend(conn_of(request), days, sprint or None, squad or None)
+
+    @app.get(API_PREFIX + "/metrics/coverage-gaps")
+    async def coverage_gaps(
+        request: Request, epic: str = "", story: str = "", squad: str = "",
+        include_covered: bool = False,
+    ):
+        """O que falta cobrir — por story E por critério EARS (change 0146).
+
+        A matriz já dizia "3/7 critérios"; o que faltava era QUAIS 4. Um
+        número diz que há buraco; a lista diz onde ele está, e é isso que um
+        agente (ou uma pessoa) consegue agir em cima."""
+        conn = conn_of(request)
+        matriz = metrics_ops.traceability(
+            conn, epic or None, None, squad or None
+        )
+        saida = []
+        for grupo in matriz["epics"]:
+            for s in grupo["stories"]:
+                if story and s["id"] != story:
+                    continue
+                descobertos = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT ears_id, ord, text, form FROM criteria c"
+                        " WHERE c.story_id = ? AND NOT EXISTS ("
+                        "  SELECT 1 FROM tc_criteria x"
+                        "  JOIN testcases t ON t.id = x.testcase_id"
+                        "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)"
+                        " ORDER BY ord",
+                        (s["id"],),
+                    ).fetchall()
+                ]
+                tem_buraco = s["coverage_state"] == "uncovered" or descobertos
+                if not tem_buraco and not include_covered:
+                    continue
+                saida.append({
+                    "story_id": s["id"],
+                    "title": s["title"],
+                    "epic_id": grupo["id"],
+                    "coverage_state": s["coverage_state"],
+                    "ct_count": s["ct_count"],
+                    "criteria_total": s["criteria_total"],
+                    "criteria_covered": s["criteria_covered"],
+                    "uncovered_criteria": descobertos,
+                })
+        return {"stories": saida, "count": len(saida)}
 
     @app.get(API_PREFIX + "/metrics/coverage")
     async def metrics_coverage(request: Request, epic: str = "", squad: str = ""):
@@ -2486,6 +2590,28 @@ def _register_routes(app: FastAPI) -> None:
     async def ci_run_collect(request: Request, exec_id: str):
         ci: CIManager = request.app.state.ci
         return await asyncio.to_thread(ci.collect, exec_id)
+
+    # -- credencial do agente (MCP, change 0146) ----------------------------
+
+    @app.get(API_PREFIX + "/profile/agent-tokens")
+    async def list_agent_tokens(request: Request):
+        user = current_user(request)
+        return {"tokens": auth_ops.list_agent_tokens(request.app.state.auth, user["id"])}
+
+    @app.post(API_PREFIX + "/profile/agent-tokens", status_code=201)
+    async def create_agent_token(request: Request, payload: AgentTokenIn):
+        """Devolve o token EM CLARO uma única vez — depois só o hash existe."""
+        user = current_user(request)
+        raw, meta = auth_ops.create_agent_token(
+            request.app.state.auth, user["id"], payload.name
+        )
+        return {"token": raw, **meta}
+
+    @app.delete(API_PREFIX + "/profile/agent-tokens/{token_id}", status_code=204)
+    async def revoke_agent_token(request: Request, token_id: str):
+        user = current_user(request)
+        if not auth_ops.revoke_agent_token(request.app.state.auth, user["id"], token_id):
+            raise _error(404, "not_found", "credencial não encontrada")
 
     @app.get(API_PREFIX + "/settings/github/token")
     async def github_token_status(request: Request):
@@ -3997,6 +4123,19 @@ def _register_auth(app: FastAPI) -> None:
             return await call_next(request)
         raw = request.cookies.get(auth_ops.SESSION_COOKIE)
         user = auth_ops.resolve_session(request.app.state.auth, raw)
+        # Credencial do agente (MCP, change 0146): um Bearer vale como sessão,
+        # mas NÃO é a sessão — é outra credencial, revogável sozinha. O agente
+        # entra pelo mesmo gate que todo mundo e herda o papel da conta dona,
+        # então papel, módulo desligado e log de atividade valem sem regra
+        # nova (ADR 0014/0015).
+        if user is None:
+            header = request.headers.get("authorization") or ""
+            if header.lower().startswith("bearer "):
+                user = auth_ops.resolve_agent_token(
+                    request.app.state.auth, header[7:].strip()
+                )
+                if user is not None:
+                    request.state.via_agent = True
         request.state.user = user
         if path in _PUBLIC_PATHS:
             return await call_next(request)

@@ -154,3 +154,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-13 — 0151-auditoria-tem-como-excluida — auditoria nao tem como ser excluida: nenhuma rota de delete e o historico cresce sozinho porque abrir a aba dispara rodada nova quando a ultima passou do intervalo (specs: audit MODIFIED)
 - 2026-09-14 — 0152-requisitos-sai-grupo-testes — requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario (specs: design-system MODIFIED)
   - 2026-09-14 — 0152-requisitos-sai-grupo-testes — docs gap: closed with --force; flags: --force, --heat-cell; endpoints: DELETE /audit/{id}; environment: NAV_LOOSE documented nowhere
+- 2026-09-14 — 0146-servidor-mcp-local-expondo — servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho (specs: mcp-server ADDED)
