@@ -422,6 +422,14 @@
         "date": "2026-09-13",
         "supersedes": "0007 (parcialmente), 0012 (parcialmente)",
         "summary": "Integracao externa volta ao escopo, com quatro regras."
+      },
+      {
+        "id": "0016",
+        "path": ".doctrina/decisions/0016-observabilidade-e-sinal-no-tempo-com-descida-ate-o-artefato-ingerido-por-pull.md",
+        "title": "Observabilidade e sinal no tempo com descida ate o artefato, ingerido por pull",
+        "status": "accepted",
+        "date": "2026-09-14",
+        "summary": "Observabilidade e sinal no tempo com descida ate o artefato."
       }
     ],
     "changes": [
@@ -448,6 +456,46 @@
         "status": "proposed",
         "opened": "2026-09-13",
         "lane": "product (uncertain)"
+      },
+      {
+        "id": "0153-ingestao-runs-github-actions",
+        "title": "ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada",
+        "path": ".doctrina/changes/0153-ingestao-runs-github-actions",
+        "status": "proposed",
+        "opened": "2026-09-14",
+        "lane": "runtime (confident; signals: github actions) — opened anyway (--force)"
+      },
+      {
+        "id": "0154-modelo-sinal-generico-manifesto",
+        "title": "modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo",
+        "path": ".doctrina/changes/0154-modelo-sinal-generico-manifesto",
+        "status": "proposed",
+        "opened": "2026-09-14",
+        "lane": "product (uncertain; signals: declarar)"
+      },
+      {
+        "id": "0155-aba-observabilidade-eixo-temporal",
+        "title": "aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor",
+        "path": ".doctrina/changes/0155-aba-observabilidade-eixo-temporal",
+        "status": "proposed",
+        "opened": "2026-09-14",
+        "lane": "product (uncertain)"
+      },
+      {
+        "id": "0156-retencao-artefato-sinal-print",
+        "title": "retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar",
+        "path": ".doctrina/changes/0156-retencao-artefato-sinal-print",
+        "status": "proposed",
+        "opened": "2026-09-14",
+        "lane": "runtime (confident; signals: log) — opened anyway (--force)"
+      },
+      {
+        "id": "0157-credencial-github-expira-revogada",
+        "title": "credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio",
+        "path": ".doctrina/changes/0157-credencial-github-expira-revogada",
+        "status": "proposed",
+        "opened": "2026-09-14",
+        "lane": "runtime (confident; signals: em silencio) — opened anyway (--force)"
       }
     ],
     "changes_archive": [
@@ -2373,19 +2421,6 @@
         ]
       },
       {
-        "id": "0152-requisitos-sai-grupo-testes",
-        "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
-        "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
-        "status": "applied",
-        "applied": "2026-09-14",
-        "specs_affected": [
-          {
-            "capability": "design-system",
-            "operation": "MODIFIED"
-          }
-        ]
-      },
-      {
         "id": "0149-pagina-mcp-aba-ia",
         "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
         "path": ".doctrina/changes/archive/2026-09-14-0149-pagina-mcp-aba-ia",
@@ -2394,6 +2429,19 @@
         "specs_affected": [
           {
             "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0152-requisitos-sai-grupo-testes",
+        "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
+        "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]
