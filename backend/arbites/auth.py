@@ -648,6 +648,11 @@ MODULES: dict[str, dict[str, Any]] = {
         "tab": "daily",
         "paths": ("/daily", "/dailies"),
     },
+    "mod_observability": {
+        "label": "Observabilidade",
+        "tab": "observability",
+        "paths": ("/ci",),
+    },
     "mod_meetings": {
         "label": "Reuniões",
         "tab": "meetings",

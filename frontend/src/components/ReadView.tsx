@@ -65,32 +65,53 @@ export function ReadField({
  * cabeçalhos `#…`, linhas e parágrafos em branco. Suficiente para o modo
  * leitura de corpos de CT/requisito (Objetivo / Passos / Resultado esperado).
  */
-const MENTION_RE = /@([A-Z]{1,6}-\d+)/g;
 
-/** Renderiza uma linha, transformando menções `@ID` em links clicáveis. */
-function renderLine(line: string, onMention: (id: string) => void): ReactNode {
-  const parts: ReactNode[] = [];
-  let last = 0;
-  let key = 0;
-  for (const m of line.matchAll(MENTION_RE)) {
-    const start = m.index ?? 0;
-    if (start > last) parts.push(line.slice(last, start));
-    const id = m[1];
-    parts.push(
-      <button
-        key={`m${key++}`}
-        type="button"
-        className="mention-link"
-        onClick={() => onMention(id)}
-        title={`Ir para ${id}`}
-      >
-        @{id}
-      </button>,
-    );
-    last = start + m[0].length;
+/**
+ * Tokenizador inline: `**negrito**`, `` `código` `` e menções `@ID`.
+ *
+ * Antes daqui só as menções eram reconhecidas, e um corpo vindo de fora —
+ * a análise que a automação escreve em Markdown (change 0155) — chegava com
+ * os asteriscos na cara do leitor. Marcação crua na tela não é "quase certo":
+ * é a ferramenta dizendo que não leu o que recebeu.
+ */
+const INLINE_RE = /(\*\*[^*]+\*\*|`[^`]+`|@[A-Z]{1,6}-\d+)/g;
+
+function renderLine(line: string, onMention?: (id: string) => void): ReactNode {
+  const partes: ReactNode[] = [];
+  let chave = 0;
+  for (const pedaco of line.split(INLINE_RE)) {
+    if (!pedaco) continue;
+    if (pedaco.startsWith("**") && pedaco.endsWith("**") && pedaco.length > 4) {
+      partes.push(<strong key={`n${chave++}`}>{pedaco.slice(2, -2)}</strong>);
+      continue;
+    }
+    if (pedaco.startsWith("`") && pedaco.endsWith("`") && pedaco.length > 2) {
+      partes.push(
+        <code key={`c${chave++}`} className="mono">
+          {pedaco.slice(1, -1)}
+        </code>,
+      );
+      continue;
+    }
+    const mencao = /^@([A-Z]{1,6}-\d+)$/.exec(pedaco);
+    if (mencao && onMention) {
+      const id = mencao[1];
+      partes.push(
+        <button
+          key={`m${chave++}`}
+          type="button"
+          className="mention-link"
+          onClick={() => onMention(id)}
+          title={`Ir para ${id}`}
+        >
+          @{id}
+        </button>,
+      );
+      continue;
+    }
+    partes.push(pedaco);
   }
-  if (last < line.length) parts.push(line.slice(last));
-  return parts.length ? parts : line;
+  return partes.length ? partes : line;
 }
 
 export function DocBody({
@@ -119,9 +140,17 @@ export function DocBody({
         if (line.trim() === "") {
           return <div key={i} className="doc-gap" />;
         }
+        const item = /^\s*[-*]\s+(.*)$/.exec(line);
+        if (item) {
+          return (
+            <p key={i} className="doc-line doc-item">
+              {renderLine(item[1], onMention)}
+            </p>
+          );
+        }
         return (
           <p key={i} className="doc-line">
-            {onMention ? renderLine(line, onMention) : line}
+            {renderLine(line, onMention)}
           </p>
         );
       })}

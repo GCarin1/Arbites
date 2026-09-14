@@ -78,7 +78,11 @@ class FakeGitHub:
     def dispatch_workflow(self, *a, **k): raise AssertionError("não deve disparar")
     def list_recent_dispatch_runs(self, *a, **k): return []
     def get_run(self, repo, run_id): return {}
-    def get_jobs(self, repo, run_id): return []
+    def get_jobs(self, repo, run_id):
+        return [{"name": "testes-e2e", "conclusion": "success",
+                 "started_at": "2026-09-10T03:00:00Z",
+                 "completed_at": "2026-09-10T03:12:00Z",
+                 "html_url": f"https://gh/run/{run_id}/job/1"}]
 
 
 class FakeTokenStore(TokenStore):

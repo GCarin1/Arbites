@@ -222,6 +222,13 @@ observability:
       workflow: qa-nightly.yml   # opcional; sem isso, todos os workflows
       artifact: observabilidade  # opcional; sem isso, todos os artifacts
   max_runs_per_poll: 50
+  # Meta e direção são SUAS, não do Arbites: ele não tem como saber que
+  # `lcp_ms` maior é pior nem qual número é aceitável neste produto. Sem
+  # declarar, a tela diz que o sinal "subiu" — nunca que "piorou".
+  goals:
+    lcp_ms: { direction: lower, goal: 2500 }
+    violacoes_axe: { direction: lower, goal: 0 }
+    success_rate: { goal: 95 }
 ```
 
 Depois:
@@ -238,6 +245,27 @@ com os sinais no frontmatter e os anexos ao lado, hasheados. O índice SQLite
 é descartável (ADR 0001): apagá-lo e reconstruir devolve meses de série.
 Ingerir duas vezes o mesmo run não duplica — a marca d'água é o disco, não um
 contador guardado à parte.
+
+### A aba Observabilidade
+
+Fica ao lado do Dashboard, e não dentro dele: a diferença não é o nome, é o
+**eixo**. O Dashboard responde *"como está agora"* — retrato, para quem
+pergunta o estado. A Observabilidade responde *"o que mudou, quando e por
+quê"*, e por isso toda resposta vem com o período anterior ao lado.
+
+Quatro blocos, cada um nomeando a pergunta que responde:
+
+- **O que mudou** — o que se moveu sozinho: quebra depois de uma sequência
+  verde, sinal que regrediu, e o silêncio da ingestão (período sem run **é
+  dito**, porque num gráfico ausência de dado se parece com boa notícia).
+- **Saúde** — execuções e taxa de sucesso, sempre contra o período anterior e
+  contra a meta declarada.
+- **Sinais no tempo** — uma série por medida. **Cada ponto é clicável**: leva
+  à execução que o produziu.
+- **Execuções recentes** — por onde se começa a olhar.
+
+Clicar num ponto abre a descida no lugar, sem trocar de aba: execução → jobs →
+medidas → anexos (print, log) → a análise em Markdown renderizada.
 
 ### O manifesto: seu pipeline declara o que produziu
 

@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-09-13
-**Version:** 0.15.0
+**Version:** 0.16.0
 
 ## Purpose
 
@@ -98,6 +98,8 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall abrir o dashboard por uma linha de indicadores — cobertura de requisito, cobertura de execução, pass rate, taxa de bloqueio, retrabalho e health score —, todos derivados dos números que o produto já apura, sem métrica nova.
 - The system shall apresentar, logo abaixo dos indicadores, um bloco "O que precisa de atenção" em prosa, com a síntese, os riscos e as ações recomendadas do período filtrado.
 - The system shall garantir um tamanho minimo de celula na grade de atividade e rolar a grade horizontalmente dentro do card quando o periodo inteiro nao couber, mantendo a coluna de dias da semana parada e alinhada com as linhas da grade.
+- The system shall oferecer uma area de observabilidade separada do painel de indicadores, com o tempo como eixo primario, comparacao com o periodo anterior e descida do agregado ate a execucao, o job e o anexo.
+- The system shall declarar em cada bloco da area de observabilidade a pergunta que ele responde, e nao exibir bloco que nao responda a uma pergunta acionavel.
 
 ### Event-driven
 
@@ -216,6 +218,7 @@ export PDF e Markdown (para colar no Confluence).
 16. [verified] O contexto do bloco de atenção traz os indicadores do período filtrado e as ações recomendadas, e nenhum deles depende de provider de IA configurado — verified by `backend/tests/test_dashboard_attention.py`.
 17. [verified] Com a IA desligada o dashboard responde inteiro e o bloco de atenção é preenchido pelos achados determinísticos; com provider, o resumo narrado é gerado a partir dos mesmos números — verified by `backend/tests/test_dashboard_attention.py`.
 18. [unverified] Em 390 px a celula da grade de atividade mede ao menos 10 px de lado, a grade rola dentro do card e a coluna de dias tem a mesma altura da grade; em 1440 px a celula volta a crescer para preencher o card, sem rolagem — verified by `frontend/src/styles.css` + `frontend/src/components/ActivityHeatmap.tsx`.
+19. [unverified] De um ponto da serie temporal chega-se a execucao, ao job e ao anexo sem sair da aba; periodo sem dado mostra estado vazio util; em 390 px a pagina nao rola de lado — verified by `backend/tests/test_observability.py`.
 
 ## Maturity
 

@@ -204,7 +204,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.15.0",
+        "version": "0.16.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -455,14 +455,6 @@
         "path": ".doctrina/changes/0150-conector-deterministico-volume-recorrencia",
         "status": "proposed",
         "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0155-aba-observabilidade-eixo-temporal",
-        "title": "aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor",
-        "path": ".doctrina/changes/0155-aba-observabilidade-eixo-temporal",
-        "status": "proposed",
-        "opened": "2026-09-14",
         "lane": "product (uncertain)"
       },
       {
@@ -2452,6 +2444,19 @@
         "specs_affected": [
           {
             "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0155-aba-observabilidade-eixo-temporal",
+        "title": "aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor",
+        "path": ".doctrina/changes/archive/2026-09-14-0155-aba-observabilidade-eixo-temporal",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]

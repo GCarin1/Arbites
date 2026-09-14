@@ -159,3 +159,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0149-pagina-mcp-aba-ia — pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos (specs: ai-assist MODIFIED)
 - 2026-09-14 — 0153-ingestao-runs-github-actions — ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada (specs: local-automation MODIFIED)
 - 2026-09-14 — 0154-modelo-sinal-generico-manifesto — modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo (specs: local-automation MODIFIED)
+  - 2026-09-14 — 0155-aba-observabilidade-eixo-temporal — forced archive past 1 blocker (verification: 1 unchecked task in tasks.md (closing steps count))
+- 2026-09-14 — 0155-aba-observabilidade-eixo-temporal — aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor (specs: reporting MODIFIED)

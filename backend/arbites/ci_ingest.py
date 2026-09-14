@@ -34,7 +34,7 @@ import io
 import json
 import re
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -214,6 +214,7 @@ def escrever_run(
         "ingested_at": run["ingested_at"],
         "signals": sinais,
         "attachments": anexos,
+        "jobs": run.get("jobs") or [],
     }
     if aviso:
         meta["ingest_warning"] = aviso
@@ -410,9 +411,31 @@ class CIIngestor:
             "url": bruto.get("html_url"),
             "ingested_at": datetime.now(timezone.utc).isoformat(),
         }
+        # jobs: é o degrau do meio da descida (gráfico → run → job → anexo).
+        # Sem ele "o pico foi em quê?" morre em "foi neste run", que é onde
+        # um mural de gráficos costuma parar.
+        run["jobs"] = self._jobs(fonte, bruto.get("id"))
         arquivos = self._baixar_artifacts(fonte, bruto.get("id"))
         manifesto, aviso = ler_manifesto(arquivos)
         return escrever_run(self.ws.root, run, manifesto, arquivos, aviso)
+
+    def _jobs(self, fonte: dict, run_id: Any) -> list[dict[str, Any]]:
+        from .ci import CIError
+
+        try:
+            bruto = self.client.get_jobs(fonte["repo"], run_id)
+        except CIError:
+            return []  # job é detalhe; sem ele o run ainda vale
+        return [
+            {
+                "name": j.get("name"),
+                "conclusion": j.get("conclusion"),
+                "started_at": _iso(j.get("started_at")),
+                "finished_at": _iso(j.get("completed_at")),
+                "url": j.get("html_url"),
+            }
+            for j in bruto or []
+        ]
 
     def _baixar_artifacts(self, fonte: dict, run_id: Any) -> dict[str, bytes]:
         desejado = fonte.get("artifact")
@@ -428,6 +451,15 @@ class CIIngestor:
 
 
 # -- consulta ----------------------------------------------------------------
+
+
+def _jobs_de(conn, run_id: str) -> list[dict]:
+    return [
+        dict(j) for j in conn.execute(
+            "SELECT name, conclusion, started_at, finished_at, url FROM ci_jobs"
+            " WHERE run_id = ? ORDER BY ord", (run_id,),
+        )
+    ]
 
 
 def listar_runs(conn, limite: int = 50, workflow: str | None = None) -> list[dict]:
@@ -453,8 +485,35 @@ def listar_runs(conn, limite: int = 50, workflow: str | None = None) -> list[dic
                 " WHERE run_id = ? ORDER BY kind, path", (row["id"],),
             )
         ]
+        item["jobs"] = _jobs_de(conn, row["id"])
         saida.append(item)
     return saida
+
+
+def run_detalhado(ws, conn, run_id: str) -> dict[str, Any]:
+    """Um run com o CORPO: a análise que o pipeline escreveu, renderizada na
+    tela ao lado dos sinais em vez de reescrita aqui."""
+    row = conn.execute("SELECT * FROM ci_runs WHERE id = ?", (run_id,)).fetchone()
+    if not row:
+        raise IngestError("not_found", f"run {run_id} não ingerido")
+    item = dict(row)
+    item["signals"] = [
+        dict(s) for s in conn.execute(
+            "SELECT kind, name, value, unit, at FROM ci_signals"
+            " WHERE run_id = ? ORDER BY name", (run_id,))
+    ]
+    item["attachments"] = [
+        dict(a) for a in conn.execute(
+            "SELECT kind, path, title, sha256, bytes FROM ci_attachments"
+            " WHERE run_id = ? ORDER BY kind, path", (run_id,))
+    ]
+    item["jobs"] = _jobs_de(conn, run_id)
+    caminho = ws.root / row["path"]
+    item["analysis"] = (
+        frontmatter.loads(caminho.read_text(encoding="utf-8")).content
+        if caminho.exists() else ""
+    )
+    return item
 
 
 def serie(conn, name: str, since: str | None = None,
@@ -486,3 +545,213 @@ def nomes_de_sinal(conn) -> list[dict[str, Any]]:
             " FROM ci_signals GROUP BY name, kind, unit ORDER BY name"
         )
     ]
+
+
+# -- o painel de observabilidade (change 0155) -------------------------------
+#
+# A diferença para o Dashboard não é o nome, é o EIXO. O Dashboard responde
+# "como está agora" — retrato. Aqui a pergunta é "o que mudou, quando e por
+# quê", e por isso toda resposta vem com o período anterior ao lado: um número
+# sozinho não diz se está melhorando.
+
+
+def _dias_atras(dias: int) -> tuple[str, str, str]:
+    fim = datetime.now(timezone.utc)
+    inicio = fim - timedelta(days=dias)
+    anterior = inicio - timedelta(days=dias)
+    return anterior.isoformat(), inicio.isoformat(), fim.isoformat()
+
+
+def _metas(ws) -> dict[str, dict[str, Any]]:
+    """Meta e direção são CONFIGURAÇÃO de quem instala, não semântica no
+    código: o Arbites não tem como saber que `lcp_ms` maior é pior, nem qual
+    número é aceitável neste produto."""
+    bruto = (ws.config().get("observability") or {}).get("goals") or {}
+    saida = {}
+    for nome, spec in bruto.items():
+        if not isinstance(spec, dict):
+            continue
+        saida[str(nome)] = {
+            "direction": spec.get("direction"),  # "lower" | "higher"
+            "goal": spec.get("goal"),
+        }
+    return saida
+
+
+def _media(valores: list[float]) -> float | None:
+    return round(sum(valores) / len(valores), 3) if valores else None
+
+
+def _variacao(atual: float | None, antes: float | None) -> float | None:
+    if atual is None or antes in (None, 0):
+        return None
+    return round((atual - antes) / abs(antes) * 100, 1)
+
+
+def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
+    inicio_anterior, inicio, fim = _dias_atras(dias)
+    metas = _metas(ws)
+
+    def runs_entre(a: str, b: str) -> list[dict]:
+        return [
+            dict(r) for r in conn.execute(
+                "SELECT id, workflow, conclusion, started_at, url, ingest_warning"
+                " FROM ci_runs WHERE COALESCE(started_at, ingested_at) >= ?"
+                " AND COALESCE(started_at, ingested_at) < ? ORDER BY"
+                " COALESCE(started_at, ingested_at)", (a, b),
+            )
+        ]
+
+    atuais, anteriores = runs_entre(inicio, fim), runs_entre(inicio_anterior, inicio)
+
+    def taxa(runs: list[dict]) -> float | None:
+        if not runs:
+            return None
+        ok = sum(1 for r in runs if r["conclusion"] == "success")
+        return round(ok / len(runs) * 100, 1)
+
+    ultimo = conn.execute(
+        "SELECT COALESCE(started_at, ingested_at) AS at FROM ci_runs"
+        " ORDER BY 1 DESC LIMIT 1"
+    ).fetchone()
+    silencio = None
+    if ultimo and ultimo["at"]:
+        try:
+            silencio = (datetime.now(timezone.utc) - datetime.fromisoformat(
+                ultimo["at"])).days
+        except ValueError:
+            silencio = None
+
+    saude = {
+        "runs": len(atuais), "runs_previous": len(anteriores),
+        "success_rate": taxa(atuais), "success_rate_previous": taxa(anteriores),
+        "last_run_at": ultimo["at"] if ultimo else None,
+        "days_since_last_run": silencio,
+        # "87% contra a meta de 95%" — declarado, não inferido
+        "goal": (metas.get("success_rate") or {}).get("goal"),
+    }
+
+    # -- sinais: a série e o que ela fez em relação ao período anterior -----
+    sinais = []
+    for linha in conn.execute(
+        "SELECT name, kind, unit FROM ci_signals GROUP BY name, kind, unit"
+        " ORDER BY name"
+    ):
+        nome = linha["name"]
+        pontos = [
+            dict(p) for p in conn.execute(
+                "SELECT s.at, s.value, s.run_id, r.conclusion, r.url"
+                " FROM ci_signals s LEFT JOIN ci_runs r ON r.id = s.run_id"
+                " WHERE s.name = ? AND s.at >= ? AND s.at < ? ORDER BY s.at",
+                (nome, inicio, fim),
+            )
+        ]
+        antes = [
+            r["value"] for r in conn.execute(
+                "SELECT value FROM ci_signals WHERE name = ? AND at >= ? AND at < ?",
+                (nome, inicio_anterior, inicio),
+            )
+        ]
+        media_atual = _media([p["value"] for p in pontos])
+        media_antes = _media(antes)
+        meta = metas.get(nome) or {}
+        sinais.append({
+            "name": nome, "kind": linha["kind"], "unit": linha["unit"],
+            "points": pontos,
+            "current": pontos[-1]["value"] if pontos else None,
+            "average": media_atual, "previous_average": media_antes,
+            "delta_pct": _variacao(media_atual, media_antes),
+            "direction": meta.get("direction"), "goal": meta.get("goal"),
+        })
+
+    return {
+        "period": {"since": inicio, "until": fim, "days": dias},
+        "previous": {"since": inicio_anterior, "until": inicio},
+        "health": saude,
+        "signals": sinais,
+        "changes": _o_que_mudou(atuais, anteriores, sinais, saude),
+        "runs": listar_runs(conn, 30),
+    }
+
+
+def _o_que_mudou(atuais: list[dict], anteriores: list[dict],
+                 sinais: list[dict], saude: dict) -> list[dict[str, Any]]:
+    """O bloco que justifica a aba existir: o que mudou SOZINHO.
+
+    Um mural de gráficos obriga a pessoa a caçar a diferença olhando. Aqui a
+    diferença é calculada e dita em uma frase — e cada item aponta o run, para
+    a descida continuar de onde a frase parou.
+    """
+    def plural(n: int, singular: str, plural_: str) -> str:
+        return f"{n} {singular if n == 1 else plural_}"
+
+    mudancas: list[dict[str, Any]] = []
+
+    # 1. a ingestão emudeceu: período sem run não é "semana tranquila"
+    if saude["days_since_last_run"] is not None and saude["days_since_last_run"] >= 3:
+        mudancas.append({
+            "kind": "silence",
+            "text": f"nenhum run há {plural(saude['days_since_last_run'], 'dia', 'dias')} —"
+                    " verifique o agendamento e a credencial antes de ler isto"
+                    " como semana tranquila",
+        })
+
+    # 2. o run mais recente quebrou depois de uma sequência verde
+    if atuais and atuais[-1]["conclusion"] not in ("success", None):
+        verdes = 0
+        for run in reversed(atuais[:-1]):
+            if run["conclusion"] == "success":
+                verdes += 1
+            else:
+                break
+        if verdes:
+            mudancas.append({
+                "kind": "broke",
+                "run_id": atuais[-1]["id"],
+                "text": f"{atuais[-1]['workflow']} quebrou depois de"
+                        f" {plural(verdes, 'execução verde', 'execuções verdes')}"
+                        " seguidas",
+            })
+
+    # 3. sinal que se moveu mais de 10% contra o período anterior
+    for sinal in sinais:
+        variacao = sinal["delta_pct"]
+        if variacao is None or abs(variacao) < 10:
+            continue
+        direcao = sinal["direction"]
+        if direcao == "lower":
+            palavra = "piorou" if variacao > 0 else "melhorou"
+        elif direcao == "higher":
+            palavra = "melhorou" if variacao > 0 else "piorou"
+        else:
+            # sem direção declarada o Arbites NÃO julga: diz que mudou
+            palavra = "subiu" if variacao > 0 else "caiu"
+        unidade = f" {sinal['unit']}" if sinal["unit"] else ""
+        mudancas.append({
+            "kind": "signal",
+            "signal": sinal["name"],
+            "text": f"{sinal['name']} {palavra} {abs(variacao)}%"
+                    f" ({sinal['previous_average']}{unidade} →"
+                    f" {sinal['average']}{unidade}) contra o período anterior",
+            "goal_miss": (
+                sinal["goal"] is not None and sinal["average"] is not None
+                and ((direcao == "lower" and sinal["average"] > sinal["goal"])
+                     or (direcao == "higher" and sinal["average"] < sinal["goal"]))
+            ),
+        })
+
+    # 4. run ingerido sem manifesto: o dado existe mas veio por convenção
+    sem_manifesto = [r for r in atuais if r.get("ingest_warning")]
+    if sem_manifesto:
+        mudancas.append({
+            "kind": "convention",
+            "run_id": sem_manifesto[-1]["id"],
+            "text": (
+                f"{len(sem_manifesto)} "
+                + ("execução do período chegou" if len(sem_manifesto) == 1
+                   else "execuções do período chegaram")
+                + f" sem {MANIFESTO} — os anexos vieram por convenção de nome"
+                  " e nenhum sinal foi extraído"
+            ),
+        })
+    return mudancas

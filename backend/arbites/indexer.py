@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS ci_runs(
   ingest_warning TEXT, path TEXT, mtime REAL);
 CREATE TABLE IF NOT EXISTS ci_signals(
   run_id TEXT, kind TEXT, name TEXT, value REAL, unit TEXT, at TEXT);
+CREATE TABLE IF NOT EXISTS ci_jobs(
+  run_id TEXT, name TEXT, conclusion TEXT, started_at TEXT,
+  finished_at TEXT, url TEXT, ord INTEGER);
 CREATE TABLE IF NOT EXISTS ci_attachments(
   run_id TEXT, kind TEXT, path TEXT, title TEXT, sha256 TEXT, bytes INTEGER);
 CREATE TABLE IF NOT EXISTS warnings(
@@ -179,6 +182,7 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM agent_events")
     conn.execute("DELETE FROM ci_runs")
     conn.execute("DELETE FROM ci_signals")
+    conn.execute("DELETE FROM ci_jobs")
     conn.execute("DELETE FROM ci_attachments")
     conn.execute("DELETE FROM warnings")
 
@@ -392,6 +396,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
     conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
     for row in conn.execute("SELECT id FROM ci_runs WHERE path = ?", (rel,)):
         conn.execute("DELETE FROM ci_signals WHERE run_id = ?", (row["id"],))
+        conn.execute("DELETE FROM ci_jobs WHERE run_id = ?", (row["id"],))
         conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (row["id"],))
     conn.execute("DELETE FROM ci_runs WHERE path = ?", (rel,))
     for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
@@ -735,6 +740,16 @@ def _insert_ci_run(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             " VALUES (?,?,?,?,?,?)",
             (run_id, sinal.get("kind") or "custom", str(sinal["name"]), valor,
              sinal.get("unit"), sinal.get("at") or meta.get("started_at")),
+        )
+    conn.execute("DELETE FROM ci_jobs WHERE run_id = ?", (run_id,))
+    for ordem, job in enumerate(meta.get("jobs") or []):
+        if not isinstance(job, dict) or not job.get("name"):
+            continue
+        conn.execute(
+            "INSERT INTO ci_jobs(run_id, name, conclusion, started_at,"
+            " finished_at, url, ord) VALUES (?,?,?,?,?,?,?)",
+            (run_id, job["name"], job.get("conclusion"), job.get("started_at"),
+             job.get("finished_at"), job.get("url"), ordem),
         )
     conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (run_id,))
     for anexo in meta.get("attachments") or []:

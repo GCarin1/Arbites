@@ -3966,3 +3966,158 @@ button.link-chip-btn:disabled {
     min-height: 44px;
   }
 }
+
+/* -- Observabilidade (change 0155, ADR 0016) -------------------------------
+ *
+ * O eixo desta tela é o TEMPO, e é por isso que quase tudo aqui é largura
+ * elástica com altura fixa: a série precisa caber em 390 px sem virar um
+ * borrão, e o gráfico rola DENTRO do bloco em vez de empurrar a página de
+ * lado. Página que rola na horizontal esconde coluna — e coluna escondida
+ * num painel é dado que ninguém vê.
+ */
+.obs { display: flex; flex-direction: column; gap: 1rem; }
+.obs-topo {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+}
+.obs-topo h2 { margin: 0 0 0.2rem; }
+.obs-topo p { margin: 0; max-width: 62ch; }
+.obs-controles { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* A pergunta que o bloco responde, no próprio bloco: sem ela um painel vira
+ * mural de gráficos que ninguém sabe ler. */
+.obs-pergunta {
+  margin: -0.2rem 0 0.75rem; color: var(--text-muted);
+  font-size: 0.82rem; max-width: 70ch;
+}
+
+.obs-saude { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, 1fr); }
+.obs-cartao { display: flex; flex-direction: column; gap: 0.15rem; }
+.obs-rotulo {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.obs-numero { font-size: 1.6rem; line-height: 1.1; }
+.obs-cartao .muted { font-size: 0.78rem; }
+
+.obs-lista-mudancas { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: 0.5rem; }
+.obs-mudanca {
+  display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+  padding-left: 0.7rem; border-left: 3px solid var(--border);
+}
+.obs-mudanca-broke { border-left-color: var(--danger); }
+.obs-mudanca-silence { border-left-color: var(--warning); }
+.obs-mudanca-convention { border-left-color: var(--warning); }
+.obs-mudanca-signal { border-left-color: var(--accent, #58a6ff); }
+
+.obs-grade-sinais {
+  display: grid; gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.obs-sinal {
+  border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem;
+  display: flex; flex-direction: column; gap: 0.35rem; min-width: 0;
+}
+.obs-sinal header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.obs-sinal-nome { display: flex; flex-direction: column; min-width: 0; }
+.obs-sinal-nome > :first-child { overflow: hidden; text-overflow: ellipsis; }
+.obs-sinal-kind { font-size: 0.7rem; color: var(--text-muted); }
+.obs-delta { font-size: 0.78rem; }
+.obs-delta-pior { color: var(--danger); }
+.obs-delta-melhor { color: var(--success); }
+.obs-delta-neutro { color: var(--text-muted); }
+.obs-delta-base { color: var(--text-muted); }
+.obs-meta { margin: 0; font-size: 0.72rem; color: var(--text-muted); }
+.obs-sem-ponto { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
+
+.obs-serie { position: relative; height: 48px; }
+.obs-serie svg { width: 100%; height: 100%; display: block; }
+.obs-linha { fill: none; stroke: var(--accent, #58a6ff); stroke-width: 1.5;
+  vector-effect: non-scaling-stroke; }
+.obs-meta-linha { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke; opacity: 0.6; }
+.obs-pontos { position: absolute; inset: 0; }
+/* O ponto é BOTÃO, não enfeite: é ele que começa a descida até o print. */
+.obs-ponto {
+  position: absolute; width: 16px; height: 16px; padding: 0; margin: -8px 0 0 -8px;
+  border-radius: 50%; border: 2px solid var(--surface);
+  background: var(--accent, #58a6ff); cursor: pointer; min-width: 0;
+}
+.obs-ponto-falha { background: var(--danger); }
+.obs-ponto-ativo { outline: 2px solid var(--text); outline-offset: 1px; }
+
+.obs-descida-topo {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+}
+.obs-descida-topo h3 { margin: 0 0 0.2rem; }
+.obs-descida-topo p { margin: 0; font-size: 0.8rem; }
+.obs-descida-acoes { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.obs-bloco { margin-top: 0.9rem; }
+.obs-bloco h4 { margin: 0 0 0.4rem; font-size: 0.85rem; }
+.obs-aviso {
+  margin: 0.6rem 0 0; padding: 0.5rem 0.7rem; border-radius: 6px;
+  font-size: 0.82rem; color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.obs-jobs, .obs-medidas { list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
+.obs-medidas li { display: flex; justify-content: space-between; gap: 1rem; }
+.obs-medida-nome { color: var(--text-muted); }
+.obs-bolinha { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 0.45rem; background: var(--text-muted); }
+.obs-bolinha.ok { background: var(--success); }
+.obs-bolinha.falha { background: var(--danger); }
+
+.obs-anexos { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.obs-anexo {
+  display: flex; flex-direction: column; gap: 0.25rem; width: 140px;
+  text-decoration: none; color: inherit; font-size: 0.75rem;
+}
+.obs-anexo img {
+  width: 140px; height: 88px; object-fit: cover; border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.obs-anexo-arquivo {
+  display: flex; align-items: center; justify-content: center;
+  width: 140px; height: 88px; border-radius: 6px; border: 1px dashed var(--border);
+  color: var(--text-muted);
+}
+.obs-anexo-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.obs-analise { font-size: 0.88rem; }
+
+.obs-badge-ok {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+.obs-badge-falha {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.obs-runs tbody tr { cursor: pointer; }
+.obs-linha-ativa { background: color-mix(in srgb, var(--accent, #58a6ff) 10%, transparent); }
+
+@media (max-width: 860px) {
+  /* Três cartões lado a lado viram três colunas de 90 px em 390 px, e o
+     número de 1.6rem quebra no meio. Uma coluna é mais honesto. */
+  .obs-saude { grid-template-columns: 1fr; }
+  .obs-grade-sinais { grid-template-columns: 1fr; }
+  .obs-topo { flex-direction: column; align-items: stretch; }
+  .obs-controles { justify-content: flex-start; }
+  .obs-anexo, .obs-anexo img, .obs-anexo-arquivo { width: 100%; }
+}
+
+/* Item de lista no corpo do documento: o traço vira marcador de verdade em
+ * vez de ficar como caractere solto no começo da linha. */
+.doc-item { padding-left: 1.1rem; position: relative; }
+.doc-item::before {
+  content: "•"; position: absolute; left: 0.3rem; color: var(--text-muted);
+}
+
+/* A tabela ocupa a largura do bloco: deixada no tamanho do conteúdo, os
+ * cabeçalhos "Resultado / Sinais / Anexos" encostam um no outro. */
+.obs-runs .table { width: 100%; }

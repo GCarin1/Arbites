@@ -40,6 +40,9 @@ const ExecutionGuided = lazy(() =>
 const Dashboard = lazy(() =>
   import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
 );
+const Observability = lazy(() =>
+  import("./components/Observability").then((m) => ({ default: m.Observability }))
+);
 const XrayImport = lazy(() =>
   import("./components/XrayImport").then((m) => ({ default: m.XrayImport }))
 );
@@ -93,6 +96,7 @@ type Tab =
   | "daily"
   | "meetings"
   | "dashboard"
+  | "observability"
   | "automation"
   | "ia"
   | "migration"
@@ -113,6 +117,7 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "daily", label: "Daily" },
   { key: "meetings", label: "Reuniões" },
   { key: "dashboard", label: "Dashboard" },
+  { key: "observability", label: "Observabilidade" },
   { key: "automation", label: "Automação" },
   { key: "ia", label: "IA" },
   { key: "migration", label: "Migração" },
@@ -148,7 +153,14 @@ function buildHash(tab: Tab, params: Record<string, string>): string {
 // quem usa o produto para o que ele é — repositório, ciclo e execução.
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   { title: "Testes", keys: ["testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["dashboard", "defects", "todos", "audit"] },
+  {
+    title: "Acompanhamento",
+    // Observabilidade fica ao lado do Dashboard, e não dentro dele: a
+    // diferença não é o nome, é o eixo (ADR 0016). Dashboard responde
+    // "como está agora"; Observabilidade, "o que mudou e por quê".
+    // Fundir as duas produz uma tela que não serve bem a ninguém.
+    keys: ["dashboard", "observability", "defects", "todos", "audit"],
+  },
 ];
 
 // Requisito é INSUMO, não trabalho de QA (change 0152): epic e story nascem
@@ -824,6 +836,10 @@ export default function App({
                 squad={hashParams.squad ?? ""}
                 onSquadChange={(v) => setHashParam("squad", v)}
               />
+            </Suspense>
+          ) : tab === "observability" ? (
+            <Suspense fallback={<p className="empty">Carregando observabilidade…</p>}>
+              <Observability onError={setError} />
             </Suspense>
           ) : tab === "automation" ? (
             <Suspense fallback={<p className="empty">Carregando automação…</p>}>

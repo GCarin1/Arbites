@@ -766,3 +766,89 @@ export interface ReviewResponse {
   issues: ReviewIssue[];
   summary: string;
 }
+
+// -- Observabilidade (changes 0153/0154/0155, ADR 0016) ---------------------
+
+export interface CiSignalPoint {
+  at: string;
+  value: number;
+  run_id: string;
+  conclusion?: string | null;
+  url?: string | null;
+}
+
+export interface CiSignalSeries {
+  name: string;
+  kind: string;
+  unit: string | null;
+  points: CiSignalPoint[];
+  current: number | null;
+  average: number | null;
+  previous_average: number | null;
+  delta_pct: number | null;
+  /** "lower" | "higher" — declarado no arbites.yaml, nunca inferido. */
+  direction: string | null;
+  goal: number | null;
+}
+
+export interface CiJob {
+  name: string;
+  conclusion: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  url: string | null;
+}
+
+export interface CiAttachment {
+  kind: string;
+  path: string;
+  title: string | null;
+  sha256: string;
+  bytes: number;
+}
+
+export interface CiRun {
+  id: string;
+  provider: string;
+  repo: string;
+  workflow: string;
+  run_id: string;
+  event: string | null;
+  conclusion: string | null;
+  commit_sha: string | null;
+  branch: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  url: string | null;
+  ingested_at: string;
+  ingest_warning: string | null;
+  signals: { kind: string; name: string; value: number; unit: string | null; at: string }[];
+  attachments: CiAttachment[];
+  jobs: CiJob[];
+  analysis?: string;
+}
+
+export interface CiChange {
+  kind: "silence" | "broke" | "signal" | "convention";
+  text: string;
+  run_id?: string;
+  signal?: string;
+  goal_miss?: boolean;
+}
+
+export interface Observability {
+  period: { since: string; until: string; days: number };
+  previous: { since: string; until: string };
+  health: {
+    runs: number;
+    runs_previous: number;
+    success_rate: number | null;
+    success_rate_previous: number | null;
+    last_run_at: string | null;
+    days_since_last_run: number | null;
+    goal: number | null;
+  };
+  signals: CiSignalSeries[];
+  changes: CiChange[];
+  runs: CiRun[];
+}

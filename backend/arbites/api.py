@@ -2631,6 +2631,34 @@ def _register_routes(app: FastAPI) -> None:
                       workflow: str | None = None):
         return {"runs": ci_ingest.listar_runs(conn_of(request), limit, workflow)}
 
+    @app.get(API_PREFIX + "/ci/observability")
+    async def ci_observability(request: Request, days: int = 30):
+        """A tela inteira numa chamada: saúde, sinais, o que mudou e os runs.
+
+        Sempre com o período ANTERIOR ao lado — um número sozinho não diz se
+        está melhorando, e é essa comparação que separa observabilidade de
+        um mural de gráficos.
+        """
+        if days < 1 or days > 365:
+            raise _error(422, "invalid_period", "days deve estar entre 1 e 365")
+        return ci_ingest.painel(ws_of(request), conn_of(request), days)
+
+    @app.get(API_PREFIX + "/ci/runs/{run_id}")
+    async def ci_run_detail(request: Request, run_id: str):
+        return ci_ingest.run_detalhado(ws_of(request), conn_of(request), run_id)
+
+    @app.get(API_PREFIX + "/ci/attachment")
+    async def ci_attachment(request: Request, path: str):
+        """Serve o print/log/anexo do run. O caminho vem do índice, mas a
+        contenção é verificada no disco assim mesmo: um índice adulterado não
+        pode virar leitura de arquivo arbitrário."""
+        ws = ws_of(request)
+        base = (ws.root / "ci").resolve()
+        alvo = (ws.root / path).resolve()
+        if not str(alvo).startswith(str(base) + os.sep) or not alvo.is_file():
+            raise _error(404, "not_found", f"anexo ausente: {path}")
+        return FileResponse(alvo)
+
     @app.get(API_PREFIX + "/ci/signals")
     async def ci_signal_names(request: Request):
         """Os sinais que EXISTEM — descobertos do que chegou, não de uma lista

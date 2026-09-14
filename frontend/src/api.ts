@@ -15,6 +15,7 @@ import type {
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
+  CiRun,
   DailyContext,
   DailyDigestResult,
   DashboardOverview,
@@ -37,6 +38,7 @@ import type {
   GeneratePreview,
   HealthScore,
   MetricsSummary,
+  Observability,
   Criterion,
   Requirement,
   StoryChain,
@@ -134,6 +136,16 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- Observabilidade (changes 0153/0154/0155) ----------------------------
+  observability: (days: number) =>
+    request<Observability>(`/ci/observability?days=${days}`),
+  ciRun: (id: string) => request<CiRun>(`/ci/runs/${encodeURIComponent(id)}`),
+  ciIngest: () =>
+    request<{ ingested: string[]; errors: { code: string; message: string }[];
+              stopped?: string }>("/ci/ingest", { method: "POST" }),
+  ciAttachmentUrl: (path: string) =>
+    `${BASE}/ci/attachment?path=${encodeURIComponent(path)}`,
 
   // -- MCP (changes 0146/0149) ---------------------------------------------
   agentTokens: () =>

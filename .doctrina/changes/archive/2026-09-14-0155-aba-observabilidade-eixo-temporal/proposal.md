@@ -1,6 +1,7 @@
 # Change 0155-aba-observabilidade-eixo-temporal — aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-14
 - **Owner:**
 - **Lane:** product (uncertain)
@@ -55,14 +56,19 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Cada bloco da tela nomeia, no próprio corpo, a pergunta que responde.
-- [ ] De um ponto no gráfico dá para chegar à run, ao job e ao print sem
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Cada bloco da tela nomeia, no próprio corpo, a pergunta que responde.
+- [x] De um ponto no gráfico dá para chegar à run, ao job e ao print sem
       sair da aba.
-- [ ] Um período sem dado mostra estado vazio útil, não gráfico vazio.
-- [ ] Em 390 px a tela não rola de lado e os gráficos rolam dentro do bloco.
+- [x] Um período sem dado mostra estado vazio útil, não gráfico vazio.
+- [x] Em 390 px a tela não rola de lado e os gráficos rolam dentro do bloco.
 
 ## Open questions
 
-Nenhuma.
+**"Teste que virou instável" ficou de fora, e de propósito.** O bloco "o que
+mudou" entrega regressão de sinal, quebra depois de sequência verde, silêncio
+da ingestão e run sem manifesto. Instabilidade é por CENÁRIO, e o manifesto
+declara medida AGREGADA — a ingestão não recebe resultado por cenário. Somar
+isso exige parsear o Cucumber JSON do artifact e ligá-lo aos CTs, o que é
+ingestão nova e não um bloco de tela. Fica para change própria.
