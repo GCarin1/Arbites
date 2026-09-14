@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-09-13
-**Version:** 0.17.0
+**Version:** 0.18.0
 
 ## Purpose
 
@@ -102,6 +102,7 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall declarar em cada bloco da area de observabilidade a pergunta que ele responde, e nao exibir bloco que nao responda a uma pergunta acionavel.
 - The system shall aplicar retencao independente a sinal e a anexo de execucao de CI, guardando o sinal por muito mais tempo que o anexo, para que a serie temporal continue respondendo depois que a captura daquele dia ja foi descartada.
 - The system shall exibir o espaco ocupado e uma previa do que a proxima limpeza removeria antes de remover, e mover o removido para a lixeira em vez de apagar direto.
+- The system shall ingerir o resultado por cenario do Cucumber JSON presente no artifact da execucao de CI, ligando cada cenario ao caso de teste pela tag, porque medida agregada nao responde qual teste especifico esta instavel.
 
 ### Event-driven
 
@@ -110,6 +111,7 @@ export PDF e Markdown (para colar no Confluence).
 - When o usuário passa o mouse sobre uma célula do heatmap de atividade, the
   system shall exibir um tooltip com o número de mudanças (atividade) daquele
   dia e o detalhamento por tipo.
+- When um cenario passa e falha dentro do mesmo periodo e estava estavel no periodo anterior, the system shall anuncia-lo como instabilidade NOVA, distinguindo-a de cenario que ja balancava e de cenario que falha sempre.
 
 ### State-driven
 
@@ -222,6 +224,7 @@ export PDF e Markdown (para colar no Confluence).
 18. [unverified] Em 390 px a celula da grade de atividade mede ao menos 10 px de lado, a grade rola dentro do card e a coluna de dias tem a mesma altura da grade; em 1440 px a celula volta a crescer para preencher o card, sem rolagem — verified by `frontend/src/styles.css` + `frontend/src/components/ActivityHeatmap.tsx`.
 19. [unverified] De um ponto da serie temporal chega-se a execucao, ao job e ao anexo sem sair da aba; periodo sem dado mostra estado vazio util; em 390 px a pagina nao rola de lado — verified by `backend/tests/test_observability.py`.
 20. [unverified] Anexo expirado e removido para a lixeira e a serie temporal do mesmo periodo continua respondendo; a previa da limpeza corresponde ao que e removido — verified by `backend/tests/test_retencao_ci.py`.
+21. [unverified] Cucumber do artifact vira resultado por cenario; cenario que passa e falha no periodo aparece como instavel; so o que estava estavel antes entra em "o que mudou"; cenario que falha sempre nao e chamado de instavel — verified by `backend/tests/test_instabilidade.py`.
 
 ## Maturity
 

@@ -166,3 +166,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0147-ferramentas-mcp-escrita-preview — ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo (specs: mcp-server MODIFIED)
 - 2026-09-14 — 0148-intercambio-arquivo-csv-cucumber — intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API (specs: integrations MODIFIED)
 - 2026-09-14 — 0150-conector-deterministico-volume-recorrencia — conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item (specs: integrations MODIFIED)
+- 2026-09-14 — 0158-secao-negocio-menu-requisitos — secao negocio no menu com requisitos, e a tela de requisitos servindo o time de negocio: cobertura por criterio, origem local ou externa visivel, e edicao recusada quando a story vive no sistema oficial (specs: requirements MODIFIED)
+- 2026-09-14 — 0159-instabilidade-cenario-observabilidade-ingerir — instabilidade de cenario na observabilidade: ingerir o cucumber json por cenario do artifact e apontar o teste que virou instavel (specs: reporting MODIFIED)

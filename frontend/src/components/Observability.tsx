@@ -3,6 +3,7 @@ import { api } from "../api";
 import { EmptyState } from "./EmptyState";
 import { DocBody } from "./ReadView";
 import type {
+  CiFlaky,
   CiRetention,
   CiRun,
   CiSignalSeries,
@@ -551,6 +552,65 @@ export function Observability({ onError }: { onError: (message: string) => void 
               </ul>
             )}
           </section>
+
+          {/* PERGUNTA: em que teste eu não posso mais confiar?
+              Instabilidade não aparece em média nenhuma — um teste que passa,
+              falha e passa de novo some numa taxa de sucesso e continua
+              corroendo a confiança na suíte. */}
+          {painel.flaky.length > 0 && (
+            <section className="card obs-instaveis">
+              <h3>Testes instáveis</h3>
+              <p className="obs-pergunta">
+                Cenários que passaram <em>e</em> falharam neste período. Os
+                marcados como <strong>novos</strong> estavam estáveis antes.
+              </p>
+              <div className="scroll-x">
+                <table className="table stack-narrow">
+                  <thead>
+                    <tr>
+                      <th>Cenário</th>
+                      <th>Caso</th>
+                      <th>Execuções</th>
+                      <th>Falhas</th>
+                      <th>Viradas</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...painel.flaky]
+                      .sort((a, b) => Number(b.newly_flaky) - Number(a.newly_flaky))
+                      .map((f: CiFlaky) => (
+                        <tr key={f.scenario}>
+                          <td data-label="Cenário">
+                            {f.scenario}
+                            {f.newly_flaky && (
+                              <span className="badge obs-badge-novo">novo</span>
+                            )}
+                          </td>
+                          <td data-label="Caso" className="mono">
+                            {f.testcase_id ?? "—"}
+                          </td>
+                          <td data-label="Execuções">{f.runs}</td>
+                          <td data-label="Falhas">{f.failures}</td>
+                          <td data-label="Viradas">{f.flips}</td>
+                          <td data-label="">
+                            {f.last_run && (
+                              <button
+                                type="button"
+                                className="link-btn"
+                                onClick={() => void abrirRun(f.last_run as string)}
+                              >
+                                última execução
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {/* PERGUNTA: a automação está rodando, e está passando? */}
           <section className="obs-saude">

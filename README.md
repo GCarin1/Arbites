@@ -296,8 +296,14 @@ quê"*, e por isso toda resposta vem com o período anterior ao lado.
 Quatro blocos, cada um nomeando a pergunta que responde:
 
 - **O que mudou** — o que se moveu sozinho: quebra depois de uma sequência
-  verde, sinal que regrediu, e o silêncio da ingestão (período sem run **é
-  dito**, porque num gráfico ausência de dado se parece com boa notícia).
+  verde, sinal que regrediu, teste que **virou** instável, e o silêncio da
+  ingestão (período sem run **é dito**, porque num gráfico ausência de dado se
+  parece com boa notícia).
+- **Testes instáveis** — cenários que passaram *e* falharam no período. Só os
+  marcados como **novos** entram em "O que mudou": "está instável" não é
+  notícia para quem já sabe; "virou" é. Falhar sempre também não entra — isso
+  é defeito, e chamá-lo de instável faria alguém re-executar em vez de
+  corrigir.
 - **Saúde** — execuções e taxa de sucesso, sempre contra o período anterior e
   contra a meta declarada.
 - **Sinais no tempo** — uma série por medida. **Cada ponto é clicável**: leva
@@ -323,7 +329,8 @@ entrar sem mudança de código no Arbites:
   "attachments": [
     {"kind": "analysis",   "path": "analysis.md", "title": "Análise da IA"},
     {"kind": "screenshot", "path": "shots/home.png"},
-    {"kind": "log",        "path": "run.log"}
+    {"kind": "log",        "path": "run.log"},
+    {"kind": "cucumber",   "path": "cucumber.json"}
   ]
 }
 ```
@@ -334,6 +341,10 @@ entrar sem mudança de código no Arbites:
 - **Anexo** é o que não é número: print, log e o `.md` da análise. O anexo de
   `kind: analysis` vira o **corpo** do documento do run — a análise que a sua
   automação já escreveu não é reescrita aqui.
+- **`kind: cucumber`** é especial: além de virar anexo, o arquivo é lido
+  **por cenário**, e é isso que permite apontar o teste que *virou instável*
+  (a tag `@CT-XXXX` liga o cenário ao caso, ADR 0003). Sem ele o Arbites só
+  enxerga a medida agregada, e "2 cenários falharam" não diz *qual* balança.
 - **Sem manifesto** o Arbites reconhece anexo por convenção de nome
   (`*.log`, `*.png`, `analysis.md`, `cucumber.json`), **não extrai sinal
   nenhum** e marca o run com um aviso (`ingest_warning`). Convenção acerta

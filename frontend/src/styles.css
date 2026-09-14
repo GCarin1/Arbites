@@ -4136,3 +4136,29 @@ button.link-chip-btn:disabled {
   list-style: none; margin: 0 0 0.6rem; padding: 0; font-size: 0.82rem;
   display: flex; flex-direction: column; gap: 0.25rem;
 }
+
+/* -- requisito: origem e cobertura por critério (change 0158) -------------- */
+.req-origem {
+  margin: 0 0 0.6rem; font-size: 0.82rem; color: var(--text-muted);
+}
+.req-origem-externa {
+  padding: 0.55rem 0.7rem; border-radius: 6px; color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.crit-alerta { color: var(--danger); }
+/* A cobertura fica ABAIXO do texto do critério, não ao lado: em 390 px uma
+ * terceira coluna espreme a frase até ela virar uma palavra por linha. */
+.crit-cobertura {
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+/* -- testes instáveis (change 0159) ---------------------------------------- */
+.obs-instaveis .table { width: 100%; }
+.obs-mudanca-flaky { border-left-color: var(--warning); }
+.obs-badge-novo {
+  margin-left: 0.4rem; color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}

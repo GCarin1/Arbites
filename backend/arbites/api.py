@@ -812,7 +812,12 @@ def _req_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
         raise _error(404, "not_found", f"{entity_id} não encontrado")
     out = dict(row)
     out["tags"] = [t for t in (out.get("tags") or "").split(",") if t]
-    _, out["body"] = _load_doc(ws, row["path"])
+    meta, out["body"] = _load_doc(ws, row["path"])
+    # A ORIGEM do requisito (change 0158). Requisito é insumo do time de
+    # negócio: quando ele vive no sistema oficial, a cópia daqui é espelho, e
+    # a tela precisa dizer isso antes de alguém editar e criar divergência.
+    out["external"] = integ_ops.read_links(meta)
+    out["owned_elsewhere"] = bool(out["external"])
     return out
 
 
@@ -1049,7 +1054,34 @@ def _register_routes(app: FastAPI) -> None:
             " ORDER BY ord",
             (entity_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        saida = []
+        for row in rows:
+            criterio = dict(row)
+            # Cobertura POR CRITÉRIO (change 0158). "A story tem 4 CTs" não
+            # responde a pergunta do time de negócio, que é "este critério
+            # foi verificado?" — quatro casos podem cobrir o mesmo critério e
+            # deixar três descobertos.
+            casos = conn.execute(
+                "SELECT t.id, t.title,"
+                " (SELECT r.status FROM results r"
+                "   WHERE r.testcase_id = t.id"
+                "   ORDER BY r.executed_at DESC LIMIT 1) AS last_status"
+                " FROM tc_criteria c JOIN testcases t ON t.id = c.testcase_id"
+                " WHERE c.ears_id = ? AND t.story_id = ? ORDER BY t.id",
+                (row["ears_id"], entity_id),
+            ).fetchall()
+            criterio["covered_by"] = [dict(c) for c in casos]
+            estados = {c["last_status"] for c in casos}
+            if not casos:
+                criterio["coverage"] = "uncovered"
+            elif estados & {"failed", "blocked"}:
+                criterio["coverage"] = "failing"
+            elif estados == {None}:
+                criterio["coverage"] = "untested"
+            else:
+                criterio["coverage"] = "passing"
+            saida.append(criterio)
+        return saida
 
     @app.get(API_PREFIX + "/requirements/{entity_id}/chain")
     async def requirement_chain(request: Request, entity_id: str):
@@ -1167,6 +1199,22 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "requirements", entity_id)
         meta, body = _load_doc(ws, rel)
         changes = payload.model_dump(exclude_unset=True)
+        # Requisito que vive no sistema oficial NÃO se edita aqui (change
+        # 0158). Editar a cópia produz divergência silenciosa: os dois lados
+        # passam a discordar e ninguém é avisado, porque nada falha. Quem
+        # quiser mesmo assumir o requisito aqui remove o vínculo primeiro —
+        # e aí a decisão fica explícita e registrada.
+        vinculos = integ_ops.read_links(meta)
+        if vinculos and not _so_vinculo(changes):
+            sistemas = ", ".join(v["system"] for v in vinculos)
+            raise _error(
+                409, "owned_elsewhere",
+                f"{entity_id} vive em {sistemas} — editar a cópia daqui faria"
+                " os dois lados discordarem em silêncio. Edite no sistema"
+                " oficial, ou remova o vínculo"
+                f" (DELETE /integrations/links/requirement/{entity_id}/"
+                f"{vinculos[0]['system']}) para assumir o requisito aqui.",
+            )
         body = changes.pop("body", body)
         if "squad" in changes and not changes["squad"]:
             meta.pop("squad", None)
@@ -1175,6 +1223,11 @@ def _register_routes(app: FastAPI) -> None:
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
         return _req_out(conn, ws, entity_id)
+
+    def _so_vinculo(changes: dict) -> bool:
+        """Campos que descrevem o VÍNCULO continuam editáveis num requisito
+        externo: apontar melhor para onde ele mora não é divergir dele."""
+        return set(changes) <= {"external_key", "confluence_url"}
 
     @app.delete(API_PREFIX + "/requirements/{entity_id}", status_code=204)
     async def delete_requirement(request: Request, entity_id: str):

@@ -154,6 +154,46 @@ def normalizar_sinais(manifesto: dict[str, Any], quando: str) -> list[dict[str, 
 # -- gravação ----------------------------------------------------------------
 
 
+def extrair_cenarios(manifesto: dict[str, Any],
+                     arquivos: dict[str, bytes]) -> list[dict[str, Any]]:
+    """Resultado POR CENÁRIO, do Cucumber JSON que já vem no artifact.
+
+    O manifesto declara MEDIDA agregada — "2 cenários falharam" — e isso não
+    responde *qual* virou instável. Instabilidade é por cenário: um teste que
+    passa, falha e passa de novo não aparece em nenhuma média, e é justamente
+    o que corrói a confiança na suíte.
+
+    Reaproveita o leitor da change 0148: ter dois parsers para o mesmo formato
+    é convidar a divergência.
+    """
+    from .integrations_file import ArquivoErro, ler_cucumber
+
+    caminhos = [
+        item.get("path") for item in (manifesto.get("attachments") or [])
+        if item.get("kind") == "cucumber" and item.get("path")
+    ]
+    if not caminhos:
+        caminhos = [n for n in arquivos if CONVENCAO["cucumber"].search(n)]
+
+    saida: list[dict[str, Any]] = []
+    for caminho in caminhos:
+        bruto = arquivos.get(caminho)
+        if bruto is None:
+            continue
+        try:
+            cenarios = ler_cucumber(bruto)
+        except ArquivoErro:
+            continue  # artifact quebrado é problema daquele run, não da série
+        for cenario in cenarios:
+            saida.append({
+                "scenario": cenario.get("scenario"),
+                "feature": cenario.get("feature"),
+                "testcase_id": cenario.get("testcase_id"),
+                "status": cenario.get("status"),
+            })
+    return saida
+
+
 def escrever_run(
     raiz: Path, run: dict[str, Any], manifesto: dict[str, Any],
     arquivos: dict[str, bytes], aviso: str | None,
@@ -215,6 +255,7 @@ def escrever_run(
         "signals": sinais,
         "attachments": anexos,
         "jobs": run.get("jobs") or [],
+        "scenarios": extrair_cenarios(manifesto, arquivos),
     }
     if aviso:
         meta["ingest_warning"] = aviso
@@ -672,18 +713,79 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
             "direction": meta.get("direction"), "goal": meta.get("goal"),
         })
 
+    instaveis = instabilidade(conn, inicio_anterior, inicio, fim)
     return {
         "period": {"since": inicio, "until": fim, "days": dias},
         "previous": {"since": inicio_anterior, "until": inicio},
         "health": saude,
         "signals": sinais,
-        "changes": _o_que_mudou(atuais, anteriores, sinais, saude),
+        "flaky": instaveis,
+        "changes": _o_que_mudou(atuais, anteriores, sinais, saude, instaveis),
         "runs": listar_runs(conn, 30),
     }
 
 
+def instabilidade(conn, inicio_anterior: str, inicio: str,
+                  fim: str) -> list[dict[str, Any]]:
+    """Cenários que passam E falham no mesmo período — e se isso é NOVO.
+
+    Instabilidade não aparece em média nenhuma: um teste que passa, falha e
+    passa de novo some numa taxa de sucesso e continua corroendo a confiança
+    na suíte. E "instável" sozinho não é notícia — quem já sabe que aquele
+    teste balança não precisa ser lembrado. A notícia é **virou** instável:
+    estava estável no período anterior e não está mais.
+    """
+    def por_cenario(desde: str, ate: str) -> dict[str, dict[str, Any]]:
+        saida: dict[str, dict[str, Any]] = {}
+        for linha in conn.execute(
+            "SELECT scenario, testcase_id, status, run_id, at FROM ci_scenarios"
+            " WHERE at >= ? AND at < ? ORDER BY at", (desde, ate),
+        ):
+            item = saida.setdefault(linha["scenario"], {
+                "scenario": linha["scenario"],
+                "testcase_id": linha["testcase_id"],
+                "statuses": [], "runs": [],
+            })
+            item["statuses"].append(linha["status"])
+            item["runs"].append(linha["run_id"])
+            if linha["testcase_id"] and not item["testcase_id"]:
+                item["testcase_id"] = linha["testcase_id"]
+        return saida
+
+    agora = por_cenario(inicio, fim)
+    antes = por_cenario(inicio_anterior, inicio)
+
+    def balanca(item: dict[str, Any] | None) -> bool:
+        if not item:
+            return False
+        estados = set(item["statuses"])
+        return "passed" in estados and bool(estados & {"failed", "blocked"})
+
+    saida = []
+    for nome, item in sorted(agora.items()):
+        if not balanca(item):
+            continue
+        anterior = antes.get(nome)
+        viradas = sum(
+            1 for a, b in zip(item["statuses"], item["statuses"][1:]) if a != b
+        )
+        saida.append({
+            "scenario": nome,
+            "testcase_id": item["testcase_id"],
+            "runs": len(item["statuses"]),
+            "failures": sum(1 for s in item["statuses"]
+                            if s in ("failed", "blocked")),
+            "flips": viradas,
+            # a distinção que separa notícia de ruído
+            "newly_flaky": not balanca(anterior),
+            "last_run": item["runs"][-1] if item["runs"] else None,
+        })
+    return saida
+
+
 def _o_que_mudou(atuais: list[dict], anteriores: list[dict],
-                 sinais: list[dict], saude: dict) -> list[dict[str, Any]]:
+                 sinais: list[dict], saude: dict,
+                 instaveis: list[dict] | None = None) -> list[dict[str, Any]]:
     """O bloco que justifica a aba existir: o que mudou SOZINHO.
 
     Um mural de gráficos obriga a pessoa a caçar a diferença olhando. Aqui a
@@ -748,7 +850,26 @@ def _o_que_mudou(atuais: list[dict], anteriores: list[dict],
             ),
         })
 
-    # 4. run ingerido sem manifesto: o dado existe mas veio por convenção
+    # 4. teste que VIROU instável: o que estava estável e passou a balançar.
+    # "Está instável" não é notícia para quem já sabe; "virou" é.
+    for item in instaveis or []:
+        if not item["newly_flaky"]:
+            continue
+        alvo = item["testcase_id"] or item["scenario"]
+        mudancas.append({
+            "kind": "flaky",
+            "scenario": item["scenario"],
+            "testcase_id": item["testcase_id"],
+            "run_id": item["last_run"],
+            "text": f"{alvo} virou instável: passou e falhou em"
+                    f" {plural(item['runs'], 'execução', 'execuções')} deste"
+                    f" período ({plural(item['failures'], 'falha', 'falhas')},"
+                    f" {plural(item['flips'], 'virada', 'viradas')})."
+                    " No período anterior ele não"
+                    " balançava.",
+        })
+
+    # 5. run ingerido sem manifesto: o dado existe mas veio por convenção
     sem_manifesto = [r for r in atuais if r.get("ingest_warning")]
     if sem_manifesto:
         mudancas.append({

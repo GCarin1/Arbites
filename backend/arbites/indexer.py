@@ -97,6 +97,9 @@ CREATE TABLE IF NOT EXISTS ci_signals(
 CREATE TABLE IF NOT EXISTS ci_jobs(
   run_id TEXT, name TEXT, conclusion TEXT, started_at TEXT,
   finished_at TEXT, url TEXT, ord INTEGER);
+CREATE TABLE IF NOT EXISTS ci_scenarios(
+  run_id TEXT, scenario TEXT, feature TEXT, testcase_id TEXT,
+  status TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS ci_attachments(
   run_id TEXT, kind TEXT, path TEXT, title TEXT, sha256 TEXT, bytes INTEGER);
 CREATE TABLE IF NOT EXISTS warnings(
@@ -183,6 +186,7 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM ci_runs")
     conn.execute("DELETE FROM ci_signals")
     conn.execute("DELETE FROM ci_jobs")
+    conn.execute("DELETE FROM ci_scenarios")
     conn.execute("DELETE FROM ci_attachments")
     conn.execute("DELETE FROM warnings")
 
@@ -397,6 +401,7 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
     for row in conn.execute("SELECT id FROM ci_runs WHERE path = ?", (rel,)):
         conn.execute("DELETE FROM ci_signals WHERE run_id = ?", (row["id"],))
         conn.execute("DELETE FROM ci_jobs WHERE run_id = ?", (row["id"],))
+        conn.execute("DELETE FROM ci_scenarios WHERE run_id = ?", (row["id"],))
         conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (row["id"],))
     conn.execute("DELETE FROM ci_runs WHERE path = ?", (rel,))
     for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
@@ -750,6 +755,17 @@ def _insert_ci_run(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             " finished_at, url, ord) VALUES (?,?,?,?,?,?,?)",
             (run_id, job["name"], job.get("conclusion"), job.get("started_at"),
              job.get("finished_at"), job.get("url"), ordem),
+        )
+    conn.execute("DELETE FROM ci_scenarios WHERE run_id = ?", (run_id,))
+    for cenario in meta.get("scenarios") or []:
+        if not isinstance(cenario, dict) or not cenario.get("scenario"):
+            continue
+        conn.execute(
+            "INSERT INTO ci_scenarios(run_id, scenario, feature, testcase_id,"
+            " status, at) VALUES (?,?,?,?,?,?)",
+            (run_id, cenario["scenario"], cenario.get("feature"),
+             cenario.get("testcase_id"), cenario.get("status"),
+             meta.get("started_at") or meta.get("ingested_at")),
         )
     conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (run_id,))
     for anexo in meta.get("attachments") or []:

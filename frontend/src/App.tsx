@@ -152,6 +152,13 @@ function buildHash(tab: Tab, params: Record<string, string>): string {
 // telas continuam funcionando e o dado continua lá, mas saem do caminho de
 // quem usa o produto para o que ele é — repositório, ciclo e execução.
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
+  // Negócio vem PRIMEIRO porque é a ordem do fluxo: o requisito existe antes
+  // do caso, que existe antes da execução. E vem com cabeçalho próprio, não
+  // solto: o cabeçalho é o que diz de QUEM é a coisa — requisito é insumo do
+  // time de negócio, e o QA cobre o que eles escreveram (change 0152). Um
+  // item sob "Testes" afirmava o contrário, e menu que mente sobre a dona da
+  // coisa ensina o modelo errado para quem chega.
+  { title: "Negócio", keys: ["requirements"] },
   { title: "Testes", keys: ["testcases", "executions"] },
   {
     title: "Acompanhamento",
@@ -163,18 +170,10 @@ const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
   },
 ];
 
-// Requisito é INSUMO, não trabalho de QA (change 0152): epic e story nascem
-// com o time de negócio, e o que o QA faz é cobri-los. Sob o cabeçalho
-// "Testes" o menu afirmava o contrário, e menu que mente sobre de quem é a
-// coisa ensina o modelo errado para quem chega.
-//
-// Fica ANTES dos grupos, e não depois, porque é a ordem do fluxo: requisito
-// existe antes do caso, que existe antes da execução.
-//
-// Sem cabeçalho próprio pela mesma razão da change 0129: um título de grupo
-// para um item só ocupa uma linha inteira para dizer o que o próprio item já
-// diz. Se um dia houver mais de uma tela de negócio, aí o grupo nasce.
-const NAV_LOOSE_TOP: Tab[] = ["requirements"];
+// Vazio desde a change 0158: Requisitos ganhou o grupo "Negócio" acima. A
+// constante fica porque o topo do menu é onde o próximo item de fluxo entra —
+// e porque tirá-la e recolocá-la depois custa mais do que mantê-la.
+const NAV_LOOSE_TOP: Tab[] = [];
 
 // Itens sem grupo, entre o trabalho do dia e o que foi congelado.
 // "Ferramentas" tinha UM item: um cabeçalho para um item ocupa uma linha
@@ -999,6 +998,7 @@ export default function App({
                 <RequirementEditor
                   id={selectedReq}
                   onChanged={refresh}
+                  onNavigate={navigateTo}
                   onDeleted={() => {
                     setSelectedReq(null);
                     void refresh();

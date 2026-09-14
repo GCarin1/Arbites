@@ -145,14 +145,17 @@ export function ReqRepository({
           string,
           { ct: number; state: MatrixStory["coverage_state"]; critTotal: number; critCovered: number }
         >();
-        for (const epic of m.epics)
-          for (const s of epic.stories)
-            map.set(s.id, {
-              ct: s.ct_count,
-              state: s.coverage_state,
-              critTotal: s.criteria_total,
-              critCovered: s.criteria_covered,
-            });
+        const anotar = (s: MatrixStory) =>
+          map.set(s.id, {
+            ct: s.ct_count,
+            state: s.coverage_state,
+            critTotal: s.criteria_total,
+            critCovered: s.criteria_covered,
+          });
+        for (const epic of m.epics) for (const s of epic.stories) anotar(s);
+        // Story sem epic conta igual: ela some da matriz por epic, e sem isto
+        // a tela a mostrava como "sem cobertura" mesmo coberta.
+        for (const s of m.orphan_stories ?? []) anotar(s);
         setCoverage(map);
       })
       .catch(() => {});
@@ -510,10 +513,13 @@ export function RequirementEditor({
   id,
   onChanged,
   onDeleted,
+  onNavigate,
 }: {
   id: string;
   onChanged: () => void;
   onDeleted: () => void;
+  /** Para os CTs que cobrem cada critério virarem link (change 0158). */
+  onNavigate?: (id: string) => void;
 }) {
   const [req, setReq] = useState<Requirement | null>(null);
   const [editing, setEditing] = useState(false);
@@ -608,7 +614,19 @@ export function RequirementEditor({
             status={<span className={`status-dot dot-${req.status}`}>{req.status}</span>}
             actions={
               <>
-                <button className="primary" onClick={() => setEditing(true)}>
+                {/* Requisito que vive no sistema oficial não se edita aqui
+                    (change 0158): editar a cópia faz os dois lados
+                    discordarem em silêncio, porque nada falha. */}
+                <button
+                  className="primary"
+                  onClick={() => setEditing(true)}
+                  disabled={req.owned_elsewhere}
+                  title={
+                    req.owned_elsewhere
+                      ? "este requisito vive no sistema oficial — edite lá"
+                      : undefined
+                  }
+                >
                   Editar
                 </button>
                 <button className="danger" onClick={() => setConfirmDelete(true)}>
@@ -617,6 +635,19 @@ export function RequirementEditor({
               </>
             }
           >
+          {req.owned_elsewhere ? (
+            <p className="req-origem req-origem-externa">
+              Este requisito <strong>vive em{" "}
+              {(req.external ?? []).map((v) => v.system).join(", ")}</strong> — aqui
+              ele é espelho. Editar a cópia faria os dois lados discordarem sem
+              ninguém ser avisado, então a edição está fechada. Para assumi-lo
+              aqui, remova o vínculo externo primeiro; a decisão fica explícita.
+            </p>
+          ) : (
+            <p className="req-origem">
+              Escrito aqui — sem vínculo com sistema externo.
+            </p>
+          )}
           <div className="read-grid">
             <ReadField label="Tipo" value={req.kind} />
             <ReadField
@@ -652,7 +683,9 @@ export function RequirementEditor({
             </div>
             <DocBody text={req.body} />
           </div>
-          {req.kind === "story" && <CriteriaCard id={req.id} />}
+          {req.kind === "story" && (
+            <CriteriaCard id={req.id} onNavigate={onNavigate} />
+          )}
         </>
       ) : (
         <>
@@ -798,7 +831,44 @@ function appendEarsCriterion(body: string, form: string): string {
 
 /** Critérios EARS indexados da story, com a forma detectada por critério —
  * dá visibilidade ao lint (cinza = fora de EARS). */
-function CriteriaCard({ id }: { id: string }) {
+/**
+ * Cobertura de um critério, em uma palavra e uma cor (change 0158).
+ *
+ * A pergunta do time de negócio não é "quantos casos esta story tem?" — é
+ * "este critério foi verificado?". São perguntas diferentes: quatro casos
+ * podem cobrir o mesmo critério e deixar três descobertos, e a contagem por
+ * story esconde exatamente isso.
+ */
+const COBERTURA: Record<string, { label: string; dot: string; hint: string }> = {
+  uncovered: {
+    label: "sem caso",
+    dot: "dot-col-blocked",
+    hint: "nenhum caso de teste cita este critério",
+  },
+  untested: {
+    label: "nunca executado",
+    dot: "dot-col-pending",
+    hint: "há caso citando o critério, mas nenhum foi executado ainda",
+  },
+  failing: {
+    label: "com falha",
+    dot: "dot-col-failed",
+    hint: "o último resultado de algum caso deste critério falhou ou ficou bloqueado",
+  },
+  passing: {
+    label: "verificado",
+    dot: "dot-col-passed",
+    hint: "todos os casos que cobrem este critério passaram na última execução",
+  },
+};
+
+function CriteriaCard({
+  id,
+  onNavigate,
+}: {
+  id: string;
+  onNavigate?: (id: string) => void;
+}) {
   const [crits, setCrits] = useState<Criterion[]>([]);
 
   useEffect(() => {
@@ -811,25 +881,58 @@ function CriteriaCard({ id }: { id: string }) {
 
   if (crits.length === 0) return null;
 
+  const descobertos = crits.filter((c) => c.coverage === "uncovered").length;
+
   return (
     <div className="card">
       <div className="card-head">
         <h3>Critérios de aceite (EARS)</h3>
         <span className="spacer" />
-        <span className="caption muted">{crits.length} critério(s)</span>
+        <span className="caption muted">
+          {crits.length} {crits.length === 1 ? "critério" : "critérios"}
+          {descobertos > 0 && (
+            <>
+              {" · "}
+              <strong className="crit-alerta">
+                {descobertos} sem caso de teste
+              </strong>
+            </>
+          )}
+        </span>
       </div>
       <div className="criteria-list">
-        {crits.map((c) => (
-          <div key={c.ears_id} className="criteria-row">
-            <span className="mono muted">{c.ears_id}</span>
-            <span
-              className={`status-dot ${c.form ? "dot-col-passed" : "dot-col-blocked"} caption`}
-            >
-              {c.form ? FORM_LABEL[c.form] ?? c.form : "fora de EARS"}
-            </span>
-            <span className="criteria-text">{c.text}</span>
-          </div>
-        ))}
+        {crits.map((c) => {
+          const cob = COBERTURA[c.coverage ?? "uncovered"];
+          return (
+            <div key={c.ears_id} className="criteria-row">
+              <span className="mono muted">{c.ears_id}</span>
+              <span
+                className={`status-dot ${c.form ? "dot-col-passed" : "dot-col-blocked"} caption`}
+              >
+                {c.form ? FORM_LABEL[c.form] ?? c.form : "fora de EARS"}
+              </span>
+              <span className="criteria-text">
+                {c.text}
+                <span className="crit-cobertura">
+                  <span className={`status-dot ${cob.dot} caption`} title={cob.hint}>
+                    {cob.label}
+                  </span>
+                  {(c.covered_by ?? []).map((ct) => (
+                    <button
+                      key={ct.id}
+                      type="button"
+                      className="link-btn mono caption"
+                      title={ct.title}
+                      onClick={() => onNavigate?.(ct.id)}
+                    >
+                      {ct.id}
+                    </button>
+                  ))}
+                </span>
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

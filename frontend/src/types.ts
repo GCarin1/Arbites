@@ -108,6 +108,9 @@ export interface Requirement {
   created?: string | null;
   path: string;
   body?: string;
+  /** Onde este requisito vive, se não for aqui (change 0158, ADR 0015). */
+  external?: { system: string; id: string; revision?: string | null }[];
+  owned_elsewhere?: boolean;
 }
 
 export interface ChainTestcase {
@@ -154,6 +157,10 @@ export interface Criterion {
   ord: number;
   text: string;
   form: string | null; // ubiquitous|event|state|unwanted|optional | null (fora de EARS)
+  // Cobertura POR CRITÉRIO (change 0158): "a story tem 4 CTs" não responde
+  // "este critério foi verificado?" — quatro casos podem cobrir o mesmo.
+  covered_by?: { id: string; title: string; last_status: string | null }[];
+  coverage?: "uncovered" | "untested" | "failing" | "passing";
 }
 
 export interface TestCase {
@@ -717,6 +724,9 @@ export interface TraceabilityMatrix {
   epic_filter: string | null;
   sprint_filter: string | null;
   epics: MatrixEpic[];
+  /** Stories sem epic. Sem elas a tela dizia "sem cobertura" para story
+   *  coberta — cobertura falsa é pior que ausente (change 0158). */
+  orphan_stories?: MatrixStory[];
 }
 
 // ------------------------------------------------------------------ IA (M5)
@@ -829,11 +839,25 @@ export interface CiRun {
 }
 
 export interface CiChange {
-  kind: "silence" | "broke" | "signal" | "convention";
+  kind: "silence" | "broke" | "signal" | "convention" | "flaky";
   text: string;
   run_id?: string;
   signal?: string;
+  scenario?: string;
+  testcase_id?: string;
   goal_miss?: boolean;
+}
+
+/** Cenário que passa E falha no período (change 0159). */
+export interface CiFlaky {
+  scenario: string;
+  testcase_id: string | null;
+  runs: number;
+  failures: number;
+  flips: number;
+  /** Estava estável no período anterior — é o que separa notícia de ruído. */
+  newly_flaky: boolean;
+  last_run: string | null;
 }
 
 export interface Observability {
@@ -849,6 +873,7 @@ export interface Observability {
     goal: number | null;
   };
   signals: CiSignalSeries[];
+  flaky: CiFlaky[];
   changes: CiChange[];
   runs: CiRun[];
 }
