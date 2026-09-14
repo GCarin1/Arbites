@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-09",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -430,6 +430,15 @@
         "status": "accepted",
         "date": "2026-09-14",
         "summary": "Observabilidade e sinal no tempo com descida ate o artefato."
+      },
+      {
+        "id": "0017",
+        "path": ".doctrina/decisions/0017-credencial-de-ci-por-variavel-de-ambiente-onde-nao-ha-cofre-do-so.md",
+        "title": "Credencial de CI por variável de ambiente onde não há cofre do SO",
+        "status": "accepted",
+        "date": "2026-09-14",
+        "landed": "2026-09-14",
+        "summary": "Onde não há cofre do SO, a credencial de CI pode vir da variável de ambiente"
       }
     ],
     "changes": [],
@@ -2507,6 +2516,19 @@
         "specs_affected": [
           {
             "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0160-instancia-container-tem-cofre",
+        "title": "instancia em container nao tem cofre do SO: a ausencia de keyring derrubava a aplicacao inteira com 500, e a credencial de CI nao tinha como ser configurada",
+        "path": ".doctrina/changes/archive/2026-09-14-0160-instancia-container-tem-cofre",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
             "operation": "MODIFIED"
           }
         ]

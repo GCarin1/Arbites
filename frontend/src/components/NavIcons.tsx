@@ -16,8 +16,12 @@ const PATHS: Record<string, string> = {
   testcases: "M6 2.5H4.5a1 1 0 0 0-1 1V13a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V3.5a1 1 0 0 0-1-1H10 M6 2.5a2 2 0 1 1 4 0 M6 9l1.5 1.5L10.5 7.5",
   // play — execução
   executions: "M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12Z M6.75 5.75 10.5 8l-3.75 2.25Z",
-  // barras — dashboard
+  // barras com eixo — dashboard, que é RETRATO
   dashboard: "M2 13.5h12 M4.5 11V6.5 M8 11V3.5 M11.5 11V8.5",
+  // linha no tempo com o ponto do pico — observabilidade, que é SÉRIE.
+  // Deliberadamente diferente das barras: as duas telas respondem perguntas
+  // diferentes (ADR 0016), e ícone igual apagaria a distinção no menu.
+  observability: "M1.5 12 5 8.5 7.5 11 11.5 4.5 M11.5 4.5a1.25 1.25 0 1 0 0 .01Z M14.5 7.5 12.4 5.4",
   // triângulo de alerta — defeito
   defects: "M8 2.5 14.5 13.5H1.5L8 2.5Z M8 6.5v3 M8 11.5v.5",
   // lista com vistos — afazeres
@@ -44,7 +48,27 @@ const PATHS: Record<string, string> = {
 
 export function NavIcon({ name }: { name: string }) {
   const d = PATHS[name];
-  if (!d) return <span className="nav-icon" aria-hidden="true" />;
+  // Ícone faltando aparece como um traço neutro, não como um vazio. Um vazio
+  // invisível foi exatamente como a Observabilidade ficou sem ícone desde a
+  // change 0155 sem ninguém notar: nada quebrava, só sumia.
+  if (!d) {
+    return (
+      <svg
+        className="nav-icon"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M5 8h6" />
+      </svg>
+    );
+  }
   return (
     <svg
       className="nav-icon"

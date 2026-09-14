@@ -417,6 +417,18 @@ intervalo perdido volta inteiro.
 > índice, nunca logado. E um período sem run é visível na série em vez de
 > passar por "semana tranquila".
 
+**Em container não há cofre do SO** (ADR 0017). Lá a credencial entra pela
+variável de ambiente `ARBITES_GITHUB_TOKEN`, já prevista no
+`docker-compose.yml` — o mesmo canal por onde a senha de bootstrap do admin
+chega. O ambiente tem precedência sobre o cofre quando os dois existem: quem
+definiu a variável quis aquele token.
+
+Sem cofre e sem a variável, a aplicação **sobe normalmente** — só a automação
+de CI e a observabilidade ficam sem credencial, e a tela **Problemas** diz
+isso com o remédio. Tentar salvar o token pela tela responde `409` explicando
+a saída, em vez de falhar depois. O valor nunca volta em resposta nenhuma, e
+nunca toca o disco do workspace.
+
 ## Intercâmbio por arquivo: o piso que funciona com qualquer ferramenta
 
 Adaptador por API só existe onde há API **e permissão** — e permissão, numa

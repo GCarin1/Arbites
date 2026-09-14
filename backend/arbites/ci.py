@@ -12,6 +12,7 @@ Token: PAT fine-grained via keyring (ADR 0008) — nunca em YAML, nunca no
 from __future__ import annotations
 
 import io
+import os
 import sqlite3
 import time
 import zipfile
@@ -41,16 +42,69 @@ class CIError(Exception):
 # Token (keyring do SO)
 
 
+# Fora do keyring, só UM lugar: a variável de ambiente do processo (change
+# 0160). A ADR 0008 rejeitou "token em arquivo de config" porque o workspace é
+# versionável e compartilhável — e continua rejeitando. Ambiente do container
+# não é isso: não viaja com o workspace, não entra no git, e é o mesmo canal
+# por onde a senha de bootstrap do admin já chega no `docker-compose.yml`.
+ENV_TOKEN = "ARBITES_GITHUB_TOKEN"
+
+
 class TokenStore:
+    """O cofre do SO, com uma saída para onde ele não existe.
+
+    Num container não há keychain nenhum, e `keyring` levanta `NoKeyringError`
+    na primeira chamada. Antes da change 0160 isso derrubava a aplicação
+    INTEIRA com 500 — porque a tela Problemas pergunta pelo estado da
+    credencial em todo carregamento, e a pergunta explodia. Ausência de cofre
+    é uma resposta legítima ("não há credencial"), não um acidente.
+    """
+
     def set(self, token: str) -> None:
         import keyring
 
-        keyring.set_password(KEYRING_SERVICE, KEYRING_USER, token)
+        try:
+            keyring.set_password(KEYRING_SERVICE, KEYRING_USER, token)
+        except Exception as e:  # noqa: BLE001 — qualquer falha do cofre
+            raise CIError(
+                "no_keyring",
+                "esta instância não tem cofre do sistema operacional (típico"
+                f" de container): guardar o token aqui falharia em silêncio."
+                f" Defina {ENV_TOKEN} no ambiente do processo — no"
+                " docker-compose.yml, do mesmo jeito que a senha de bootstrap"
+                f" do admin. Motivo do cofre: {e}",
+                409,
+            ) from e
 
     def get(self) -> str | None:
+        """O ambiente PRIMEIRO: quem definiu a variável quis aquele token, e
+        um resto esquecido no cofre não pode ganhar dele em silêncio."""
+        do_ambiente = (os.environ.get(ENV_TOKEN) or "").strip()
+        if do_ambiente:
+            return do_ambiente
         import keyring
 
-        return keyring.get_password(KEYRING_SERVICE, KEYRING_USER)
+        try:
+            return keyring.get_password(KEYRING_SERVICE, KEYRING_USER)
+        except Exception:  # noqa: BLE001 — sem cofre é "não há credencial"
+            return None
+
+    def available(self) -> bool:
+        """Se dá para GUARDAR um token nesta instância. Ler funciona sempre
+        (pelo ambiente); guardar, não — e a tela precisa dizer isso antes de
+        alguém digitar um token num campo que vai recusar."""
+        import keyring
+
+        try:
+            keyring.get_keyring().get_password(KEYRING_SERVICE, "__probe__")
+        except Exception:  # noqa: BLE001
+            return False
+        return True
+
+    def source(self) -> str | None:
+        if (os.environ.get(ENV_TOKEN) or "").strip():
+            return "env"
+        return "keyring" if self.get() else None
 
     def status(self) -> dict[str, Any]:
         return {"configured": self.get() is not None}  # nunca o valor

@@ -20,6 +20,11 @@ services:
       # "off" fecha o cadastro público; contas passam a ser criadas só pelo
       # painel. Deixe "on" enquanto o time ainda está entrando.
       ARBITES_SIGNUP: ${ARBITES_SIGNUP:-on}
+      # PAT do GitHub (ADR 0017). No desktop ele mora no cofre do SO (ADR
+      # 0008); num container não há cofre nenhum, e é por aqui que ele entra.
+      # Opcional: sem ele a aplicação sobe igual, só a automação de CI e a
+      # observabilidade ficam sem credencial — e a tela Problemas diz isso.
+      ARBITES_GITHUB_TOKEN: ${ARBITES_GITHUB_TOKEN:-}
     volumes:
       - arbites-data:/data
       # Repositórios de automação, se houver: somente leitura, porque o
