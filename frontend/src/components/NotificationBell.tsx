@@ -130,7 +130,7 @@ export function NotificationBell({
             <strong>Notificações</strong>
             <span className="spacer" />
             <button
-              className="link-btn"
+              className="sino-acao"
               disabled={naoLidas === 0}
               onClick={() => {
                 void (async () => {
@@ -149,7 +149,7 @@ export function NotificationBell({
               Marcar todas como lidas
             </button>
             <button
-              className="link-btn"
+              className="sino-acao"
               disabled={itens.length === 0}
               onClick={() => {
                 void (async () => {
@@ -209,7 +209,7 @@ export function NotificationBell({
                     </button>
                     <button
                       type="button"
-                      className="link-btn sino-marcar"
+                      className="sino-acao sino-marcar"
                       onClick={() => void marcar(item, !item.read)}
                     >
                       {item.read ? "não lida" : "lida"}

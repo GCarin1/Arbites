@@ -5,7 +5,7 @@
 **Implementation:** verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx
 **Realizes:** SC3
 **Last updated:** 2026-09-13
-**Version:** 0.19.0
+**Version:** 0.19.1
 
 ## Purpose
 
@@ -106,6 +106,7 @@ export PDF e Markdown (para colar no Confluence).
 - The system shall apresentar um sino de notificacoes no cabecalho com a quantidade de itens nao lidos, derivando a lista do estado vivo das fontes existentes em vez de manter uma caixa de entrada gravada, para que um motivo resolvido saia da lista sozinho.
 - The system shall guardar por usuario apenas o que foi lido e ate onde foi limpo, com identificador estavel por notificacao, para que a marca de leitura sobreviva ao recalculo da lista.
 - The system shall levar da notificacao ao artefato de origem, e apresentar o nome do arquivo ou do item em destaque separado do texto da mensagem.
+- The system shall apresentar acao de varias palavras como um controle unico e delimitado, e nao como texto solto, para que o rotulo nao seja lido como varias acoes distintas.
 
 ### Event-driven
 
@@ -230,6 +231,7 @@ export PDF e Markdown (para colar no Confluence).
 20. [unverified] Anexo expirado e removido para a lixeira e a serie temporal do mesmo periodo continua respondendo; a previa da limpeza corresponde ao que e removido — verified by `backend/tests/test_retencao_ci.py`.
 21. [unverified] Cucumber do artifact vira resultado por cenario; cenario que passa e falha no periodo aparece como instavel; so o que estava estavel antes entra em "o que mudou"; cenario que falha sempre nao e chamado de instavel — verified by `backend/tests/test_instabilidade.py`.
 22. [unverified] Problema resolvido sai do sino mesmo sem leitura; o sino e a tela de problemas leem a mesma lista; lido e por pessoa e sobrevive ao recalculo; limpar e marca d'agua; log de atividade so alcanca admin com o interruptor ligado — verified by `backend/tests/test_notificacoes.py`.
+23. [unverified] As acoes do sino tem contorno proprio e fonte proporcional, entao "Marcar todas como lidas" le como um botao e nao como quatro links — verified by `frontend/src/styles.css`.
 
 ## Maturity
 

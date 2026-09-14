@@ -4189,6 +4189,27 @@ button.link-chip-btn:disabled {
   position: sticky; top: 0; background: var(--surface); z-index: 1;
 }
 .sino-topo .spacer { flex: 1; }
+/* Uma ação de várias palavras precisa parecer UM objeto.
+ * `.link-btn` é monoespaçado e sem contorno: numa frase de quatro palavras
+ * ("Marcar todas como lidas") cada palavra ganha a mesma largura e o mesmo
+ * azul, e a linha inteira lê como quatro links soltos — ainda mais ao lado de
+ * "Limpar", que é outro. Com contorno e fonte proporcional, a frase vira um
+ * botão só, independente de quantas palavras tenha. */
+.sino-acao {
+  height: auto;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+.sino-acao:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
 .sino-vazio {
   margin: 0; padding: 1rem 0.9rem; font-size: 0.83rem;
   color: var(--text-muted);
@@ -4225,9 +4246,14 @@ button.link-chip-btn:disabled {
   color: var(--text);
   background: color-mix(in srgb, var(--text) 9%, transparent);
 }
+/* Mesmo problema, menor: "não lida" em mono azul são duas palavras que leem
+ * como dois links. Vira um selo só. */
 .sino-marcar {
-  flex: 0 0 auto; align-self: flex-start; height: auto;
-  padding: 0.6rem 0.6rem 0.6rem 0.2rem; font-size: 0.74rem; white-space: nowrap;
+  /* Alinhado ao topo, na altura do tipo e do horário: centralizado ele
+   * flutuaria no meio de uma notificação de quatro linhas e ficaria longe da
+   * linha que diz do que ela trata. */
+  flex: 0 0 auto; align-self: flex-start;
+  margin: 0.55rem 0.5rem 0 0.2rem;
 }
 
 @media (max-width: 860px) {
