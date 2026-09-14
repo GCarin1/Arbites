@@ -45,7 +45,7 @@
         "id": "auth",
         "path": ".doctrina/specs/auth/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-09-12",
         "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
         "realizes": [
@@ -2589,6 +2589,19 @@
         "id": "0165-primeira-execucao-fora-container",
         "title": "primeira execucao fora do container: o .env nunca era lido, entao nenhum admin era criado e a pessoa se trancava fora por tentativas",
         "path": ".doctrina/changes/archive/2026-09-14-0165-primeira-execucao-fora-container",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0166-login-saida-propria-maquina",
+        "title": "401 no login sem saida na propria maquina: conta inexistente senha errada e conta inativa respondem igual e nao havia como diagnosticar nem redefinir",
+        "path": ".doctrina/changes/archive/2026-09-14-0166-login-saida-propria-maquina",
         "status": "applied",
         "applied": "2026-09-14",
         "specs_affected": [

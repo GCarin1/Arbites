@@ -174,3 +174,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0163-sino-avisava-sobre-afazer — sino nao avisava sobre afazer vencido nem sobre afazer que vence hoje (specs: reporting MODIFIED)
 - 2026-09-14 — 0164-listas-como-artefato-proprio — listas de to do como artefato proprio com vinculo um a um entre afazer e linha da lista, e borda do afazer pela cor do status (specs: todos MODIFIED)
 - 2026-09-14 — 0165-primeira-execucao-fora-container — primeira execucao fora do container: o .env nunca era lido, entao nenhum admin era criado e a pessoa se trancava fora por tentativas (specs: auth MODIFIED)
+- 2026-09-14 — 0166-login-saida-propria-maquina — 401 no login sem saida na propria maquina: conta inexistente senha errada e conta inativa respondem igual e nao havia como diagnosticar nem redefinir (specs: auth MODIFIED)

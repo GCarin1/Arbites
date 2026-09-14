@@ -68,6 +68,30 @@ Duas coisas que vale saber:
 > que a change 0165 corrigiu foi o caminho sem container, onde `python -m
 > arbites serve` ignorava o arquivo e a instância subia sem admin.
 
+### Não consigo entrar
+
+O login responde **401 "e-mail ou senha inválidos"** para três situações
+diferentes — conta inexistente, senha errada e conta não-ativa — e isso é
+deliberado: distinguir "não existe" de "senha errada" entrega uma lista de
+contas válidas a quem tenta adivinhar. De dentro da sua máquina, porém, você
+tem direito à resposta:
+
+```
+python -m arbites admin
+```
+
+Ele diz quantas contas existem, com papel e status — ou avisa que **não existe
+conta nenhuma**, que é o motivo mais comum do 401 numa instalação nova. Para
+criar a primeira conta, ou redefinir a senha de uma que já existe:
+
+```
+python -m arbites admin --email voce@exemplo.com --password uma-senha-de-12-ou-mais
+```
+
+> **O caminho traiçoeiro:** se a conta já existe, o bootstrap por ambiente
+> **nunca mais toca nela** — mudar `ARBITES_ADMIN_PASSWORD` no `.env` não muda
+> a senha de uma conta criada antes. É para isso que serve o comando acima.
+
 **Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
 e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
 ou destravar na hora:
@@ -76,6 +100,9 @@ ou destravar na hora:
 python -m arbites unlock                      # todas as contas
 python -m arbites unlock --email voce@exemplo.com
 ```
+
+(Redefinir a senha pelo `admin` já destrava a conta junto — quem chegou lá
+provavelmente errou a senha algumas vezes.)
 
 ### 3. Subir a plataforma (um comando sobe tudo)
 
