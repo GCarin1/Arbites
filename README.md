@@ -448,6 +448,35 @@ cenário sem tag aparece em `unmatched`, com aviso.
 > Por enquanto essas rotas não têm tela: são API. O uso previsto é pela linha
 > de comando ou pelo agente MCP, que alcança as mesmas rotas.
 
+### Empurrar um ciclo inteiro de uma vez
+
+O agente é a ponte certa para o fluxo com humano no meio e a ponte **errada**
+para volume: empurrar 47 resultados não deveria custar 47 turnos de agente,
+47 confirmações, nem variar de uma execução para outra.
+
+```
+GET  /api/v1/integrations/bulk/{exec_id}/preview?system=file   # o delta
+POST /api/v1/integrations/bulk/{exec_id}?system=file           # empurra
+```
+
+Quatro mecânicas, cada uma contra um jeito específico de perder dado:
+
+- **repetir não duplica** — a idempotência vem do vínculo, não da memória de
+  quem chamou: o que já foi tem vínculo, e o que tem vínculo sai do delta;
+- **marca item a item, no momento em que vai** — marcar só no fim deixaria,
+  numa queda no meio, metade sincronizada sem registro, e a retomada
+  reenviaria tudo;
+- **conflito sai do lote, não trava o lote** — um artefato que precisa de uma
+  pessoa não faz os outros 46 esperarem;
+- **limite de taxa faz recuar, não descartar** — o item volta para a fila;
+  perder item de lote é pior do que demorar.
+
+> **O transporte que acompanha esta versão é só o de arquivo.** A orquestração
+> (conjunto → delta → envio → marca → retomada) é genérica e roda sobre a
+> porta, mas nenhum adaptador de API embarcado existe ainda: pedir `system=
+> businessmap` é recusado com `no_transport` em vez de tentar e falhar mais
+> tarde.
+
 ## Rodadas de auditoria: elas se acumulam sozinhas
 
 A aba **Auditoria** dispara uma rodada nova sempre que a última passou de

@@ -5,7 +5,7 @@
 **Implementation:** planned — a identidade externa landa na change 0145; a porta e os adaptadores nas 0148 e 0150
 **Realizes:** [SC4] parcialmente (o resgate do Xray foi pontual; aqui o vinculo com o sistema oficial vira permanente) e a decisao de escopo da ADR 0015
 **Last updated:** 2026-09-13
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -51,6 +51,7 @@ existe so para volume e recorrencia.
 - The system shall recusar em voz alta, no preview, tudo o que a ferramenta
   de destino nao consegue representar, nomeando o que ficara de fora.
 - The system shall oferecer intercambio por arquivo em CSV e Cucumber JSON, nos dois sentidos, como adaptador que implementa a mesma porta dos demais e funciona com qualquer ferramenta que importe planilha, sem credencial e sem chamada de rede.
+- The system shall oferecer envio em lote de um ciclo inteiro para o sistema ligado, com preview do delta antes de escrever, marcando cada item no momento em que ele vai para que uma interrupcao seja retomavel sem reenviar o que ja foi.
 
 ### Event-driven
 
@@ -60,6 +61,7 @@ existe so para volume e recorrencia.
 - When o lado remoto mudou de revisao E o lado local mudou de hash desde a
   ultima sincronia, the system shall registrar um CONFLITO em vez de
   escolher um dos lados.
+- When o sistema de destino responde limite de taxa, the system shall recuar progressivamente e retomar, sem descartar item do lote.
 
 ### State-driven
 
@@ -79,6 +81,7 @@ existe so para volume e recorrencia.
   corporativo: o escopo e artefato de teste e evidencia.
 - The system shall not gravar credencial de sistema externo em arquivo do
   workspace; ela vive no keyring do SO (ADR 0008).
+- The system shall not travar um lote por causa de um artefato em conflito: o artefato sai do lote com o motivo registrado e o restante segue.
 
 ## Acceptance criteria
 
@@ -97,6 +100,7 @@ existe so para volume e recorrencia.
    explicitamente que a evidencia ficara de fora — verified by
    `backend/tests/test_integrations.py`.
 6. [unverified] Exportar e reimportar o mesmo arquivo nao cria duplicata, um CSV com coluna faltando falha nomeando a coluna, e o preview declara que evidencia sai como caminho e nao como anexo — verified by `backend/tests/test_integrations_file.py`.
+7. [unverified] Empurrar o mesmo ciclo duas vezes nao duplica no destino, interromper e repetir continua de onde parou, artefato em conflito sai do lote sem travar o resto, e limite de taxa nao perde item — verified by `backend/tests/test_integrations_bulk.py`.
 
 ## Maturity
 

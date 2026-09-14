@@ -48,9 +48,11 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import ci_ingest, ci_retencao, integrations_file as file_ops, mcp_write
+from . import ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import integrations_file as file_ops, mcp_write
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
 from .ci_credential import CredentialState
+from .integrations_bulk import LoteErro
 from .integrations_file import ArquivoErro
 from .mcp_write import WriteRecusada
 from .ci_ingest import CIIngestor, IngestError
@@ -691,6 +693,13 @@ def create_app(
 
     @app.exception_handler(CIError)
     async def _ci_error(request: Request, exc: CIError):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(LoteErro)
+    async def _lote_erro(request: Request, exc: LoteErro):
         return JSONResponse(
             status_code=exc.status,
             content={"error": {"code": exc.code, "message": exc.message}},
@@ -3034,6 +3043,30 @@ def _register_routes(app: FastAPI) -> None:
                  " (ADR 0003)"] if orfaos else []
             ),
         }
+
+    # -- envio em lote (change 0150) ----------------------------------------
+    #
+    # O agente é a ponte certa para o fluxo com humano no meio e a ponte
+    # ERRADA para volume: empurrar 47 resultados não deveria custar 47 turnos,
+    # 47 confirmações, nem variar de uma execução para outra.
+
+    def _lote_de(request: Request, system: str):
+        return bulk_ops.Lote(
+            ws_of(request), conn_of(request), bulk_ops.tracker_para(system),
+            system, _load_doc, _write_doc, reindex_file,
+        )
+
+    @app.get(API_PREFIX + "/integrations/bulk/{exec_id}/preview")
+    async def previa_lote(request: Request, exec_id: str, system: str = "file"):
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return _lote_de(request, system).delta(execution)
+
+    @app.post(API_PREFIX + "/integrations/bulk/{exec_id}")
+    async def empurrar_lote(request: Request, exec_id: str, system: str = "file"):
+        """Empurra o ciclo. Reexecutável sem efeito colateral: o que já foi
+        tem vínculo, e o que tem vínculo sai do delta."""
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return await _lote_de(request, system).empurrar(execution)
 
     @app.get(API_PREFIX + "/integrations/capabilities")
     async def integration_capabilities(request: Request):

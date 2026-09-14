@@ -1,6 +1,7 @@
 # Change 0150-conector-deterministico-volume-recorrencia — conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item
 
-- **Status:** proposed
+- **Status:** applied
+- **Applied:** 2026-09-14
 - **Date:** 2026-09-13
 - **Owner:**
 - **Lane:** product (uncertain)
@@ -56,14 +57,14 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 "task marked done" from "verification passed" — link the evidence.
 -->
 
-- [ ] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
-- [ ] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
-- [ ] Empurrar o mesmo ciclo duas vezes não duplica nada no destino.
-- [ ] Interromper no meio e repetir continua de onde parou, sem reenviar o
+- [x] Automated checks pass (`doctrina verify`, or the project's typecheck/test/build).
+- [x] The affected spec's acceptance criteria are met and cite their evidence (`doctrina coverage`).
+- [x] Empurrar o mesmo ciclo duas vezes não duplica nada no destino.
+- [x] Interromper no meio e repetir continua de onde parou, sem reenviar o
       que já tinha ido.
-- [ ] Um artefato em conflito sai do lote com o motivo e o restante do lote
+- [x] Um artefato em conflito sai do lote com o motivo e o restante do lote
       segue.
-- [ ] Resposta de limite de taxa faz o envio recuar e retomar, sem perder
+- [x] Resposta de limite de taxa faz o envio recuar e retomar, sem perder
       item.
 
 ## Open questions
@@ -71,3 +72,13 @@ unchecked (pass --force to archive anyway and record the gap). Distinguish
 Esta change só faz sentido depois que a 0145 a 0148 estiverem em uso real.
 Se na prática o agente der conta do volume que você tem, ela pode não
 precisar existir — e não construir é o melhor resultado possível para ela.
+
+**Resolvida assim:** construída, com a ressalva mantida e um limite dito em
+voz alta. O que entrou foi a ORQUESTRAÇÃO — conjunto → delta → envio → marca
+→ retomada — que é genérica e está testada contra os quatro modos de perder
+dado. O TRANSPORTE não: nenhum adaptador de API acompanha, e o único destino
+que empurra lote é o de arquivo (0148). `system=businessmap` é recusado com
+`no_transport` em vez de tentar e falhar depois.
+
+Se o agente der conta do seu volume real, a parte construída não estorva: ela
+não roda sozinha, não agenda nada e só existe quando alguém chama a rota.
