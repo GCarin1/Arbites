@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
 from . import agent_pack as agent_pack_ops
+from . import integrations as integ_ops
 from . import auth as auth_ops
 from . import audit as audit_ops
 from . import context_pack as context_pack_ops
@@ -47,7 +48,14 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
+from . import ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import integrations_file as file_ops, mcp_write
 from .ci import CIError, CIManager, HttpxGitHub, TokenStore
+from .ci_credential import CredentialState
+from .integrations_bulk import LoteErro
+from .integrations_file import ArquivoErro
+from .mcp_write import WriteRecusada
+from .ci_ingest import CIIngestor, IngestError
 from .executions import ExecutionError
 from . import feature_sync as feature_sync_ops
 from .gherkin_scan import (
@@ -152,6 +160,28 @@ class MoveIn(BaseModel):
     folder: str = ""  # destino relativo (vazio = raiz)
 
 
+class ExternalLinkIn(BaseModel):
+    """Vínculo com um sistema externo (change 0145)."""
+
+    model_config = ConfigDict(extra="forbid")
+    system: str
+    id: str
+    revision: str | None = None
+    # quando ausente, o servidor carimba o hash do conteúdo ATUAL: é o caso
+    # normal — quem acabou de sincronizar mandou o que está aqui agora
+    synced_hash: str | None = None
+
+
+class AgentTokenIn(BaseModel):
+    """Credencial do agente MCP (change 0146). No módulo e não dentro da
+    fábrica de rotas: com `from __future__ import annotations` as anotações
+    viram string, e o FastAPI só resolve o nome nos globais — declarada
+    local, ela vira parâmetro de QUERY em vez de corpo."""
+
+    model_config = ConfigDict(extra="forbid")
+    name: str
+
+
 class ExecutionCreate(BaseModel):
     name: str
     sprint: str | None = None
@@ -249,8 +279,60 @@ relevantes. Mantenha vivo — remova o que ficou desatualizado. -->
 """
 
 
+class McpTestcaseIn(BaseModel):
+    """Escrita de caso vinda do agente. `system` + `remote_id` são o que
+    tornam a chamada idempotente: com eles, repetir ATUALIZA."""
+    title: str
+    system: str | None = None
+    remote_id: str | None = None
+    revision: str | None = None
+    type: str | None = None
+    priority: str | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+    story: str | None = None
+    squad: str | None = None
+    folder: str | None = None
+    body: str | None = None
+
+
+class McpEvidenceIn(BaseModel):
+    filename: str
+    content_base64: str
+    mime: str | None = None
+    note: str | None = None
+
+
+class McpResultIn(BaseModel):
+    execution_id: str
+    testcase_id: str
+    status: str
+    comment: str | None = None
+    steps: dict[str, str] | None = None
+    evidence: list[McpEvidenceIn] | None = None
+
+
+class FileImportIn(BaseModel):
+    """Importação por arquivo: o conteúdo vem no corpo, não como upload, para
+    o agente MCP poder usar a mesma rota que a tela."""
+    content: str
+    system: str = "file"
+
+
+class McpLinkIn(BaseModel):
+    entity_id: str
+    system: str
+    remote_id: str
+    kind: str = "testcase"
+    revision: str | None = None
+
+
 class TokenIn(BaseModel):
     token: str
+    # Validade informada por quem criou o token: o provedor não conta ao
+    # cliente quando o token expira (change 0157). Opcional — quem usa um
+    # classic sem expiração simplesmente não informa.
+    expires_at: str | None = None
 
 
 class AIProviderConfig(BaseModel):
@@ -549,7 +631,13 @@ def create_app(
         reindex_full(ws, app.state.conn)
         app.state.runner = RunManager(ws, app.state.conn)
         app.state.tokens = tokens
+        app.state.credential = CredentialState(ws)
+        # O cliente real ganha memória da recusa; um fake de teste não tem o
+        # atributo e segue como antes.
+        if hasattr(github, "credential") and github.credential is None:
+            github.credential = app.state.credential
         app.state.ci = CIManager(ws, app.state.conn, github, tokens)
+        app.state.ci_ingest = CIIngestor(ws, app.state.conn, github)
         app.state.ai_keys = ai_keys
         app.state.ai_transport = ai_transport
         # Banco de contas: conexao propria e duravel, jamais a do indice
@@ -607,6 +695,35 @@ def create_app(
     async def _ci_error(request: Request, exc: CIError):
         return JSONResponse(
             status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(LoteErro)
+    async def _lote_erro(request: Request, exc: LoteErro):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(ArquivoErro)
+    async def _arquivo_erro(request: Request, exc: ArquivoErro):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(WriteRecusada)
+    async def _write_recusada(request: Request, exc: WriteRecusada):
+        return JSONResponse(
+            status_code=exc.status,
+            content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(IngestError)
+    async def _ingest_error(request: Request, exc: IngestError):
+        status = {"no_sources": 409, "not_found": 404}.get(exc.code, 422)
+        return JSONResponse(
+            status_code=status,
             content={"error": {"code": exc.code, "message": exc.message}},
         )
 
@@ -695,7 +812,12 @@ def _req_out(conn: sqlite3.Connection, ws: Workspace, entity_id: str) -> dict:
         raise _error(404, "not_found", f"{entity_id} não encontrado")
     out = dict(row)
     out["tags"] = [t for t in (out.get("tags") or "").split(",") if t]
-    _, out["body"] = _load_doc(ws, row["path"])
+    meta, out["body"] = _load_doc(ws, row["path"])
+    # A ORIGEM do requisito (change 0158). Requisito é insumo do time de
+    # negócio: quando ele vive no sistema oficial, a cópia daqui é espelho, e
+    # a tela precisa dizer isso antes de alguém editar e criar divergência.
+    out["external"] = integ_ops.read_links(meta)
+    out["owned_elsewhere"] = bool(out["external"])
     return out
 
 
@@ -773,13 +895,22 @@ def _register_routes(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/warnings")
     async def get_warnings(request: Request):
-        return [
+        avisos = [
             dict(row)
             for row in conn_of(request).execute(
                 "SELECT source_path, code, message, created_at FROM warnings"
                 " ORDER BY source_path, code"
             )
         ]
+        # O problema da credencial é DERIVADO a cada leitura, não guardado na
+        # tabela acima: aquela tabela é do índice, e um reindex a esvazia — o
+        # problema voltaria a ser invisível justamente no cenário que a change
+        # 0157 existe para cobrir. Vem primeiro porque bloqueia a ingestão
+        # inteira, enquanto um aviso de integridade é de um arquivo só.
+        credencial: CredentialState = request.app.state.credential
+        return credencial.problemas(
+            request.app.state.tokens.get() is not None
+        ) + avisos
 
     # -- lixeira (0081) ---------------------------------------------------
 
@@ -923,7 +1054,34 @@ def _register_routes(app: FastAPI) -> None:
             " ORDER BY ord",
             (entity_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        saida = []
+        for row in rows:
+            criterio = dict(row)
+            # Cobertura POR CRITÉRIO (change 0158). "A story tem 4 CTs" não
+            # responde a pergunta do time de negócio, que é "este critério
+            # foi verificado?" — quatro casos podem cobrir o mesmo critério e
+            # deixar três descobertos.
+            casos = conn.execute(
+                "SELECT t.id, t.title,"
+                " (SELECT r.status FROM results r"
+                "   WHERE r.testcase_id = t.id"
+                "   ORDER BY r.executed_at DESC LIMIT 1) AS last_status"
+                " FROM tc_criteria c JOIN testcases t ON t.id = c.testcase_id"
+                " WHERE c.ears_id = ? AND t.story_id = ? ORDER BY t.id",
+                (row["ears_id"], entity_id),
+            ).fetchall()
+            criterio["covered_by"] = [dict(c) for c in casos]
+            estados = {c["last_status"] for c in casos}
+            if not casos:
+                criterio["coverage"] = "uncovered"
+            elif estados & {"failed", "blocked"}:
+                criterio["coverage"] = "failing"
+            elif estados == {None}:
+                criterio["coverage"] = "untested"
+            else:
+                criterio["coverage"] = "passing"
+            saida.append(criterio)
+        return saida
 
     @app.get(API_PREFIX + "/requirements/{entity_id}/chain")
     async def requirement_chain(request: Request, entity_id: str):
@@ -1041,6 +1199,22 @@ def _register_routes(app: FastAPI) -> None:
         rel = _find_path(conn, "requirements", entity_id)
         meta, body = _load_doc(ws, rel)
         changes = payload.model_dump(exclude_unset=True)
+        # Requisito que vive no sistema oficial NÃO se edita aqui (change
+        # 0158). Editar a cópia produz divergência silenciosa: os dois lados
+        # passam a discordar e ninguém é avisado, porque nada falha. Quem
+        # quiser mesmo assumir o requisito aqui remove o vínculo primeiro —
+        # e aí a decisão fica explícita e registrada.
+        vinculos = integ_ops.read_links(meta)
+        if vinculos and not _so_vinculo(changes):
+            sistemas = ", ".join(v["system"] for v in vinculos)
+            raise _error(
+                409, "owned_elsewhere",
+                f"{entity_id} vive em {sistemas} — editar a cópia daqui faria"
+                " os dois lados discordarem em silêncio. Edite no sistema"
+                " oficial, ou remova o vínculo"
+                f" (DELETE /integrations/links/requirement/{entity_id}/"
+                f"{vinculos[0]['system']}) para assumir o requisito aqui.",
+            )
         body = changes.pop("body", body)
         if "squad" in changes and not changes["squad"]:
             meta.pop("squad", None)
@@ -1049,6 +1223,11 @@ def _register_routes(app: FastAPI) -> None:
         _write_doc(ws.root / rel, meta, body)
         reindex_file(ws, conn, ws.root / rel)
         return _req_out(conn, ws, entity_id)
+
+    def _so_vinculo(changes: dict) -> bool:
+        """Campos que descrevem o VÍNCULO continuam editáveis num requisito
+        externo: apontar melhor para onde ele mora não é divergir dele."""
+        return set(changes) <= {"external_key", "confluence_url"}
 
     @app.delete(API_PREFIX + "/requirements/{entity_id}", status_code=204)
     async def delete_requirement(request: Request, entity_id: str):
@@ -1227,6 +1406,54 @@ def _register_routes(app: FastAPI) -> None:
                 author_of(request),
             )
         return {"path": ws.relpath(dest)}
+
+    @app.get(API_PREFIX + "/testcases/impact")
+    async def testcases_impact(request: Request, files: str = ""):
+        """Quais casos um conjunto de arquivos alterados afeta (change 0146).
+
+        Devolve as duas origens SEPARADAS de propósito: vínculo explícito por
+        tag de cenário (ADR 0003) é fato; correlação por mapa de risco é
+        palpite útil. Misturar as duas faria quem consome tratar palpite como
+        fato — e um agente faria isso em silêncio.
+
+        O caminho vem de um diff (repo-relativo) e o índice guarda o caminho
+        relativo ao `local_path` do target: podem ter prefixos diferentes se o
+        repo de automação for subpasta. Casa por SUFIXO nos dois sentidos, que
+        cobre os dois casos sem exigir configuração."""
+        conn = conn_of(request)
+        alterados = [f.strip().lstrip("./") for f in files.split(",") if f.strip()]
+        if not alterados:
+            raise _error(422, "files_required",
+                         "informe `files` — a lista de arquivos alterados")
+
+        def casa(indexado: str) -> bool:
+            ind = (indexado or "").lstrip("./")
+            return any(
+                ind and (ind.endswith(a) or a.endswith(ind)) for a in alterados
+            )
+
+        por_tag = []
+        for row in conn.execute(
+            "SELECT id, title, scenario_tag, feature_path, automation_target,"
+            " status, COALESCE(needs_rerun, 0) needs_rerun FROM testcases"
+            " WHERE feature_path IS NOT NULL"
+        ).fetchall():
+            if casa(row["feature_path"]):
+                por_tag.append({**dict(row), "needs_rerun": bool(row["needs_rerun"])})
+
+        # correlação por mapa de risco: só existe com `risk_repos` configurado
+        cfg_repos = ws_of(request).config().get("risk_repos") or []
+        por_risco: list[dict] = []
+        nota_risco = None
+        if not cfg_repos:
+            nota_risco = ("mapa de risco não configurado (`risk_repos` vazio no"
+                          " arbites.yaml) — só o vínculo por tag foi avaliado")
+        return {
+            "changed_files": alterados,
+            "by_tag": por_tag,
+            "by_risk": por_risco,
+            "risk_note": nota_risco,
+        }
 
     @app.get(API_PREFIX + "/testcases/{entity_id}")
     async def get_testcase(request: Request, entity_id: str):
@@ -1699,6 +1926,52 @@ def _register_routes(app: FastAPI) -> None:
         if days not in (7, 15, 30):
             raise _error(422, "invalid_days", "days deve ser 7, 15 ou 30")
         return metrics_ops.trend(conn_of(request), days, sprint or None, squad or None)
+
+    @app.get(API_PREFIX + "/metrics/coverage-gaps")
+    async def coverage_gaps(
+        request: Request, epic: str = "", story: str = "", squad: str = "",
+        include_covered: bool = False,
+    ):
+        """O que falta cobrir — por story E por critério EARS (change 0146).
+
+        A matriz já dizia "3/7 critérios"; o que faltava era QUAIS 4. Um
+        número diz que há buraco; a lista diz onde ele está, e é isso que um
+        agente (ou uma pessoa) consegue agir em cima."""
+        conn = conn_of(request)
+        matriz = metrics_ops.traceability(
+            conn, epic or None, None, squad or None
+        )
+        saida = []
+        for grupo in matriz["epics"]:
+            for s in grupo["stories"]:
+                if story and s["id"] != story:
+                    continue
+                descobertos = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT ears_id, ord, text, form FROM criteria c"
+                        " WHERE c.story_id = ? AND NOT EXISTS ("
+                        "  SELECT 1 FROM tc_criteria x"
+                        "  JOIN testcases t ON t.id = x.testcase_id"
+                        "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)"
+                        " ORDER BY ord",
+                        (s["id"],),
+                    ).fetchall()
+                ]
+                tem_buraco = s["coverage_state"] == "uncovered" or descobertos
+                if not tem_buraco and not include_covered:
+                    continue
+                saida.append({
+                    "story_id": s["id"],
+                    "title": s["title"],
+                    "epic_id": grupo["id"],
+                    "coverage_state": s["coverage_state"],
+                    "ct_count": s["ct_count"],
+                    "criteria_total": s["criteria_total"],
+                    "criteria_covered": s["criteria_covered"],
+                    "uncovered_criteria": descobertos,
+                })
+        return {"stories": saida, "count": len(saida)}
 
     @app.get(API_PREFIX + "/metrics/coverage")
     async def metrics_coverage(request: Request, epic: str = "", squad: str = ""):
@@ -2487,14 +2760,412 @@ def _register_routes(app: FastAPI) -> None:
         ci: CIManager = request.app.state.ci
         return await asyncio.to_thread(ci.collect, exec_id)
 
+    # -- observabilidade: runs ingeridos (changes 0153/0154, ADR 0016) ------
+    #
+    # Puxar, não receber: a instância é local e não é alcançável da internet.
+    # O que já foi ingerido é respondido pelo DISCO, então repetir a ingestão
+    # não duplica e uma semana desligado volta inteira.
+
+    @app.post(API_PREFIX + "/ci/ingest")
+    async def ci_ingest_now(request: Request, limit: int | None = None):
+        ingestor: CIIngestor = request.app.state.ci_ingest
+        return await asyncio.to_thread(ingestor.ingerir, limit)
+
+    @app.get(API_PREFIX + "/ci/runs")
+    async def ci_runs(request: Request, limit: int = 50,
+                      workflow: str | None = None):
+        return {"runs": ci_ingest.listar_runs(conn_of(request), limit, workflow)}
+
+    @app.get(API_PREFIX + "/ci/observability")
+    async def ci_observability(request: Request, days: int = 30):
+        """A tela inteira numa chamada: saúde, sinais, o que mudou e os runs.
+
+        Sempre com o período ANTERIOR ao lado — um número sozinho não diz se
+        está melhorando, e é essa comparação que separa observabilidade de
+        um mural de gráficos.
+        """
+        if days < 1 or days > 365:
+            raise _error(422, "invalid_period", "days deve estar entre 1 e 365")
+        return ci_ingest.painel(ws_of(request), conn_of(request), days)
+
+    @app.get(API_PREFIX + "/ci/retention")
+    async def ci_retention_preview(request: Request):
+        """O que está ocupado e o que a próxima limpeza levaria — ANTES de
+        levar. Limpeza que só diz o que fez depois de feita obriga a confiar
+        sem poder conferir (change 0156)."""
+        return await asyncio.to_thread(ci_retencao.previa, ws_of(request))
+
+    @app.post(API_PREFIX + "/ci/retention/apply")
+    async def ci_retention_apply(request: Request):
+        return await asyncio.to_thread(
+            ci_retencao.aplicar, ws_of(request), conn_of(request)
+        )
+
+    @app.get(API_PREFIX + "/ci/runs/{run_id}")
+    async def ci_run_detail(request: Request, run_id: str):
+        return ci_ingest.run_detalhado(ws_of(request), conn_of(request), run_id)
+
+    @app.get(API_PREFIX + "/ci/attachment")
+    async def ci_attachment(request: Request, path: str):
+        """Serve o print/log/anexo do run. O caminho vem do índice, mas a
+        contenção é verificada no disco assim mesmo: um índice adulterado não
+        pode virar leitura de arquivo arbitrário."""
+        ws = ws_of(request)
+        base = (ws.root / "ci").resolve()
+        alvo = (ws.root / path).resolve()
+        if not str(alvo).startswith(str(base) + os.sep) or not alvo.is_file():
+            raise _error(404, "not_found", f"anexo ausente: {path}")
+        return FileResponse(alvo)
+
+    @app.get(API_PREFIX + "/ci/signals")
+    async def ci_signal_names(request: Request):
+        """Os sinais que EXISTEM — descobertos do que chegou, não de uma lista
+        fixa no código: um sinal novo aparece aqui sem deploy."""
+        return {"signals": ci_ingest.nomes_de_sinal(conn_of(request))}
+
+    @app.get(API_PREFIX + "/ci/signals/{name}")
+    async def ci_signal_series(request: Request, name: str,
+                               since: str | None = None,
+                               until: str | None = None):
+        return ci_ingest.serie(conn_of(request), name, since, until)
+
+    # -- identidade externa (change 0145, ADR 0015) -------------------------
+    #
+    # O vínculo mora no FRONTMATTER, não só no índice: o índice é descartável
+    # (ADR 0001) e um reindex apagaria a memória do que já foi sincronizado —
+    # e aí a próxima sincronia recriaria no sistema oficial tudo o que já
+    # existe lá.
+
+    _VINCULAVEIS = {"testcase": "testcases", "requirement": "requirements"}
+
+    def _tabela_de(kind: str) -> str:
+        if kind not in _VINCULAVEIS:
+            raise _error(
+                422, "unlinkable_kind",
+                "só caso de teste e requisito têm vínculo externo; recebido: %s" % kind,
+            )
+        return _VINCULAVEIS[kind]
+
+    @app.get(API_PREFIX + "/integrations/links")
+    async def external_links(request: Request, system: str = "", state: str = ""):
+        """O que daqui está ligado a quê lá, e em que estado.
+
+        É a consulta que torna qualquer escrita idempotente: antes de criar
+        no sistema oficial, pergunte o que já existe. `state` filtra por
+        pendência — `local_changed` é o que falta empurrar."""
+        ws, conn = ws_of(request), conn_of(request)
+        saida = []
+        for kind, tabela in _VINCULAVEIS.items():
+            for row in conn.execute(
+                f"SELECT id, title, path FROM {tabela} ORDER BY id"
+            ).fetchall():
+                try:
+                    meta, corpo = _load_doc(ws, row["path"])
+                except (OSError, ValueError):
+                    continue
+                agora = integ_ops.content_hash(corpo)
+                vinculos = integ_ops.read_links(meta)
+                if system:
+                    vinculos = [v for v in vinculos if v["system"] == system]
+                for v in vinculos:
+                    estado = integ_ops.sync_state(v, agora)
+                    if state and estado != state:
+                        continue
+                    saida.append({
+                        "kind": kind, "entity_id": row["id"], "title": row["title"],
+                        "system": v["system"], "remote_id": v["id"],
+                        "revision": v.get("revision"),
+                        "synced_at": v.get("synced_at"), "state": estado,
+                    })
+                # Artefato sem vínculo TAMBÉM é resposta: ele é o
+                # `never_synced`, e é justamente o que alguém pede quando
+                # pergunta "o que ainda não foi para lá?". Filtrar por
+                # sistema o exclui — ele não pertence a sistema nenhum.
+                if not vinculos and not system and state in ("", "never_synced"):
+                    saida.append({
+                        "kind": kind, "entity_id": row["id"], "title": row["title"],
+                        "system": None, "remote_id": None, "revision": None,
+                        "synced_at": None, "state": "never_synced",
+                    })
+        return {"links": saida, "count": len(saida)}
+
+    @app.put(API_PREFIX + "/integrations/links/{kind}/{entity_id}")
+    async def set_external_link(
+        request: Request, kind: str, entity_id: str, payload: ExternalLinkIn
+    ):
+        """Registra (ou atualiza) o vínculo de UM sistema, preservando os
+        outros: numa migração corporativa os dois convivem, e perder o antigo
+        enquanto o novo nasce é perder o rastro quando ele mais importa."""
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, _tabela_de(kind), entity_id)
+        meta, corpo = _load_doc(ws, rel)
+        meta[integ_ops.CAMPO] = integ_ops.upsert_link(
+            meta, payload.system, payload.id, payload.revision,
+            payload.synced_hash or integ_ops.content_hash(corpo),
+            datetime.now(timezone.utc).isoformat(),
+        )
+        path = ws.root / rel
+        _write_doc(path, meta, corpo)
+        reindex_file(ws, conn, path)
+        return {"entity_id": entity_id, "external": meta[integ_ops.CAMPO]}
+
+    @app.delete(API_PREFIX + "/integrations/links/{kind}/{entity_id}/{system}",
+                status_code=204)
+    async def delete_external_link(
+        request: Request, kind: str, entity_id: str, system: str
+    ):
+        ws, conn = ws_of(request), conn_of(request)
+        rel = _find_path(conn, _tabela_de(kind), entity_id)
+        meta, corpo = _load_doc(ws, rel)
+        restantes = integ_ops.remove_link(meta, system)
+        if restantes:
+            meta[integ_ops.CAMPO] = restantes
+        else:
+            meta.pop(integ_ops.CAMPO, None)
+        path = ws.root / rel
+        _write_doc(path, meta, corpo)
+        reindex_file(ws, conn, path)
+
+    # -- escritas do agente (change 0147) -----------------------------------
+    #
+    # Prévia e gravação em ROTAS SEPARADAS, não num `apply` no corpo: o log de
+    # atividade registra o caminho, e um booleano no corpo não apareceria lá.
+    # O registro precisa distinguir "o agente olhou" de "o agente gravou".
+
+    @app.post(API_PREFIX + "/integrations/write/testcase/preview")
+    async def mcp_preview_testcase(request: Request, payload: McpTestcaseIn):
+        return mcp_write.previa_testcase(
+            ws_of(request), conn_of(request), payload.model_dump())
+
+    @app.post(API_PREFIX + "/integrations/write/testcase")
+    async def mcp_write_testcase(request: Request, payload: McpTestcaseIn):
+        ws, conn = ws_of(request), conn_of(request)
+        resultado = mcp_write.aplicar_testcase(
+            ws, conn, payload.model_dump(), author_of(request),
+            _write_doc, reindex_file,
+        )
+        await asyncio.to_thread(
+            versioning.commit_paths, ws, [ws.root / resultado["path"]],
+            f"{resultado['action']} {resultado['entity_id']} via agente",
+            author_of(request),
+        )
+        return resultado
+
+    @app.post(API_PREFIX + "/integrations/write/result/preview")
+    async def mcp_preview_result(request: Request, payload: McpResultIn):
+        return mcp_write.previa_resultado(
+            ws_of(request), conn_of(request), payload.model_dump(), exec_ops.load)
+
+    @app.post(API_PREFIX + "/integrations/write/result")
+    async def mcp_write_result(request: Request, payload: McpResultIn):
+        return mcp_write.aplicar_resultado(
+            ws_of(request), conn_of(request), payload.model_dump(),
+            author_of(request), exec_ops, reindex_file,
+        )
+
+    @app.post(API_PREFIX + "/integrations/write/link/preview")
+    async def mcp_preview_link(request: Request, payload: McpLinkIn):
+        return mcp_write.previa_vinculo(
+            ws_of(request), conn_of(request), payload.model_dump(),
+            _find_path, _load_doc,
+        )
+
+    @app.post(API_PREFIX + "/integrations/write/link")
+    async def mcp_write_link(request: Request, payload: McpLinkIn):
+        return mcp_write.aplicar_vinculo(
+            ws_of(request), conn_of(request), payload.model_dump(),
+            _find_path, _load_doc, _write_doc, reindex_file,
+        )
+
+    # -- intercâmbio por arquivo (change 0148) ------------------------------
+    #
+    # O adaptador que funciona com QUALQUER ferramenta: toda ferramenta de
+    # teste do mercado importa CSV, e nenhuma exige credencial para isso. É
+    # também o SEGUNDO adaptador — e é ele que prova que a porta da change
+    # 0145 não saiu com o formato de uma ferramenta só.
+
+    @app.get(API_PREFIX + "/integrations/file/testcases")
+    async def exportar_casos_csv(request: Request, system: str = "file",
+                                 folder: str = ""):
+        ws, conn = ws_of(request), conn_of(request)
+        linhas = []
+        for row in conn.execute("SELECT id, path FROM testcases ORDER BY id"):
+            if folder and not row["path"].startswith(f"testcases/{folder}"):
+                continue
+            try:
+                meta, corpo = _load_doc(ws, row["path"])
+            except (OSError, ValueError):
+                continue
+            linhas.append({"meta": meta, "body": corpo})
+        csv_texto = file_ops.exportar_casos(linhas, system)
+        return Response(
+            content=csv_texto, media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition":
+                     'attachment; filename="arbites-testcases.csv"'},
+        )
+
+    @app.get(API_PREFIX + "/integrations/file/results")
+    async def exportar_resultados_csv(request: Request, execution: str = "",
+                                      system: str = "file"):
+        ws, conn = ws_of(request), conn_of(request)
+        ids = ([execution] if execution else
+               [r["id"] for r in conn.execute(
+                   "SELECT id FROM executions ORDER BY created_at DESC LIMIT 200")])
+        execucoes = []
+        for exec_id in ids:
+            try:
+                execucoes.append(exec_ops.load(ws, exec_id))
+            except Exception:  # noqa: BLE001 — ciclo removido do disco
+                continue
+        csv_texto = file_ops.exportar_resultados(execucoes, system)
+        return Response(
+            content=csv_texto, media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition":
+                     'attachment; filename="arbites-results.csv"'},
+        )
+
+    @app.post(API_PREFIX + "/integrations/file/testcases/preview")
+    async def previa_import_casos(request: Request, payload: FileImportIn):
+        ws, conn = ws_of(request), conn_of(request)
+        linhas = file_ops.ler_csv(payload.content, ["title"])
+
+        def achar(system: str, remote_id: str):
+            achado = mcp_write.achar_por_vinculo(
+                ws, conn, "testcases", system, remote_id)
+            return achado[0] if achado else None
+
+        return file_ops.previa_importacao(linhas, payload.system, achar)
+
+    @app.post(API_PREFIX + "/integrations/file/testcases")
+    async def importar_casos(request: Request, payload: FileImportIn):
+        """Importa. A idempotência vem do `external_id`, não da ordem: o mesmo
+        arquivo importado de novo ATUALIZA o que já entrou."""
+        ws, conn = ws_of(request), conn_of(request)
+        linhas = file_ops.ler_csv(payload.content, ["title"])
+
+        def achar(system: str, remote_id: str):
+            achado = mcp_write.achar_por_vinculo(
+                ws, conn, "testcases", system, remote_id)
+            return achado[0] if achado else None
+
+        plano = file_ops.previa_importacao(linhas, payload.system, achar)
+        ignoradas = {d["line"] for d in plano["skipped_duplicates"]}
+        criados, atualizados = [], []
+        for numero, linha in enumerate(linhas, start=2):
+            if numero in ignoradas:
+                continue
+            pedido = {
+                "title": (linha.get("title") or "").strip(),
+                "body": linha.get("body") or "",
+                "type": (linha.get("type") or "").strip() or None,
+                "priority": (linha.get("priority") or "").strip() or None,
+                "status": (linha.get("status") or "").strip() or None,
+                "story": (linha.get("story") or "").strip() or None,
+                "folder": (linha.get("folder") or "").strip() or None,
+                "tags": [t for t in (linha.get("tags") or "").split(
+                    file_ops.SEPARADOR_LISTA) if t.strip()] or None,
+            }
+            externo = (linha.get("external_id") or "").strip()
+            if externo:
+                pedido["system"] = payload.system
+                pedido["remote_id"] = externo
+            feito = mcp_write.aplicar_testcase(
+                ws, conn, pedido, author_of(request), _write_doc, reindex_file)
+            (criados if feito["action"] == "create" else atualizados).append(
+                feito["entity_id"])
+        return {"created": criados, "updated": atualizados, "plan": plano}
+
+    @app.post(API_PREFIX + "/integrations/file/cucumber/preview")
+    async def previa_cucumber(request: Request, payload: FileImportIn):
+        """Os cenários do arquivo e a que caso cada um se liga pela tag."""
+        cenarios = file_ops.ler_cucumber(payload.content)
+        conn = conn_of(request)
+        conhecidos, orfaos = [], []
+        for cenario in cenarios:
+            ct = cenario.get("testcase_id")
+            existe = bool(ct) and conn.execute(
+                "SELECT 1 FROM testcases WHERE id = ?", (ct,)).fetchone()
+            (conhecidos if existe else orfaos).append(cenario)
+        return {
+            "scenarios": cenarios,
+            "matched": conhecidos,
+            "unmatched": orfaos,
+            "warnings": (
+                [f"{len(orfaos)} cenário(s) sem tag @CT-XXXX que resolva para um"
+                 " caso daqui — sem a tag não há como ligar resultado a caso"
+                 " (ADR 0003)"] if orfaos else []
+            ),
+        }
+
+    # -- envio em lote (change 0150) ----------------------------------------
+    #
+    # O agente é a ponte certa para o fluxo com humano no meio e a ponte
+    # ERRADA para volume: empurrar 47 resultados não deveria custar 47 turnos,
+    # 47 confirmações, nem variar de uma execução para outra.
+
+    def _lote_de(request: Request, system: str):
+        return bulk_ops.Lote(
+            ws_of(request), conn_of(request), bulk_ops.tracker_para(system),
+            system, _load_doc, _write_doc, reindex_file,
+        )
+
+    @app.get(API_PREFIX + "/integrations/bulk/{exec_id}/preview")
+    async def previa_lote(request: Request, exec_id: str, system: str = "file"):
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return _lote_de(request, system).delta(execution)
+
+    @app.post(API_PREFIX + "/integrations/bulk/{exec_id}")
+    async def empurrar_lote(request: Request, exec_id: str, system: str = "file"):
+        """Empurra o ciclo. Reexecutável sem efeito colateral: o que já foi
+        tem vínculo, e o que tem vínculo sai do delta."""
+        execution = exec_ops.load(ws_of(request), exec_id)
+        return await _lote_de(request, system).empurrar(execution)
+
+    @app.get(API_PREFIX + "/integrations/capabilities")
+    async def integration_capabilities(request: Request):
+        """O que cada adaptador consegue representar. O que ele NÃO representa
+        precisa ser dito em voz alta antes de sincronizar, não descoberto
+        depois (ADR 0015)."""
+        return {"adapters": [c.as_dict() for c in integ_ops.ADAPTADORES.values()]}
+
+    # -- credencial do agente (MCP, change 0146) ----------------------------
+
+    @app.get(API_PREFIX + "/profile/agent-tokens")
+    async def list_agent_tokens(request: Request):
+        user = current_user(request)
+        return {"tokens": auth_ops.list_agent_tokens(request.app.state.auth, user["id"])}
+
+    @app.post(API_PREFIX + "/profile/agent-tokens", status_code=201)
+    async def create_agent_token(request: Request, payload: AgentTokenIn):
+        """Devolve o token EM CLARO uma única vez — depois só o hash existe."""
+        user = current_user(request)
+        raw, meta = auth_ops.create_agent_token(
+            request.app.state.auth, user["id"], payload.name
+        )
+        return {"token": raw, **meta}
+
+    @app.delete(API_PREFIX + "/profile/agent-tokens/{token_id}", status_code=204)
+    async def revoke_agent_token(request: Request, token_id: str):
+        user = current_user(request)
+        if not auth_ops.revoke_agent_token(request.app.state.auth, user["id"], token_id):
+            raise _error(404, "not_found", "credencial não encontrada")
+
     @app.get(API_PREFIX + "/settings/github/token")
     async def github_token_status(request: Request):
-        return request.app.state.tokens.status()  # status apenas, nunca o valor
+        # Status apenas, nunca o valor. A VALIDADE não é segredo — é uma data,
+        # e existe para ser vista antes de passar (change 0157).
+        credencial: CredentialState = request.app.state.credential
+        return credencial.status(request.app.state.tokens.get() is not None)
 
     @app.put(API_PREFIX + "/settings/github/token")
     async def github_token_set(request: Request, payload: TokenIn):
         request.app.state.tokens.set(payload.token)
-        return request.app.state.tokens.status()
+        # O provedor não conta ao cliente quando o token expira: quem o criou
+        # informa. Sem isso o Arbites só descobre a expiração quando ela já
+        # aconteceu — tarde demais para pedir a renovação a tempo.
+        credencial: CredentialState = request.app.state.credential
+        credencial.registrar_token(payload.expires_at)
+        return credencial.status(True)
 
     # -- migração Xray (M2) -------------------------------------------------
 
@@ -3726,6 +4397,53 @@ def _register_routes(app: FastAPI) -> None:
             for r in rows
         ]
 
+    @app.delete(API_PREFIX + "/audit/{audit_id}", status_code=204)
+    async def delete_audit(request: Request, audit_id: str):
+        """Exclui UMA rodada, para a lixeira (change 0151).
+
+        Uma rodada é um documento do workspace como outro qualquer, e todos
+        os outros já tinham exclusão. Vai para `.arbites/trash/` e não some:
+        um retrato do estado de qualidade apagado sem volta não se
+        recupera."""
+        ws, conn = ws_of(request), conn_of(request)
+        row = conn.execute(
+            "SELECT path FROM audits WHERE id = ?", (audit_id,)
+        ).fetchone()
+        if not row:
+            raise _error(404, "not_found", f"{audit_id} não encontrada")
+        path = ws.root / row["path"]
+        ws.trash(path)
+        reindex_file(ws, conn, path)
+
+    @app.delete(API_PREFIX + "/audit", status_code=200)
+    async def delete_audits_before(request: Request, before: str = ""):
+        """Exclui em lote as rodadas ANTERIORES a uma data (change 0151).
+
+        `GET /audit/latest` dispara rodada nova sempre que a última passou do
+        intervalo, então basta abrir a aba todo dia para a pasta crescer sem
+        ninguém pedir. Exclusão de uma em uma não dá conta disso.
+
+        Comparação por prefixo de data ISO, não por parse: `ran_at` é gravado
+        em ISO UTC e ordenar string ISO é ordenar tempo. `before` é
+        EXCLUSIVO — a rodada exatamente da data informada não é levada."""
+        if not before:
+            raise _error(422, "before_required",
+                         "informe `before` (data ISO) — a exclusão em lote"
+                         " não apaga o histórico inteiro sem recorte")
+        ws, conn = ws_of(request), conn_of(request)
+        rows = conn.execute(
+            "SELECT id, path FROM audits WHERE ran_at < ? ORDER BY ran_at",
+            (before,),
+        ).fetchall()
+        removed = []
+        for row in rows:
+            path = ws.root / row["path"]
+            if path.exists():
+                ws.trash(path)
+                reindex_file(ws, conn, path)
+            removed.append(row["id"])
+        return {"removed": removed, "count": len(removed)}
+
     @app.get(API_PREFIX + "/audit/{audit_id}")
     async def get_audit(request: Request, audit_id: str):
         return _audit_out(conn_of(request), ws_of(request), audit_id)
@@ -3867,6 +4585,15 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # O painel inteiro, e nao rota a rota: uma rota /admin/ nova ja nasce
     # restrita. GET /admin/switches e a excecao deliberada — a UI precisa
     # saber o que esconder, e o estado de um interruptor nao e segredo.
+    # Excluir rodada de auditoria e mais perto de destruir registro do que de
+    # descartar rascunho: e um retrato do estado de qualidade num momento
+    # (0151). Rodar e ler continuam abertos a qualquer papel.
+    # Aplicar retenção remove anexo e run: é destrutivo, mesmo indo para a
+    # lixeira. LER a prévia continua aberto — ver o que seria removido é o
+    # que permite alguém discordar antes de acontecer.
+    (r"/ci/retention/apply$", {"POST"}, "admin", None),
+    (r"/audit$", {"DELETE"}, "admin", None),
+    (r"/audit/[^/]+$", {"DELETE"}, "admin", None),
     (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),
     (r"/admin/switches$", {"PUT"}, "admin", None),
 )
@@ -3945,6 +4672,23 @@ def _register_auth(app: FastAPI) -> None:
             return await call_next(request)
         raw = request.cookies.get(auth_ops.SESSION_COOKIE)
         user = auth_ops.resolve_session(request.app.state.auth, raw)
+        # Credencial do agente (MCP, change 0146): um Bearer vale como sessão,
+        # mas NÃO é a sessão — é outra credencial, revogável sozinha. O agente
+        # entra pelo mesmo gate que todo mundo e herda o papel da conta dona,
+        # então papel, módulo desligado e log de atividade valem sem regra
+        # nova (ADR 0014/0015).
+        if user is None:
+            header = request.headers.get("authorization") or ""
+            if header.lower().startswith("bearer "):
+                # O interruptor `mcp_server` desliga a superfície do agente
+                # INTEIRA (change 0149): sem ele a credencial não resolve, e
+                # o navegador segue intacto — são credenciais diferentes.
+                if auth_ops.switch_enabled(request.app.state.auth, "mcp_server"):
+                    user = auth_ops.resolve_agent_token(
+                        request.app.state.auth, header[7:].strip()
+                    )
+                    if user is not None:
+                        request.state.via_agent = True
         request.state.user = user
         if path in _PUBLIC_PATHS:
             return await call_next(request)
@@ -3956,6 +4700,20 @@ def _register_auth(app: FastAPI) -> None:
             )
             response.delete_cookie(auth_ops.SESSION_COOKIE, path="/")
             return response
+        # "Ele mexe ou só olha?" é UMA pergunta com duas respostas — por isso
+        # um interruptor, e não um por ferramenta (change 0149). Vale para
+        # qualquer método que altere, inclusive os que ainda não existem.
+        if (getattr(request.state, "via_agent", False)
+                and request.method not in ("GET", "HEAD", "OPTIONS")
+                and not auth_ops.switch_enabled(request.app.state.auth, "mcp_write")):
+            return JSONResponse(
+                status_code=403,
+                content={"error": {
+                    "code": "agent_write_disabled",
+                    "message": "o agente está em modo somente-leitura;"
+                               " ligue a escrita em IA → MCP",
+                }},
+            )
         if user["must_change_password"] and path not in _PASSWORD_CHANGE_PATHS:
             return JSONResponse(
                 status_code=403,

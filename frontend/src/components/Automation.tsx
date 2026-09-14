@@ -3,6 +3,7 @@ import { fetchOuAvisar } from "../api";
 import { Modal } from "./Modal";
 import { TabBar } from "./TabBar";
 import { useToast } from "./Toast";
+import type { GithubTokenStatus } from "../types";
 
 const BASE = "/api/v1";
 
@@ -1250,6 +1251,11 @@ function CIPanel({
 }) {
   const [tokenConfigured, setTokenConfigured] = useState<boolean | null>(null);
   const [tokenInput, setTokenInput] = useState("");
+  // Validade da credencial (change 0157): o provedor não conta ao cliente
+  // quando o token expira, então quem o criou informa. Sem isso o Arbites só
+  // descobre a expiração depois dela — tarde para pedir a renovação.
+  const [tokenExpira, setTokenExpira] = useState("");
+  const [credencial, setCredencial] = useState<GithubTokenStatus | null>(null);
   const [target, setTarget] = useState("");
   const [tags, setTags] = useState("");
   const [ciFeature, setCiFeature] = useState("");
@@ -1262,8 +1268,11 @@ function CIPanel({
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    json<{ configured: boolean }>(`${BASE}/settings/github/token`)
-      .then((data) => setTokenConfigured(data.configured))
+    json<GithubTokenStatus>(`${BASE}/settings/github/token`)
+      .then((data) => {
+        setTokenConfigured(data.configured);
+        setCredencial(data);
+      })
       .catch(() => setTokenConfigured(null));
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
@@ -1276,11 +1285,18 @@ function CIPanel({
 
   async function saveToken() {
     try {
-      const data = await json<{ configured: boolean }>(
+      const data = await json<GithubTokenStatus>(
         `${BASE}/settings/github/token`,
-        { method: "PUT", body: JSON.stringify({ token: tokenInput }) },
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            token: tokenInput,
+            expires_at: tokenExpira || null,
+          }),
+        },
       );
       setTokenConfigured(data.configured);
+      setCredencial(data);
       setTokenInput("");
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -1371,11 +1387,47 @@ function CIPanel({
             value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)}
           />
+          <input
+            type="date"
+            aria-label="Validade do token"
+            title="Quando este token expira (o fine-grained dura no máximo 366 dias)"
+            value={tokenExpira}
+            onChange={(e) => setTokenExpira(e.target.value)}
+          />
           <button onClick={() => void saveToken()} disabled={!tokenInput}>
             Salvar no keyring
           </button>
         </div>
-        <p className="caption muted">Guardado no keyring do sistema, nunca em arquivo.</p>
+        <p className="caption muted">
+          Guardado no keyring do sistema, nunca em arquivo. A <strong>validade</strong>
+          {" "}é opcional e não é segredo — é uma data, e serve para o Arbites avisar
+          em Problemas <em>antes</em> de o token expirar. Um fine-grained dura no
+          máximo 366 dias e a organização pode revogá-lo antes disso; sem a data,
+          a ingestão pararia em silêncio.
+        </p>
+        {credencial?.last_refusal && (
+          <p className="obs-aviso">
+            O GitHub recusou esta credencial em{" "}
+            {credencial.last_refusal.at.slice(0, 10)} (HTTP{" "}
+            {credencial.last_refusal.status}): {credencial.last_refusal.message}.
+            A ingestão está parada por isso.
+          </p>
+        )}
+        {credencial?.expires_at && (
+          <p className="caption muted">
+            Validade informada: {credencial.expires_at}
+            {credencial.days_until_expiry !== null &&
+              ` · ${
+                credencial.days_until_expiry < 0
+                  ? `expirou há ${Math.abs(credencial.days_until_expiry)} ${
+                      Math.abs(credencial.days_until_expiry) === 1 ? "dia" : "dias"
+                    }`
+                  : `faltam ${credencial.days_until_expiry} ${
+                      credencial.days_until_expiry === 1 ? "dia" : "dias"
+                    }`
+              }`}
+          </p>
+        )}
       </div>
     );
   }

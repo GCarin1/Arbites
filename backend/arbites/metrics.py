@@ -373,6 +373,80 @@ def traceability(
         ).fetchone()
         return dict(row) if row else None
 
+    def montar_story(story) -> dict | None:
+        """A linha da matriz para UMA story. Extraída do laço dos epics para
+        a story órfã poder usar a mesma conta — antes ela simplesmente não
+        aparecia na matriz, e a tela a mostrava como "sem cobertura" mesmo
+        coberta, inventando um buraco que não existia."""
+        cts = conn.execute(
+            "SELECT id, title, status FROM testcases WHERE story_id = ?"
+            + ct_squad_where + " ORDER BY id",
+            ([story["id"], squad] if squad else [story["id"]]),
+        ).fetchall()
+        if squad and not cts:
+            return None  # squad: oculta stories sem CT no squad
+        ct_rows = []
+        lasts = []
+        for ct in cts:
+            last = last_result(ct["id"])
+            if last:
+                lasts.append((ct["id"], last))
+            ct_rows.append({**dict(ct), "last_result": last})
+        statuses = [last["status"] for _, last in lasts]
+        agg_status = next((s for s in _WORST_ORDER if s in statuses), None)
+        newest = max(lasts, key=lambda x: x[1]["executed_at"] or "")[1] if lasts else None
+        evidence_count = 0
+        for ct_id, last in lasts:
+            evidence_count += conn.execute(
+                "SELECT COUNT(*) c FROM evidences"
+                " WHERE execution_id = ? AND testcase_id = ?",
+                (last["execution_id"], ct_id),
+            ).fetchone()["c"]
+        defects = [
+            dict(d)
+            for d in conn.execute(
+                "SELECT id, title, status, severity, testcase_id, execution_id"
+                " FROM defects WHERE testcase_id IN (SELECT id FROM testcases"
+                " WHERE story_id = ?) ORDER BY id",
+                (story["id"],),
+            )
+        ]
+        # cobertura de critérios EARS (0092): total × cobertos (critério
+        # com ≥1 CT vinculado via `criteria`)
+        criteria_total = conn.execute(
+            "SELECT COUNT(*) c FROM criteria WHERE story_id = ?",
+            (story["id"],),
+        ).fetchone()["c"]
+        criteria_covered = conn.execute(
+            "SELECT COUNT(DISTINCT c.ears_id) c FROM criteria c"
+            " WHERE c.story_id = ? AND EXISTS ("
+            "  SELECT 1 FROM tc_criteria x JOIN testcases t ON t.id = x.testcase_id"
+            "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)",
+            (story["id"],),
+        ).fetchone()["c"]
+        # estado semântico de cobertura (0087): honesto além de "tem CT?"
+        if not cts:
+            coverage_state = "uncovered"
+        elif agg_status is None:
+            coverage_state = "untested"  # tem CT, nenhum executado
+        elif agg_status == "passed":
+            coverage_state = "passing"  # todos os executados passaram
+        else:
+            coverage_state = "failing"  # pior executado é failed/blocked/…
+        return {
+            **dict(story),
+            "ct_count": len(cts),
+            "covered": len(cts) > 0,
+            "coverage_state": coverage_state,
+            "criteria_total": criteria_total,
+            "criteria_covered": criteria_covered,
+            "last_status": agg_status,
+            "last_execution": newest["execution_id"] if newest else None,
+            "evidence_count": evidence_count,
+            "defects": defects,
+            "testcases": ct_rows,
+        }
+
     out_epics = []
     for epic_row in epics:
         stories = conn.execute(
@@ -380,83 +454,30 @@ def traceability(
             " WHERE kind='story' AND epic_id = ? ORDER BY id",
             (epic_row["id"],),
         ).fetchall()
-        out_stories = []
-        for story in stories:
-            cts = conn.execute(
-                "SELECT id, title, status FROM testcases WHERE story_id = ?"
-                + ct_squad_where + " ORDER BY id",
-                ([story["id"], squad] if squad else [story["id"]]),
-            ).fetchall()
-            if squad and not cts:
-                continue  # squad: oculta stories sem CT no squad
-            ct_rows = []
-            lasts = []
-            for ct in cts:
-                last = last_result(ct["id"])
-                if last:
-                    lasts.append((ct["id"], last))
-                ct_rows.append({**dict(ct), "last_result": last})
-            statuses = [last["status"] for _, last in lasts]
-            agg_status = next((s for s in _WORST_ORDER if s in statuses), None)
-            newest = max(lasts, key=lambda x: x[1]["executed_at"] or "")[1] if lasts else None
-            evidence_count = 0
-            for ct_id, last in lasts:
-                evidence_count += conn.execute(
-                    "SELECT COUNT(*) c FROM evidences"
-                    " WHERE execution_id = ? AND testcase_id = ?",
-                    (last["execution_id"], ct_id),
-                ).fetchone()["c"]
-            defects = [
-                dict(d)
-                for d in conn.execute(
-                    "SELECT id, title, status, severity, testcase_id, execution_id"
-                    " FROM defects WHERE testcase_id IN (SELECT id FROM testcases"
-                    " WHERE story_id = ?) ORDER BY id",
-                    (story["id"],),
-                )
-            ]
-            # cobertura de critérios EARS (0092): total × cobertos (critério
-            # com ≥1 CT vinculado via `criteria`)
-            criteria_total = conn.execute(
-                "SELECT COUNT(*) c FROM criteria WHERE story_id = ?",
-                (story["id"],),
-            ).fetchone()["c"]
-            criteria_covered = conn.execute(
-                "SELECT COUNT(DISTINCT c.ears_id) c FROM criteria c"
-                " WHERE c.story_id = ? AND EXISTS ("
-                "  SELECT 1 FROM tc_criteria x JOIN testcases t ON t.id = x.testcase_id"
-                "  WHERE x.ears_id = c.ears_id AND t.story_id = c.story_id)",
-                (story["id"],),
-            ).fetchone()["c"]
-            # estado semântico de cobertura (0087): honesto além de "tem CT?"
-            if not cts:
-                coverage_state = "uncovered"
-            elif agg_status is None:
-                coverage_state = "untested"  # tem CT, nenhum executado
-            elif agg_status == "passed":
-                coverage_state = "passing"  # todos os executados passaram
-            else:
-                coverage_state = "failing"  # pior executado é failed/blocked/…
-            out_stories.append(
-                {
-                    **dict(story),
-                    "ct_count": len(cts),
-                    "covered": len(cts) > 0,
-                    "coverage_state": coverage_state,
-                    "criteria_total": criteria_total,
-                    "criteria_covered": criteria_covered,
-                    "last_status": agg_status,
-                    "last_execution": newest["execution_id"] if newest else None,
-                    "evidence_count": evidence_count,
-                    "defects": defects,
-                    "testcases": ct_rows,
-                }
-            )
+        out_stories = [linha for linha in (montar_story(s) for s in stories)
+                       if linha is not None]
         if squad and not out_stories:
             continue  # squad: oculta epics sem story no squad
         out_epics.append({**dict(epic_row), "stories": out_stories})
+
+    # Story ÓRFÃ (sem epic, ou apontando para um epic que não existe mais)
+    # entra na matriz também. Ela existe na tela de requisitos, sob "sem
+    # epic/" — deixá-la de fora daqui fazia a mesma tela dizer "sem cobertura"
+    # para uma story coberta, e cobertura falsa é pior do que cobertura
+    # ausente: alguém age sobre um buraco que não existe.
+    orfas = []
+    if not epic:
+        linhas = conn.execute(
+            "SELECT id, title, status FROM requirements WHERE kind='story'"
+            " AND (epic_id IS NULL OR epic_id = ''"
+            "      OR epic_id NOT IN (SELECT id FROM requirements WHERE kind='epic'))"
+            " ORDER BY id"
+        ).fetchall()
+        orfas = [linha for linha in (montar_story(s) for s in linhas)
+                 if linha is not None]
+
     return {"epic_filter": epic, "sprint_filter": sprint, "squad_filter": squad,
-            "epics": out_epics}
+            "epics": out_epics, "orphan_stories": orfas}
 
 
 _SEVERITY_ORDER = ["critical", "high", "medium", "low"]

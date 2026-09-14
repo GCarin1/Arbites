@@ -1,6 +1,8 @@
 import type {
   ActivityEntry,
   AdminOverview,
+  AgentToken,
+  ExternalLink,
   LoginAttempt,
   ManagedUser,
   Role,
@@ -13,6 +15,8 @@ import type {
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
+  CiRetention,
+  CiRun,
   DailyContext,
   DailyDigestResult,
   DashboardOverview,
@@ -35,6 +39,7 @@ import type {
   GeneratePreview,
   HealthScore,
   MetricsSummary,
+  Observability,
   Criterion,
   Requirement,
   StoryChain,
@@ -132,6 +137,40 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
+
+  // -- Observabilidade (changes 0153/0154/0155) ----------------------------
+  observability: (days: number) =>
+    request<Observability>(`/ci/observability?days=${days}`),
+  ciRun: (id: string) => request<CiRun>(`/ci/runs/${encodeURIComponent(id)}`),
+  ciIngest: () =>
+    request<{ ingested: string[]; errors: { code: string; message: string }[];
+              stopped?: string }>("/ci/ingest", { method: "POST" }),
+  ciRetention: () => request<CiRetention>("/ci/retention"),
+  ciRetentionApply: () =>
+    request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(
+      "/ci/retention/apply", { method: "POST" },
+    ),
+  ciAttachmentUrl: (path: string) =>
+    `${BASE}/ci/attachment?path=${encodeURIComponent(path)}`,
+
+  // -- MCP (changes 0146/0149) ---------------------------------------------
+  agentTokens: () =>
+    request<{ tokens: AgentToken[] }>("/profile/agent-tokens"),
+  // o token em claro vem UMA vez: quem não guardar, gera outro
+  createAgentToken: (name: string) =>
+    request<{ token: string; name: string; created_at: string }>(
+      "/profile/agent-tokens",
+      { method: "POST", body: JSON.stringify({ name }) },
+    ),
+  revokeAgentToken: (id: string) =>
+    request<void>(`/profile/agent-tokens/${id}`, { method: "DELETE" }),
+  externalLinks: (params: { system?: string; state?: string } = {}) =>
+    request<{ links: ExternalLink[]; count: number }>(
+      "/integrations/links?" +
+        new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v) as [string, string][],
+        ),
+    ),
 
   // -- painel de administração (capability admin) --------------------------
   adminUsers: () => request<{ users: ManagedUser[] }>("/admin/users"),
@@ -356,6 +395,14 @@ export const api = {
   auditHistory: (limit = 20) =>
     request<AuditHistoryEntry[]>(`/audit/history?limit=${limit}`),
   audit: (id: string) => request<AuditReport>(`/audit/${id}`),
+  deleteAudit: (id: string) =>
+    request<void>(`/audit/${id}`, { method: "DELETE" }),
+  // `before` é exclusivo: a rodada exatamente dessa data NÃO é levada
+  deleteAuditsBefore: (before: string) =>
+    request<{ removed: string[]; count: number }>(
+      `/audit?before=${encodeURIComponent(before)}`,
+      { method: "DELETE" },
+    ),
 
   profile: () => request<{ name: string; memory: string }>("/profile"),
 

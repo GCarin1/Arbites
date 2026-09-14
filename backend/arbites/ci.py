@@ -64,6 +64,8 @@ class GitHubClient(Protocol):
     def dispatch_workflow(self, repo: str, workflow: str, ref: str,
                           inputs: dict[str, str]) -> None: ...
     def list_recent_dispatch_runs(self, repo: str, workflow: str) -> list[dict]: ...
+    def list_workflow_runs(self, repo: str, workflow: str | None,
+                           page: int, per_page: int) -> list[dict]: ...
     def get_run(self, repo: str, run_id: int) -> dict: ...
     def get_jobs(self, repo: str, run_id: int) -> list[dict]: ...
     def list_artifacts(self, repo: str, run_id: int) -> list[dict]: ...
@@ -73,8 +75,12 @@ class GitHubClient(Protocol):
 class HttpxGitHub:
     """Implementação real (httpx) com backoff em rate limit."""
 
-    def __init__(self, tokens: TokenStore):
+    def __init__(self, tokens: TokenStore, credential=None):
         self.tokens = tokens
+        # Estado da credencial (change 0157). Opcional para não quebrar quem
+        # constrói o cliente sem workspace — sem ele o comportamento é o de
+        # antes, só sem memória da recusa.
+        self.credential = credential
 
     def _request(self, method: str, path: str, **kwargs) -> Any:
         import httpx
@@ -92,14 +98,37 @@ class HttpxGitHub:
                 method, f"https://api.github.com{path}",
                 headers=headers, timeout=30, **kwargs,
             )
+            # 401 é credencial, sempre — e repetir uma credencial ruim só
+            # gasta tempo e chega ao mesmo lugar (change 0157).
+            if resp.status_code == 401:
+                raise self._recusa(401, resp.text)
+            # 403 é ambíguo no GitHub: é rate limit quando a cota zerou, e é
+            # permissão quando o token não alcança o recurso. Tratar os dois
+            # como rate limit faria a ferramenta tentar de novo para sempre
+            # contra um token revogado, em silêncio — que é o defeito que
+            # esta change existe para matar.
+            if resp.status_code == 403 and not _e_rate_limit(resp):
+                raise self._recusa(403, resp.text)
             if resp.status_code in (403, 429) and attempt < 3:
                 time.sleep(2 ** attempt)  # backoff em rate limit (spec)
                 continue
             if resp.status_code >= 400:
                 raise CIError("github_error",
                               f"GitHub {resp.status_code}: {resp.text[:200]}")
+            if self.credential is not None:
+                self.credential.registrar_sucesso()
             return resp
         raise CIError("rate_limited", "rate limit persistente na API do GitHub")
+
+    def _recusa(self, status: int, corpo: str) -> CIError:
+        mensagem = _motivo(corpo)
+        if self.credential is not None:
+            self.credential.registrar_recusa(status, mensagem)
+        return CIError(
+            "bad_credential",
+            f"o GitHub recusou a credencial (HTTP {status}): {mensagem}",
+            status=409,
+        )
 
     def dispatch_workflow(self, repo, workflow, ref, inputs):
         self._request(
@@ -112,6 +141,24 @@ class HttpxGitHub:
             "GET",
             f"/repos/{repo}/actions/workflows/{workflow}/runs"
             "?event=workflow_dispatch&per_page=10",
+        )
+        return resp.json().get("workflow_runs", [])
+
+    def list_workflow_runs(self, repo, workflow=None, page=1, per_page=50):
+        """Runs CONCLUÍDOS do repositório, do mais novo para o mais velho.
+
+        Diferente de `list_recent_dispatch_runs`, aqui NÃO se filtra por
+        `event=workflow_dispatch`: o run que interessa à observabilidade é
+        justamente o que ninguém daqui disparou — o `schedule` que roda de
+        madrugada. Paginado porque voltar depois de uma semana fora tem de
+        trazer a semana inteira, não a primeira página dela.
+        """
+        alvo = (
+            f"/repos/{repo}/actions/workflows/{workflow}/runs"
+            if workflow else f"/repos/{repo}/actions/runs"
+        )
+        resp = self._request(
+            "GET", f"{alvo}?status=completed&per_page={per_page}&page={page}"
         )
         return resp.json().get("workflow_runs", [])
 
@@ -135,6 +182,36 @@ class HttpxGitHub:
 
 # ---------------------------------------------------------------------------
 # Orquestração
+
+
+def _e_rate_limit(resp) -> bool:
+    """403 com cota zerada é limite de taxa; 403 sem cota zerada é permissão.
+
+    O cabeçalho é a evidência: o GitHub zera `x-ratelimit-remaining` quando
+    barra por cota. O texto do corpo é o segundo sinal, para o caso do
+    cabeçalho não vir (proxy corporativo costuma podar cabeçalho).
+    """
+    if resp.headers.get("x-ratelimit-remaining") == "0":
+        return True
+    if resp.headers.get("retry-after"):
+        return True
+    corpo = (resp.text or "").lower()
+    return "rate limit" in corpo or "secondary rate" in corpo or "abuse" in corpo
+
+
+def _motivo(corpo: str) -> str:
+    """Extrai a frase do provedor. Repassar o motivo dele é melhor do que
+    inventar um nosso: 'Bad credentials' e 'Resource not accessible by
+    personal access token' pedem ações diferentes de quem lê."""
+    try:
+        import json as _json
+
+        dados = _json.loads(corpo or "{}")
+        if isinstance(dados, dict) and dados.get("message"):
+            return str(dados["message"])[:200]
+    except ValueError:
+        pass
+    return (corpo or "sem detalhe").strip()[:200]
 
 
 def _now() -> str:

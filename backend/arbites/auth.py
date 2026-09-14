@@ -111,6 +111,15 @@ CREATE TABLE IF NOT EXISTS activity (
 CREATE INDEX IF NOT EXISTS idx_activity_at ON activity(at);
 CREATE INDEX IF NOT EXISTS idx_activity_user ON activity(user_email, at);
 
+CREATE TABLE IF NOT EXISTS agent_tokens (
+    token_hash   TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    last_used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_agent_tokens_user ON agent_tokens(user_id);
+
 CREATE TABLE IF NOT EXISTS switches (
     name       TEXT PRIMARY KEY,
     enabled    INTEGER NOT NULL,
@@ -495,6 +504,85 @@ def authenticate(
     return _row_to_user(row)
 
 
+# -- credencial do agente (MCP, change 0146) --------------------------------
+#
+# SEPARADA da sessão do navegador de propósito: revogar o acesso do agente
+# não pode derrubar a sua sessão, e a recíproca também vale. Ela HERDA o
+# papel da conta que a gerou — o agente nunca alcança mais que a pessoa — e
+# não expira por inatividade, porque um agente pode ficar dias sem chamar e
+# continuar sendo o mesmo agente.
+#
+# Guardamos o HASH, como na sessão: quem tem o banco não tem o token.
+
+AGENT_TOKEN_PREFIX = "arb_"
+
+
+def create_agent_token(
+    conn: sqlite3.Connection, user_id: int, name: str
+) -> tuple[str, dict[str, Any]]:
+    """Cria e devolve (token em claro, metadados). O claro só existe aqui."""
+    if not name.strip():
+        raise AuthError(422, "name_required", "dê um nome à credencial")
+    raw = AGENT_TOKEN_PREFIX + secrets.token_urlsafe(32)
+    conn.execute(
+        "INSERT INTO agent_tokens (token_hash, name, user_id, created_at)"
+        " VALUES (?, ?, ?, ?)",
+        (_hash_token(raw), name.strip(), user_id, _iso(_now())),
+    )
+    conn.commit()
+    return raw, {"name": name.strip(), "created_at": _iso(_now()), "last_used_at": None}
+
+
+def list_agent_tokens(conn: sqlite3.Connection, user_id: int) -> list[dict[str, Any]]:
+    return [
+        {"id": row["token_hash"][:12], "name": row["name"],
+         "created_at": row["created_at"], "last_used_at": row["last_used_at"]}
+        for row in conn.execute(
+            "SELECT token_hash, name, created_at, last_used_at FROM agent_tokens"
+            " WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+    ]
+
+
+def revoke_agent_token(conn: sqlite3.Connection, user_id: int, token_id: str) -> bool:
+    """Revoga pelo prefixo do hash — o valor em claro ninguém mais tem."""
+    cur = conn.execute(
+        "DELETE FROM agent_tokens WHERE user_id = ? AND token_hash LIKE ?",
+        (user_id, token_id + "%"),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def resolve_agent_token(
+    conn: sqlite3.Connection, raw: str | None
+) -> dict[str, Any] | None:
+    """Valida a credencial do agente e devolve o usuário dono, ou None.
+
+    Sem expiração por inatividade (ver acima), mas conta que deixou de estar
+    ativa derruba a credencial junto: o agente não sobrevive à pessoa."""
+    if not raw or not raw.startswith(AGENT_TOKEN_PREFIX):
+        return None
+    token_hash = _hash_token(raw)
+    row = conn.execute(
+        "SELECT user_id FROM agent_tokens WHERE token_hash = ?", (token_hash,)
+    ).fetchone()
+    if row is None:
+        return None
+    user = get_user(conn, row["user_id"])
+    if user is None or user["status"] != "active":
+        conn.execute("DELETE FROM agent_tokens WHERE token_hash = ?", (token_hash,))
+        conn.commit()
+        return None
+    conn.execute(
+        "UPDATE agent_tokens SET last_used_at = ? WHERE token_hash = ?",
+        (_iso(_now()), token_hash),
+    )
+    conn.commit()
+    return user
+
+
 # -- interruptores de superfície --------------------------------------------
 
 # Cada entrada governa uma CAPACIDADE, não uma URL: quando uma rota nova faz
@@ -505,6 +593,13 @@ SWITCHES: dict[str, str] = {
     "target_env": "Leitura e escrita do .env dos projetos-alvo",
     "ai": "Chamadas aos providers de IA",
     "xray_import": "Importação de XML do Xray",
+    # Publicar o workspace para um processo externo é CAPACIDADE, não tela
+    # (ADR 0014) — por isso superfície e não módulo. E a tela do MCP precisa
+    # continuar visível justamente para poder religar.
+    "mcp_server": "Servidor MCP (workspace exposto a um agente)",
+    # Escrita do agente: a pergunta real é "ele mexe ou só olha?", e ela tem
+    # DUAS respostas, não uma por ferramenta. Nasce desligada (change 0149).
+    "mcp_write": "Escrita pelo agente MCP",
 }
 
 # MÓDULOS do produto (ADR 0014). Um módulo é uma TELA mais os caminhos de API
@@ -553,6 +648,11 @@ MODULES: dict[str, dict[str, Any]] = {
         "tab": "daily",
         "paths": ("/daily", "/dailies"),
     },
+    "mod_observability": {
+        "label": "Observabilidade",
+        "tab": "observability",
+        "paths": ("/ci",),
+    },
     "mod_meetings": {
         "label": "Reuniões",
         "tab": "meetings",
@@ -571,9 +671,19 @@ def _all_switch_labels() -> dict[str, tuple[str, str, str | None]]:
     return out
 
 
+# Quase todo interruptor nasce LIGADO: o default preserva o comportamento de
+# quem já instalou. A exceção é o que CONCEDE poder novo — aí o default
+# seguro é o contrário, e quem quer conceder liga de propósito.
+SWITCHES_DEFAULT_OFF = frozenset({"mcp_write"})
+
+
+def _default_de(name: str) -> bool:
+    return name not in SWITCHES_DEFAULT_OFF
+
+
 def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    """Estado de todos os interruptores conhecidos. Ausente no banco = ligado:
-    o default preserva o comportamento da instalação local."""
+    """Estado de todos os interruptores conhecidos. Ausente no banco = o
+    default do interruptor (ligado, salvo os que concedem poder)."""
     stored = {
         row["name"]: row
         for row in conn.execute("SELECT * FROM switches").fetchall()
@@ -588,7 +698,7 @@ def list_switches(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             # produto respondem a perguntas diferentes (ADR 0014)
             "kind": kind,
             "tab": tab,
-            "enabled": bool(row["enabled"]) if row is not None else True,
+            "enabled": bool(row["enabled"]) if row is not None else _default_de(name),
             "updated_at": row["updated_at"] if row is not None else None,
             "updated_by": row["updated_by"] if row is not None else None,
         })
@@ -599,7 +709,7 @@ def switch_enabled(conn: sqlite3.Connection, name: str) -> bool:
     row = conn.execute(
         "SELECT enabled FROM switches WHERE name = ?", (name,)
     ).fetchone()
-    return True if row is None else bool(row["enabled"])
+    return _default_de(name) if row is None else bool(row["enabled"])
 
 
 def set_switch(

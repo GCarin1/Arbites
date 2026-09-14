@@ -142,14 +142,25 @@ def test_put_targets_e_privativo_do_admin(editor):
 # -- AC3 e AC4: interruptores -----------------------------------------------
 
 
-def test_interruptores_nascem_todos_ligados(client):
+def test_interruptores_nascem_ligados_menos_os_que_concedem_poder(client):
+    """O default preserva o comportamento de quem já instalou — quase sempre.
+
+    A exceção é o interruptor que CONCEDE poder novo (change 0149): aí o
+    default seguro é o contrário, e quem quer conceder liga de propósito.
+    Antes desta change a suíte afirmava que todos nasciam ligados; isso
+    deixou de ser verdade no dia em que `mcp_write` existiu.
+    """
     switches = client.get("/api/v1/admin/switches").json()["switches"]
     # Duas famílias na mesma lista (ADR 0014): superfície perigosa governa
     # uma CAPACIDADE técnica, módulo governa uma TELA e os caminhos dela.
     assert {s["name"] for s in switches} == set(auth_ops.SWITCHES) | set(
         auth_ops.MODULES
     )
-    assert all(s["enabled"] for s in switches)
+    nascem_desligados = auth_ops.SWITCHES_DEFAULT_OFF
+    for s in switches:
+        esperado = s["name"] not in nascem_desligados
+        assert s["enabled"] is esperado, s["name"]
+    assert nascem_desligados, "se ninguém nasce desligado, este teste não prova nada"
     assert all(s["updated_at"] is None for s in switches)
     por_nome = {s["name"]: s for s in switches}
     assert por_nome["ai"]["kind"] == "surface"
@@ -298,3 +309,19 @@ def test_so_admin_alcanca_a_gestao_de_contas(viewer, editor):
         assert sessao.post("/api/v1/admin/users/1/reject").status_code == 403
         assert sessao.post("/api/v1/admin/users/1/disable").status_code == 403
         assert sessao.post("/api/v1/admin/users/1/enable").status_code == 403
+
+
+def test_so_admin_exclui_rodada_de_auditoria(viewer, editor):
+    """Rodar e ler auditoria é de todos; apagar é de quem administra (0151).
+
+    Uma rodada é o retrato do estado de qualidade num momento — apagar é
+    mais perto de destruir registro do que de descartar rascunho.
+    """
+    for sessao in (viewer, editor):
+        # ler continua aberto
+        assert sessao.get("/api/v1/audit/history").status_code == 200
+        # apagar, não
+        assert sessao.delete("/api/v1/audit/AUD-0001").status_code == 403
+        assert sessao.request(
+            "DELETE", "/api/v1/audit?before=2030-01-01T00:00:00+00:00"
+        ).status_code == 403

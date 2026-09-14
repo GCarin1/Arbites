@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-13
-**Version:** 0.17.0
+**Version:** 0.18.0
 
 ## Purpose
 
@@ -100,6 +100,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall manter o texto de um passo de execucao numa faixa propria em tela estreita, com as acoes e o status do passo na faixa seguinte, em vez de espremer o texto numa coluna ao lado dos botoes e deixar o status orfao numa terceira linha.
 - The system shall montar todo estado vazio de lista de trabalho com marca visual, titulo da situacao, uma ou duas linhas dizendo o que mora ali, e a acao que resolve o vazio quando existe um proximo passo obvio, com a altura dada pelo conteudo.
 - The system shall distinguir a lista que nunca teve item da lista cujo filtro nao alcancou nenhum, oferecendo criar no primeiro caso e limpar o filtro no segundo, para que ninguem crie um item que ja existe escondido pelo recorte.
+- The system shall agrupar o menu por DONO do artefato e nao so por proximidade de fluxo — requisito e insumo do time de negocio e fica fora do grupo de trabalho de QA, antes dele, na ordem em que o fluxo acontece.
 
 ### Event-driven
 
@@ -188,6 +189,7 @@ e prova a sua fatia, citando o teste/artefato. -->
 26. [unverified] Nenhuma tela exibe o controle de arquivo nativo — os quatro pontos de envio passam pelo botao do sistema, mostram o nome escolhido e aceitam reescolher o mesmo arquivo — verified by `frontend/src/components/FilePicker.tsx`.
 27. [unverified] Em 390 px a linha de um passo de execucao cai em duas faixas (numero e texto; acoes e status) e em 1440 px continua numa faixa so — verified by `frontend/src/styles.css` + `frontend/src/components/Executions.tsx`.
 28. [unverified] Num workspace novo as telas de test cases, requisitos, execucoes, defeitos e afazeres mostram estado vazio com marca, titulo, corpo e ao menos uma acao; com filtro que nao casa aparece o vazio de filtro, cuja acao e limpar — verified by `frontend/src/components/EmptyState.tsx` + `frontend/src/styles.css`.
+29. [unverified] O menu apresenta Requisitos como item sem cabecalho de grupo, entre Hoje e o grupo Testes, que passa a conter apenas Test cases e Execucoes — verified by `frontend/src/App.tsx`.
 
 ## Maturity
 

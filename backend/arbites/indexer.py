@@ -87,6 +87,21 @@ CREATE TABLE IF NOT EXISTS audits(
 CREATE TABLE IF NOT EXISTS agent_events(
   id TEXT PRIMARY KEY, at TEXT, action TEXT, target_id TEXT,
   target_title TEXT, summary TEXT, path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS ci_runs(
+  id TEXT PRIMARY KEY, provider TEXT, repo TEXT, workflow TEXT, run_id TEXT,
+  event TEXT, conclusion TEXT, commit_sha TEXT, branch TEXT,
+  started_at TEXT, finished_at TEXT, url TEXT, ingested_at TEXT,
+  ingest_warning TEXT, path TEXT, mtime REAL);
+CREATE TABLE IF NOT EXISTS ci_signals(
+  run_id TEXT, kind TEXT, name TEXT, value REAL, unit TEXT, at TEXT);
+CREATE TABLE IF NOT EXISTS ci_jobs(
+  run_id TEXT, name TEXT, conclusion TEXT, started_at TEXT,
+  finished_at TEXT, url TEXT, ord INTEGER);
+CREATE TABLE IF NOT EXISTS ci_scenarios(
+  run_id TEXT, scenario TEXT, feature TEXT, testcase_id TEXT,
+  status TEXT, at TEXT);
+CREATE TABLE IF NOT EXISTS ci_attachments(
+  run_id TEXT, kind TEXT, path TEXT, title TEXT, sha256 TEXT, bytes INTEGER);
 CREATE TABLE IF NOT EXISTS warnings(
   source_path TEXT, code TEXT, message TEXT, created_at TEXT);
 CREATE TABLE IF NOT EXISTS index_meta(key TEXT PRIMARY KEY, value TEXT);
@@ -168,6 +183,11 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
     conn.execute("DELETE FROM decisions")
     conn.execute("DELETE FROM audits")
     conn.execute("DELETE FROM agent_events")
+    conn.execute("DELETE FROM ci_runs")
+    conn.execute("DELETE FROM ci_signals")
+    conn.execute("DELETE FROM ci_jobs")
+    conn.execute("DELETE FROM ci_scenarios")
+    conn.execute("DELETE FROM ci_attachments")
     conn.execute("DELETE FROM warnings")
 
     seen_ids: dict[str, str] = {}  # id -> relpath (detecção de duplicidade)
@@ -274,6 +294,19 @@ def reindex_full(ws: Workspace, conn: sqlite3.Connection) -> dict:
         if doc.id and track_id(doc, rel):
             _insert_agent_event(conn, doc, rel)
 
+    # ci/ — runs ingeridos do provedor (ADR 0016). O arquivo é a verdade:
+    # apagar o índice e reconstruir devolve a série temporal inteira.
+    for path, text, error in read_all(ws.root / "ci"):
+        rel = ws.relpath(path)
+        # só `ci/<ano>/<chave>.md` é run; `.md` mais fundo é ANEXO (a análise
+        # que o pipeline escreveu), e parsear anexo como run só geraria ruído
+        if len(rel.split("/")) != 3:
+            continue
+        doc = parse_one(path, text, error)
+        _flush_doc_warnings(conn, doc, rel)
+        if doc.id:
+            _insert_ci_run(conn, doc, rel)
+
     exec_base = ws.root / "executions"
     if exec_base.exists():
         for path in sorted(exec_base.glob("*/*/execution.json")):
@@ -365,6 +398,12 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
         conn.commit()
         return
     conn.execute("DELETE FROM warnings WHERE source_path = ?", (rel,))
+    for row in conn.execute("SELECT id FROM ci_runs WHERE path = ?", (rel,)):
+        conn.execute("DELETE FROM ci_signals WHERE run_id = ?", (row["id"],))
+        conn.execute("DELETE FROM ci_jobs WHERE run_id = ?", (row["id"],))
+        conn.execute("DELETE FROM ci_scenarios WHERE run_id = ?", (row["id"],))
+        conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (row["id"],))
+    conn.execute("DELETE FROM ci_runs WHERE path = ?", (rel,))
     for table in ("requirements", "testcases", "defects", "todos", "meetings", "decisions", "audits", "agent_events"):
         for row in conn.execute(f"SELECT id FROM {table} WHERE path = ?", (rel,)):
             if table == "testcases":
@@ -406,6 +445,8 @@ def _reindex_file_once(ws: Workspace, conn: sqlite3.Connection, path: Path) -> N
                 _insert_audit(conn, doc, rel)
             elif top == "agent_log":
                 _insert_agent_event(conn, doc, rel)
+            elif top == "ci" and len(rel.split("/")) == 3:
+                _insert_ci_run(conn, doc, rel)
             m = _ID_RE.match(doc.id)
             if m:
                 ws.bump_counter_to(m.group(1), int(m.group(2)))
@@ -668,6 +709,74 @@ def _insert_audit(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             doc.path.stat().st_mtime,
         ),
     )
+
+
+def _insert_ci_run(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
+    """Indexa um run ingerido: cabeçalho, sinais e anexos.
+
+    Sinal e anexo vêm do frontmatter, não de tabela própria no disco: o
+    arquivo tem de continuar legível por humano e por `git diff`.
+    """
+    meta = doc.meta
+    run_id = str(doc.id)
+    conn.execute(
+        "INSERT OR REPLACE INTO ci_runs(id, provider, repo, workflow, run_id,"
+        " event, conclusion, commit_sha, branch, started_at, finished_at, url,"
+        " ingested_at, ingest_warning, path, mtime)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            run_id, meta.get("provider"), meta.get("repo"), meta.get("workflow"),
+            str(meta.get("run_id") or ""), meta.get("event"), meta.get("conclusion"),
+            meta.get("commit"), meta.get("branch"), meta.get("started_at"),
+            meta.get("finished_at"), meta.get("url"), meta.get("ingested_at"),
+            meta.get("ingest_warning"), rel, doc.path.stat().st_mtime,
+        ),
+    )
+    conn.execute("DELETE FROM ci_signals WHERE run_id = ?", (run_id,))
+    for sinal in meta.get("signals") or []:
+        if not isinstance(sinal, dict) or sinal.get("name") is None:
+            continue
+        try:
+            valor = float(sinal.get("value"))
+        except (TypeError, ValueError):
+            continue
+        conn.execute(
+            "INSERT INTO ci_signals(run_id, kind, name, value, unit, at)"
+            " VALUES (?,?,?,?,?,?)",
+            (run_id, sinal.get("kind") or "custom", str(sinal["name"]), valor,
+             sinal.get("unit"), sinal.get("at") or meta.get("started_at")),
+        )
+    conn.execute("DELETE FROM ci_jobs WHERE run_id = ?", (run_id,))
+    for ordem, job in enumerate(meta.get("jobs") or []):
+        if not isinstance(job, dict) or not job.get("name"):
+            continue
+        conn.execute(
+            "INSERT INTO ci_jobs(run_id, name, conclusion, started_at,"
+            " finished_at, url, ord) VALUES (?,?,?,?,?,?,?)",
+            (run_id, job["name"], job.get("conclusion"), job.get("started_at"),
+             job.get("finished_at"), job.get("url"), ordem),
+        )
+    conn.execute("DELETE FROM ci_scenarios WHERE run_id = ?", (run_id,))
+    for cenario in meta.get("scenarios") or []:
+        if not isinstance(cenario, dict) or not cenario.get("scenario"):
+            continue
+        conn.execute(
+            "INSERT INTO ci_scenarios(run_id, scenario, feature, testcase_id,"
+            " status, at) VALUES (?,?,?,?,?,?)",
+            (run_id, cenario["scenario"], cenario.get("feature"),
+             cenario.get("testcase_id"), cenario.get("status"),
+             meta.get("started_at") or meta.get("ingested_at")),
+        )
+    conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (run_id,))
+    for anexo in meta.get("attachments") or []:
+        if not isinstance(anexo, dict) or not anexo.get("path"):
+            continue
+        conn.execute(
+            "INSERT INTO ci_attachments(run_id, kind, path, title, sha256, bytes)"
+            " VALUES (?,?,?,?,?,?)",
+            (run_id, anexo.get("kind") or "file", anexo["path"], anexo.get("title"),
+             anexo.get("sha256"), anexo.get("bytes")),
+        )
 
 
 def _insert_agent_event(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:

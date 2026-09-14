@@ -40,6 +40,9 @@ const ExecutionGuided = lazy(() =>
 const Dashboard = lazy(() =>
   import("./components/Dashboard").then((m) => ({ default: m.Dashboard }))
 );
+const Observability = lazy(() =>
+  import("./components/Observability").then((m) => ({ default: m.Observability }))
+);
 const XrayImport = lazy(() =>
   import("./components/XrayImport").then((m) => ({ default: m.XrayImport }))
 );
@@ -93,6 +96,7 @@ type Tab =
   | "daily"
   | "meetings"
   | "dashboard"
+  | "observability"
   | "automation"
   | "ia"
   | "migration"
@@ -113,6 +117,7 @@ const NAV: { key: Tab; label: string }[] = [
   { key: "daily", label: "Daily" },
   { key: "meetings", label: "Reuniões" },
   { key: "dashboard", label: "Dashboard" },
+  { key: "observability", label: "Observabilidade" },
   { key: "automation", label: "Automação" },
   { key: "ia", label: "IA" },
   { key: "migration", label: "Migração" },
@@ -147,9 +152,28 @@ function buildHash(tab: Tab, params: Record<string, string>): string {
 // telas continuam funcionando e o dado continua lá, mas saem do caminho de
 // quem usa o produto para o que ele é — repositório, ciclo e execução.
 const NAV_GROUPS: { title: string; keys: Tab[] }[] = [
-  { title: "Testes", keys: ["requirements", "testcases", "executions"] },
-  { title: "Acompanhamento", keys: ["dashboard", "defects", "todos", "audit"] },
+  // Negócio vem PRIMEIRO porque é a ordem do fluxo: o requisito existe antes
+  // do caso, que existe antes da execução. E vem com cabeçalho próprio, não
+  // solto: o cabeçalho é o que diz de QUEM é a coisa — requisito é insumo do
+  // time de negócio, e o QA cobre o que eles escreveram (change 0152). Um
+  // item sob "Testes" afirmava o contrário, e menu que mente sobre a dona da
+  // coisa ensina o modelo errado para quem chega.
+  { title: "Negócio", keys: ["requirements"] },
+  { title: "Testes", keys: ["testcases", "executions"] },
+  {
+    title: "Acompanhamento",
+    // Observabilidade fica ao lado do Dashboard, e não dentro dele: a
+    // diferença não é o nome, é o eixo (ADR 0016). Dashboard responde
+    // "como está agora"; Observabilidade, "o que mudou e por quê".
+    // Fundir as duas produz uma tela que não serve bem a ninguém.
+    keys: ["dashboard", "observability", "defects", "todos", "audit"],
+  },
 ];
+
+// Vazio desde a change 0158: Requisitos ganhou o grupo "Negócio" acima. A
+// constante fica porque o topo do menu é onde o próximo item de fluxo entra —
+// e porque tirá-la e recolocá-la depois custa mais do que mantê-la.
+const NAV_LOOSE_TOP: Tab[] = [];
 
 // Itens sem grupo, entre o trabalho do dia e o que foi congelado.
 // "Ferramentas" tinha UM item: um cabeçalho para um item ocupa uma linha
@@ -661,6 +685,20 @@ export default function App({
                   ))}
               </div>
             )}
+            {/* Insumo do negócio, antes do trabalho de QA (0152). */}
+            <div className="nav-group">
+              {NAV_LOOSE_TOP.filter(isReachable).map((k) => (
+                <NavItem
+                  key={k}
+                  item={NAV_BY_KEY[k]}
+                  tab={tab}
+                  setTab={selectTab}
+                  problemCount={problemCount}
+                  pinned={pins.includes(k)}
+                  onTogglePin={() => togglePin(k)}
+                />
+              ))}
+            </div>
             {NAV_GROUPS.map((group) => (
               <div key={group.title} className="nav-group">
                 <button
@@ -798,6 +836,10 @@ export default function App({
                 onSquadChange={(v) => setHashParam("squad", v)}
               />
             </Suspense>
+          ) : tab === "observability" ? (
+            <Suspense fallback={<p className="empty">Carregando observabilidade…</p>}>
+              <Observability onError={setError} />
+            </Suspense>
           ) : tab === "automation" ? (
             <Suspense fallback={<p className="empty">Carregando automação…</p>}>
               <Automation
@@ -810,7 +852,11 @@ export default function App({
             </Suspense>
           ) : tab === "ia" ? (
             <Suspense fallback={<p className="empty">Carregando IA…</p>}>
-              <AiAssist onChanged={() => void refresh()} onError={setError} />
+              <AiAssist
+                onChanged={() => void refresh()}
+                onError={setError}
+                isAdmin={user.role === "admin"}
+              />
             </Suspense>
           ) : tab === "defects" ? (
             <Suspense fallback={<p className="empty">Carregando defeitos…</p>}>
@@ -832,7 +878,7 @@ export default function App({
             </Suspense>
           ) : tab === "audit" ? (
             <Suspense fallback={<p className="empty">Carregando auditoria…</p>}>
-              <Audit onError={setError} />
+              <Audit onError={setError} isAdmin={user.role === "admin"} />
             </Suspense>
           ) : tab === "memory" ? (
             <Suspense fallback={<p className="empty">Carregando memória do projeto…</p>}>
@@ -952,6 +998,7 @@ export default function App({
                 <RequirementEditor
                   id={selectedReq}
                   onChanged={refresh}
+                  onNavigate={navigateTo}
                   onDeleted={() => {
                     setSelectedReq(null);
                     void refresh();

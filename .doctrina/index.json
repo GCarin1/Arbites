@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-13",
+  "last_updated": "2026-09-14",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -26,7 +26,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.14.0",
+        "version": "0.15.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -37,7 +37,7 @@
         "id": "audit",
         "path": ".doctrina/specs/audit/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — snapshot de qualidade (`backend/arbites/audit.py`) + log de atividade no gate (`backend/arbites/api.py`, `backend/arbites/auth.py`)"
       },
@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.17.0",
+        "version": "0.18.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -141,15 +141,34 @@
         ]
       },
       {
+        "id": "integrations",
+        "path": ".doctrina/specs/integrations/spec.md",
+        "status": "active",
+        "version": "0.3.0",
+        "last_updated": "2026-09-13",
+        "implementation": "planned — a identidade externa landa na change 0145; a porta e os adaptadores nas 0148 e 0150",
+        "realizes": [
+          "SC4"
+        ]
+      },
+      {
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.11.0",
+        "version": "0.14.0",
         "last_updated": "2026-07-21",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC5"
         ]
+      },
+      {
+        "id": "mcp-server",
+        "path": ".doctrina/specs/mcp-server/spec.md",
+        "status": "active",
+        "version": "0.2.0",
+        "last_updated": "2026-09-13",
+        "implementation": "planned — leituras na change 0146, escritas na 0147, tela na 0149"
       },
       {
         "id": "meetings",
@@ -185,7 +204,7 @@
         "id": "reporting",
         "path": ".doctrina/specs/reporting/spec.md",
         "status": "active",
-        "version": "0.15.0",
+        "version": "0.18.0",
         "last_updated": "2026-09-13",
         "implementation": "verified — M1.5 + M7 (filtro squad) + M8 (metas/thresholds) + M9 (painel de defeitos); backend/arbites/metrics.py, backend/arbites/api.py, backend/arbites/export_pdf.py, frontend/src/components/Dashboard.tsx",
         "realizes": [
@@ -196,7 +215,7 @@
         "id": "requirements",
         "path": ".doctrina/specs/requirements/spec.md",
         "status": "active",
-        "version": "0.8.0",
+        "version": "0.9.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)",
         "realizes": [
@@ -403,58 +422,17 @@
         "date": "2026-09-13",
         "supersedes": "0007 (parcialmente), 0012 (parcialmente)",
         "summary": "Integracao externa volta ao escopo, com quatro regras."
+      },
+      {
+        "id": "0016",
+        "path": ".doctrina/decisions/0016-observabilidade-e-sinal-no-tempo-com-descida-ate-o-artefato-ingerido-por-pull.md",
+        "title": "Observabilidade e sinal no tempo com descida ate o artefato, ingerido por pull",
+        "status": "accepted",
+        "date": "2026-09-14",
+        "summary": "Observabilidade e sinal no tempo com descida ate o artefato."
       }
     ],
-    "changes": [
-      {
-        "id": "0145-identidade-externa-frontmatter-vinculo",
-        "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
-        "path": ".doctrina/changes/0145-identidade-externa-frontmatter-vinculo",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0146-servidor-mcp-local-expondo",
-        "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
-        "path": ".doctrina/changes/0146-servidor-mcp-local-expondo",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0147-ferramentas-mcp-escrita-preview",
-        "title": "ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo",
-        "path": ".doctrina/changes/0147-ferramentas-mcp-escrita-preview",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0148-intercambio-arquivo-csv-cucumber",
-        "title": "intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API",
-        "path": ".doctrina/changes/0148-intercambio-arquivo-csv-cucumber",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0149-pagina-mcp-aba-ia",
-        "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
-        "path": ".doctrina/changes/0149-pagina-mcp-aba-ia",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      },
-      {
-        "id": "0150-conector-deterministico-volume-recorrencia",
-        "title": "conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item",
-        "path": ".doctrina/changes/0150-conector-deterministico-volume-recorrencia",
-        "status": "proposed",
-        "opened": "2026-09-13",
-        "lane": "product (uncertain)"
-      }
-    ],
+    "changes": [],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -2334,6 +2312,201 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0151-auditoria-tem-como-excluida",
+        "title": "auditoria nao tem como ser excluida: nenhuma rota de delete e o historico cresce sozinho porque abrir a aba dispara rodada nova quando a ultima passou do intervalo",
+        "path": ".doctrina/changes/archive/2026-09-13-0151-auditoria-tem-como-excluida",
+        "status": "applied",
+        "applied": "2026-09-13",
+        "specs_affected": [
+          {
+            "capability": "audit",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0145-identidade-externa-frontmatter-vinculo",
+        "title": "identidade externa no frontmatter e vinculo por sistema, a base para nao duplicar o que ja existe na ferramenta oficial",
+        "path": ".doctrina/changes/archive/2026-09-14-0145-identidade-externa-frontmatter-vinculo",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "integrations",
+            "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0146-servidor-mcp-local-expondo",
+        "title": "servidor MCP local expondo as leituras derivadas que um agente nao consegue calcular sozinho",
+        "path": ".doctrina/changes/archive/2026-09-14-0146-servidor-mcp-local-expondo",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "mcp-server",
+            "operation": "ADDED"
+          }
+        ]
+      },
+      {
+        "id": "0147-ferramentas-mcp-escrita-preview",
+        "title": "ferramentas MCP de escrita com preview e idempotencia pelo vinculo externo",
+        "path": ".doctrina/changes/archive/2026-09-14-0147-ferramentas-mcp-escrita-preview",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "mcp-server",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0148-intercambio-arquivo-csv-cucumber",
+        "title": "intercambio por arquivo CSV e Cucumber JSON nos dois sentidos, o piso que funciona com qualquer ferramenta sem API",
+        "path": ".doctrina/changes/archive/2026-09-14-0148-intercambio-arquivo-csv-cucumber",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "integrations",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0149-pagina-mcp-aba-ia",
+        "title": "pagina do MCP na aba de IA com estado do servidor instrucoes de conexao ferramentas expostas e vinculos externos",
+        "path": ".doctrina/changes/archive/2026-09-14-0149-pagina-mcp-aba-ia",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0150-conector-deterministico-volume-recorrencia",
+        "title": "conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item",
+        "path": ".doctrina/changes/archive/2026-09-14-0150-conector-deterministico-volume-recorrencia",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "integrations",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0152-requisitos-sai-grupo-testes",
+        "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
+        "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0153-ingestao-runs-github-actions",
+        "title": "ingestao de runs do github actions que o arbites nao disparou, com recuperacao do que passou enquanto a maquina estava desligada",
+        "path": ".doctrina/changes/archive/2026-09-14-0153-ingestao-runs-github-actions",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0154-modelo-sinal-generico-manifesto",
+        "title": "modelo de sinal generico e manifesto no artifact, para o workflow declarar o que produziu sem o arbites conhecer cada tipo",
+        "path": ".doctrina/changes/archive/2026-09-14-0154-modelo-sinal-generico-manifesto",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0155-aba-observabilidade-eixo-temporal",
+        "title": "aba de observabilidade com eixo temporal e descida do agregado ate o print, separada do dashboard que e retrato para gestor",
+        "path": ".doctrina/changes/archive/2026-09-14-0155-aba-observabilidade-eixo-temporal",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0156-retencao-artefato-sinal-print",
+        "title": "retencao de artefato e sinal: print e log de um cron diario enchem o disco e ninguem decidiu por quanto tempo guardar",
+        "path": ".doctrina/changes/archive/2026-09-14-0156-retencao-artefato-sinal-print",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0157-credencial-github-expira-revogada",
+        "title": "credencial do github que expira ou e revogada vira problema visivel em vez de ingestao que para em silencio",
+        "path": ".doctrina/changes/archive/2026-09-14-0157-credencial-github-expira-revogada",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0158-secao-negocio-menu-requisitos",
+        "title": "secao negocio no menu com requisitos, e a tela de requisitos servindo o time de negocio: cobertura por criterio, origem local ou externa visivel, e edicao recusada quando a story vive no sistema oficial",
+        "path": ".doctrina/changes/archive/2026-09-14-0158-secao-negocio-menu-requisitos",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "requirements",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0159-instabilidade-cenario-observabilidade-ingerir",
+        "title": "instabilidade de cenario na observabilidade: ingerir o cucumber json por cenario do artifact e apontar o teste que virou instavel",
+        "path": ".doctrina/changes/archive/2026-09-14-0159-instabilidade-cenario-observabilidade-ingerir",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "reporting",
             "operation": "MODIFIED"
           }
         ]

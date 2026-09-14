@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 (backend/arbites/api.py, backend/arbites/indexer.py)
 **Realizes:** SC1
 **Last updated:** 2026-07-20
-**Version:** 0.8.0
+**Version:** 0.9.0
 
 ## Purpose
 
@@ -63,6 +63,9 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
   rodaram) → executions envolvidas → defeitos vinculados — em leitura pura
   sobre as tabelas existentes; a UI oferece a visão "Story 360" navegável a
   partir da aba Requisitos (cada nó abre a tela do item).
+- The system shall exibir a cobertura de cada criterio de aceite individualmente, com os casos que o cobrem e o ultimo resultado deles, porque a contagem por story nao responde se um criterio especifico foi verificado.
+- The system shall declarar na tela se o requisito foi escrito aqui ou vive num sistema externo, para que a origem seja visivel antes de alguem edita-lo.
+- The system shall incluir story sem epic no calculo de cobertura, para que ela nao seja apresentada como descoberta quando esta coberta.
 
 ### Event-driven
 
@@ -80,6 +83,7 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
 
 - The system shall not sincronizar automaticamente com Confluence ou Jira;
   `external_key` e `confluence_url` são referências textuais manuais.
+- The system shall not aceitar edicao de requisito vinculado a um sistema externo, recusando com o motivo e indicando a remocao do vinculo como saida explicita, porque editar a copia faz os dois lados discordarem sem ninguem ser avisado.
 
 ### Optional
 
@@ -128,6 +132,7 @@ apontando para o sistema corporativo (Jira hoje, Businessmap depois).
    de 4 estados e filtro na aba Requisitos — verified by
    `backend/tests/test_metrics.py` (`test_traceability_coverage_state`) +
    build + revisão visual (`frontend/src/components/Requirements.tsx`).
+10. [unverified] Criterio sem caso aparece descoberto e criterio com caso falhando nao aparece verificado; requisito vinculado recusa edicao nomeando o sistema; story sem epic coberta nao e dada como descoberta — verified by `backend/tests/test_requisitos_negocio.py`.
 
 ## Maturity
 
