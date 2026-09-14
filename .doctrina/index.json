@@ -2395,6 +2395,19 @@
         ]
       },
       {
+        "id": "0150-conector-deterministico-volume-recorrencia",
+        "title": "conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item",
+        "path": ".doctrina/changes/archive/2026-09-14-0150-conector-deterministico-volume-recorrencia",
+        "status": "applied",
+        "applied": "2026-09-14",
+        "specs_affected": [
+          {
+            "capability": "integrations",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
         "id": "0152-requisitos-sai-grupo-testes",
         "title": "requisitos sai do grupo Testes: ele e insumo do time de negocio e nao trabalho de QA, e sob aquele cabecalho o menu afirma o contrario",
         "path": ".doctrina/changes/archive/2026-09-14-0152-requisitos-sai-grupo-testes",
@@ -2468,19 +2481,6 @@
         "specs_affected": [
           {
             "capability": "local-automation",
-            "operation": "MODIFIED"
-          }
-        ]
-      },
-      {
-        "id": "0150-conector-deterministico-volume-recorrencia",
-        "title": "conector deterministico para volume e recorrencia empurrando ciclo fechado inteiro sem custar um turno de agente por item",
-        "path": ".doctrina/changes/archive/2026-09-14-0150-conector-deterministico-volume-recorrencia",
-        "status": "applied",
-        "applied": "2026-09-14",
-        "specs_affected": [
-          {
-            "capability": "integrations",
             "operation": "MODIFIED"
           }
         ]
