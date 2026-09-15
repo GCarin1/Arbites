@@ -97,9 +97,11 @@ feito para ser compartilhado (ADR 0008). Chave de IA vai para o cofre do SO
 > os blocos que interessam.
 
 > **Cuidado ao editar `automation_targets` à mão:** salvar os targets pela tela
-> (Automação → Configurar) reescreve o bloco inteiro e **apaga o sub-bloco
-> `github:`** escrito à mão, sem avisar. Hoje os dois caminhos são
-> incompatíveis; está registrado para correção.
+> (Automação → Configurar) reescrevia o bloco inteiro e **apagava o sub-bloco
+> `github:`** escrito à mão. Corrigido na change 0172: repositório, workflow
+> e branch têm campos próprios na tela e sobrevivem ao salvamento. Um bloco
+> pela metade (repositório sem workflow) não é gravado — ele só produziria um
+> erro de disparo com o bloco aparentemente configurado no YAML.
 
 ### Não consigo entrar
 

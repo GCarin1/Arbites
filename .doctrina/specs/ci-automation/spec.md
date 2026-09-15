@@ -4,8 +4,8 @@
 **Status:** deprecated
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
-**Last updated:** 2026-07-09
-**Version:** 0.4.0
+**Last updated:** 2026-09-15
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -41,6 +41,7 @@ workflow/jobs/steps do workflow.
   `feature`, `environment (dev|cer|prd)`, `browser` e `source_repo`,
   repassando-os como inputs do workflow_dispatch quando informados.
 - The system shall aceitar a credencial de CI pela variavel de ambiente do processo onde o cofre do sistema operacional nao existe, com precedencia sobre o cofre, sem nunca devolver o valor nem grava-lo no workspace.
+- The system shall oferecer na tela de configuração do alvo os campos de repositório, workflow e branch do GitHub, e preservá-los em toda gravação — nenhuma configuração feita à mão no `arbites.yaml` pode ser descartada por um salvamento pela tela.
 
 ### Event-driven
 
@@ -53,6 +54,7 @@ workflow/jobs/steps do workflow.
 - When a API do GitHub retorna rate limit, the system shall aplicar
   backoff no polling.
 - When alguem tenta guardar a credencial numa instancia sem cofre, the system shall recusar explicando a saida, em vez de aceitar em silencio ou falhar depois.
+- When o disparo é pedido para um alvo sem repositório e workflow, the system shall recusá-lo nomeando a tela onde se configura, em vez de citar apenas a chave do arquivo de configuração.
 
 ### State-driven
 
@@ -65,6 +67,7 @@ workflow/jobs/steps do workflow.
 - The system shall not gravar o PAT em YAML, no índice ou em logs.
 - The system shall not retornar o valor do token em
   `GET /settings/github/token` (status apenas).
+- The system shall not gravar um bloco `github` pela metade; repositório sem workflow (ou o contrário) é descartado, porque um bloco incompleto faz o disparo acusar falta de configuração com o bloco aparentemente presente no arquivo.
 
 ### Optional
 
@@ -85,6 +88,7 @@ workflow/jobs/steps do workflow.
 4. [verified] Inputs opcionais do dispatch (feature/environment/browser/
    source_repo) chegam ao workflow — verified by `backend/tests/test_ci_runs.py`.
 5. [unverified] Instancia sem cofre responde a tela de problemas e o status do token sem erro, anuncia a falta com o remedio, recusa a gravacao explicando, e aceita a credencial pelo ambiente sem vazar o valor nem toca-lo no disco — verified by `backend/tests/test_sem_cofre.py`.
+6. [verified] O bloco `github` sobrevive a duas gravações seguidas pela tela e continua no `arbites.yaml`; um bloco pela metade não é gravado; um alvo sem GitHub continua válido para execução local; e a recusa do disparo aponta Automação → Configurar — verified by `backend/tests/test_alvo_github.py`.
 
 ## Maturity
 

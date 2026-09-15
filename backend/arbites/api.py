@@ -355,6 +355,17 @@ class AIProvidersIn(BaseModel):
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
 
 
+class GithubTargetIn(BaseModel):
+    """Onde o workflow deste alvo mora. Sem `repo` e `workflow` o dispatch
+    não tem para onde ir — e este bloco não tinha representação no modelo,
+    então salvar o alvo pela tela APAGAVA o que estivesse escrito à mão no
+    `arbites.yaml` (change 0172)."""
+
+    repo: str = ""       # "owner/repo"
+    workflow: str = ""   # nome do arquivo, ex.: "e2e.yml"
+    ref: str | None = None
+
+
 class AutomationTargetIn(BaseModel):
     name: str
     kind: str = "behave"
@@ -363,6 +374,7 @@ class AutomationTargetIn(BaseModel):
     python_path: str | None = None
     working_dir: str | None = None
     timeout_minutes: float | None = None
+    github: GithubTargetIn | None = None
 
 
 class AutomationTargetsIn(BaseModel):
@@ -2355,6 +2367,7 @@ def _register_routes(app: FastAPI) -> None:
                     "python_path": target.get("python_path"),
                     "working_dir": target.get("working_dir"),
                     "timeout_minutes": target.get("timeout_minutes"),
+                    "github": target.get("github") or None,
                     "scenarios": scenarios,
                     "queue_length": runner.queue_length(str(name)),
                 }
@@ -2387,9 +2400,16 @@ def _register_routes(app: FastAPI) -> None:
             except PythonPathError as exc:
                 raise _error(422, "bad_python_path",
                              f"alvo '{alvo.name}': {exc}")
-        config["automation_targets"] = [
-            t.model_dump(exclude_none=True) for t in payload.targets
-        ]
+        alvos = []
+        for t in payload.targets:
+            bruto = t.model_dump(exclude_none=True)
+            gh = bruto.get("github") or {}
+            # Bloco pela metade é pior que bloco ausente: o dispatch acusaria
+            # "sem repo/workflow" com o bloco na cara de quem olha o YAML.
+            if not (gh.get("repo") and gh.get("workflow")):
+                bruto.pop("github", None)
+            alvos.append(bruto)
+        config["automation_targets"] = alvos
         ws.config_path.write_text(
             _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
