@@ -968,3 +968,13 @@ export interface TodoList {
   progress: { total: number; done: number; open: number };
   body: string;
 }
+
+/** Repositório de onde a observabilidade puxa execuções (change 0173). */
+export interface CiSource {
+  provider?: string;
+  repo: string;
+  /** Vazio = todos os workflows do repositório. */
+  workflow?: string | null;
+  /** Vazio = todos os artifacts do run. */
+  artifact?: string | null;
+}

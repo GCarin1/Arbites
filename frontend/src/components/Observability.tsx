@@ -7,6 +7,7 @@ import type {
   CiRetention,
   CiRun,
   CiSignalSeries,
+  CiSource,
   Observability as Painel,
 } from "../types";
 
@@ -424,6 +425,9 @@ export function Observability({ onError }: { onError: (message: string) => void 
   const [carregando, setCarregando] = useState(true);
   const [run, setRun] = useState<CiRun | null>(null);
   const [ingerindo, setIngerindo] = useState(false);
+  const [origens, setOrigens] = useState<CiSource[]>([]);
+  const [novaOrigem, setNovaOrigem] = useState<CiSource>({ repo: "" });
+  const [salvandoOrigem, setSalvandoOrigem] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -439,6 +443,28 @@ export function Observability({ onError }: { onError: (message: string) => void 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    // As origens são o pré-requisito da aba inteira: sem elas "Buscar" não
+    // tem de onde puxar, e antes só existiam no arbites.yaml (change 0173).
+    api
+      .ciSources()
+      .then((r) => setOrigens(r.sources))
+      .catch(() => setOrigens([]));
+  }, []);
+
+  const salvarOrigens = async (proximas: CiSource[]) => {
+    setSalvandoOrigem(true);
+    try {
+      const r = await api.ciSourcesSave(proximas);
+      setOrigens(r.sources);
+      setNovaOrigem({ repo: "" });
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setSalvandoOrigem(false);
+    }
+  };
 
   const abrirRun = useCallback(
     async (runId: string) => {
@@ -508,16 +534,108 @@ export function Observability({ onError }: { onError: (message: string) => void 
         </div>
       </header>
 
+      {/* As origens vêm ANTES do painel quando não há nenhuma: sem elas o
+          botão "Buscar" não tem de onde puxar, e a resposta "nenhuma fonte"
+          não dizia onde declarar uma (change 0173). */}
+      {(semDado || origens.length > 0) && (
+        <section className="card obs-origens">
+          <div className="card-head">
+            <h3>Origens</h3>
+            <span className="spacer" />
+            <span className="caption muted">
+              de onde as execuções são puxadas
+            </span>
+          </div>
+          {origens.length === 0 ? (
+            <p className="caption muted">
+              Nenhuma origem declarada ainda — por isso "Buscar execuções" não
+              traz nada. Informe o repositório abaixo; workflow e artifact
+              vazios significam "todos".
+            </p>
+          ) : (
+            <ul className="obs-lista-origens">
+              {origens.map((o) => (
+                <li key={`${o.repo}/${o.workflow ?? ""}`}>
+                  <span className="mono">{o.repo}</span>
+                  <span className="caption muted">
+                    {o.workflow ? o.workflow : "todos os workflows"}
+                    {o.artifact ? ` · ${o.artifact}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    disabled={salvandoOrigem}
+                    onClick={() =>
+                      void salvarOrigens(origens.filter((x) => x !== o))
+                    }
+                  >
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="field-grid">
+            <div className="field col-4">
+              <label htmlFor="obs-repo">Repositório</label>
+              <input
+                id="obs-repo"
+                className="mono"
+                value={novaOrigem.repo}
+                onChange={(e) =>
+                  setNovaOrigem((o) => ({ ...o, repo: e.target.value }))
+                }
+                placeholder="organizacao/repositorio"
+              />
+            </div>
+            <div className="field col-4">
+              <label htmlFor="obs-workflow">Workflow (opcional)</label>
+              <input
+                id="obs-workflow"
+                className="mono"
+                value={novaOrigem.workflow ?? ""}
+                onChange={(e) =>
+                  setNovaOrigem((o) => ({ ...o, workflow: e.target.value }))
+                }
+                placeholder="vazio = todos"
+              />
+            </div>
+            <div className="field col-4">
+              <label htmlFor="obs-artifact">Artifact (opcional)</label>
+              <input
+                id="obs-artifact"
+                className="mono"
+                value={novaOrigem.artifact ?? ""}
+                onChange={(e) =>
+                  setNovaOrigem((o) => ({ ...o, artifact: e.target.value }))
+                }
+                placeholder="vazio = todos"
+              />
+            </div>
+          </div>
+          <div className="toolbar">
+            <button
+              type="button"
+              className="primary"
+              disabled={!novaOrigem.repo.trim() || salvandoOrigem}
+              onClick={() => void salvarOrigens([...origens, novaOrigem])}
+            >
+              {salvandoOrigem ? "Salvando…" : "Adicionar origem"}
+            </button>
+          </div>
+        </section>
+      )}
+
       {semDado ? (
         <EmptyState
           icon="dashboard"
           title="Nenhuma execução de CI chegou ainda"
           action={{ label: ingerindo ? "Buscando…" : "Buscar agora", onClick: () => void ingerir() }}
         >
-          Esta área vive do que a sua automação já produz. Declare a origem em{" "}
-          <code>observability.sources</code> no <code>arbites.yaml</code> e publique
-          um <code>arbites.json</code> junto do artifact do workflow — os sinais,
-          prints, logs e a análise em Markdown entram sozinhos a partir daí.
+          Esta área vive do que a sua automação já produz. Declare a origem no
+          bloco acima e publique um <code>arbites.json</code> junto do artifact
+          do workflow — os sinais, prints, logs e a análise em Markdown entram
+          sozinhos a partir daí.
         </EmptyState>
       ) : (
         <>

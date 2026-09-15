@@ -369,7 +369,13 @@ print. Puxa, não recebe por webhook: uma instância local não é alcançável
 pela internet, e puxar dá de graça a retomada (ficar dias desligado traz o
 intervalo inteiro, não só o run mais recente).
 
-Declare as fontes no `arbites.yaml` do workspace:
+**Pelo jeito mais curto:** a aba Observabilidade tem o bloco **Origens** —
+repositório, workflow e artifact (os dois últimos opcionais: em branco valem
+"todos"). Ele grava no `arbites.yaml` por você, e aparece justamente quando
+ainda não há execução nenhuma, que é quando a pergunta "por que não achou
+nada?" surge. Declarar exige papel `admin`; ver o que está declarado, não.
+
+Pelo arquivo, se preferir editar à mão:
 
 ```yaml
 observability:
@@ -395,6 +401,8 @@ observability:
 Depois:
 
 ```
+GET  /api/v1/ci/sources           # o que está declarado
+PUT  /api/v1/ci/sources           # declara (admin) — o que a aba usa
 POST /api/v1/ci/ingest            # puxa o que ainda não está no disco
 GET  /api/v1/ci/runs?limit=50     # runs ingeridos, com sinais e anexos
 GET  /api/v1/ci/signals           # que sinais existem (descobertos, não fixos)

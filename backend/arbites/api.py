@@ -355,6 +355,24 @@ class AIProvidersIn(BaseModel):
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
 
 
+class ObservabilitySourceIn(BaseModel):
+    """Um repositório de onde a observabilidade puxa execuções (change 0173).
+
+    `workflow` e `artifact` vazios significam "todos" — é o caso comum e
+    exigir os dois só faria o operador adivinhar nomes.
+    """
+
+    provider: str = "github"
+    repo: str
+    workflow: str | None = None
+    artifact: str | None = None
+
+
+class ObservabilitySourcesIn(BaseModel):
+    sources: list[ObservabilitySourceIn] = []
+    max_runs_per_poll: int | None = None
+
+
 class GithubTargetIn(BaseModel):
     """Onde o workflow deste alvo mora. Sem `repo` e `workflow` o dispatch
     não tem para onde ir — e este bloco não tinha representação no modelo,
@@ -2913,6 +2931,48 @@ def _register_routes(app: FastAPI) -> None:
     # O que já foi ingerido é respondido pelo DISCO, então repetir a ingestão
     # não duplica e uma semana desligado volta inteira.
 
+    @app.get(API_PREFIX + "/ci/sources")
+    async def get_ci_sources(request: Request):
+        config = ws_of(request).config().get("observability") or {}
+        return {"sources": config.get("sources") or [],
+                "max_runs_per_poll": config.get("max_runs_per_poll") or 50}
+
+    @app.put(API_PREFIX + "/ci/sources")
+    async def put_ci_sources(request: Request, payload: ObservabilitySourcesIn):
+        """Declara as origens sem abrir o YAML na mão (change 0173).
+
+        Antes só existiam no arquivo: quem clicava em "Buscar execuções" numa
+        instalação nova recebia "nenhuma fonte" e não tinha onde declarar uma.
+        """
+        ws = ws_of(request)
+        import yaml as _yaml
+
+        config = ws.config()
+        observabilidade = dict(config.get("observability") or {})
+        fontes = []
+        for fonte in payload.sources:
+            if not fonte.repo.strip():
+                continue
+            limpa: dict[str, Any] = {"provider": fonte.provider or "github",
+                                     "repo": fonte.repo.strip()}
+            # Vazio quer dizer "todos": gravar a chave com "" faria a
+            # ingestão procurar um workflow chamado string vazia.
+            if (fonte.workflow or "").strip():
+                limpa["workflow"] = fonte.workflow.strip()
+            if (fonte.artifact or "").strip():
+                limpa["artifact"] = fonte.artifact.strip()
+            fontes.append(limpa)
+        observabilidade["sources"] = fontes
+        if payload.max_runs_per_poll:
+            observabilidade["max_runs_per_poll"] = int(payload.max_runs_per_poll)
+        config["observability"] = observabilidade
+        ws.config_path.write_text(
+            _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        return {"sources": fontes,
+                "max_runs_per_poll": observabilidade.get("max_runs_per_poll") or 50}
+
     @app.post(API_PREFIX + "/ci/ingest")
     async def ci_ingest_now(request: Request, limit: int | None = None):
         ingestor: CIIngestor = request.app.state.ci_ingest
@@ -4879,6 +4939,10 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # lixeira. LER a prévia continua aberto — ver o que seria removido é o
     # que permite alguém discordar antes de acontecer.
     (r"/ci/retention/apply$", {"POST"}, "admin", None),
+    # Declarar de onde a observabilidade puxa é escrever no arbites.yaml, o
+    # mesmo alcance de PUT /targets e PUT /ai/providers. LER continua aberto:
+    # a tela precisa dizer "nenhuma origem declarada" a quem não é admin.
+    (r"/ci/sources$", {"PUT"}, "admin", None),
     (r"/audit$", {"DELETE"}, "admin", None),
     (r"/audit/[^/]+$", {"DELETE"}, "admin", None),
     (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),

@@ -16,6 +16,7 @@ import type {
   AuditReport,
   AutomationReport,
   CiRetention,
+  CiSource,
   CiRun,
   DailyContext,
   DailyDigestResult,
@@ -221,6 +222,13 @@ export const api = {
   ciIngest: () =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
               stopped?: string }>("/ci/ingest", { method: "POST" }),
+  ciSources: () =>
+    request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
+  ciSourcesSave: (sources: CiSource[]) =>
+    request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources", {
+      method: "PUT",
+      body: JSON.stringify({ sources }),
+    }),
   ciRetention: () => request<CiRetention>("/ci/retention"),
   ciRetentionApply: () =>
     request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(

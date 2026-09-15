@@ -181,3 +181,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-15 — 0170-run-local-cria-execution — run local cria execution vazia e a falha de arranque do processo nao chega em lugar nenhum (specs: local-automation MODIFIED)
 - 2026-09-15 — 0171-cts-criados-sincronizacao-caem — CTs criados pela sincronizacao de feature caem todos numa pasta so em vez de espelhar a arvore dos arquivos (specs: local-automation MODIFIED)
 - 2026-09-15 — 0172-bloco-github-alvo-existe — bloco github do alvo nao existe na UI e o dispatch responde 422 sem dizer o que falta, e salvar pela tela apaga o bloco escrito a mao (specs: ci-automation MODIFIED)
+- 2026-09-15 — 0173-origens-observabilidade-so-existem — origens da observabilidade so existem no yaml e nao ha onde declara-las pela tela (specs: ci-automation MODIFIED)
