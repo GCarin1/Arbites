@@ -11,8 +11,8 @@
 **Status:** active
 **Implementation:** verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`
 **Realizes:** SC15
-**Last updated:** 2026-09-14
-**Version:** 0.5.0
+**Last updated:** 2026-09-15
+**Version:** 0.5.1
 
 ## Purpose
 
@@ -68,6 +68,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 - The system shall oferecer um comando local para descartar o historico de tentativas de login, para que o bloqueio por tentativas nao deixe o dono da instancia sem saida na propria maquina.
 - The system shall oferecer um comando local que informe as contas existentes com papel e status, e que avise quando nao existe conta alguma, porque a recusa de login e indistinguivel de fora e de dentro da maquina a pessoa tem direito a resposta.
 - The system shall permitir criar ou redefinir localmente a conta de administrador, reativando-a e descartando o bloqueio por tentativas, sem nunca expor senha nem hash na saida.
+- The system shall oferecer a troca da própria senha a qualquer momento pela tela de perfil, sem depender de obrigação pendente nem de intervenção de um admin.
 
 ### Event-driven
 
@@ -87,6 +88,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
   cookie.
 - When uma requisição de escrita (qualquer método que não seja GET, HEAD ou OPTIONS) chega de uma sessão com papel `viewer`, the system shall recusá-la com 403 e código `forbidden`, exceto a troca da própria senha e o logout.
 - When uma rota governada por um interruptor desligado é chamada, the system shall recusá-la com 403 e código `feature_disabled`, nomeando o interruptor responsável.
+- When o login devolve uma conta que ainda deve a troca de senha, the system shall apresentar a tela de troca em vez da tela de entrada, e só considerar a sessão concluída quando a obrigação sair — jamais por ter havido um login bem-sucedido.
 
 ### State-driven
 
@@ -103,6 +105,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 - While o papel da sessão não alcança a rota, the system shall responder 403 com código `forbidden` — nunca 404, para não transformar autorização em adivinhação de rota.
 - While nao existe administrador ativo e o ambiente nao traz credencial de bootstrap, the system shall registrar um erro dizendo que ninguem consegue entrar e como corrigir, em vez de subir em silencio.
 - While não existe nenhum admin ativo, the system shall informar esse estado em `GET /auth/me` a quem ainda não tem sessão, junto com a indicação de haver ou não `ARBITES_ADMIN_EMAIL` declarado, para que a tela diga qual das duas saídas serve antes de alguém se cadastrar em vão.
+- While a sessão está presa na troca obrigatória com o app já montado, the system shall devolver a SPA à tela de troca ao receber `password_change_required`, em vez de manter as telas pedindo dados que nunca chegam.
 
 ### Unwanted-behavior (must-not)
 
@@ -161,6 +164,7 @@ Eles vivem num banco durável próprio, `.arbites/auth.db` (ADR 0011).
 12. [unverified] O arquivo de ambiente e aplicado sem sobrepor variavel ja exportada e sem expor valores; arranque sem admin e sem credencial registra erro nomeando as variaveis; o comando de destrave libera o login e pode alcancar uma conta so — verified by `backend/tests/test_primeira_execucao.py`.
 13. [unverified] Workspace sem conta explica o 401 e ensina o comando; criar e redefinir permitem entrar; conta pendente volta a ativa; senha curta e recusada sem tocar na conta; a listagem nunca mostra senha nem hash — verified by `backend/tests/test_recuperar_admin.py`.
 14. [verified] Sem admin ativo, `GET /auth/me` responde `no_admin` e a tela avisa antes do cadastro; o e-mail de `ARBITES_ADMIN_EMAIL` nasce admin ativo sem troca de senha obrigatória e entra no login seguinte, e qualquer outro e-mail continua pendente; com um admin ativo o mesmo e-mail volta a nascer pendente — verified by `backend/tests/test_primeiro_dono.py`.
+15. [verified] O login de uma conta que deve a troca abre a tela de troca (não a de entrada), a recusa das demais rotas traz o código `password_change_required`, as três rotas de saída continuam abertas, e trocar a senha libera o app na mesma sessão — verified by `backend/tests/test_troca_obrigatoria.py`.
 
 ## Maturity
 

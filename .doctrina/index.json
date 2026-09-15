@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-14",
+  "last_updated": "2026-09-15",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -45,8 +45,8 @@
         "id": "auth",
         "path": ".doctrina/specs/auth/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-09-14",
+        "version": "0.5.1",
+        "last_updated": "2026-09-15",
         "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
         "realizes": [
           "SC15"
@@ -446,8 +446,8 @@
         "title": "Instancia sem admin ativo revela o estado e o e-mail do ambiente vira dono no cadastro",
         "status": "accepted",
         "date": "2026-09-14",
-        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas",
-        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`"
+        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`",
+        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas"
       }
     ],
     "changes": [],
@@ -2645,6 +2645,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0169-tela-troca-senha-obrigatoria",
+        "title": "tela de troca de senha obrigatoria nunca aparece e a sessao acaba entrando no app com todas as chamadas em 403",
+        "path": ".doctrina/changes/archive/2026-09-15-0169-tela-troca-senha-obrigatoria",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2853,6 +2866,12 @@
         "last_updated": "2026-07-17"
       },
       {
+        "id": "replace-requirement-troca-so-a-primeira-linha",
+        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
+        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
+        "last_updated": "2026-09-14"
+      },
+      {
         "id": "responsividade-se-verifica-no-navegador-nao-no-css",
         "path": ".doctrina/skills/responsividade-se-verifica-no-navegador-nao-no-css.md",
         "description": "Responsividade não se confere lendo CSS nem confiando no build — abra o app no viewport alvo e meça `scrollWidth` contra `innerWidth` tela a tela; o que quebra são sobras de layout que o CSS não denuncia.",
@@ -2931,10 +2950,10 @@
         "last_updated": "2026-07-10"
       },
       {
-        "id": "replace-requirement-troca-so-a-primeira-linha",
-        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
-        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
-        "last_updated": "2026-09-14"
+        "id": "mesmo-componente-em-dois-ramos-mantem-estado",
+        "path": ".doctrina/skills/mesmo-componente-em-dois-ramos-mantem-estado.md",
+        "description": "Dois ramos de um `if` que renderizam o MESMO componente na mesma posição fazem o React reaproveitar a instância — o `useState` inicial não roda de novo e o componente aparece com o estado do ramo anterior; a saída é uma `key` distinta por ramo.",
+        "last_updated": "2026-09-15"
       }
     ],
     "contracts": [

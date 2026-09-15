@@ -137,6 +137,19 @@ python -m arbites admin --email voce@exemplo.com --password uma-senha-de-12-ou-m
 > - sem nada declarado, use o `python -m arbites admin --email ... --password
 >   ...` acima, que promove a conta que já existe e destrava o login junto.
 
+### Trocar a senha
+
+No **Perfil** (menu do avatar, canto superior direito) há o cartão **Senha**:
+senha atual, nova e confirmação. Trocar derruba as **outras** sessões da
+conta — a que você está usando continua aberta. Mínimo de 12 caracteres.
+
+Quando a conta nasce pelo `python -m arbites admin` ou pelo bootstrap por
+ambiente, ela vem com **troca obrigatória**: a senha passou pelo histórico do
+shell ou pelo `docker inspect`, então serve para entrar uma vez. Nesse caso o
+login abre direto a tela "Definir uma senha", e até a troca acontecer o
+backend recusa todas as outras rotas com `password_change_required` — a SPA
+devolve você à tela de troca em vez de ficar pedindo dados que não virão.
+
 **Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
 e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
 ou destravar na hora:
