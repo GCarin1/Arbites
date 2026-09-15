@@ -155,8 +155,8 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.14.0",
-        "last_updated": "2026-07-21",
+        "version": "0.15.0",
+        "last_updated": "2026-09-15",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC5"
@@ -2658,6 +2658,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0170-run-local-cria-execution",
+        "title": "run local cria execution vazia e a falha de arranque do processo nao chega em lugar nenhum",
+        "path": ".doctrina/changes/archive/2026-09-15-0170-run-local-cria-execution",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2818,6 +2831,12 @@
         "last_updated": "2026-07-13"
       },
       {
+        "id": "mesmo-componente-em-dois-ramos-mantem-estado",
+        "path": ".doctrina/skills/mesmo-componente-em-dois-ramos-mantem-estado.md",
+        "description": "Dois ramos de um `if` que renderizam o MESMO componente na mesma posição fazem o React reaproveitar a instância — o `useState` inicial não roda de novo e o componente aparece com o estado do ramo anterior; a saída é uma `key` distinta por ramo.",
+        "last_updated": "2026-09-15"
+      },
+      {
         "id": "metricas-resultado-liquido",
         "path": ".doctrina/skills/metricas-resultado-liquido.md",
         "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
@@ -2948,12 +2967,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "mesmo-componente-em-dois-ramos-mantem-estado",
-        "path": ".doctrina/skills/mesmo-componente-em-dois-ramos-mantem-estado.md",
-        "description": "Dois ramos de um `if` que renderizam o MESMO componente na mesma posição fazem o React reaproveitar a instância — o `useState` inicial não roda de novo e o componente aparece com o estado do ramo anterior; a saída é uma `key` distinta por ramo.",
-        "last_updated": "2026-09-15"
       }
     ],
     "contracts": [

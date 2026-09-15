@@ -483,7 +483,7 @@ function HistoryCard({
   onGoSetup: () => void;
 }) {
   const [runs, setRuns] = useState<
-    { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]
+    { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number>; abort_reason?: string | null }[]
   >([]);
   const [summary, setSummary] = useState<{
     total_runs: number;
@@ -496,10 +496,10 @@ function HistoryCard({
   useEffect(() => {
     let alive = true;
     Promise.all([
-      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number>; abort_reason?: string | null }[]>(
         `${BASE}/executions?origin=local_run`,
       ),
-      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number>; abort_reason?: string | null }[]>(
         `${BASE}/executions?origin=github_actions`,
       ),
       json<{
@@ -524,7 +524,15 @@ function HistoryCard({
     };
   }, []);
 
-  function outcomeOf(counts: Record<string, number>): { label: string; dot: string } {
+  function outcomeOf(
+    counts: Record<string, number>,
+    abortReason?: string | null,
+  ): { label: string; dot: string; title?: string } {
+    // O aborto vem primeiro: um run que nem chegou a rodar não é "failed"
+    // nem "sem resultados" — ele tem um motivo, e o motivo é o que resolve
+    // o problema de quem está olhando (change 0170).
+    if (abortReason)
+      return { label: "não executou", dot: "dot-col-blocked", title: abortReason };
     if ((counts["failed"] ?? 0) > 0) return { label: "failed", dot: "dot-col-failed" };
     if ((counts["blocked"] ?? 0) > 0) return { label: "blocked", dot: "dot-col-blocked" };
     if ((counts["passed"] ?? 0) > 0) return { label: "passed", dot: "dot-col-passed" };
@@ -624,14 +632,21 @@ function HistoryCard({
             </thead>
             <tbody>
               {runs.map((r) => {
-                const o = outcomeOf(r.result_counts);
+                const o = outcomeOf(r.result_counts, r.abort_reason);
                 return (
                   <tr key={r.id}>
                     <td className="mono">{r.id}</td>
-                    <td>{r.name}</td>
+                    <td>
+                      {r.name}
+                      {o.title && (
+                        <span className="run-motivo caption">{o.title}</span>
+                      )}
+                    </td>
                     <td className="caption muted">{r.origin}</td>
                     <td>
-                      <span className={`status-dot ${o.dot} caption`}>{o.label}</span>
+                      <span className={`status-dot ${o.dot} caption`} title={o.title}>
+                        {o.label}
+                      </span>
                     </td>
                     <td className="caption muted">{when(r.created_at)}</td>
                   </tr>

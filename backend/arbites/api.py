@@ -67,7 +67,7 @@ from .gherkin_scan import (
     list_feature_files,
     scan_target,
 )
-from .runner import RunManager
+from .runner import PythonPathError, RunManager, resolver_python
 from .xray_import import XrayImportError
 from .indexer import clear_needs_rerun, connect, reindex_file, reindex_full
 from .parser import parse_markdown
@@ -2378,6 +2378,15 @@ def _register_routes(app: FastAPI) -> None:
         import yaml as _yaml
 
         config = ws.config()
+        # Recusar aqui poupa a viagem inteira (change 0170): o valor errado
+        # em `python_path` só falhava na hora de executar, e a execution
+        # nascia vazia dizendo "sem resultados".
+        for alvo in payload.targets:
+            try:
+                resolver_python(alvo.python_path)
+            except PythonPathError as exc:
+                raise _error(422, "bad_python_path",
+                             f"alvo '{alvo.name}': {exc}")
         config["automation_targets"] = [
             t.model_dump(exclude_none=True) for t in payload.targets
         ]
