@@ -5020,12 +5020,25 @@ def _register_auth(app: FastAPI) -> None:
     async def register(request: Request, payload: RegisterIn):
         if os.environ.get("ARBITES_SIGNUP", "on").strip().lower() == "off":
             raise _error(403, "signup_disabled", "cadastro fechado nesta instancia")
+        conn = auth_of(request)
+        # Cadastro pendente numa instancia SEM admin ativo e um beco sem
+        # saida: nao existe quem aprove. Quando o e-mail e o que o operador
+        # declarou no ambiente, a conta ja nasce dona (change 0168).
+        dono = auth_ops.claims_instance(conn, payload.email)
         user = auth_ops.create_user(
-            auth_of(request), payload.email, payload.password, payload.name,
-            role="viewer", status="pending",
+            conn, payload.email, payload.password, payload.name,
+            role="admin" if dono else "viewer",
+            status="active" if dono else "pending",
         )
+        if dono:
+            # Senha escolhida por quem se cadastrou, nao vinda do ambiente:
+            # nao ha nada para trocar no primeiro login.
+            return {"user": user, "admin": True,
+                    "message": "primeira conta desta instancia;"
+                               " entrou como administrador"}
         # Nasce pendente: nenhuma sessao aqui, de proposito.
-        return {"user": user, "message": "cadastro recebido; aguarde a liberacao"}
+        return {"user": user, "admin": False,
+                "message": "cadastro recebido; aguarde a liberacao"}
 
     @app.post(API_PREFIX + "/auth/login")
     async def login(request: Request, payload: LoginIn):
@@ -5056,9 +5069,17 @@ def _register_auth(app: FastAPI) -> None:
         if not request.app.state.auth_enabled:
             return {"user": current_user(request), "auth_enabled": False}
         user = getattr(request.state, "user", None)
+        # `no_admin` conta a quem ainda nao entrou que um cadastro feito
+        # agora ficaria pendente para sempre, e `owner_declared` diz qual das
+        # duas saidas serve (cadastrar-se com o e-mail do ambiente, ou o
+        # comando local). E uma revelacao deliberada: ver ADR 0018.
+        sem_admin = auth_ops.no_active_admin(auth_of(request))
         return {"user": user, "auth_enabled": True,
                 "signup_enabled":
-                    os.environ.get("ARBITES_SIGNUP", "on").strip().lower() != "off"}
+                    os.environ.get("ARBITES_SIGNUP", "on").strip().lower() != "off",
+                "no_admin": sem_admin,
+                "owner_declared":
+                    bool(sem_admin and auth_ops.owner_email_from_env())}
 
 
     # -- painel de administracao (capability admin) -------------------------

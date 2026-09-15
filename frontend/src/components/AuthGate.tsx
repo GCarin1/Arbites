@@ -5,7 +5,12 @@ import { Login } from "./Login";
 
 type State =
   | { phase: "checking" }
-  | { phase: "anonymous"; signupEnabled: boolean }
+  | {
+      phase: "anonymous";
+      signupEnabled: boolean;
+      noAdmin?: boolean;
+      ownerDeclared?: boolean;
+    }
   | { phase: "must-change"; user: SessionUser }
   | { phase: "authenticated"; user: SessionUser };
 
@@ -32,6 +37,8 @@ export function AuthGate({
         setState({
           phase: "anonymous",
           signupEnabled: me.signup_enabled !== false,
+          noAdmin: me.no_admin === true,
+          ownerDeclared: me.owner_declared === true,
         });
         return;
       }
@@ -73,6 +80,8 @@ export function AuthGate({
     return (
       <Login
         signupEnabled={state.signupEnabled}
+        noAdmin={state.noAdmin === true}
+        ownerDeclared={state.ownerDeclared === true}
         onAuthenticated={(user) =>
           setState(
             user.must_change_password

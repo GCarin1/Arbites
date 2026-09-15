@@ -133,10 +133,13 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   register: (email: string, password: string, name: string) =>
-    request<{ user: SessionUser; message: string }>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password, name }),
-    }),
+    request<{ user: SessionUser; message: string; admin?: boolean }>(
+      "/auth/register",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, password, name }),
+      },
+    ),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switches: () => request<{ switches: Switch[] }>("/admin/switches"),
 

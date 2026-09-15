@@ -12,10 +12,14 @@ function messageOf(err: unknown): string {
 export function Login({
   onAuthenticated,
   signupEnabled,
+  noAdmin,
+  ownerDeclared,
   forcePasswordChange,
 }: {
   onAuthenticated: (user: SessionUser) => void;
   signupEnabled: boolean;
+  noAdmin?: boolean;
+  ownerDeclared?: boolean;
   forcePasswordChange?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>(
@@ -27,6 +31,9 @@ export function Login({
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
+  // O aviso vem do estado que o /auth/me trouxe ao montar a tela; assim que
+  // o cadastro cria o dono, ele deixou de ser verdade e sai da frente.
+  const [semAdmin, setSemAdmin] = useState(noAdmin === true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -40,12 +47,17 @@ export function Login({
         const { user } = await api.login(email, password);
         onAuthenticated(user);
       } else if (mode === "register") {
-        await api.register(email, password, name);
+        const { admin } = await api.register(email, password, name);
+        if (admin) setSemAdmin(false);
         setMode("login");
         setPassword("");
         setNotice(
-          "Cadastro recebido. Um administrador precisa liberar o acesso " +
-            "antes do primeiro login.",
+          admin
+            ? "Esta instância não tinha administrador e o e-mail confere " +
+                "com ARBITES_ADMIN_EMAIL: a conta já entrou como " +
+                "administrador ativa. Pode fazer login."
+            : "Cadastro recebido. Um administrador precisa liberar o acesso " +
+                "antes do primeiro login.",
         );
       } else {
         if (newPassword !== confirmation) {
@@ -83,6 +95,32 @@ export function Login({
             Esta conta ainda usa a senha de instalação. Defina uma senha
             própria para continuar.
           </p>
+        )}
+
+        {mode !== "password" && semAdmin && (
+          <div className="login-sem-admin" role="status">
+            <strong>Esta instância ainda não tem administrador ativo.</strong>
+            {ownerDeclared ? (
+              <p>
+                Cadastre-se com o e-mail declarado em{" "}
+                <code>ARBITES_ADMIN_EMAIL</code> e a conta já entra como
+                administrador. Qualquer outro e-mail fica pendente — e não há
+                quem aprove.
+              </p>
+            ) : (
+              <p>
+                Um cadastro feito aqui nasce pendente e{" "}
+                <strong>ninguém poderá aprová-lo</strong>. Crie o
+                administrador na máquina onde o Arbites roda:
+              </p>
+            )}
+            {!ownerDeclared && (
+              <pre>
+                {"python -m arbites admin --email voce@exemplo.com" +
+                  " --password uma-senha-de-12-ou-mais"}
+              </pre>
+            )}
+          </div>
         )}
 
         {mode !== "password" && (

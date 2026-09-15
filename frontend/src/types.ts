@@ -79,6 +79,10 @@ export interface SessionInfo {
   user: SessionUser | null;
   auth_enabled: boolean;
   signup_enabled?: boolean;
+  /** Nenhum admin ativo: um cadastro feito agora ficaria pendente sem quem aprove. */
+  no_admin?: boolean;
+  /** Há ARBITES_ADMIN_EMAIL declarado, então cadastrar-se com ele já vira admin. */
+  owner_declared?: boolean;
 }
 
 export interface WorkspaceInfo {
