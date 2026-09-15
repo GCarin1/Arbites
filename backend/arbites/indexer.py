@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS scenarios(
 CREATE TABLE IF NOT EXISTS executions(
   id TEXT PRIMARY KEY, name TEXT, owner TEXT, sprint TEXT, environment TEXT,
   origin TEXT, status TEXT, created_at TEXT, closed_at TEXT, path TEXT,
-  squad TEXT, starts_on TEXT, ends_on TEXT);
+  squad TEXT, starts_on TEXT, ends_on TEXT, abort_reason TEXT);
 CREATE TABLE IF NOT EXISTS results(
   execution_id TEXT, testcase_id TEXT, status TEXT, executed_at TEXT,
   duration_seconds REAL, assignee TEXT, PRIMARY KEY(execution_id, testcase_id));
@@ -130,6 +130,7 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE executions ADD COLUMN squad TEXT",
         "ALTER TABLE executions ADD COLUMN starts_on TEXT",
         "ALTER TABLE executions ADD COLUMN ends_on TEXT",
+        "ALTER TABLE executions ADD COLUMN abort_reason TEXT",
         "ALTER TABLE results ADD COLUMN assignee TEXT",
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
         "ALTER TABLE testcases ADD COLUMN created TEXT",
@@ -875,8 +876,8 @@ def _index_execution(
     conn.execute(
         "INSERT OR REPLACE INTO executions"
         "(id, name, owner, sprint, environment, origin, status, created_at, closed_at, path,"
-        " squad, starts_on, ends_on)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " squad, starts_on, ends_on, abort_reason)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             exec_id,
             data.get("name"),
@@ -891,6 +892,7 @@ def _index_execution(
             (str(data.get("squad")).strip() or None) if data.get("squad") else None,
             data.get("starts_on"),
             data.get("ends_on"),
+            ((data.get("aborted") or {}).get("reason") or None),
         ),
     )
     for result in data.get("results") or []:

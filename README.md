@@ -97,9 +97,11 @@ feito para ser compartilhado (ADR 0008). Chave de IA vai para o cofre do SO
 > os blocos que interessam.
 
 > **Cuidado ao editar `automation_targets` à mão:** salvar os targets pela tela
-> (Automação → Configurar) reescreve o bloco inteiro e **apaga o sub-bloco
-> `github:`** escrito à mão, sem avisar. Hoje os dois caminhos são
-> incompatíveis; está registrado para correção.
+> (Automação → Configurar) reescrevia o bloco inteiro e **apagava o sub-bloco
+> `github:`** escrito à mão. Corrigido na change 0172: repositório, workflow
+> e branch têm campos próprios na tela e sobrevivem ao salvamento. Um bloco
+> pela metade (repositório sem workflow) não é gravado — ele só produziria um
+> erro de disparo com o bloco aparentemente configurado no YAML.
 
 ### Não consigo entrar
 
@@ -136,6 +138,19 @@ python -m arbites admin --email voce@exemplo.com --password uma-senha-de-12-ou-m
 >   existe um admin ativo, esse mesmo e-mail volta a nascer pendente;
 > - sem nada declarado, use o `python -m arbites admin --email ... --password
 >   ...` acima, que promove a conta que já existe e destrava o login junto.
+
+### Trocar a senha
+
+No **Perfil** (menu do avatar, canto superior direito) há o cartão **Senha**:
+senha atual, nova e confirmação. Trocar derruba as **outras** sessões da
+conta — a que você está usando continua aberta. Mínimo de 12 caracteres.
+
+Quando a conta nasce pelo `python -m arbites admin` ou pelo bootstrap por
+ambiente, ela vem com **troca obrigatória**: a senha passou pelo histórico do
+shell ou pelo `docker inspect`, então serve para entrar uma vez. Nesse caso o
+login abre direto a tela "Definir uma senha", e até a troca acontecer o
+backend recusa todas as outras rotas com `password_change_required` — a SPA
+devolve você à tela de troca em vez de ficar pedindo dados que não virão.
 
 **Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
 e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
@@ -354,7 +369,13 @@ print. Puxa, não recebe por webhook: uma instância local não é alcançável
 pela internet, e puxar dá de graça a retomada (ficar dias desligado traz o
 intervalo inteiro, não só o run mais recente).
 
-Declare as fontes no `arbites.yaml` do workspace:
+**Pelo jeito mais curto:** a aba Observabilidade tem o bloco **Origens** —
+repositório, workflow e artifact (os dois últimos opcionais: em branco valem
+"todos"). Ele grava no `arbites.yaml` por você, e aparece justamente quando
+ainda não há execução nenhuma, que é quando a pergunta "por que não achou
+nada?" surge. Declarar exige papel `admin`; ver o que está declarado, não.
+
+Pelo arquivo, se preferir editar à mão:
 
 ```yaml
 observability:
@@ -380,6 +401,8 @@ observability:
 Depois:
 
 ```
+GET  /api/v1/ci/sources           # o que está declarado
+PUT  /api/v1/ci/sources           # declara (admin) — o que a aba usa
 POST /api/v1/ci/ingest            # puxa o que ainda não está no disco
 GET  /api/v1/ci/runs?limit=50     # runs ingeridos, com sinais e anexos
 GET  /api/v1/ci/signals           # que sinais existem (descobertos, não fixos)

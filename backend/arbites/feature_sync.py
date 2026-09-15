@@ -73,6 +73,46 @@ def scan_feature_files(
     return out
 
 
+def prefixo_estatico(glob: str) -> str:
+    """A parte do glob antes do primeiro curinga — `features/` em
+    `features/**/*.feature`.
+
+    É ruído em todo caminho capturado, então sai da árvore espelhada: o CT
+    de `features/login/login.feature` vai para `<pasta>/login/login/`, não
+    para `<pasta>/features/login/login/`.
+    """
+    partes: list[str] = []
+    for parte in (glob or "").replace("\\", "/").split("/"):
+        if any(c in parte for c in "*?["):
+            break
+        partes.append(parte)
+    return "/".join(partes)
+
+
+def pasta_do_cenario(feature_path: str, glob: str) -> str:
+    """Subpasta do CT, espelhando a árvore do `.feature` (change 0171).
+
+    Uma pasta POR ARQUIVO `.feature`, com a hierarquia preservada: o nome do
+    arquivo (sem extensão) é a folha. Antes todos os CTs de todos os
+    `.feature` caíam num diretório só, e um repositório com dezenas de
+    features virava uma lista chapada de centenas de arquivos.
+
+    Não há colapso quando pasta e arquivo têm o mesmo nome
+    (`login/login.feature` → `login/login/`): a regra vale igual para todo
+    caminho, e o destino continua previsível quando um segundo `.feature`
+    aparece ao lado.
+    """
+    caminho = (feature_path or "").replace("\\", "/").strip("/")
+    prefixo = prefixo_estatico(glob)
+    if prefixo and caminho.startswith(prefixo + "/"):
+        caminho = caminho[len(prefixo) + 1:]
+    partes = [p for p in caminho.split("/") if p not in ("", ".", "..")]
+    if not partes:
+        return ""
+    partes[-1] = partes[-1].rsplit(".", 1)[0] or partes[-1]
+    return "/".join(partes)
+
+
 def scenario_body(feature_name: str, scenario: dict[str, Any], language: str) -> str:
     """Body BDD verbatim do CT criado a partir de um cenário."""
     header = "# language: %s\n" % language if language and language != "en" else ""

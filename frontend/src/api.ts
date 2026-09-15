@@ -16,6 +16,7 @@ import type {
   AuditReport,
   AutomationReport,
   CiRetention,
+  CiSource,
   CiRun,
   DailyContext,
   DailyDigestResult,
@@ -68,6 +69,17 @@ export function onUnauthenticated(listener: () => void): () => void {
   return () => unauthenticatedListeners.delete(listener);
 }
 
+// O mesmo, para a sessao que existe mas esta presa na troca de senha
+// obrigatoria (change 0169). O backend responde 403 `password_change_required`
+// em TODA rota que nao seja a troca; sem este canal a SPA fica montada
+// pedindo dados que nunca chegam, e a pessoa nao tem para onde ir.
+const passwordChangeListeners = new Set<() => void>();
+
+export function onPasswordChangeRequired(listener: () => void): () => void {
+  passwordChangeListeners.add(listener);
+  return () => passwordChangeListeners.delete(listener);
+}
+
 /**
  * Mensagem de falha de REDE (change 0134).
  *
@@ -104,6 +116,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (resp.status === 401 && !path.startsWith("/auth/")) {
     for (const listener of unauthenticatedListeners) listener();
+  }
+  if (resp.status === 403 && !path.startsWith("/auth/")) {
+    // Ler o corpo aqui consome o stream, entao usa-se um clone: o fluxo de
+    // erro abaixo ainda precisa da mensagem original.
+    try {
+      const data = await resp.clone().json();
+      if (data?.error?.code === "password_change_required") {
+        for (const listener of passwordChangeListeners) listener();
+      }
+    } catch {
+      /* corpo não-JSON: não é o nosso 403 */
+    }
   }
   if (!resp.ok) {
     let message = `${resp.status} ${resp.statusText}`;
@@ -198,6 +222,13 @@ export const api = {
   ciIngest: () =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
               stopped?: string }>("/ci/ingest", { method: "POST" }),
+  ciSources: () =>
+    request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
+  ciSourcesSave: (sources: CiSource[]) =>
+    request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources", {
+      method: "PUT",
+      body: JSON.stringify({ sources }),
+    }),
   ciRetention: () => request<CiRetention>("/ci/retention"),
   ciRetentionApply: () =>
     request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(

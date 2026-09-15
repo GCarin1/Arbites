@@ -4,8 +4,8 @@
 **Status:** deprecated
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
-**Last updated:** 2026-07-09
-**Version:** 0.4.0
+**Last updated:** 2026-09-15
+**Version:** 0.6.0
 
 ## Purpose
 
@@ -41,6 +41,8 @@ workflow/jobs/steps do workflow.
   `feature`, `environment (dev|cer|prd)`, `browser` e `source_repo`,
   repassando-os como inputs do workflow_dispatch quando informados.
 - The system shall aceitar a credencial de CI pela variavel de ambiente do processo onde o cofre do sistema operacional nao existe, com precedencia sobre o cofre, sem nunca devolver o valor nem grava-lo no workspace.
+- The system shall oferecer na tela de configuração do alvo os campos de repositório, workflow e branch do GitHub, e preservá-los em toda gravação — nenhuma configuração feita à mão no `arbites.yaml` pode ser descartada por um salvamento pela tela.
+- The system shall permitir declarar e remover as origens da observabilidade pela própria tela, gravando-as no `arbites.yaml`, sem exigir que o operador edite o arquivo à mão.
 
 ### Event-driven
 
@@ -53,18 +55,22 @@ workflow/jobs/steps do workflow.
 - When a API do GitHub retorna rate limit, the system shall aplicar
   backoff no polling.
 - When alguem tenta guardar a credencial numa instancia sem cofre, the system shall recusar explicando a saida, em vez de aceitar em silencio ou falhar depois.
+- When o disparo é pedido para um alvo sem repositório e workflow, the system shall recusá-lo nomeando a tela onde se configura, em vez de citar apenas a chave do arquivo de configuração.
 
 ### State-driven
 
 - While o job está em andamento, the system shall exibir apenas o status
   dos steps do workflow (não dos steps Gherkin — indisponíveis ao vivo).
 - While a instancia nao tem cofre de credenciais do sistema operacional, the system shall responder que nao ha credencial em vez de falhar, mantendo a aplicacao inteira utilizavel.
+- While nenhuma origem está declarada, the system shall dizer isso na tela de observabilidade junto do campo que a declara, em vez de apenas informar que nenhuma execução chegou.
 
 ### Unwanted-behavior (must-not)
 
 - The system shall not gravar o PAT em YAML, no índice ou em logs.
 - The system shall not retornar o valor do token em
   `GET /settings/github/token` (status apenas).
+- The system shall not gravar um bloco `github` pela metade; repositório sem workflow (ou o contrário) é descartado, porque um bloco incompleto faz o disparo acusar falta de configuração com o bloco aparentemente presente no arquivo.
+- The system shall not gravar `workflow` ou `artifact` vazios como valor; ausentes significam "todos", e a chave vazia faria a ingestão procurar um nome que nunca existe.
 
 ### Optional
 
@@ -85,6 +91,8 @@ workflow/jobs/steps do workflow.
 4. [verified] Inputs opcionais do dispatch (feature/environment/browser/
    source_repo) chegam ao workflow — verified by `backend/tests/test_ci_runs.py`.
 5. [unverified] Instancia sem cofre responde a tela de problemas e o status do token sem erro, anuncia a falta com o remedio, recusa a gravacao explicando, e aceita a credencial pelo ambiente sem vazar o valor nem toca-lo no disco — verified by `backend/tests/test_sem_cofre.py`.
+6. [verified] O bloco `github` sobrevive a duas gravações seguidas pela tela e continua no `arbites.yaml`; um bloco pela metade não é gravado; um alvo sem GitHub continua válido para execução local; e a recusa do disparo aponta Automação → Configurar — verified by `backend/tests/test_alvo_github.py`.
+7. [verified] Instalação nova responde lista vazia; declarar grava no `arbites.yaml` e é exatamente o que a ingestão enxerga; workflow e artifact em branco não viram chave; origem sem repositório é descartada; escrever exige `admin` e ler não — verified by `backend/tests/test_origens_observabilidade.py`.
 
 ## Maturity
 

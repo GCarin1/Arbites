@@ -50,6 +50,35 @@ export function Profile({
   const [memory, setMemory] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [senhaNova, setSenhaNova] = useState("");
+  const [senhaConfirma, setSenhaConfirma] = useState("");
+  const [senhaBusy, setSenhaBusy] = useState(false);
+  const [senhaOk, setSenhaOk] = useState("");
+
+  async function trocarSenha(evento: React.FormEvent) {
+    evento.preventDefault();
+    setSenhaOk("");
+    if (senhaNova !== senhaConfirma) {
+      onError("a confirmação não confere com a nova senha");
+      return;
+    }
+    setSenhaBusy(true);
+    try {
+      await api.changePassword(senhaAtual, senhaNova);
+      setSenhaAtual("");
+      setSenhaNova("");
+      setSenhaConfirma("");
+      setSenhaOk(
+        "Senha trocada. As outras sessões desta conta foram derrubadas;" +
+          " esta continua aberta.",
+      );
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "falha ao trocar a senha");
+    } finally {
+      setSenhaBusy(false);
+    }
+  }
 
   useEffect(() => {
     json<ProfileData>(`${BASE}/profile`)
@@ -151,6 +180,59 @@ export function Profile({
           </div>
         </div>
       </div>
+
+      <form className="card block" onSubmit={trocarSenha}>
+        <div className="card-head">
+          <h3>Senha</h3>
+          <span className="spacer" />
+          <span className="caption muted">mínimo de 12 caracteres</span>
+        </div>
+        <p className="caption muted" style={{ marginBottom: "var(--s1)" }}>
+          Trocar a senha derruba as outras sessões desta conta — a que você
+          está usando agora continua aberta.
+        </p>
+        <div className="field-grid">
+          <div className="field col-4">
+            <label htmlFor="perfil-senha-atual">Senha atual</label>
+            <input
+              id="perfil-senha-atual"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={senhaAtual}
+              onChange={(e) => setSenhaAtual(e.target.value)}
+            />
+          </div>
+          <div className="field col-4">
+            <label htmlFor="perfil-senha-nova">Nova senha</label>
+            <input
+              id="perfil-senha-nova"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={senhaNova}
+              onChange={(e) => setSenhaNova(e.target.value)}
+            />
+          </div>
+          <div className="field col-4">
+            <label htmlFor="perfil-senha-confirma">Confirmar nova senha</label>
+            <input
+              id="perfil-senha-confirma"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={senhaConfirma}
+              onChange={(e) => setSenhaConfirma(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="toolbar">
+          <button className="primary" type="submit" disabled={senhaBusy}>
+            {senhaBusy ? "Trocando…" : "Trocar senha"}
+          </button>
+          {senhaOk && <span className="caption">{senhaOk}</span>}
+        </div>
+      </form>
 
       <div className="card block">
         <div className="card-head">

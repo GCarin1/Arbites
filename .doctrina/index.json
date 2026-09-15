@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-14",
+  "last_updated": "2026-09-15",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -45,8 +45,8 @@
         "id": "auth",
         "path": ".doctrina/specs/auth/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-09-14",
+        "version": "0.5.1",
+        "last_updated": "2026-09-15",
         "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
         "realizes": [
           "SC15"
@@ -56,8 +56,8 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.4.0",
-        "last_updated": "2026-07-09",
+        "version": "0.6.0",
+        "last_updated": "2026-09-15",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC6"
@@ -155,8 +155,8 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.14.0",
-        "last_updated": "2026-07-21",
+        "version": "0.15.1",
+        "last_updated": "2026-09-15",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC5"
@@ -446,8 +446,8 @@
         "title": "Instancia sem admin ativo revela o estado e o e-mail do ambiente vira dono no cadastro",
         "status": "accepted",
         "date": "2026-09-14",
-        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas",
-        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`"
+        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`",
+        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas"
       }
     ],
     "changes": [],
@@ -2645,6 +2645,71 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0169-tela-troca-senha-obrigatoria",
+        "title": "tela de troca de senha obrigatoria nunca aparece e a sessao acaba entrando no app com todas as chamadas em 403",
+        "path": ".doctrina/changes/archive/2026-09-15-0169-tela-troca-senha-obrigatoria",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0170-run-local-cria-execution",
+        "title": "run local cria execution vazia e a falha de arranque do processo nao chega em lugar nenhum",
+        "path": ".doctrina/changes/archive/2026-09-15-0170-run-local-cria-execution",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0171-cts-criados-sincronizacao-caem",
+        "title": "CTs criados pela sincronizacao de feature caem todos numa pasta so em vez de espelhar a arvore dos arquivos",
+        "path": ".doctrina/changes/archive/2026-09-15-0171-cts-criados-sincronizacao-caem",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0172-bloco-github-alvo-existe",
+        "title": "bloco github do alvo nao existe na UI e o dispatch responde 422 sem dizer o que falta, e salvar pela tela apaga o bloco escrito a mao",
+        "path": ".doctrina/changes/archive/2026-09-15-0172-bloco-github-alvo-existe",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0173-origens-observabilidade-so-existem",
+        "title": "origens da observabilidade so existem no yaml e nao ha onde declara-las pela tela",
+        "path": ".doctrina/changes/archive/2026-09-15-0173-origens-observabilidade-so-existem",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2805,6 +2870,12 @@
         "last_updated": "2026-07-13"
       },
       {
+        "id": "mesmo-componente-em-dois-ramos-mantem-estado",
+        "path": ".doctrina/skills/mesmo-componente-em-dois-ramos-mantem-estado.md",
+        "description": "Dois ramos de um `if` que renderizam o MESMO componente na mesma posição fazem o React reaproveitar a instância — o `useState` inicial não roda de novo e o componente aparece com o estado do ramo anterior; a saída é uma `key` distinta por ramo.",
+        "last_updated": "2026-09-15"
+      },
+      {
         "id": "metricas-resultado-liquido",
         "path": ".doctrina/skills/metricas-resultado-liquido.md",
         "description": "Como escrever métricas de reporting sobre o índice sem inflar contagem — distinguir estado atual (results) de log de transições (result_events).",
@@ -2851,6 +2922,12 @@
         "path": ".doctrina/skills/progresso-ao-vivo-fonte-oficial-reconcilia.md",
         "description": "Progresso em tempo real parseado de um stream de texto é sempre best-effort — pode e deve existir para UX, mas a fonte oficial estruturada (JSON/artefato final) SEMPRE reconcilia o estado no fim; o live nunca é a verdade final.",
         "last_updated": "2026-07-17"
+      },
+      {
+        "id": "replace-requirement-troca-so-a-primeira-linha",
+        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
+        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
+        "last_updated": "2026-09-14"
       },
       {
         "id": "responsividade-se-verifica-no-navegador-nao-no-css",
@@ -2931,10 +3008,10 @@
         "last_updated": "2026-07-10"
       },
       {
-        "id": "replace-requirement-troca-so-a-primeira-linha",
-        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
-        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
-        "last_updated": "2026-09-14"
+        "id": "configuracao-que-a-tela-nao-alcanca",
+        "path": ".doctrina/skills/configuracao-que-a-tela-nao-alcanca.md",
+        "description": "Toda configuração que uma funcionalidade EXIGE precisa de campo na tela; sem isso o erro correto (\"falta X no arquivo\") não tem onde ser resolvido, e um modelo Pydantic sem o campo ainda APAGA o que foi escrito à mão no arquivo ao salvar pela tela.",
+        "last_updated": "2026-09-15"
       }
     ],
     "contracts": [

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, onUnauthenticated } from "../api";
+import { api, onPasswordChangeRequired, onUnauthenticated } from "../api";
 import type { SessionUser } from "../types";
 import { Login } from "./Login";
 
@@ -64,6 +64,20 @@ export function AuthGate({
     });
   }, []);
 
+  useEffect(() => {
+    // E qualquer 403 `password_change_required` devolve para a troca — a
+    // obrigação pode nascer com o app já montado (um admin redefine a senha
+    // pelo painel, ou pelo comando local), e aí a sessão segue viva
+    // respondendo 403 em tudo.
+    return onPasswordChangeRequired(() => {
+      setState((atual) =>
+        atual.phase === "authenticated"
+          ? { phase: "must-change", user: atual.user }
+          : atual,
+      );
+    });
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -79,6 +93,7 @@ export function AuthGate({
   if (state.phase === "anonymous") {
     return (
       <Login
+        key="anonymous"
         signupEnabled={state.signupEnabled}
         noAdmin={state.noAdmin === true}
         ownerDeclared={state.ownerDeclared === true}
@@ -95,10 +110,25 @@ export function AuthGate({
 
   if (state.phase === "must-change") {
     return (
+      // A `key` e o que importa aqui: sem ela o React reaproveita a mesma
+      // instancia de <Login> da fase anonima, e o `useState` inicial que
+      // escolhe o modo "password" NAO roda de novo — a tela continuava
+      // mostrando "Entrar" como se o login nao tivesse acontecido
+      // (change 0169).
       <Login
+        key="must-change"
         forcePasswordChange
         signupEnabled={false}
-        onAuthenticated={(user) => setState({ phase: "authenticated", user })}
+        onAuthenticated={(user) =>
+          // Nunca dar a fase "authenticated" por decreto: quem ainda deve a
+          // troca volta para ca, em vez de montar o app inteiro e levar 403
+          // em cada chamada sem saida.
+          setState(
+            user.must_change_password
+              ? { phase: "must-change", user }
+              : { phase: "authenticated", user },
+          )
+        }
       />
     );
   }

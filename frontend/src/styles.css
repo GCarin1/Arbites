@@ -3547,6 +3547,35 @@ button.link-chip-btn:disabled {
 }
 /* Aviso de instancia sem admin: quem cadastra precisa saber ANTES que o
    pedido nao tem quem aprove (change 0168). */
+/* Motivo de um run que nao chegou a executar (change 0170): fica na linha,
+   nao so no title, porque em telefone nao ha hover. */
+/* Origens da observabilidade (change 0173). */
+.obs-lista-origens {
+  list-style: none;
+  margin: 0 0 var(--s1);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.obs-lista-origens li {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+.obs-lista-origens li .caption {
+  flex: 1;
+  min-width: 0;
+}
+
+.run-motivo {
+  display: block;
+  margin-top: 2px;
+  color: var(--warning, #d29922);
+  white-space: normal;
+}
+
 .login-sem-admin {
   border: 1px solid var(--warning, #d29922);
   background: rgba(210, 153, 34, 0.1);

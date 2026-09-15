@@ -67,7 +67,7 @@ from .gherkin_scan import (
     list_feature_files,
     scan_target,
 )
-from .runner import RunManager
+from .runner import PythonPathError, RunManager, resolver_python
 from .xray_import import XrayImportError
 from .indexer import clear_needs_rerun, connect, reindex_file, reindex_full
 from .parser import parse_markdown
@@ -355,6 +355,35 @@ class AIProvidersIn(BaseModel):
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
 
 
+class ObservabilitySourceIn(BaseModel):
+    """Um repositório de onde a observabilidade puxa execuções (change 0173).
+
+    `workflow` e `artifact` vazios significam "todos" — é o caso comum e
+    exigir os dois só faria o operador adivinhar nomes.
+    """
+
+    provider: str = "github"
+    repo: str
+    workflow: str | None = None
+    artifact: str | None = None
+
+
+class ObservabilitySourcesIn(BaseModel):
+    sources: list[ObservabilitySourceIn] = []
+    max_runs_per_poll: int | None = None
+
+
+class GithubTargetIn(BaseModel):
+    """Onde o workflow deste alvo mora. Sem `repo` e `workflow` o dispatch
+    não tem para onde ir — e este bloco não tinha representação no modelo,
+    então salvar o alvo pela tela APAGAVA o que estivesse escrito à mão no
+    `arbites.yaml` (change 0172)."""
+
+    repo: str = ""       # "owner/repo"
+    workflow: str = ""   # nome do arquivo, ex.: "e2e.yml"
+    ref: str | None = None
+
+
 class AutomationTargetIn(BaseModel):
     name: str
     kind: str = "behave"
@@ -363,6 +392,7 @@ class AutomationTargetIn(BaseModel):
     python_path: str | None = None
     working_dir: str | None = None
     timeout_minutes: float | None = None
+    github: GithubTargetIn | None = None
 
 
 class AutomationTargetsIn(BaseModel):
@@ -2355,6 +2385,7 @@ def _register_routes(app: FastAPI) -> None:
                     "python_path": target.get("python_path"),
                     "working_dir": target.get("working_dir"),
                     "timeout_minutes": target.get("timeout_minutes"),
+                    "github": target.get("github") or None,
                     "scenarios": scenarios,
                     "queue_length": runner.queue_length(str(name)),
                 }
@@ -2378,9 +2409,25 @@ def _register_routes(app: FastAPI) -> None:
         import yaml as _yaml
 
         config = ws.config()
-        config["automation_targets"] = [
-            t.model_dump(exclude_none=True) for t in payload.targets
-        ]
+        # Recusar aqui poupa a viagem inteira (change 0170): o valor errado
+        # em `python_path` só falhava na hora de executar, e a execution
+        # nascia vazia dizendo "sem resultados".
+        for alvo in payload.targets:
+            try:
+                resolver_python(alvo.python_path)
+            except PythonPathError as exc:
+                raise _error(422, "bad_python_path",
+                             f"alvo '{alvo.name}': {exc}")
+        alvos = []
+        for t in payload.targets:
+            bruto = t.model_dump(exclude_none=True)
+            gh = bruto.get("github") or {}
+            # Bloco pela metade é pior que bloco ausente: o dispatch acusaria
+            # "sem repo/workflow" com o bloco na cara de quem olha o YAML.
+            if not (gh.get("repo") and gh.get("workflow")):
+                bruto.pop("github", None)
+            alvos.append(bruto)
+        config["automation_targets"] = alvos
         ws.config_path.write_text(
             _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
@@ -2445,10 +2492,15 @@ def _register_routes(app: FastAPI) -> None:
             return feat, sc
 
         created: list[str] = []
-        folder = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
-        target_dir = _safe_area_dir(ws, "testcases", folder)
+        raiz = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
         for item in payload.create:
             feat, sc = find_scenario(item.feature_path, item.scenario_name)
+            # Uma pasta por arquivo `.feature`, espelhando a árvore do
+            # repositório (change 0171). Antes tudo caía em `raiz` e um
+            # projeto com dezenas de features virava uma lista chapada.
+            sub = feature_sync_ops.pasta_do_cenario(item.feature_path, glob)
+            folder = f"{raiz}/{sub}".strip("/") if sub else raiz
+            target_dir = _safe_area_dir(ws, "testcases", folder)
             new_id = ws.next_id("testcase")
             today = date.today().isoformat()
             meta = {
@@ -2878,6 +2930,48 @@ def _register_routes(app: FastAPI) -> None:
     # Puxar, não receber: a instância é local e não é alcançável da internet.
     # O que já foi ingerido é respondido pelo DISCO, então repetir a ingestão
     # não duplica e uma semana desligado volta inteira.
+
+    @app.get(API_PREFIX + "/ci/sources")
+    async def get_ci_sources(request: Request):
+        config = ws_of(request).config().get("observability") or {}
+        return {"sources": config.get("sources") or [],
+                "max_runs_per_poll": config.get("max_runs_per_poll") or 50}
+
+    @app.put(API_PREFIX + "/ci/sources")
+    async def put_ci_sources(request: Request, payload: ObservabilitySourcesIn):
+        """Declara as origens sem abrir o YAML na mão (change 0173).
+
+        Antes só existiam no arquivo: quem clicava em "Buscar execuções" numa
+        instalação nova recebia "nenhuma fonte" e não tinha onde declarar uma.
+        """
+        ws = ws_of(request)
+        import yaml as _yaml
+
+        config = ws.config()
+        observabilidade = dict(config.get("observability") or {})
+        fontes = []
+        for fonte in payload.sources:
+            if not fonte.repo.strip():
+                continue
+            limpa: dict[str, Any] = {"provider": fonte.provider or "github",
+                                     "repo": fonte.repo.strip()}
+            # Vazio quer dizer "todos": gravar a chave com "" faria a
+            # ingestão procurar um workflow chamado string vazia.
+            if (fonte.workflow or "").strip():
+                limpa["workflow"] = fonte.workflow.strip()
+            if (fonte.artifact or "").strip():
+                limpa["artifact"] = fonte.artifact.strip()
+            fontes.append(limpa)
+        observabilidade["sources"] = fontes
+        if payload.max_runs_per_poll:
+            observabilidade["max_runs_per_poll"] = int(payload.max_runs_per_poll)
+        config["observability"] = observabilidade
+        ws.config_path.write_text(
+            _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        return {"sources": fontes,
+                "max_runs_per_poll": observabilidade.get("max_runs_per_poll") or 50}
 
     @app.post(API_PREFIX + "/ci/ingest")
     async def ci_ingest_now(request: Request, limit: int | None = None):
@@ -4845,6 +4939,10 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # lixeira. LER a prévia continua aberto — ver o que seria removido é o
     # que permite alguém discordar antes de acontecer.
     (r"/ci/retention/apply$", {"POST"}, "admin", None),
+    # Declarar de onde a observabilidade puxa é escrever no arbites.yaml, o
+    # mesmo alcance de PUT /targets e PUT /ai/providers. LER continua aberto:
+    # a tela precisa dizer "nenhuma origem declarada" a quem não é admin.
+    (r"/ci/sources$", {"PUT"}, "admin", None),
     (r"/audit$", {"DELETE"}, "admin", None),
     (r"/audit/[^/]+$", {"DELETE"}, "admin", None),
     (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),
