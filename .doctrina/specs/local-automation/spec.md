@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC5
 **Last updated:** 2026-09-15
-**Version:** 0.15.0
+**Version:** 0.15.1
 
 ## Purpose
 
@@ -125,6 +125,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 - When a ingestao volta depois de um periodo parada, the system shall recuperar o intervalo inteiro que passou, e nao apenas a execucao mais recente.
 - When um alvo de automação é salvo com `python_path` que não resolve para um interpretador, the system shall recusar a gravação nomeando o alvo e o que o campo espera, em vez de aceitar um valor que só falha na hora de executar.
 - When um run local é abortado antes de produzir resultado, the system shall registrar o motivo na própria execution — inclusive quando ela não tem nenhum CT vinculado — e exibi-lo na lista de runs, em vez de mostrar apenas "sem resultados".
+- When CTs são criados pela sincronização de `.feature`, the system shall criar uma pasta por arquivo `.feature`, preservando a hierarquia do repositório abaixo da pasta de destino e descartando o prefixo estático do glob.
 
 ### State-driven
 
@@ -231,6 +232,7 @@ read-only; o elo é a tag `@CT-XXXX` no cenário.
 22. [unverified] Um sinal nunca visto e ingerido sem mudanca de codigo e fica consultavel por nome e periodo; artifact sem manifesto cai no modo convencao e anuncia que caiu — verified by `backend/tests/test_ci_ingest.py`.
 23. [unverified] Credencial perto de expirar aparece em Problemas antes de expirar, recusa do provedor vira problema com motivo, e repor a credencial retoma a ingestao sem perder o intervalo — verified by `backend/tests/test_credencial_ci.py`.
 24. [verified] `python_path` vazio usa o Python do Arbites, pasta de virtualenv é resolvida, e arquivo de configuração, pasta sem interpretador e caminho inexistente são recusados ao salvar o alvo com código `bad_python_path`; um run abortado grava o motivo na execution e no índice mesmo sem nenhum CT — verified by `backend/tests/test_run_nao_executou.py`.
+25. [verified] Dois cenários de `.feature` em níveis diferentes da árvore criam CTs em pastas distintas que espelham o caminho do arquivo, o prefixo estático do glob é descartado, a pasta informada no modal vira a raiz do espelho, e caminho com `..` não escapa da área — verified by `backend/tests/test_pasta_por_feature.py`.
 
 ## Maturity
 

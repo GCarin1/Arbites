@@ -179,3 +179,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-14 — 0168-cadastro-formulario-fica-pendente — cadastro pelo formulario fica pendente mesmo sem nenhum admin ativo para aprovar, e a tela nao avisa disso (specs: auth MODIFIED)
 - 2026-09-15 — 0169-tela-troca-senha-obrigatoria — tela de troca de senha obrigatoria nunca aparece e a sessao acaba entrando no app com todas as chamadas em 403 (specs: auth MODIFIED)
 - 2026-09-15 — 0170-run-local-cria-execution — run local cria execution vazia e a falha de arranque do processo nao chega em lugar nenhum (specs: local-automation MODIFIED)
+- 2026-09-15 — 0171-cts-criados-sincronizacao-caem — CTs criados pela sincronizacao de feature caem todos numa pasta so em vez de espelhar a arvore dos arquivos (specs: local-automation MODIFIED)

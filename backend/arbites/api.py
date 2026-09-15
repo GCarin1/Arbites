@@ -2454,10 +2454,15 @@ def _register_routes(app: FastAPI) -> None:
             return feat, sc
 
         created: list[str] = []
-        folder = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
-        target_dir = _safe_area_dir(ws, "testcases", folder)
+        raiz = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
         for item in payload.create:
             feat, sc = find_scenario(item.feature_path, item.scenario_name)
+            # Uma pasta por arquivo `.feature`, espelhando a árvore do
+            # repositório (change 0171). Antes tudo caía em `raiz` e um
+            # projeto com dezenas de features virava uma lista chapada.
+            sub = feature_sync_ops.pasta_do_cenario(item.feature_path, glob)
+            folder = f"{raiz}/{sub}".strip("/") if sub else raiz
+            target_dir = _safe_area_dir(ws, "testcases", folder)
             new_id = ws.next_id("testcase")
             today = date.today().isoformat()
             meta = {

@@ -155,7 +155,7 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.15.0",
+        "version": "0.15.1",
         "last_updated": "2026-09-15",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2663,6 +2663,19 @@
         "id": "0170-run-local-cria-execution",
         "title": "run local cria execution vazia e a falha de arranque do processo nao chega em lugar nenhum",
         "path": ".doctrina/changes/archive/2026-09-15-0170-run-local-cria-execution",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0171-cts-criados-sincronizacao-caem",
+        "title": "CTs criados pela sincronizacao de feature caem todos numa pasta so em vez de espelhar a arvore dos arquivos",
+        "path": ".doctrina/changes/archive/2026-09-15-0171-cts-criados-sincronizacao-caem",
         "status": "applied",
         "applied": "2026-09-15",
         "specs_affected": [
