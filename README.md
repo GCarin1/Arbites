@@ -416,6 +416,51 @@ com os sinais no frontmatter e os anexos ao lado, hasheados. O índice SQLite
 Ingerir duas vezes o mesmo run não duplica — a marca d'água é o disco, não um
 contador guardado à parte.
 
+### O manifesto: o que o artifact declara
+
+O `arbites.json` publicado junto do artifact é o contrato. Versão 2:
+
+```json
+{
+  "version": 2,
+  "labels": {
+    "componente": "carteira-mfe",
+    "ambiente": "hml",
+    "stack": "front",
+    "versao": "1.24.0"
+  },
+  "signals": [
+    { "kind": "performance", "name": "lcp_ms", "value": 2410, "unit": "ms" },
+    { "kind": "coverage", "name": "cobertura_pct", "value": 82, "unit": "%" }
+  ],
+  "attachments": [
+    { "kind": "analysis",   "path": "analysis.md",  "title": "Análise do deploy" },
+    { "kind": "cucumber",   "path": "result.json" },
+    { "kind": "axe",        "path": "axe.json",     "title": "Varredura axe-core" },
+    { "kind": "log",        "path": "suite.log" },
+    { "kind": "screenshot", "path": "print-falha.png", "title": "Tela na falha" }
+  ]
+}
+```
+
+**`labels` é o que resolve micro-frontend.** O repositório onde o workflow
+mora **não** é o que está sob teste: o mesmo repositório de testes valida
+vários componentes, e vários repositórios de deploy chamam a mesma suíte. Sem
+rótulo, a taxa de sucesso vira a média de coisas diferentes, que não é a saúde
+de nada. A chave é livre — a topologia é sua, não do Arbites. Rótulos com um
+único valor, ou com um valor por execução (`versao`), ficam fora do recorte:
+um não divide e o outro é identificador.
+
+**`kind: "axe"` é lido nativamente.** Publique o JSON cru do axe-core e o
+Arbites extrai regra, gravidade, critério da WCAG (da tag `wcag143` → `1.4.3`),
+nível (A/AA/AAA), quantos **elementos** violam e em que página. Aceita o
+resultado de uma rota (objeto) e de várias (lista). Quem usa outra ferramenta
+declara `findings` direto no manifesto, com a mesma forma. A versão 1 do
+manifesto continua válida.
+
+Log, print e análise em Markdown viram anexos hasheados ao lado do run e
+aparecem na descida (gráfico → execução → job → arquivo).
+
 ### Exportar o painel
 
 No cabeçalho da aba, ao lado do período, há **PDF**, **CSV** e **MD**. São três
@@ -429,6 +474,11 @@ perguntas diferentes, não três botões para a mesma:
   ninguém desempilhar nada antes, para cruzar com o que o Arbites não conhece.
 - **MD** — o painel em texto, para ata, issue e wiki; continua legível daqui a
   um ano sem leitor especial.
+- **CSV de acessibilidade** (botão na aba Acessibilidade) — as regras violadas
+  com gravidade, critério WCAG e número de elementos, para priorizar fora daqui.
+
+O PDF leva as **pizzas**, a saúde **por repositório** e a seção de
+**acessibilidade** com os critérios da WCAG, além das séries.
 
 O arquivo sai nomeado pelo fim do período (`observabilidade-2026-09-16.pdf`) e
 respeita o período escolhido no seletor.

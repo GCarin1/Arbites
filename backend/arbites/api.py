@@ -3008,6 +3008,15 @@ def _register_routes(app: FastAPI) -> None:
 
         painel = ci_ingest.painel(ws_of(request), conn_of(request), days)
         sufixo = (painel.get("period") or {}).get("until", "")[:10] or "hoje"
+        if format == "findings":
+            # Os achados agregados, para a planilha priorizar fora do Arbites
+            # (change 0176) — outra pergunta que o csv de série não responde.
+            return PlainTextResponse(
+                export_obs.achados_csv(painel),
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition":
+                         f'attachment; filename="acessibilidade-{sufixo}.csv"'},
+            )
         if format == "csv":
             return PlainTextResponse(
                 export_obs.sinais_csv(painel),
@@ -3029,7 +3038,8 @@ def _register_routes(app: FastAPI) -> None:
                 headers={"Content-Disposition":
                          f'attachment; filename="observabilidade-{sufixo}.pdf"'},
             )
-        raise _error(422, "invalid_format", "format deve ser pdf, md ou csv")
+        raise _error(422, "invalid_format",
+                     "format deve ser pdf, md, csv ou findings")
 
     @app.get(API_PREFIX + "/ci/retention")
     async def ci_retention_preview(request: Request):

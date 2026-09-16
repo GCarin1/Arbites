@@ -164,6 +164,42 @@ def painel_markdown(painel: dict[str, Any]) -> str:
     else:
         linhas.append("Nenhum sinal declarado chegou no período.")
 
+    recortes = painel.get("by_repo") or []
+    if recortes:
+        linhas += ["", "## Saúde por repositório", "",
+                   "| Repositório | Execuções | Falhas | Taxa | vs. anterior |",
+                   "| --- | ---: | ---: | ---: | --- |"]
+        for item in recortes:
+            taxa = item.get("success_rate")
+            delta = item.get("delta_pct")
+            linhas.append(
+                f"| {item.get('name')} | {item.get('runs')} |"
+                f" {item.get('failures')} |"
+                f" {f'{taxa}%' if taxa is not None else '—'} |"
+                f" {f'{delta:+.1f}%' if delta is not None else 'sem base anterior'} |"
+            )
+
+    achados_ = painel.get("findings") or {}
+    if achados_.get("total"):
+        delta = achados_.get("delta_pct")
+        linhas += [
+            "", "## Acessibilidade", "",
+            f"**{achados_['total']}** elemento(s) com violação"
+            f" ({achados_.get('previous_total', 0)} no período anterior"
+            + (f", {delta:+.1f}%" if delta is not None else "") + ").",
+            "",
+            "| Regra | Gravidade | WCAG | Elementos | Execuções |",
+            "| --- | --- | --- | ---: | ---: |",
+        ]
+        for regra in (achados_.get("top_rules") or [])[:12]:
+            criterio = regra.get("wcag") or "—"
+            if regra.get("level"):
+                criterio += f" ({regra['level']})"
+            linhas.append(
+                f"| {regra.get('rule')} | {regra.get('impact')} | {criterio} |"
+                f" {regra.get('count')} | {regra.get('runs')} |"
+            )
+
     runs = painel.get("runs") or []
     linhas += ["", "## Execuções recentes", ""]
     if runs:
@@ -252,6 +288,102 @@ def _desenhar_serie(pdf, sinal: dict[str, Any], x: float, y: float,
         pdf.set_draw_color(*cor)
         pdf.circle(x=x + i * passo - 0.7, y=ponto_y(float(p["value"])) - 0.7,
                    radius=0.7, style="F")
+
+
+# Mesmos papéis da tela: quem vê o anexo reconhece o que já viu.
+_FATIA_PAPEL = {
+    "success": (63, 185, 80), "passed": (63, 185, 80),
+    "failure": (218, 54, 51), "failed": (218, 54, 51),
+    "blocked": (210, 153, 34), "timed_out": (210, 153, 34),
+    "cancelled": _CINZA, "skipped": _CINZA,
+    "critical": (218, 54, 51), "serious": (240, 136, 62),
+    "moderate": (210, 153, 34), "minor": (88, 166, 255), "unknown": _CINZA,
+}
+_FATIA_NEUTRA = [(56, 139, 253), (163, 113, 247), (63, 185, 80),
+                 (240, 136, 62), (219, 97, 162)]
+
+
+def _desenhar_pizza(pdf, fatias: list[dict[str, Any]], x: float, y: float,
+                    raio: float, rotulos: dict[str, str]) -> float:
+    """A pizza e sua legenda. Devolve a altura ocupada.
+
+    A cor não carrega o significado sozinha: a legenda repete rótulo, valor e
+    porcentagem ao lado — quem imprime em preto e branco lê o mesmo.
+    """
+    import math
+
+    total = sum(int(f.get("value") or 0) for f in fatias)
+    if not total:
+        pdf.set_xy(x, y)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(*_CINZA)
+        pdf.cell(60, 5, _latin1("sem dado no periodo"))
+        return 6.0
+
+    cx, cy = x + raio, y + raio
+    inicio = 0.0
+    for i, fatia in enumerate(fatias):
+        valor = int(fatia.get("value") or 0)
+        if not valor:
+            continue
+        fim = inicio + valor / total
+        cor = _FATIA_PAPEL.get(str(fatia.get("label")),
+                               _FATIA_NEUTRA[i % len(_FATIA_NEUTRA)])
+        pdf.set_fill_color(*cor)
+        pdf.set_draw_color(*cor)
+        # Setor por triângulos: o fpdf2 não tem primitiva de arco preenchido,
+        # e uma aproximação de 1 grau é indistinguível de um arco impresso.
+        passos = max(int((fim - inicio) * 180), 2)
+        for k in range(passos):
+            a1 = 2 * math.pi * (inicio + (fim - inicio) * k / passos) - math.pi / 2
+            a2 = 2 * math.pi * (inicio + (fim - inicio) * (k + 1) / passos) - math.pi / 2
+            with pdf.new_path() as caminho:
+                caminho.style.fill_color = pdf.fill_color
+                caminho.style.stroke_width = 0
+                caminho.move_to(cx, cy)
+                caminho.line_to(cx + raio * math.cos(a1), cy + raio * math.sin(a1))
+                caminho.line_to(cx + raio * math.cos(a2), cy + raio * math.sin(a2))
+                caminho.close()
+        inicio = fim
+
+    linha = y
+    for i, fatia in enumerate(fatias):
+        cor = _FATIA_PAPEL.get(str(fatia.get("label")),
+                               _FATIA_NEUTRA[i % len(_FATIA_NEUTRA)])
+        pdf.set_fill_color(*cor)
+        pdf.rect(x + raio * 2 + 4, linha + 1.2, 2.4, 2.4, style="F")
+        pdf.set_xy(x + raio * 2 + 8, linha)
+        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_text_color(*_TEXTO)
+        rotulo = rotulos.get(str(fatia.get("label")), str(fatia.get("label")))
+        pdf.cell(46, 4.5, _latin1(
+            f"{rotulo}: {fatia.get('value')} ({fatia.get('pct')}%)"))
+        linha += 4.5
+    return max(raio * 2, linha - y) + 2
+
+
+_ROTULOS_PT = {
+    "success": "passou", "failure": "falhou", "cancelled": "cancelado",
+    "timed_out": "estourou o tempo", "passed": "passou", "failed": "falhou",
+    "blocked": "bloqueado", "skipped": "pulado",
+    "critical": "critico", "serious": "grave", "moderate": "moderado",
+    "minor": "leve", "unknown": "sem classificacao",
+}
+
+
+def achados_csv(painel: dict[str, Any]) -> str:
+    """Os achados agregados, para a planilha priorizar fora do Arbites."""
+    saida = io.StringIO()
+    escritor = csv.writer(saida, lineterminator="\n")
+    escritor.writerow(["regra", "gravidade", "wcag", "nivel", "elementos",
+                       "execucoes", "ajuda"])
+    for regra in (painel.get("findings") or {}).get("top_rules") or []:
+        escritor.writerow([
+            regra.get("rule"), regra.get("impact"), regra.get("wcag") or "",
+            regra.get("level") or "", regra.get("count"), regra.get("runs"),
+            regra.get("help") or "",
+        ])
+    return saida.getvalue()
 
 
 def painel_pdf(painel: dict[str, Any]) -> bytes:
@@ -353,6 +485,94 @@ def painel_pdf(painel: dict[str, Any]) -> bytes:
         pdf.cell(0, 4, _latin1(legenda))
         _desenhar_serie(pdf, sinal, 14, y + 10, pdf.w - 28, 18)
         pdf.set_y(y + 31)
+
+    # -- divisões do período: a pergunta "de que é feito", que a série não
+    # responde. Duas pizzas lado a lado, como na tela.
+    divisao = painel.get("distribution") or {}
+    if divisao.get("runs_by_conclusion") or divisao.get("scenarios_by_status"):
+        if pdf.get_y() > pdf.h - 60:
+            pdf.add_page()
+        titulo("Divisao do periodo")
+        topo = pdf.get_y() + 2
+        alturas = [
+            _desenhar_pizza(pdf, divisao.get("runs_by_conclusion") or [],
+                            14, topo, 11, _ROTULOS_PT),
+            _desenhar_pizza(pdf, divisao.get("scenarios_by_status") or [],
+                            pdf.w / 2, topo, 11, _ROTULOS_PT),
+        ]
+        pdf.set_y(topo + max(alturas) + 4)
+
+    recortes = painel.get("by_repo") or []
+    if recortes:
+        if pdf.get_y() > pdf.h - 45:
+            pdf.add_page()
+        titulo("Saude por repositorio")
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*_CINZA)
+        colunas = [("Repositorio", 96), ("Exec.", 18), ("Falhas", 18),
+                   ("Taxa", 20), ("vs. anterior", 24)]
+        for rotulo, w in colunas:
+            pdf.cell(w, 5, _latin1(rotulo))
+        pdf.ln(5)
+        pdf.set_font("Helvetica", "", 8)
+        for item in recortes:
+            if pdf.get_y() > pdf.h - 20:
+                pdf.add_page()
+            pdf.set_text_color(*_TEXTO)
+            taxa = item.get("success_rate")
+            delta = item.get("delta_pct")
+            valores = [
+                str(item.get("name") or "")[:64], str(item.get("runs")),
+                str(item.get("failures")),
+                f"{taxa}%" if taxa is not None else "-",
+                f"{delta:+.1f}%" if delta is not None else "sem base",
+            ]
+            for (_, w), valor in zip(colunas, valores):
+                pdf.cell(w, 5, _latin1(valor))
+            pdf.ln(5)
+        pdf.ln(2)
+
+    achados = painel.get("findings") or {}
+    if achados.get("total"):
+        if pdf.get_y() > pdf.h - 70:
+            pdf.add_page()
+        titulo("Acessibilidade")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*_CINZA)
+        delta = achados.get("delta_pct")
+        _paragrafo(pdf, _latin1(
+            f"{achados['total']} elemento(s) com violacao"
+            f" ({achados.get('previous_total', 0)} no periodo anterior"
+            + (f", {delta:+.1f}%" if delta is not None else "") + ")."), 4.5)
+        topo = pdf.get_y() + 1
+        altura = _desenhar_pizza(pdf, achados.get("by_impact") or [], 14, topo,
+                                 11, _ROTULOS_PT)
+        pdf.set_y(topo + altura + 3)
+        regras = achados.get("top_rules") or []
+        if regras:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*_CINZA)
+            colunas = [("Regra", 74), ("Gravidade", 24), ("WCAG", 22),
+                       ("Elementos", 22), ("Execucoes", 22)]
+            for rotulo, w in colunas:
+                pdf.cell(w, 5, _latin1(rotulo))
+            pdf.ln(5)
+            pdf.set_font("Helvetica", "", 8)
+            for regra in regras[:10]:
+                if pdf.get_y() > pdf.h - 20:
+                    pdf.add_page()
+                pdf.set_text_color(*_TEXTO)
+                criterio = regra.get("wcag") or "-"
+                if regra.get("level"):
+                    criterio += f" ({regra['level']})"
+                valores = [str(regra.get("rule"))[:46],
+                           _ROTULOS_PT.get(str(regra.get("impact")),
+                                           str(regra.get("impact"))),
+                           criterio, str(regra.get("count")), str(regra.get("runs"))]
+                for (_, w), valor in zip(colunas, valores):
+                    pdf.cell(w, 5, _latin1(valor))
+                pdf.ln(5)
+            pdf.ln(2)
 
     instaveis = painel.get("flaky") or []
     if instaveis:

@@ -41,13 +41,19 @@ from typing import Any
 import frontmatter
 
 MANIFESTO = "arbites.json"
-VERSAO_MANIFESTO = 1
+# Versão 2 acrescenta `labels` (qual componente/ambiente o run validou) e
+# `findings` (achado estruturado, p. ex. WCAG). A 1 continua válida: um
+# manifesto antigo não pode parar de ser lido porque o formato cresceu
+# (change 0175).
+VERSAO_MANIFESTO = 2
+VERSOES_ACEITAS = (1, 2)
 
 # Convenção de nome — o FALLBACK, para quando o workflow não pode ser
 # alterado. Anunciado como fallback de propósito: ele acerta hoje e quebra
 # calado no dia em que alguém renomear o arquivo.
 CONVENCAO = {
     "analysis": re.compile(r"(analysis|analise|relatorio)\.md$", re.I),
+    "axe": re.compile(r"(axe|a11y|acessibilidade)[^/]*\.json$", re.I),
     "log": re.compile(r"\.(log|txt)$", re.I),
     "screenshot": re.compile(r"\.(png|jpe?g|webp)$", re.I),
     "cucumber": re.compile(r"(result|cucumber)\.json$", re.I),
@@ -96,11 +102,12 @@ def ler_manifesto(arquivos: dict[str, bytes]) -> tuple[dict[str, Any], str | Non
                     "manifest_invalid",
                     f"{MANIFESTO} presente mas ilegível: {e}",
                 ) from e
-            if dados.get("version") != VERSAO_MANIFESTO:
+            if dados.get("version") not in VERSOES_ACEITAS:
                 raise IngestError(
                     "manifest_version",
                     f"{MANIFESTO} versão {dados.get('version')!r};"
-                    f" esta instância lê a versão {VERSAO_MANIFESTO}",
+                    f" esta instância lê as versões"
+                    f" {', '.join(str(v) for v in VERSOES_ACEITAS)}",
                 )
             return dados, None
     return _por_convencao(arquivos), (
@@ -121,6 +128,56 @@ def _por_convencao(arquivos: dict[str, bytes]) -> dict[str, Any]:
                 anexos.append({"kind": kind, "path": nome})
                 break
     return {"version": VERSAO_MANIFESTO, "signals": [], "attachments": anexos}
+
+
+def normalizar_rotulos(manifesto: dict[str, Any]) -> dict[str, str]:
+    """`labels` do manifesto: o que ESTE run validou (change 0175).
+
+    O repositório onde o workflow mora não é o que está sob teste. Num
+    projeto de micro-frontends o mesmo repositório de testes valida vários
+    componentes, e vários repositórios de deploy chamam a mesma suíte — sem
+    um rótulo declarado, a taxa de sucesso vira uma média de coisas
+    diferentes, que não é a saúde de nada.
+
+    Chave livre de propósito: a topologia é de quem instala, e fixar
+    `componente`/`ambiente` no código só obrigaria a contorná-los depois.
+    """
+    bruto = manifesto.get("labels") or {}
+    if not isinstance(bruto, dict):
+        return {}
+    saida = {}
+    for chave, valor in bruto.items():
+        nome = str(chave).strip()
+        if not nome or valor is None:
+            continue
+        texto = str(valor).strip()
+        if texto:
+            saida[nome] = texto[:120]
+    return saida
+
+
+def extrair_achados(manifesto: dict[str, Any],
+                    arquivos: dict[str, bytes]) -> list[dict[str, Any]]:
+    """Achados estruturados: os declarados no manifesto mais os lidos do axe.
+
+    Duas entradas, uma forma só. O anexo `kind: "axe"` é o caminho curto —
+    o pipeline publica o JSON que a ferramenta já produz, sem reescrever
+    nada — e `findings` no manifesto atende quem usa outra ferramenta.
+    """
+    from .ci_axe import ler_axe, normalizar_achados
+
+    saida = normalizar_achados(manifesto.get("findings"))
+    caminhos = [
+        item.get("path") for item in (manifesto.get("attachments") or [])
+        if item.get("kind") == "axe" and item.get("path")
+    ]
+    if not caminhos:
+        caminhos = [n for n in arquivos if CONVENCAO["axe"].search(n)]
+    for caminho in caminhos:
+        bruto = arquivos.get(caminho)
+        if bruto is not None:
+            saida.extend(ler_axe(bruto))
+    return saida
 
 
 def normalizar_sinais(manifesto: dict[str, Any], quando: str) -> list[dict[str, Any]]:
@@ -256,6 +313,8 @@ def escrever_run(
         "attachments": anexos,
         "jobs": run.get("jobs") or [],
         "scenarios": extrair_cenarios(manifesto, arquivos),
+        "labels": normalizar_rotulos(manifesto),
+        "findings": extrair_achados(manifesto, arquivos),
     }
     if aviso:
         meta["ingest_warning"] = aviso
@@ -714,6 +773,14 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
         })
 
     instaveis = instabilidade(conn, inicio_anterior, inicio, fim)
+    # Recortes: num projeto de micro-frontends a média global esconde
+    # exatamente o que se quer ver (change 0175). O rótulo em destaque é o
+    # mais usado pelos runs — quem instala escolhe a topologia, não o código.
+    rotulos = nomes_de_rotulo(conn)
+    recortes = {
+        nome: por_rotulo(conn, nome, inicio_anterior, inicio, fim)
+        for nome in rotulos[:4]
+    }
     return {
         "period": {"since": inicio, "until": fim, "days": dias},
         "previous": {"since": inicio_anterior, "until": inicio},
@@ -722,7 +789,191 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
         "flaky": instaveis,
         "changes": _o_que_mudou(atuais, anteriores, sinais, saude, instaveis),
         "runs": listar_runs(conn, 30),
+        "distribution": distribuicao(conn, inicio, fim),
+        "findings": achados(conn, inicio_anterior, inicio, fim),
+        "by_repo": por_repositorio(conn, inicio_anterior, inicio, fim),
+        "label_names": rotulos,
+        "by_label": recortes,
     }
+
+
+def _fatias(pares: list[tuple[str, int]], ordem: tuple[str, ...] = ()) -> list[dict]:
+    """Fatias de uma pizza, com o total junto.
+
+    A porcentagem vai calculada no servidor: duas telas dividindo o mesmo
+    número por conta própria acabam discordando no arredondamento.
+    """
+    total = sum(v for _, v in pares) or 0
+    def chave(item: tuple[str, int]) -> tuple:
+        rotulo, valor = item
+        return (ordem.index(rotulo) if rotulo in ordem else len(ordem), -valor)
+    return [
+        {"label": rotulo, "value": valor,
+         "pct": round(valor / total * 100, 1) if total else 0.0}
+        for rotulo, valor in sorted(pares, key=chave) if valor
+    ]
+
+
+def distribuicao(conn, inicio: str, fim: str) -> dict[str, Any]:
+    """Como as execuções do período se dividem — é a pizza que o mural pede.
+
+    Série responde "está piorando?"; divisão responde "de que é feito o
+    período". As duas perguntas são diferentes e nenhuma substitui a outra.
+    """
+    conclusoes = [
+        (r["conclusion"] or "sem conclusão", r["c"]) for r in conn.execute(
+            "SELECT conclusion, COUNT(*) c FROM ci_runs"
+            " WHERE COALESCE(started_at, ingested_at) >= ?"
+            " AND COALESCE(started_at, ingested_at) < ? GROUP BY conclusion",
+            (inicio, fim))
+    ]
+    cenarios = [
+        (r["status"] or "sem status", r["c"]) for r in conn.execute(
+            "SELECT status, COUNT(*) c FROM ci_scenarios"
+            " WHERE at >= ? AND at < ? GROUP BY status", (inicio, fim))
+    ]
+    return {
+        "runs_by_conclusion": _fatias(
+            conclusoes, ("success", "failure", "cancelled", "timed_out")),
+        "scenarios_by_status": _fatias(
+            cenarios, ("passed", "failed", "blocked", "skipped")),
+    }
+
+
+def achados(conn, inicio_anterior: str, inicio: str, fim: str) -> dict[str, Any]:
+    """Acessibilidade e afins, agregados — por gravidade, regra e critério.
+
+    `violacoes_axe: 14` diz que piorou, não diz o quê. Aqui o número vira
+    trabalho priorizável: quantos elementos, de que gravidade, contra qual
+    critério da WCAG, em que página.
+    """
+    def soma(desde: str, ate: str) -> int:
+        linha = conn.execute(
+            "SELECT COALESCE(SUM(count), 0) t FROM ci_findings"
+            " WHERE at >= ? AND at < ?", (desde, ate)).fetchone()
+        return int(linha["t"] or 0)
+
+    por_impacto = [
+        (r["impact"] or "unknown", int(r["t"] or 0)) for r in conn.execute(
+            "SELECT impact, SUM(count) t FROM ci_findings"
+            " WHERE at >= ? AND at < ? GROUP BY impact", (inicio, fim))
+    ]
+    por_categoria = [
+        (r["category"] or "quality", int(r["t"] or 0)) for r in conn.execute(
+            "SELECT category, SUM(count) t FROM ci_findings"
+            " WHERE at >= ? AND at < ? GROUP BY category", (inicio, fim))
+    ]
+    regras = [
+        {"rule": r["rule"], "impact": r["impact"], "wcag": r["wcag"],
+         "level": r["level"], "count": int(r["t"] or 0), "runs": r["runs"],
+         "help": r["help"], "help_url": r["help_url"]}
+        for r in conn.execute(
+            "SELECT rule, impact, wcag, level, SUM(count) t,"
+            " COUNT(DISTINCT run_id) runs, MAX(help) help, MAX(help_url) help_url"
+            " FROM ci_findings WHERE at >= ? AND at < ?"
+            " GROUP BY rule ORDER BY t DESC LIMIT 12", (inicio, fim))
+    ]
+    criterios = [
+        {"wcag": r["wcag"], "level": r["level"], "count": int(r["t"] or 0)}
+        for r in conn.execute(
+            "SELECT wcag, MAX(level) level, SUM(count) t FROM ci_findings"
+            " WHERE at >= ? AND at < ? AND wcag IS NOT NULL"
+            " GROUP BY wcag ORDER BY t DESC LIMIT 12", (inicio, fim))
+    ]
+    paginas = [
+        {"page": r["page"], "count": int(r["t"] or 0)}
+        for r in conn.execute(
+            "SELECT page, SUM(count) t FROM ci_findings"
+            " WHERE at >= ? AND at < ? AND page IS NOT NULL AND page != ''"
+            " GROUP BY page ORDER BY t DESC LIMIT 10", (inicio, fim))
+    ]
+    atual, antes = soma(inicio, fim), soma(inicio_anterior, inicio)
+    return {
+        "total": atual, "previous_total": antes,
+        "delta_pct": _variacao(float(atual), float(antes) if antes else None),
+        "by_impact": _fatias(por_impacto, ("critical", "serious", "moderate",
+                                           "minor", "unknown")),
+        "by_category": _fatias(por_categoria),
+        "top_rules": regras,
+        "by_wcag": criterios,
+        "top_pages": paginas,
+    }
+
+
+def _recorte(conn, coluna: str, tabela: str, inicio_anterior: str,
+             inicio: str, fim: str, filtro: str = "", args: tuple = ()) -> list[dict]:
+    """Saúde de cada valor de um recorte (repositório ou rótulo).
+
+    Num projeto de micro-frontends a média global não é a saúde de nada: oito
+    componentes atrás de uma taxa só escondem exatamente o que se quer ver.
+    """
+    def linhas(desde: str, ate: str) -> dict[str, dict]:
+        sql = (
+            f"SELECT {coluna} AS chave,"
+            " SUM(CASE WHEN r.conclusion = 'success' THEN 1 ELSE 0 END) ok,"
+            " COUNT(*) total, MAX(COALESCE(r.started_at, r.ingested_at)) ultimo"
+            f" FROM {tabela} WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
+            " AND COALESCE(r.started_at, r.ingested_at) < ?"
+            + (f" AND {filtro}" if filtro else "")
+            + f" GROUP BY {coluna}"
+        )
+        return {
+            r["chave"]: {"runs": r["total"], "ok": r["ok"], "last_run_at": r["ultimo"]}
+            for r in conn.execute(sql, (desde, ate, *args)) if r["chave"]
+        }
+
+    agora, antes = linhas(inicio, fim), linhas(inicio_anterior, inicio)
+    saida = []
+    for chave, dados in agora.items():
+        taxa = round(dados["ok"] / dados["runs"] * 100, 1) if dados["runs"] else None
+        anterior = antes.get(chave)
+        taxa_antes = (round(anterior["ok"] / anterior["runs"] * 100, 1)
+                      if anterior and anterior["runs"] else None)
+        saida.append({
+            "name": chave, "runs": dados["runs"],
+            "failures": dados["runs"] - dados["ok"],
+            "success_rate": taxa, "success_rate_previous": taxa_antes,
+            "delta_pct": _variacao(taxa, taxa_antes),
+            "last_run_at": dados["last_run_at"],
+        })
+    # pior primeiro: quem olha o painel quer saber onde doer
+    saida.sort(key=lambda x: (x["success_rate"] if x["success_rate"] is not None
+                              else 101, -x["runs"]))
+    return saida
+
+
+def por_repositorio(conn, inicio_anterior: str, inicio: str,
+                    fim: str) -> list[dict[str, Any]]:
+    return _recorte(conn, "r.repo", "ci_runs r", inicio_anterior, inicio, fim)
+
+
+# Acima disto um rótulo deixa de ser recorte e vira identificador: `versao`
+# com 24 valores não agrupa nada, só empurra `componente` para fora da tela.
+MAX_VALORES_DE_ROTULO = 12
+
+
+def nomes_de_rotulo(conn) -> list[str]:
+    """Rótulos que servem como RECORTE, do mais grosso para o mais fino.
+
+    Ordenados por número de valores distintos: `stack` (2) antes de
+    `componente` (8), e `versao` (dezenas) fora — um rótulo com um valor por
+    run não agrupa nada. Dois valores no mínimo, porque um só não divide.
+    """
+    return [
+        r["name"] for r in conn.execute(
+            "SELECT name, COUNT(DISTINCT value) v FROM ci_labels"
+            " GROUP BY name HAVING v BETWEEN 2 AND ? ORDER BY v, name",
+            (MAX_VALORES_DE_ROTULO,),
+        )
+    ]
+
+
+def por_rotulo(conn, rotulo: str, inicio_anterior: str, inicio: str,
+               fim: str) -> list[dict[str, Any]]:
+    return _recorte(
+        conn, "l.value", "ci_labels l JOIN ci_runs r ON r.id = l.run_id",
+        inicio_anterior, inicio, fim, "l.name = ?", (rotulo,),
+    )
 
 
 def instabilidade(conn, inicio_anterior: str, inicio: str,

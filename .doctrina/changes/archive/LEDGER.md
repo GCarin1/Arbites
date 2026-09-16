@@ -183,3 +183,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-15 — 0172-bloco-github-alvo-existe — bloco github do alvo nao existe na UI e o dispatch responde 422 sem dizer o que falta, e salvar pela tela apaga o bloco escrito a mao (specs: ci-automation MODIFIED)
 - 2026-09-15 — 0173-origens-observabilidade-so-existem — origens da observabilidade so existem no yaml e nao ha onde declara-las pela tela (specs: ci-automation MODIFIED)
 - 2026-09-16 — 0174-exportar-painel-observabilidade-graficos — exportar o painel de observabilidade e os graficos dos sinais (specs: ci-automation MODIFIED)
+- 2026-09-16 — 0175-manifesto-declara-rotulos-achados — manifesto declara rotulos e achados estruturados de acessibilidade, com leitor nativo de axe (specs: ci-automation MODIFIED)
+- 2026-09-16 — 0176-painel-ganha-pizzas-recorte — painel ganha pizzas recorte por repositorio e componente aba de acessibilidade e configuracao em aba separada (specs: ci-automation MODIFIED)

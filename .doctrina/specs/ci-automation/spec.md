@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-16
-**Version:** 0.7.0
+**Version:** 0.9.0
 
 ## Purpose
 
@@ -44,6 +44,12 @@ workflow/jobs/steps do workflow.
 - The system shall oferecer na tela de configuração do alvo os campos de repositório, workflow e branch do GitHub, e preservá-los em toda gravação — nenhuma configuração feita à mão no `arbites.yaml` pode ser descartada por um salvamento pela tela.
 - The system shall permitir declarar e remover as origens da observabilidade pela própria tela, gravando-as no `arbites.yaml`, sem exigir que o operador edite o arquivo à mão.
 - The system shall exportar o painel de observabilidade do período escolhido em PDF com os gráficos desenhados, em CSV com uma linha por medida, e em Markdown legível sem leitor especial.
+- The system shall aceitar no manifesto do artifact um bloco `labels` de chave livre declarando o que aquela execução validou — componente, ambiente, camada — e continuar aceitando manifestos da versão anterior.
+- The system shall registrar achados estruturados por execução com regra, gravidade, critério da WCAG, quantidade de elementos e página, lendo nativamente o JSON do axe-core publicado como anexo, sem exigir que o pipeline o reescreva.
+- The system shall responder a saúde recortada por repositório de origem e por rótulo declarado, além da divisão do período por resultado de execução e de cenário.
+- The system shall exibir a divisão do período em gráfico de pizza — execuções por resultado e cenários por resultado — ao lado das séries, porque divisão e tendência são perguntas diferentes.
+- The system shall separar a observabilidade em Painel, Acessibilidade e Configuração, mantendo fora do painel diário o que se preenche uma vez.
+- The system shall exibir a saúde recortada por repositório e por rótulo declarado, do pior para o melhor.
 
 ### Event-driven
 
@@ -74,6 +80,8 @@ workflow/jobs/steps do workflow.
 - The system shall not gravar `workflow` ou `artifact` vazios como valor; ausentes significam "todos", e a chave vazia faria a ingestão procurar um nome que nunca existe.
 - The system shall not depender de captura de tela para exportar os gráficos; a série é desenhada no próprio arquivo, porque exportar não pode exigir um navegador aberto.
 - The system shall not afirmar melhora ou piora de um sinal sem direção declarada na exportação, pela mesma razão que não afirma na tela — a semântica é de quem instala.
+- The system shall not oferecer como recorte um rótulo com um único valor ou com valores demais; um valor não divide nada e um por execução é identificador, não dimensão.
+- The system shall not deixar a cor de uma fatia carregar sozinha o significado; rótulo, valor e porcentagem acompanham cada fatia na legenda.
 
 ### Optional
 
@@ -97,6 +105,8 @@ workflow/jobs/steps do workflow.
 6. [verified] O bloco `github` sobrevive a duas gravações seguidas pela tela e continua no `arbites.yaml`; um bloco pela metade não é gravado; um alvo sem GitHub continua válido para execução local; e a recusa do disparo aponta Automação → Configurar — verified by `backend/tests/test_alvo_github.py`.
 7. [verified] Instalação nova responde lista vazia; declarar grava no `arbites.yaml` e é exatamente o que a ingestão enxerga; workflow e artifact em branco não viram chave; origem sem repositório é descartada; escrever exige `admin` e ler não — verified by `backend/tests/test_origens_observabilidade.py`.
 8. [verified] Os três formatos saem como anexo nomeado pelo período; o CSV traz uma linha por medida com a execução de origem; o Markdown não afirma piora de sinal sem direção declarada; o PDF é PDF com painel vazio, com série constante e com várias mudanças — verified by `backend/tests/test_export_observabilidade.py`.
+9. [verified] O critério da WCAG sai da tag do axe, o número é de elementos e não de regras, JSON quebrado não derruba a ingestão, achado declarado e lido do axe têm a mesma forma e somam; rótulo de valor único e de cardinalidade alta ficam fora do recorte; e cada repositório responde a própria taxa, pior primeiro — verified by `backend/tests/test_manifesto_v2.py`, `backend/tests/test_recortes_observabilidade.py`.
+10. [verified] As três abas abrem em 390px e 1440px sem estouro horizontal; as pizzas desenham com uma e com várias fatias; o recorte por repositório e por rótulo aparece com o pior primeiro; e a aba de acessibilidade lista regra, gravidade, critério WCAG, elementos e página — verified by `backend/tests/test_recortes_observabilidade.py`, `backend/tests/test_export_observabilidade.py`.
 
 ## Maturity
 

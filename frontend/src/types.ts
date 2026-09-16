@@ -891,6 +891,55 @@ export interface Observability {
   flaky: CiFlaky[];
   changes: CiChange[];
   runs: CiRun[];
+  /** Divisões do período — a pergunta "de que é feito", que a série não responde. */
+  distribution: {
+    runs_by_conclusion: CiFatia[];
+    scenarios_by_status: CiFatia[];
+  };
+  findings: CiAchados;
+  /** Saúde por repositório de teste e por rótulo declarado no manifesto. */
+  by_repo: CiRecorte[];
+  label_names: string[];
+  by_label: Record<string, CiRecorte[]>;
+}
+
+export interface CiFatia {
+  label: string;
+  value: number;
+  /** Calculada no servidor: duas telas dividindo por conta própria discordam. */
+  pct: number;
+}
+
+export interface CiRecorte {
+  name: string;
+  runs: number;
+  failures: number;
+  success_rate: number | null;
+  success_rate_previous: number | null;
+  delta_pct: number | null;
+  last_run_at: string | null;
+}
+
+export interface CiRegra {
+  rule: string;
+  impact: string;
+  wcag: string | null;
+  level: string | null;
+  count: number;
+  runs: number;
+  help: string | null;
+  help_url: string | null;
+}
+
+export interface CiAchados {
+  total: number;
+  previous_total: number;
+  delta_pct: number | null;
+  by_impact: CiFatia[];
+  by_category: CiFatia[];
+  top_rules: CiRegra[];
+  by_wcag: { wcag: string; level: string | null; count: number }[];
+  top_pages: { page: string; count: number }[];
 }
 
 export interface GithubTokenStatus {

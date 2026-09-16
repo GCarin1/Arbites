@@ -130,12 +130,64 @@ def test_numero_inteiro_sai_sem_casa_decimal():
     assert export_obs._numero(None) == "—"
 
 
+# -- pizzas, recortes e acessibilidade no arquivo (change 0176) ---------------
+
+RICO = {**PAINEL,
+        "distribution": {
+            "runs_by_conclusion": [{"label": "success", "value": 22, "pct": 78.6},
+                                   {"label": "failure", "value": 6, "pct": 21.4}],
+            "scenarios_by_status": [{"label": "passed", "value": 161, "pct": 95.8},
+                                    {"label": "failed", "value": 7, "pct": 4.2}]},
+        "by_repo": [{"name": "b3/e2e-front", "runs": 24, "failures": 6,
+                     "success_rate": 75.0, "success_rate_previous": 90.0,
+                     "delta_pct": -16.7, "last_run_at": None}],
+        "findings": {
+            "total": 1022, "previous_total": 900, "delta_pct": 13.6,
+            "by_impact": [{"label": "critical", "value": 480, "pct": 47.0},
+                          {"label": "serious", "value": 491, "pct": 48.0}],
+            "by_category": [{"label": "accessibility", "value": 1022, "pct": 100.0}],
+            "top_rules": [{"rule": "color-contrast", "impact": "serious",
+                           "wcag": "1.4.3", "level": "AA", "count": 385,
+                           "runs": 48, "help": "Contraste", "help_url": "u"}],
+            "by_wcag": [{"wcag": "1.4.3", "level": "AA", "count": 385}],
+            "top_pages": [{"page": "/carteira", "count": 300}]},
+        "label_names": ["componente"], "by_label": {}}
+
+
+def test_o_pdf_desenha_as_pizzas_e_a_acessibilidade():
+    dados = export_obs.painel_pdf(RICO)
+    assert dados[:4] == b"%PDF"
+    # o painel rico ocupa visivelmente mais que o painel só de séries
+    assert len(dados) > len(export_obs.painel_pdf(PAINEL))
+
+
+def test_pizza_de_uma_fatia_so_nao_some():
+    """Uma fatia que cobre o círculo inteiro tem início e fim coincidentes."""
+    unica = {**RICO, "distribution": {
+        "runs_by_conclusion": [{"label": "success", "value": 10, "pct": 100.0}],
+        "scenarios_by_status": []}}
+    assert export_obs.painel_pdf(unica)[:4] == b"%PDF"
+
+
+def test_o_markdown_traz_repositorio_e_acessibilidade():
+    md = export_obs.painel_markdown(RICO)
+    assert "## Saúde por repositório" in md and "b3/e2e-front" in md
+    assert "## Acessibilidade" in md and "1.4.3 (AA)" in md
+
+
+def test_csv_de_achados_prioriza_por_elemento():
+    linhas = export_obs.achados_csv(RICO).strip().splitlines()
+    assert linhas[0].startswith("regra,gravidade,wcag,nivel,elementos")
+    assert "color-contrast,serious,1.4.3,AA,385,48" in linhas[1]
+
+
 # -- rota --------------------------------------------------------------------
 
 @pytest.mark.parametrize("formato,tipo,extensao", [
     ("pdf", "application/pdf", ".pdf"),
     ("csv", "text/csv", ".csv"),
     ("md", "text/markdown", ".md"),
+    ("findings", "text/csv", ".csv"),
 ])
 def test_a_rota_devolve_anexo_nos_tres_formatos(ws, formato, tipo, extensao):
     with logged_in_client(ws) as client:

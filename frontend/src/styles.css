@@ -3549,6 +3549,79 @@ button.link-chip-btn:disabled {
    pedido nao tem quem aprove (change 0168). */
 /* Motivo de um run que nao chegou a executar (change 0170): fica na linha,
    nao so no title, porque em telefone nao ha hover. */
+/* Pizza: divisao do periodo (change 0176). A cor nunca carrega o significado
+   sozinha — a legenda repete rotulo e numero ao lado. */
+.obs-pizzas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+}
+.obs-pizza {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--s2);
+}
+.obs-pizza h4 { margin: 0 0 2px; font-size: var(--fs-body); }
+.obs-pizza-pergunta {
+  margin: 0 0 var(--s1);
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+}
+.obs-pizza-corpo {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.obs-pizza-corpo svg { width: 108px; height: 108px; flex: none; }
+.obs-pizza-legenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.obs-pizza-legenda li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--fs-caption);
+}
+.obs-bolinha {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  transform: translateY(1px);
+}
+.obs-pizza-rotulo { flex: 1; min-width: 0; }
+.obs-pizza-valor { font-variant-numeric: tabular-nums; }
+
+/* Recorte por repositorio/rotulo: a media global nao e a saude de nada
+   quando sao varios micro-frontends (change 0176). */
+.obs-recorte { margin-bottom: var(--s2); }
+.obs-recortes .obs-recorte {
+  background: transparent; border: 0; padding: 0; margin: var(--s1) 0 0;
+}
+.obs-ok { color: var(--success); font-weight: 600; }
+.obs-atencao { color: var(--warning); font-weight: 600; }
+.obs-ruim { color: var(--danger); font-weight: 600; }
+.obs-impacto-critical { color: var(--danger); border-color: var(--danger); }
+.obs-impacto-serious { color: #f0883e; border-color: #f0883e; }
+.obs-impacto-moderate { color: var(--warning); border-color: var(--warning); }
+.obs-impacto-minor { color: #58a6ff; border-color: #58a6ff; }
+.obs-lista-paginas {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.obs-lista-paginas li {
+  display: flex; gap: var(--s1); align-items: baseline; flex-wrap: wrap;
+}
+.obs-lista-paginas li .mono { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.obs-config-nota { margin: var(--s1) 0; }
+
 /* Origens da observabilidade (change 0173). */
 .obs-lista-origens {
   list-style: none;
@@ -3564,9 +3637,13 @@ button.link-chip-btn:disabled {
   gap: var(--s1);
   flex-wrap: wrap;
 }
+.obs-lista-origens li .mono,
 .obs-lista-origens li .caption {
-  flex: 1;
+  /* `owner/repo` longo e `mono` nao tem espaco onde quebrar: sem isto a
+     linha estourava o cartao em 390px (defeito da 0173). */
+  flex: 1 1 100%;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .run-motivo {
@@ -4069,7 +4146,10 @@ button.link-chip-btn:disabled {
   font-size: 0.82rem; max-width: 70ch;
 }
 
-.obs-saude { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, 1fr); }
+/* Faixa de tres numeros. `obs-saude` e o caso do painel; `obs-cartoes` e a
+   mesma faixa em qualquer outro bloco (change 0176). */
+.obs-saude,
+.obs-cartoes { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, 1fr); }
 .obs-cartao { display: flex; flex-direction: column; gap: 0.15rem; }
 .obs-rotulo {
   font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;
@@ -4182,7 +4262,7 @@ button.link-chip-btn:disabled {
 @media (max-width: 860px) {
   /* Três cartões lado a lado viram três colunas de 90 px em 390 px, e o
      número de 1.6rem quebra no meio. Uma coluna é mais honesto. */
-  .obs-saude { grid-template-columns: 1fr; }
+  .obs-saude, .obs-cartoes { grid-template-columns: 1fr; }
   .obs-grade-sinais { grid-template-columns: 1fr; }
   .obs-topo { flex-direction: column; align-items: stretch; }
   .obs-controles { justify-content: flex-start; }

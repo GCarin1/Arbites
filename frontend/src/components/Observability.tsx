@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { EmptyState } from "./EmptyState";
+import { Pizza } from "./Pizza";
+import { TabBar } from "./TabBar";
 import { DocBody } from "./ReadView";
 import type {
   CiFlaky,
   CiRetention,
   CiRun,
   CiSignalSeries,
+  CiRecorte,
   CiSource,
   Observability as Painel,
 } from "../types";
@@ -419,6 +422,249 @@ function Retencao({
   );
 }
 
+type Aba = "painel" | "acessibilidade" | "config";
+
+const ABAS = [
+  ["painel", "Painel"],
+  ["acessibilidade", "Acessibilidade"],
+  ["config", "Configuração"],
+] as const satisfies readonly (readonly [Aba, string])[];
+
+const IMPACTOS: Record<string, string> = {
+  critical: "crítico",
+  serious: "grave",
+  moderate: "moderado",
+  minor: "leve",
+  unknown: "sem classificação",
+};
+
+const CONCLUSOES: Record<string, string> = {
+  success: "passou",
+  failure: "falhou",
+  cancelled: "cancelado",
+  timed_out: "estourou o tempo",
+};
+
+const STATUS_CENARIO: Record<string, string> = {
+  passed: "passou",
+  failed: "falhou",
+  blocked: "bloqueado",
+  skipped: "pulado",
+};
+
+/**
+ * Saúde por recorte — repositório de teste, componente, ambiente (0176).
+ *
+ * Num projeto de micro-frontends a média global não é a saúde de nada: oito
+ * componentes atrás de uma taxa só escondem exatamente o que se quer ver.
+ * Pior primeiro, porque quem abre o painel quer saber onde dói.
+ */
+function Recorte({ titulo, pergunta, itens }: {
+  titulo: string;
+  pergunta: string;
+  itens: CiRecorte[];
+}) {
+  if (!itens.length) return null;
+  return (
+    <section className="card obs-recorte">
+      <h3>{titulo}</h3>
+      <p className="obs-pergunta">{pergunta}</p>
+      <div className="table-wrap">
+        <table className="dense">
+          <thead>
+            <tr>
+              <th>{titulo}</th>
+              <th>Execuções</th>
+              <th>Falhas</th>
+              <th>Taxa de sucesso</th>
+              <th>vs. anterior</th>
+            </tr>
+          </thead>
+          <tbody>
+            {itens.map((item) => (
+              <tr key={item.name}>
+                <td data-label={titulo} className="mono">{item.name}</td>
+                <td data-label="Execuções">{item.runs}</td>
+                <td data-label="Falhas">{item.failures}</td>
+                <td data-label="Taxa de sucesso">
+                  <span
+                    className={
+                      item.success_rate === null
+                        ? ""
+                        : item.success_rate >= 95
+                          ? "obs-ok"
+                          : item.success_rate >= 80
+                            ? "obs-atencao"
+                            : "obs-ruim"
+                    }
+                  >
+                    {item.success_rate === null ? "—" : `${item.success_rate}%`}
+                  </span>
+                </td>
+                <td data-label="vs. anterior" className="caption muted">
+                  {item.delta_pct === null
+                    ? "sem base anterior"
+                    : `${item.delta_pct > 0 ? "+" : ""}${item.delta_pct}%`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Acessibilidade em aba própria (0176).
+ *
+ * `violacoes_axe: 14` diz que piorou, não diz o quê. Aqui o número vira
+ * trabalho priorizável: quantos elementos, de que gravidade, contra qual
+ * critério da WCAG, em que página.
+ */
+function Acessibilidade({ achados, dias }: {
+  achados: Painel["findings"];
+  dias: number;
+}) {
+  if (!achados || achados.total === 0) {
+    return (
+      <EmptyState icon="dashboard" title="Nenhum achado de acessibilidade no período">
+        Publique o JSON do <strong>axe-core</strong> como anexo{" "}
+        <code>{'{"kind": "axe"}'}</code> no <code>arbites.json</code> — ou
+        declare <code>findings</code> direto no manifesto, se usar outra
+        ferramenta. O Arbites lê a regra, a gravidade, o critério da WCAG e a
+        página sozinho.
+      </EmptyState>
+    );
+  }
+  return (
+    <>
+      <section className="card">
+        <h3>Achados no período</h3>
+        <p className="obs-pergunta">
+          Quantos elementos violam alguma regra, e o quanto isso andou.
+        </p>
+        <div className="obs-cartoes">
+          <div className="obs-cartao">
+            <span className="obs-rotulo">ELEMENTOS COM VIOLAÇÃO</span>
+            <strong className="obs-numero">{achados.total}</strong>
+            <span className="caption muted">
+              {achados.previous_total} no período anterior
+            </span>
+          </div>
+          <div className="obs-cartao">
+            <span className="obs-rotulo">VARIAÇÃO</span>
+            <strong className="obs-numero">
+              {achados.delta_pct === null
+                ? "—"
+                : `${achados.delta_pct > 0 ? "+" : ""}${achados.delta_pct}%`}
+            </strong>
+            <span className="caption muted">
+              {achados.delta_pct === null
+                ? "sem base anterior"
+                : achados.delta_pct > 0
+                  ? "piorou — violação a mais é sempre pior"
+                  : "melhorou"}
+            </span>
+          </div>
+          <div className="obs-cartao">
+            <span className="obs-rotulo">CRITÉRIOS WCAG ATINGIDOS</span>
+            <strong className="obs-numero">{achados.by_wcag.length}</strong>
+            <span className="caption muted">critérios distintos com violação</span>
+          </div>
+        </div>
+      </section>
+
+      <div className="obs-pizzas">
+        <Pizza
+          titulo="Por gravidade"
+          pergunta="O que atacar primeiro."
+          fatias={achados.by_impact}
+          rotulos={IMPACTOS}
+        />
+        <Pizza
+          titulo="Por categoria"
+          pergunta="De que tipo é o achado."
+          fatias={achados.by_category}
+        />
+      </div>
+
+      <section className="card">
+        <div className="card-head">
+          <h3>Regras mais violadas</h3>
+          <span className="spacer" />
+          <a
+            className="button-link"
+            href={api.observabilityExportUrl("findings", dias)}
+            download
+            title="As regras violadas, para priorizar na planilha"
+          >
+            CSV
+          </a>
+        </div>
+        <p className="obs-pergunta">
+          Onde está a maior parte do trabalho — com o critério da WCAG ao lado,
+          que é como a norma cobra.
+        </p>
+        <div className="table-wrap">
+          <table className="dense">
+            <thead>
+              <tr>
+                <th>Regra</th>
+                <th>Gravidade</th>
+                <th>WCAG</th>
+                <th>Elementos</th>
+                <th>Execuções</th>
+              </tr>
+            </thead>
+            <tbody>
+              {achados.top_rules.map((r) => (
+                <tr key={r.rule}>
+                  <td data-label="Regra">
+                    {r.help_url ? (
+                      <a href={r.help_url} target="_blank" rel="noreferrer">
+                        {r.rule}
+                      </a>
+                    ) : (
+                      r.rule
+                    )}
+                    {r.help && <span className="caption muted"> — {r.help}</span>}
+                  </td>
+                  <td data-label="Gravidade">
+                    <span className={`badge obs-impacto-${r.impact}`}>
+                      {IMPACTOS[r.impact] ?? r.impact}
+                    </span>
+                  </td>
+                  <td data-label="WCAG" className="mono">
+                    {r.wcag ? `${r.wcag}${r.level ? ` (${r.level})` : ""}` : "—"}
+                  </td>
+                  <td data-label="Elementos">{r.count}</td>
+                  <td data-label="Execuções">{r.runs}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {achados.top_pages.length > 0 && (
+        <section className="card">
+          <h3>Páginas com mais violações</h3>
+          <p className="obs-pergunta">Por onde começar a varredura manual.</p>
+          <ul className="obs-lista-paginas">
+            {achados.top_pages.map((p) => (
+              <li key={p.page}>
+                <span className="mono">{p.page}</span>
+                <span className="caption muted">{p.count} elemento(s)</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
+
 export function Observability({ onError }: { onError: (message: string) => void }) {
   const [dias, setDias] = useState(30);
   const [painel, setPainel] = useState<Painel | null>(null);
@@ -428,6 +674,10 @@ export function Observability({ onError }: { onError: (message: string) => void 
   const [origens, setOrigens] = useState<CiSource[]>([]);
   const [novaOrigem, setNovaOrigem] = useState<CiSource>({ repo: "" });
   const [salvandoOrigem, setSalvandoOrigem] = useState(false);
+  // Configuração sai do meio do painel e vira aba (change 0176): quem lê o
+  // painel todo dia não quer tropeçar no formulário que se preenche uma vez.
+  const [aba, setAba] = useState<Aba>("painel");
+  const [recorte, setRecorte] = useState<string>("");
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -562,109 +812,124 @@ export function Observability({ onError }: { onError: (message: string) => void 
         </div>
       </header>
 
-      {/* As origens vêm ANTES do painel quando não há nenhuma: sem elas o
-          botão "Buscar" não tem de onde puxar, e a resposta "nenhuma fonte"
-          não dizia onde declarar uma (change 0173). */}
-      {(semDado || origens.length > 0) && (
-        <section className="card obs-origens">
-          <div className="card-head">
-            <h3>Origens</h3>
-            <span className="spacer" />
-            <span className="caption muted">
-              de onde as execuções são puxadas
-            </span>
-          </div>
-          {origens.length === 0 ? (
-            <p className="caption muted">
-              Nenhuma origem declarada ainda — por isso "Buscar execuções" não
-              traz nada. Informe o repositório abaixo; workflow e artifact
-              vazios significam "todos".
-            </p>
-          ) : (
-            <ul className="obs-lista-origens">
-              {origens.map((o) => (
-                <li key={`${o.repo}/${o.workflow ?? ""}`}>
-                  <span className="mono">{o.repo}</span>
-                  <span className="caption muted">
-                    {o.workflow ? o.workflow : "todos os workflows"}
-                    {o.artifact ? ` · ${o.artifact}` : ""}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn-sm"
-                    disabled={salvandoOrigem}
-                    onClick={() =>
-                      void salvarOrigens(origens.filter((x) => x !== o))
-                    }
-                  >
-                    Remover
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="field-grid">
-            <div className="field col-4">
-              <label htmlFor="obs-repo">Repositório</label>
-              <input
-                id="obs-repo"
-                className="mono"
-                value={novaOrigem.repo}
-                onChange={(e) =>
-                  setNovaOrigem((o) => ({ ...o, repo: e.target.value }))
-                }
-                placeholder="organizacao/repositorio"
-              />
-            </div>
-            <div className="field col-4">
-              <label htmlFor="obs-workflow">Workflow (opcional)</label>
-              <input
-                id="obs-workflow"
-                className="mono"
-                value={novaOrigem.workflow ?? ""}
-                onChange={(e) =>
-                  setNovaOrigem((o) => ({ ...o, workflow: e.target.value }))
-                }
-                placeholder="vazio = todos"
-              />
-            </div>
-            <div className="field col-4">
-              <label htmlFor="obs-artifact">Artifact (opcional)</label>
-              <input
-                id="obs-artifact"
-                className="mono"
-                value={novaOrigem.artifact ?? ""}
-                onChange={(e) =>
-                  setNovaOrigem((o) => ({ ...o, artifact: e.target.value }))
-                }
-                placeholder="vazio = todos"
-              />
-            </div>
-          </div>
-          <div className="toolbar">
-            <button
-              type="button"
-              className="primary"
-              disabled={!novaOrigem.repo.trim() || salvandoOrigem}
-              onClick={() => void salvarOrigens([...origens, novaOrigem])}
-            >
-              {salvandoOrigem ? "Salvando…" : "Adicionar origem"}
-            </button>
-          </div>
-        </section>
-      )}
+      <TabBar
+        tabs={ABAS}
+        value={aba}
+        onChange={setAba}
+        label="Seções da observabilidade"
+      />
 
-      {semDado ? (
+      {aba === "config" ? (
+        <>
+          <p className="caption muted obs-config-nota">
+            De onde as execuções são puxadas e por quanto tempo ficam. É o que
+            se preenche uma vez — por isso saiu do meio do painel.
+          </p>
+          <section className="card obs-origens">
+            <div className="card-head">
+              <h3>Origens</h3>
+              <span className="spacer" />
+              <span className="caption muted">
+                de onde as execuções são puxadas
+              </span>
+            </div>
+            {origens.length === 0 ? (
+              <p className="caption muted">
+                Nenhuma origem declarada ainda — por isso "Buscar execuções" não
+                traz nada. Informe o repositório abaixo; workflow e artifact
+                vazios significam "todos".
+              </p>
+            ) : (
+              <ul className="obs-lista-origens">
+                {origens.map((o) => (
+                  <li key={`${o.repo}/${o.workflow ?? ""}`}>
+                    <span className="mono">{o.repo}</span>
+                    <span className="caption muted">
+                      {o.workflow ? o.workflow : "todos os workflows"}
+                      {o.artifact ? ` · ${o.artifact}` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      disabled={salvandoOrigem}
+                      onClick={() =>
+                        void salvarOrigens(origens.filter((x) => x !== o))
+                      }
+                    >
+                      Remover
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="field-grid">
+              <div className="field col-4">
+                <label htmlFor="obs-repo">Repositório</label>
+                <input
+                  id="obs-repo"
+                  className="mono"
+                  value={novaOrigem.repo}
+                  onChange={(e) =>
+                    setNovaOrigem((o) => ({ ...o, repo: e.target.value }))
+                  }
+                  placeholder="organizacao/repositorio"
+                />
+              </div>
+              <div className="field col-4">
+                <label htmlFor="obs-workflow">Workflow (opcional)</label>
+                <input
+                  id="obs-workflow"
+                  className="mono"
+                  value={novaOrigem.workflow ?? ""}
+                  onChange={(e) =>
+                    setNovaOrigem((o) => ({ ...o, workflow: e.target.value }))
+                  }
+                  placeholder="vazio = todos"
+                />
+              </div>
+              <div className="field col-4">
+                <label htmlFor="obs-artifact">Artifact (opcional)</label>
+                <input
+                  id="obs-artifact"
+                  className="mono"
+                  value={novaOrigem.artifact ?? ""}
+                  onChange={(e) =>
+                    setNovaOrigem((o) => ({ ...o, artifact: e.target.value }))
+                  }
+                  placeholder="vazio = todos"
+                />
+              </div>
+            </div>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="primary"
+                disabled={!novaOrigem.repo.trim() || salvandoOrigem}
+                onClick={() => void salvarOrigens([...origens, novaOrigem])}
+              >
+                {salvandoOrigem ? "Salvando…" : "Adicionar origem"}
+              </button>
+            </div>
+          </section>
+          <Retencao onError={onError} onLimpou={() => void carregar()} />
+        </>
+      ) : semDado ? (
         <EmptyState
           icon="dashboard"
           title="Nenhuma execução de CI chegou ainda"
-          action={{ label: ingerindo ? "Buscando…" : "Buscar agora", onClick: () => void ingerir() }}
+          action={{
+            label: "Declarar uma origem",
+            onClick: () => setAba("config"),
+          }}
         >
-          Esta área vive do que a sua automação já produz. Declare a origem no
-          bloco acima e publique um <code>arbites.json</code> junto do artifact
-          do workflow — os sinais, prints, logs e a análise em Markdown entram
-          sozinhos a partir daí.
+          Esta área vive do que a sua automação já produz. Declare a origem na
+          aba <strong>Configuração</strong> e publique um{" "}
+          <code>arbites.json</code> junto do artifact do workflow — sinais,
+          achados de acessibilidade, prints, logs e a análise em Markdown
+          entram sozinhos a partir daí.
         </EmptyState>
+      ) : aba === "acessibilidade" ? (
+        <Acessibilidade achados={painel.findings} dias={dias} />
       ) : (
         <>
           {/* PERGUNTA: o que mudou sozinho desde o período anterior?
@@ -792,6 +1057,59 @@ export function Observability({ onError }: { onError: (message: string) => void 
             </div>
           </section>
 
+          {/* PERGUNTA: de que é feito o período? Série responde "está
+              piorando"; divisão responde "de que é feito" — e nenhuma
+              substitui a outra (change 0176). */}
+          <div className="obs-pizzas">
+            <Pizza
+              titulo="Execuções por resultado"
+              pergunta="Quanto do período foi verde."
+              fatias={painel.distribution.runs_by_conclusion}
+              rotulos={CONCLUSOES}
+            />
+            <Pizza
+              titulo="Cenários por resultado"
+              pergunta="Onde a falha se concentra — run inteiro ou cenário solto."
+              fatias={painel.distribution.scenarios_by_status}
+              rotulos={STATUS_CENARIO}
+            />
+          </div>
+
+          {/* PERGUNTA: qual repositório/componente está pior? Média global
+              não é a saúde de nada quando são vários micro-frontends. */}
+          <Recorte
+            titulo="Repositório"
+            pergunta="Cada repositório de teste que alimenta esta aba, pior primeiro."
+            itens={painel.by_repo}
+          />
+          {painel.label_names.length > 0 && (
+            <section className="card obs-recortes">
+              <div className="card-head">
+                <h3>Por rótulo</h3>
+                <span className="spacer" />
+                <span className="caption muted">
+                  declarado em <code>labels</code> no manifesto
+                </span>
+              </div>
+              <p className="obs-pergunta">
+                O repositório do workflow não é o que está sob teste: num
+                projeto de micro-frontends o recorte que importa é o
+                componente, o ambiente, a camada.
+              </p>
+              <TabBar
+                tabs={painel.label_names.map((n) => [n, n] as const)}
+                value={recorte || painel.label_names[0]}
+                onChange={setRecorte}
+                label="Rótulos declarados"
+              />
+              <Recorte
+                titulo={recorte || painel.label_names[0]}
+                pergunta=""
+                itens={painel.by_label[recorte || painel.label_names[0]] ?? []}
+              />
+            </section>
+          )}
+
           {/* PERGUNTA: alguma medida regrediu, e em qual execução? */}
           <section className="card obs-sinais">
             <h3>Sinais no tempo</h3>
@@ -890,7 +1208,6 @@ export function Observability({ onError }: { onError: (message: string) => void 
             </div>
           </section>
 
-          <Retencao onError={onError} onLimpou={() => void carregar()} />
         </>
       )}
     </div>
