@@ -476,6 +476,34 @@ manifesto continua válida.
 Log, print e análise em Markdown viram anexos hasheados ao lado do run e
 aparecem na descida (gráfico → execução → job → arquivo).
 
+### A aba Análise: o agente que junta tudo
+
+O painel responde perguntas isoladas — "está piorando?", "qual produto
+quebra?", "onde estão as violações?". Ninguém junta as três no fim do dia.
+
+Em **Observabilidade → Análise**, o agente lê o período inteiro (saúde, sinais
+com meta e direção declaradas, cenários instáveis, acessibilidade com WCAG e os
+dois recortes de repositório) e escreve o veredito: síntese, saúde em uma
+palavra, riscos com o número que os sustenta, e o que fazer — cada ação com o
+alvo, que costuma ser um repositório de origem.
+
+A análise vira **arquivo** em `workspace/ci/analises/ANL-AAAAMMDD-N.md`, com o
+**dossiê no frontmatter** e o veredito no corpo. Guardar os números junto do
+texto é o que permite comparar depois: comparar só o texto seria resenha de
+resenha, e no dia em que a retenção apagar os runs antigos nem o texto teria
+com o que ser conferido. Sendo arquivo, o histórico sobrevive a um reindex
+(ADR 0001).
+
+**Comparar duas análises** entrega os dois dossiês e os dois vereditos ao
+modelo e pede o julgamento — que é o que um humano faria com as duas folhas
+lado a lado. "Melhorou" não se calcula no código: `success_rate` subiu e
+`lcp_ms` também não diz se o produto está melhor. A comparação vai sempre da
+mais antiga para a mais recente, e separa **melhorou**, **piorou** e
+**continua igual** — o que ficou parado costuma ser o que ninguém pegou.
+
+Exige um provider de IA configurado em **IA → Providers**; sem ele a
+plataforma segue inteira, só sem esta aba.
+
 ### Exportar o painel
 
 No cabeçalho da aba, ao lado do período, há **PDF**, **CSV** e **MD**. São três

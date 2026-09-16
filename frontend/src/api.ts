@@ -15,6 +15,9 @@ import type {
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
+  CiAnalise,
+  CiAnaliseResumo,
+  CiComparativo,
   CiRetention,
   CiSource,
   CiRun,
@@ -236,6 +239,20 @@ export const api = {
     days: number,
   ) =>
     `${BASE}/ci/observability/export?format=${format}&days=${days}`,
+  ciAnalises: () =>
+    request<{ analyses: CiAnaliseResumo[] }>("/ci/analysis"),
+  ciAnalise: (id: string) =>
+    request<CiAnalise & { body: string }>(`/ci/analysis/${encodeURIComponent(id)}`),
+  ciAnalisar: (days: number) =>
+    request<CiAnalise & { body: string }>("/ci/analysis", {
+      method: "POST",
+      body: JSON.stringify({ days }),
+    }),
+  ciCompararAnalises: (a: string, b: string) =>
+    request<CiComparativo>("/ci/analysis/compare", {
+      method: "POST",
+      body: JSON.stringify({ a, b }),
+    }),
   ciRetention: () => request<CiRetention>("/ci/retention"),
   ciRetentionApply: () =>
     request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(

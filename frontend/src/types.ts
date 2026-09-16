@@ -1030,3 +1030,36 @@ export interface CiSource {
   /** Vazio = todos os artifacts do run. */
   artifact?: string | null;
 }
+
+/** Uma análise da observabilidade guardada no workspace (change 0179). */
+export interface CiAnaliseResumo {
+  id: string;
+  created_at: string;
+  days: number | null;
+  provider: string | null;
+  saude_geral: string | null;
+  sintese: string | null;
+  runs: number | null;
+  success_rate: number | null;
+  findings_total: number | null;
+  riscos: number;
+  path: string;
+}
+
+export interface CiAnalise extends CiAnaliseResumo {
+  body: string;
+  riscos_detalhe?: { titulo: string; evidencia: string; gravidade: string }[];
+}
+
+export interface CiComparativo {
+  from: string;
+  to: string;
+  from_at: string | null;
+  to_at: string | null;
+  veredito: string;
+  sintese: string;
+  melhoras: string[];
+  pioras: string[];
+  permanece: string[];
+  proximo_passo: string;
+}

@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.10.0",
+        "version": "0.11.0",
         "last_updated": "2026-09-16",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2767,6 +2767,19 @@
         "id": "0178-erros-repositorio-origem-disparou",
         "title": "erros por repositorio de origem que disparou a suite de teste",
         "path": ".doctrina/changes/archive/2026-09-16-0178-erros-repositorio-origem-disparou",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0179-agente-analise-observabilidade-historico",
+        "title": "agente de analise da observabilidade com historico e comparativo entre analises",
+        "path": ".doctrina/changes/archive/2026-09-16-0179-agente-analise-observabilidade-historico",
         "status": "applied",
         "applied": "2026-09-16",
         "specs_affected": [

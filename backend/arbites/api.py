@@ -48,7 +48,7 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import ci_analise, ci_ingest, ci_retencao, integrations_bulk as bulk_ops
 from . import notifications as notif_ops
 from . import todolists as list_ops
 from . import integrations_file as file_ops, mcp_write
@@ -353,6 +353,17 @@ class AIProvidersIn(BaseModel):
     default_provider: str | None = None
     providers: list[AIProviderConfig] = []
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
+
+
+class AnaliseCIIn(BaseModel):
+    days: int = 30
+    provider: str | None = None
+
+
+class CompararAnalisesIn(BaseModel):
+    a: str
+    b: str
+    provider: str | None = None
 
 
 class ObservabilitySourceIn(BaseModel):
@@ -3040,6 +3051,56 @@ def _register_routes(app: FastAPI) -> None:
             )
         raise _error(422, "invalid_format",
                      "format deve ser pdf, md, csv ou findings")
+
+    # -- agente de análise da observabilidade (change 0179) ---------------
+    #
+    # O painel responde perguntas isoladas; ninguém junta as três no fim do
+    # dia. O agente junta, escreve o veredito e GUARDA — como artefato do
+    # workspace, para o histórico sobreviver a um reindex (ADR 0001).
+
+    @app.post(API_PREFIX + "/ci/analysis")
+    async def criar_analise_ci(request: Request, payload: AnaliseCIIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        nome = payload.provider or (_ai_config(ws).get("default_provider") or "")
+        quadro = ci_ingest.painel(ws, conn, payload.days)
+        if not (quadro.get("health") or {}).get("runs"):
+            raise _error(422, "no_runs",
+                         "não há execução ingerida no período; não há o que"
+                         " analisar")
+        analise = await asyncio.to_thread(
+            ci_analise.analisar, provider, ws, quadro, nome,
+            _with_memory(request, ""),
+        )
+        _log_agent_event(
+            ws, conn, "analyze_observability", analise["id"], analise["id"],
+            f"Analisou {payload.days} dia(s) de observabilidade:"
+            f" {analise.get('saude_geral')}",
+        )
+        return analise
+
+    @app.get(API_PREFIX + "/ci/analysis")
+    async def listar_analises_ci(request: Request, limit: int = 50):
+        return {"analyses": ci_analise.listar(ws_of(request), limit)}
+
+    @app.get(API_PREFIX + "/ci/analysis/{analise_id}")
+    async def ler_analise_ci(request: Request, analise_id: str):
+        try:
+            return ci_analise.ler(ws_of(request), analise_id)
+        except ci_analise.AnaliseError as e:
+            raise _error(e.status, e.code, e.message)
+
+    @app.post(API_PREFIX + "/ci/analysis/compare")
+    async def comparar_analises_ci(request: Request, payload: CompararAnalisesIn):
+        """Compara duas análises guardadas — sempre da mais velha para a mais
+        nova, porque "melhorou" depende de qual veio antes."""
+        ws = ws_of(request)
+        provider = _ai_provider(request, payload.provider)
+        try:
+            return await asyncio.to_thread(
+                ci_analise.comparar, provider, ws, payload.a, payload.b)
+        except ci_analise.AnaliseError as e:
+            raise _error(e.status, e.code, e.message)
 
     @app.get(API_PREFIX + "/ci/retention")
     async def ci_retention_preview(request: Request):

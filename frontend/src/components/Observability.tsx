@@ -9,6 +9,9 @@ import type {
   CiRetention,
   CiRun,
   CiSignalSeries,
+  CiAnalise,
+  CiAnaliseResumo,
+  CiComparativo,
   CiRecorte,
   CiSource,
   Observability as Painel,
@@ -422,13 +425,269 @@ function Retencao({
   );
 }
 
-type Aba = "painel" | "acessibilidade" | "config";
+type Aba = "painel" | "acessibilidade" | "analise" | "config";
 
 const ABAS = [
   ["painel", "Painel"],
   ["acessibilidade", "Acessibilidade"],
+  ["analise", "Análise"],
   ["config", "Configuração"],
 ] as const satisfies readonly (readonly [Aba, string])[];
+
+const SAUDE: Record<string, string> = {
+  boa: "obs-ok",
+  atencao: "obs-atencao",
+  ruim: "obs-ruim",
+};
+
+const VEREDITO: Record<string, string> = {
+  melhorou: "obs-ok",
+  piorou: "obs-ruim",
+  estavel: "obs-atencao",
+  misto: "obs-atencao",
+};
+
+/**
+ * Agente de análise, histórico e comparativo (change 0179).
+ *
+ * O painel responde perguntas isoladas; ninguém junta as três no fim do dia.
+ * O agente junta, escreve o veredito e guarda — e duas análises guardadas
+ * respondem a pergunta que nenhum gráfico responde: "melhorou desde então?".
+ */
+function Analise({ dias, onError }: {
+  dias: number;
+  onError: (message: string) => void;
+}) {
+  const [historico, setHistorico] = useState<CiAnaliseResumo[]>([]);
+  const [aberta, setAberta] = useState<(CiAnalise & { body: string }) | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const [comparando, setComparando] = useState(false);
+  const [comparativo, setComparativo] = useState<CiComparativo | null>(null);
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [carregado, setCarregado] = useState(false);
+
+  const carregarHistorico = useCallback(async () => {
+    try {
+      const r = await api.ciAnalises();
+      setHistorico(r.analyses);
+      // As duas mais recentes já vêm escolhidas: é a comparação que quase
+      // todo mundo quer, e digitar dois ids não ajuda ninguém.
+      if (r.analyses.length >= 2) {
+        setA((atual) => atual || r.analyses[1].id);
+        setB((atual) => atual || r.analyses[0].id);
+      }
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setCarregado(true);
+    }
+  }, [onError]);
+
+  useEffect(() => {
+    void carregarHistorico();
+  }, [carregarHistorico]);
+
+  const gerar = async () => {
+    setGerando(true);
+    try {
+      const nova = await api.ciAnalisar(dias);
+      setAberta(nova);
+      await carregarHistorico();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  const comparar = async () => {
+    if (!a || !b || a === b) return;
+    setComparando(true);
+    try {
+      setComparativo(await api.ciCompararAnalises(a, b));
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setComparando(false);
+    }
+  };
+
+  const abrir = async (id: string) => {
+    try {
+      setAberta(await api.ciAnalise(id));
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  };
+
+  if (!carregado) return <p className="empty">Carregando análises…</p>;
+
+  return (
+    <>
+      <section className="card">
+        <div className="card-head">
+          <h3>Análise do período</h3>
+          <span className="spacer" />
+          <button className="primary" onClick={() => void gerar()} disabled={gerando}>
+            {gerando ? "Analisando…" : `Analisar os últimos ${dias} dias`}
+          </button>
+        </div>
+        <p className="obs-pergunta">
+          O agente lê o período inteiro — saúde, sinais com meta declarada,
+          cenários instáveis, acessibilidade e os dois recortes de repositório
+          — e escreve o veredito. A análise fica guardada com os números que
+          ela viu, para poder ser comparada depois.
+        </p>
+        {historico.length === 0 && (
+          <p className="caption muted">
+            Nenhuma análise ainda. Ela exige um provider de IA configurado em{" "}
+            <strong>IA → Providers</strong>; a plataforma segue inteira sem ele.
+          </p>
+        )}
+      </section>
+
+      {aberta && (
+        <section className="card obs-analise">
+          <div className="card-head">
+            <h3>{aberta.id}</h3>
+            <span className="spacer" />
+            {aberta.saude_geral && (
+              <span className={`badge ${SAUDE[aberta.saude_geral] ?? ""}`}>
+                {aberta.saude_geral}
+              </span>
+            )}
+          </div>
+          <p className="caption muted">
+            {formatarData(aberta.created_at)}
+            {aberta.provider ? ` · ${aberta.provider}` : ""}
+          </p>
+          <DocBody text={aberta.body} />
+        </section>
+      )}
+
+      {historico.length > 0 && (
+        <section className="card">
+          <h3>Histórico</h3>
+          <p className="obs-pergunta">
+            Cada análise guarda os números do seu período — o histórico
+            sobrevive a um reindex porque é arquivo no workspace.
+          </p>
+          <div className="table-wrap">
+            <table className="dense">
+              <thead>
+                <tr>
+                  <th>Análise</th>
+                  <th>Quando</th>
+                  <th>Período</th>
+                  <th>Execuções</th>
+                  <th>Taxa</th>
+                  <th>Acessibilidade</th>
+                  <th>Saúde</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historico.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={aberta?.id === item.id ? "obs-linha-ativa" : ""}
+                    onClick={() => void abrir(item.id)}
+                  >
+                    <td data-label="Análise" className="mono">{item.id}</td>
+                    <td data-label="Quando">{formatarData(item.created_at)}</td>
+                    <td data-label="Período">{item.days ?? "—"} dias</td>
+                    <td data-label="Execuções">{item.runs ?? "—"}</td>
+                    <td data-label="Taxa">
+                      {item.success_rate === null ? "—" : `${item.success_rate}%`}
+                    </td>
+                    <td data-label="Acessibilidade">{item.findings_total ?? "—"}</td>
+                    <td data-label="Saúde">
+                      <span className={SAUDE[item.saude_geral ?? ""] ?? ""}>
+                        {item.saude_geral ?? "—"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {historico.length >= 2 && (
+        <section className="card">
+          <h3>Comparar duas análises</h3>
+          <p className="obs-pergunta">
+            A pergunta que nenhum gráfico responde: melhorou desde então? A
+            comparação vai sempre da mais antiga para a mais recente.
+          </p>
+          <div className="toolbar obs-comparar">
+            <label className="caption" htmlFor="obs-comp-a">De</label>
+            <select id="obs-comp-a" value={a} onChange={(e) => setA(e.target.value)}>
+              {historico.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.id} — {formatarData(h.created_at)}
+                </option>
+              ))}
+            </select>
+            <label className="caption" htmlFor="obs-comp-b">Para</label>
+            <select id="obs-comp-b" value={b} onChange={(e) => setB(e.target.value)}>
+              {historico.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.id} — {formatarData(h.created_at)}
+                </option>
+              ))}
+            </select>
+            <button
+              className="primary"
+              onClick={() => void comparar()}
+              disabled={comparando || !a || !b || a === b}
+            >
+              {comparando ? "Comparando…" : "Comparar"}
+            </button>
+          </div>
+          {a === b && a !== "" && (
+            <p className="caption muted">Escolha duas análises diferentes.</p>
+          )}
+          {comparativo && (
+            <div className="obs-comparativo">
+              <p>
+                <span className={`badge ${VEREDITO[comparativo.veredito] ?? ""}`}>
+                  {comparativo.veredito}
+                </span>{" "}
+                <span className="caption muted">
+                  {comparativo.from} → {comparativo.to}
+                </span>
+              </p>
+              <p>{comparativo.sintese}</p>
+              {([
+                ["Melhorou", comparativo.melhoras, "obs-ok"],
+                ["Piorou", comparativo.pioras, "obs-ruim"],
+                ["Continua igual", comparativo.permanece, "obs-atencao"],
+              ] as const).map(([titulo, itens, classe]) =>
+                itens.length ? (
+                  <div key={titulo}>
+                    <h4 className={classe}>{titulo}</h4>
+                    <ul>
+                      {itens.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null,
+              )}
+              {comparativo.proximo_passo && (
+                <p>
+                  <strong>Próximo passo:</strong> {comparativo.proximo_passo}
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+    </>
+  );
+}
 
 const IMPACTOS: Record<string, string> = {
   critical: "crítico",
@@ -928,6 +1187,8 @@ export function Observability({ onError }: { onError: (message: string) => void 
           achados de acessibilidade, prints, logs e a análise em Markdown
           entram sozinhos a partir daí.
         </EmptyState>
+      ) : aba === "analise" ? (
+        <Analise dias={dias} onError={onError} />
       ) : aba === "acessibilidade" ? (
         <Acessibilidade achados={painel.findings} dias={dias} />
       ) : (

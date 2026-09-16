@@ -3599,6 +3599,15 @@ button.link-chip-btn:disabled {
 .obs-pizza-rotulo { flex: 1; min-width: 0; }
 .obs-pizza-valor { font-variant-numeric: tabular-nums; }
 
+/* Analise da observabilidade (change 0179). */
+.obs-analise { margin-bottom: var(--s2); }
+.obs-comparar { flex-wrap: wrap; align-items: center; gap: var(--s1); }
+.obs-comparar select { min-width: 0; flex: 1 1 200px; }
+.obs-comparativo { margin-top: var(--s1); }
+.obs-comparativo h4 { margin: var(--s1) 0 2px; font-size: var(--fs-caption); }
+.obs-comparativo ul { margin: 0; padding-left: 1.1rem; }
+.obs-comparativo li { font-size: var(--fs-caption); }
+
 .obs-nota-origem p { margin: 0 0 var(--s1); }
 .obs-nota-origem h4 { margin: 0 0 var(--s1); font-size: var(--fs-body); }
 

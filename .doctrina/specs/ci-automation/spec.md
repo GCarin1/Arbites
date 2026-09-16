@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-16
-**Version:** 0.10.0
+**Version:** 0.11.0
 
 ## Purpose
 
@@ -53,6 +53,7 @@ workflow/jobs/steps do workflow.
 - The system shall derivar a marca d'água da ingestão apenas dos documentos de execução, ignorando os anexos gravados ao lado — um anexo nunca pode responder "este run já foi ingerido".
 - The system shall registrar por execução o repositório de origem que disparou a suíte, com ambiente e referência, declarado no bloco `trigger` do manifesto ou num rótulo de nome conhecido.
 - The system shall responder a saúde e o volume de falhas recortados por repositório de origem, ao lado do recorte por repositório de teste — um repositório de teste serve vários produtos e só o primeiro recorte responde qual produto está quebrando.
+- The system shall manter o histórico das análises lido do disco, de modo que reconstruir o índice não apague o registro que justifica uma decisão técnica.
 
 ### Event-driven
 
@@ -66,6 +67,8 @@ workflow/jobs/steps do workflow.
   backoff no polling.
 - When alguem tenta guardar a credencial numa instancia sem cofre, the system shall recusar explicando a saida, em vez de aceitar em silencio ou falhar depois.
 - When o disparo é pedido para um alvo sem repositório e workflow, the system shall recusá-lo nomeando a tela onde se configura, em vez de citar apenas a chave do arquivo de configuração.
+- When uma análise da observabilidade é pedida, the system shall montar o dossiê do período — saúde, sinais com meta e direção, instabilidade, achados de acessibilidade e os recortes por repositório de teste e de origem — e gravá-la como artefato do workspace junto com esse dossiê.
+- When duas análises são comparadas, the system shall entregar os dois dossiês e os dois vereditos ao modelo, ordenados da mais antiga para a mais recente, em vez de calcular melhora no código.
 
 ### State-driven
 
@@ -86,6 +89,7 @@ workflow/jobs/steps do workflow.
 - The system shall not oferecer como recorte um rótulo com um único valor ou com valores demais; um valor não divide nada e um por execução é identificador, não dimensão.
 - The system shall not deixar a cor de uma fatia carregar sozinha o significado; rótulo, valor e porcentagem acompanham cada fatia na legenda.
 - The system shall not inferir o repositório de origem de uma execução que não o declara; sem declaração a execução fica fora do recorte, porque adivinhar a topologia erraria na primeira exceção.
+- The system shall not analisar um período sem execução ingerida; recusa dizendo que não há o que analisar, em vez de devolver um veredito sobre o vazio.
 
 ### Optional
 
@@ -113,6 +117,7 @@ workflow/jobs/steps do workflow.
 10. [verified] As três abas abrem em 390px e 1440px sem estouro horizontal; as pizzas desenham com uma e com várias fatias; o recorte por repositório e por rótulo aparece com o pior primeiro; e a aba de acessibilidade lista regra, gravidade, critério WCAG, elementos e página — verified by `backend/tests/test_recortes_observabilidade.py`, `backend/tests/test_export_observabilidade.py`.
 11. [verified] Um `analysis.md` no anexo não entra na marca d'água, um anexo nomeado como a chave de outro run não faz esse run ser pulado, e a marca atravessa a virada de ano — verified by `backend/tests/test_marca_dagua.py`.
 12. [verified] O bloco `trigger` é lido com nomes alternativos de campo e ganha do rótulo; a ausência não inventa origem; um repositório de teste servindo dois produtos responde uma taxa por produto; e o gráfico de erros conta volume de falha, não taxa — verified by `backend/tests/test_origem_do_disparo.py`.
+13. [verified] O dossiê é recorte e não cópia do painel, marca o sinal sem direção declarada e destaca a instabilidade nova; a análise vira arquivo com o dossiê junto e sobrevive a um reindex; duas análises no mesmo dia não colidem; identificador com travessia de caminho é recusado; e o comparativo vai sempre da mais antiga para a mais recente, com os números das duas — verified by `backend/tests/test_analise_observabilidade.py`.
 
 ## Maturity
 
