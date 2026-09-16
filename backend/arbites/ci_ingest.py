@@ -397,7 +397,17 @@ class CIIngestor:
         base = self.ws.root / "ci"
         if not base.exists():
             return set()
-        return {p.stem for p in base.rglob("*.md")}
+        # Só os documentos de run, que moram em `ci/<ano>/<chave>.md`. Um
+        # `rglob` varria também `ci/<ano>/<chave>/` — a pasta de anexos —,
+        # e a análise que o pipeline publica costuma se chamar
+        # `analysis.md`. Isso já poluía a marca d'água com `analysis`; se um
+        # dia um pipeline nomear a análise pela chave do run, o run
+        # correspondente passaria a ser pulado para sempre (change 0177).
+        return {
+            caminho.stem
+            for ano in base.iterdir() if ano.is_dir()
+            for caminho in ano.glob("*.md")
+        }
 
     # -- fontes ------------------------------------------------------------
 
@@ -1069,9 +1079,11 @@ def _o_que_mudou(atuais: list[dict], anteriores: list[dict],
             mudancas.append({
                 "kind": "broke",
                 "run_id": atuais[-1]["id"],
-                "text": f"{atuais[-1]['workflow']} quebrou depois de"
-                        f" {plural(verdes, 'execução verde', 'execuções verdes')}"
-                        " seguidas",
+                # O adjetivo concorda junto com o substantivo: "1 execução
+                # verde seguidas" era o que saía com o plural só no nome.
+                "text": f"{atuais[-1]['workflow']} quebrou depois de "
+                        + plural(verdes, "execução verde seguida",
+                                 "execuções verdes seguidas"),
             })
 
     # 3. sinal que se moveu mais de 10% contra o período anterior

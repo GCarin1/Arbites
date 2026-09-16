@@ -193,7 +193,8 @@ def test_quebra_depois_de_sequencia_verde_aponta_o_run(rig):
     mudanca = next(m for m in rig.get("/api/v1/ci/observability?days=30")
                    .json()["changes"] if m["kind"] == "broke")
     assert mudanca["run_id"] == "github-200"
-    assert "3 execuções verdes" in mudanca["text"]
+    # o adjetivo concorda junto com o substantivo (change 0177)
+    assert "3 execuções verdes seguidas" in mudanca["text"]
 
 
 def test_run_sem_manifesto_aparece_no_que_mudou(rig):

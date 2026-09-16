@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.9.0",
+        "version": "0.9.1",
         "last_updated": "2026-09-16",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2741,6 +2741,19 @@
         "id": "0176-painel-ganha-pizzas-recorte",
         "title": "painel ganha pizzas recorte por repositorio e componente aba de acessibilidade e configuracao em aba separada",
         "path": ".doctrina/changes/archive/2026-09-16-0176-painel-ganha-pizzas-recorte",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0177-marca-dagua-ingestao-conta",
+        "title": "marca dagua da ingestao conta anexo markdown como run ja ingerido",
+        "path": ".doctrina/changes/archive/2026-09-16-0177-marca-dagua-ingestao-conta",
         "status": "applied",
         "applied": "2026-09-16",
         "specs_affected": [

@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-16
-**Version:** 0.9.0
+**Version:** 0.9.1
 
 ## Purpose
 
@@ -50,6 +50,7 @@ workflow/jobs/steps do workflow.
 - The system shall exibir a divisão do período em gráfico de pizza — execuções por resultado e cenários por resultado — ao lado das séries, porque divisão e tendência são perguntas diferentes.
 - The system shall separar a observabilidade em Painel, Acessibilidade e Configuração, mantendo fora do painel diário o que se preenche uma vez.
 - The system shall exibir a saúde recortada por repositório e por rótulo declarado, do pior para o melhor.
+- The system shall derivar a marca d'água da ingestão apenas dos documentos de execução, ignorando os anexos gravados ao lado — um anexo nunca pode responder "este run já foi ingerido".
 
 ### Event-driven
 
@@ -107,6 +108,7 @@ workflow/jobs/steps do workflow.
 8. [verified] Os três formatos saem como anexo nomeado pelo período; o CSV traz uma linha por medida com a execução de origem; o Markdown não afirma piora de sinal sem direção declarada; o PDF é PDF com painel vazio, com série constante e com várias mudanças — verified by `backend/tests/test_export_observabilidade.py`.
 9. [verified] O critério da WCAG sai da tag do axe, o número é de elementos e não de regras, JSON quebrado não derruba a ingestão, achado declarado e lido do axe têm a mesma forma e somam; rótulo de valor único e de cardinalidade alta ficam fora do recorte; e cada repositório responde a própria taxa, pior primeiro — verified by `backend/tests/test_manifesto_v2.py`, `backend/tests/test_recortes_observabilidade.py`.
 10. [verified] As três abas abrem em 390px e 1440px sem estouro horizontal; as pizzas desenham com uma e com várias fatias; o recorte por repositório e por rótulo aparece com o pior primeiro; e a aba de acessibilidade lista regra, gravidade, critério WCAG, elementos e página — verified by `backend/tests/test_recortes_observabilidade.py`, `backend/tests/test_export_observabilidade.py`.
+11. [verified] Um `analysis.md` no anexo não entra na marca d'água, um anexo nomeado como a chave de outro run não faz esse run ser pulado, e a marca atravessa a virada de ano — verified by `backend/tests/test_marca_dagua.py`.
 
 ## Maturity
 
