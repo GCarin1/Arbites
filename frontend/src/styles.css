@@ -3599,6 +3599,9 @@ button.link-chip-btn:disabled {
 .obs-pizza-rotulo { flex: 1; min-width: 0; }
 .obs-pizza-valor { font-variant-numeric: tabular-nums; }
 
+.obs-nota-origem p { margin: 0 0 var(--s1); }
+.obs-nota-origem h4 { margin: 0 0 var(--s1); font-size: var(--fs-body); }
+
 /* Recorte por repositorio/rotulo: a media global nao e a saude de nada
    quando sao varios micro-frontends (change 0176). */
 .obs-recorte { margin-bottom: var(--s2); }

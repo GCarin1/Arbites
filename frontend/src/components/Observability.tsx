@@ -1075,10 +1075,46 @@ export function Observability({ onError }: { onError: (message: string) => void 
             />
           </div>
 
+          {/* PERGUNTA: qual PRODUTO está quebrando? Três repositórios
+              diferentes no mesmo evento — onde o teste mora, onde a aplicação
+              mora e quem disparou. A pergunta é sobre o segundo (0178). */}
+          {painel.by_origin.length > 0 && (
+            <>
+              <div className="obs-pizzas">
+                <Pizza
+                  titulo="Erros por repositório de origem"
+                  pergunta="De quem são as falhas do período — o volume, não a taxa."
+                  fatias={painel.errors_by_origin}
+                  vazio="nenhuma falha no período"
+                />
+                <div className="obs-pizza obs-nota-origem">
+                  <h4>Por que dois recortes</h4>
+                  <p className="caption muted">
+                    O repositório de <strong>teste</strong> é onde a suíte
+                    mora; o de <strong>origem</strong> é a aplicação cujo
+                    deploy mandou rodar. Um repositório de teste serve vários
+                    produtos, então só o segundo responde “qual produto está
+                    quebrando”.
+                  </p>
+                  <p className="caption muted">
+                    A origem vem do bloco <code>trigger</code> no{" "}
+                    <code>arbites.json</code>, ou do rótulo{" "}
+                    <code>repo_origem</code>.
+                  </p>
+                </div>
+              </div>
+              <Recorte
+                titulo="Repositório de origem"
+                pergunta="A aplicação cujo deploy disparou a suíte, pior primeiro."
+                itens={painel.by_origin}
+              />
+            </>
+          )}
+
           {/* PERGUNTA: qual repositório/componente está pior? Média global
               não é a saúde de nada quando são vários micro-frontends. */}
           <Recorte
-            titulo="Repositório"
+            titulo="Repositório de teste"
             pergunta="Cada repositório de teste que alimenta esta aba, pior primeiro."
             itens={painel.by_repo}
           />

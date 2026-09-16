@@ -899,6 +899,9 @@ export interface Observability {
   findings: CiAchados;
   /** Saúde por repositório de teste e por rótulo declarado no manifesto. */
   by_repo: CiRecorte[];
+  /** Saúde por repositório que DISPAROU a suíte — a aplicação, não o teste. */
+  by_origin: CiRecorte[];
+  errors_by_origin: CiFatia[];
   label_names: string[];
   by_label: Record<string, CiRecorte[]>;
 }

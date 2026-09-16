@@ -156,6 +156,42 @@ def normalizar_rotulos(manifesto: dict[str, Any]) -> dict[str, str]:
     return saida
 
 
+def normalizar_gatilho(manifesto: dict[str, Any],
+                      rotulos: dict[str, str]) -> dict[str, str]:
+    """Quem MANDOU rodar — o repositório de origem (change 0178).
+
+    Três repositórios diferentes no mesmo evento: onde o teste mora (o
+    `repo` do run), onde a aplicação mora (quem fez o deploy) e onde o
+    workflow foi disparado. A pergunta "qual produto está quebrando" é sobre
+    o SEGUNDO, e até aqui só o primeiro existia: `e2e-front` reunia trader,
+    carteira e ordens numa taxa só.
+
+    Vem do bloco `trigger` do manifesto; na falta dele, de um rótulo com
+    nome conhecido, porque quem já usa `labels` não precisa migrar nada.
+    """
+    bruto = manifesto.get("trigger")
+    dados: dict[str, Any] = bruto if isinstance(bruto, dict) else {}
+    saida = {}
+    for destino, chaves in (
+        ("repo", ("repo", "repository", "source_repo")),
+        ("environment", ("environment", "env", "ambiente")),
+        ("ref", ("ref", "branch", "version", "versao")),
+    ):
+        for chave in chaves:
+            valor = dados.get(chave)
+            if valor not in (None, ""):
+                saida[destino] = str(valor).strip()[:200]
+                break
+    if "repo" not in saida:
+        for chave in ("repo_origem", "source_repo", "origem", "aplicacao"):
+            if rotulos.get(chave):
+                saida["repo"] = rotulos[chave]
+                break
+    if "environment" not in saida and rotulos.get("ambiente"):
+        saida["environment"] = rotulos["ambiente"]
+    return saida
+
+
 def extrair_achados(manifesto: dict[str, Any],
                     arquivos: dict[str, bytes]) -> list[dict[str, Any]]:
     """Achados estruturados: os declarados no manifesto mais os lidos do axe.
@@ -315,6 +351,7 @@ def escrever_run(
         "scenarios": extrair_cenarios(manifesto, arquivos),
         "labels": normalizar_rotulos(manifesto),
         "findings": extrair_achados(manifesto, arquivos),
+        "trigger": normalizar_gatilho(manifesto, normalizar_rotulos(manifesto)),
     }
     if aviso:
         meta["ingest_warning"] = aviso
@@ -802,6 +839,8 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
         "distribution": distribuicao(conn, inicio, fim),
         "findings": achados(conn, inicio_anterior, inicio, fim),
         "by_repo": por_repositorio(conn, inicio_anterior, inicio, fim),
+        "by_origin": por_origem(conn, inicio_anterior, inicio, fim),
+        "errors_by_origin": erros_por_origem(conn, inicio, fim),
         "label_names": rotulos,
         "by_label": recortes,
     }
@@ -955,6 +994,32 @@ def _recorte(conn, coluna: str, tabela: str, inicio_anterior: str,
 def por_repositorio(conn, inicio_anterior: str, inicio: str,
                     fim: str) -> list[dict[str, Any]]:
     return _recorte(conn, "r.repo", "ci_runs r", inicio_anterior, inicio, fim)
+
+
+def por_origem(conn, inicio_anterior: str, inicio: str,
+               fim: str) -> list[dict[str, Any]]:
+    """Saúde por repositório que DISPAROU a suíte (change 0178)."""
+    return _recorte(conn, "r.trigger_repo", "ci_runs r", inicio_anterior,
+                    inicio, fim, "r.trigger_repo IS NOT NULL AND r.trigger_repo != ''")
+
+
+def erros_por_origem(conn, inicio: str, fim: str) -> list[dict[str, Any]]:
+    """As FALHAS divididas por repositório de origem.
+
+    Taxa de sucesso e volume de falha respondem coisas diferentes: 90% em mil
+    execuções são cem falhas, e 50% em duas são uma. Quem vai atrás do
+    problema precisa do segundo número.
+    """
+    pares = [
+        (r["trigger_repo"], r["c"]) for r in conn.execute(
+            "SELECT trigger_repo, COUNT(*) c FROM ci_runs"
+            " WHERE COALESCE(started_at, ingested_at) >= ?"
+            " AND COALESCE(started_at, ingested_at) < ?"
+            " AND conclusion IS NOT NULL AND conclusion != 'success'"
+            " AND trigger_repo IS NOT NULL AND trigger_repo != ''"
+            " GROUP BY trigger_repo", (inicio, fim))
+    ]
+    return _fatias(pares)
 
 
 # Acima disto um rótulo deixa de ser recorte e vira identificador: `versao`

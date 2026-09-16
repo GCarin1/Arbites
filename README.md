@@ -443,6 +443,21 @@ O `arbites.json` publicado junto do artifact é o contrato. Versão 2:
 }
 ```
 
+**`trigger` diz quem MANDOU rodar.** Três repositórios diferentes participam
+do mesmo evento: onde o teste mora (`b3/e2e-web`), onde a aplicação mora
+(`b3/app-trader-web`, que fez o deploy) e quem disparou o workflow. A pergunta
+"qual **produto** está quebrando" é sobre o segundo — e um repositório de teste
+que serve trader, ordens e app reunia os três numa taxa só. Declare:
+
+```json
+"trigger": { "repo": "b3/app-trader-web", "environment": "prd", "ref": "v1.24.0" }
+```
+
+A aba mostra os dois recortes lado a lado, e um gráfico de **erros por
+repositório de origem** — volume de falha, não taxa: 90% em mil execuções são
+cem falhas, e 50% em duas são uma. Quem já usa `labels` pode declarar
+`repo_origem` em vez do bloco.
+
 **`labels` é o que resolve micro-frontend.** O repositório onde o workflow
 mora **não** é o que está sob teste: o mesmo repositório de testes valida
 vários componentes, e vários repositórios de deploy chamam a mesma suíte. Sem

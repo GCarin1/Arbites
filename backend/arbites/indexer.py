@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS ci_runs(
   id TEXT PRIMARY KEY, provider TEXT, repo TEXT, workflow TEXT, run_id TEXT,
   event TEXT, conclusion TEXT, commit_sha TEXT, branch TEXT,
   started_at TEXT, finished_at TEXT, url TEXT, ingested_at TEXT,
-  ingest_warning TEXT, path TEXT, mtime REAL);
+  ingest_warning TEXT, path TEXT, mtime REAL,
+  trigger_repo TEXT, trigger_environment TEXT, trigger_ref TEXT);
 CREATE TABLE IF NOT EXISTS ci_signals(
   run_id TEXT, kind TEXT, name TEXT, value REAL, unit TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS ci_jobs(
@@ -136,6 +137,9 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE executions ADD COLUMN starts_on TEXT",
         "ALTER TABLE executions ADD COLUMN ends_on TEXT",
         "ALTER TABLE executions ADD COLUMN abort_reason TEXT",
+        "ALTER TABLE ci_runs ADD COLUMN trigger_repo TEXT",
+        "ALTER TABLE ci_runs ADD COLUMN trigger_environment TEXT",
+        "ALTER TABLE ci_runs ADD COLUMN trigger_ref TEXT",
         "ALTER TABLE results ADD COLUMN assignee TEXT",
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
         "ALTER TABLE testcases ADD COLUMN created TEXT",
@@ -777,14 +781,18 @@ def _insert_ci_run(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO ci_runs(id, provider, repo, workflow, run_id,"
         " event, conclusion, commit_sha, branch, started_at, finished_at, url,"
-        " ingested_at, ingest_warning, path, mtime)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " ingested_at, ingest_warning, path, mtime,"
+        " trigger_repo, trigger_environment, trigger_ref)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             run_id, meta.get("provider"), meta.get("repo"), meta.get("workflow"),
             str(meta.get("run_id") or ""), meta.get("event"), meta.get("conclusion"),
             meta.get("commit"), meta.get("branch"), meta.get("started_at"),
             meta.get("finished_at"), meta.get("url"), meta.get("ingested_at"),
             meta.get("ingest_warning"), rel, doc.path.stat().st_mtime,
+            (meta.get("trigger") or {}).get("repo"),
+            (meta.get("trigger") or {}).get("environment"),
+            (meta.get("trigger") or {}).get("ref"),
         ),
     )
     conn.execute("DELETE FROM ci_signals WHERE run_id = ?", (run_id,))
