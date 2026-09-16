@@ -847,6 +847,33 @@ automáticas — e com isso reduzir o acúmulo — ajuste
 > nome parecido: ele é contínuo e imutável de propósito, e não existe rota
 > que o apague. Registro que o próprio suspeito apaga não prova nada.
 
+## Conferir o layout em telefone
+
+O Arbites é usado no celular — no corredor, na reunião, na fila. Medir se a
+página estoura horizontalmente **não** prova que a tela está inteira: o que
+quebra em 390px passa por baixo desse número. Texto some dentro de um cartão
+que tem `overflow: hidden`, rótulo de coluna é escrito por cima do valor,
+botão fica com alvo de 16px. A página não estoura em nenhum desses casos.
+
+```
+node frontend/scripts/audita-estreito.mjs \
+  --url http://127.0.0.1:8000 --email voce@exemplo.com --senha ... --largura 390
+```
+
+Ele percorre as telas do menu (e as faixas internas da observabilidade)
+medindo cinco famílias de quebra: `passa-da-viewport`,
+`cortado-pelo-ancestral`, `texto-cortado`, `rotulo-sobre-o-valor` e
+`alvo-pequeno` (WCAG 2.5.8 pede 24×24 CSS px). Sai com código 1 se achar
+algo, então serve de gate. Rode também com `--largura 320`.
+
+Playwright **não** é dependência do projeto — instalá-lo puxaria centenas de
+MB para quem só quer rodar o Arbites. Aponte uma instalação existente com
+`PLAYWRIGHT_ROOT=/caminho/para/node_modules`, ou
+`npm i -D playwright && npx playwright install chromium`.
+
+Tela nova? Acrescente-a à lista `TELAS` do script: uma tela que o detector
+não visita é uma tela sem revisão.
+
 ## Estrutura do repositório
 
 ```

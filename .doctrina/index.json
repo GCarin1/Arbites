@@ -105,8 +105,8 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.18.0",
-        "last_updated": "2026-09-13",
+        "version": "0.19.0",
+        "last_updated": "2026-09-16",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
@@ -2801,6 +2801,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0181-revisao-layout-tela-estreita",
+        "title": "revisao de layout em tela estreita com detector reutilizavel",
+        "path": ".doctrina/changes/archive/2026-09-16-0181-revisao-layout-tela-estreita",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2953,6 +2966,12 @@
         "path": ".doctrina/skills/keyword-match-descarta-frontmatter-antes-de-tokenizar.md",
         "description": "Uma função de casamento por palavra-chave (keyword match) que recebe o arquivo INTEIRO de um documento (frontmatter YAML + corpo) e limita quantas palavras extrai (ex.: [:8]) pode ter esse orçamento inteiro consumido por metadados (id/title/kind/status) antes de alcançar o conteúdo real — resultado: nunca casa nada, sem erro, sem log.",
         "last_updated": "2026-07-12"
+      },
+      {
+        "id": "layout-em-tela-estreita",
+        "path": ".doctrina/skills/layout-em-tela-estreita.md",
+        "description": "Conferir layout estreito medindo `scrollWidth` da PÁGINA não pega quase nada — texto cortado dentro do cartão, rótulo escrito por cima do valor, filho cortado pelo ancestral e alvo de toque abaixo de 24px passam todos por baixo desse número; rode `frontend/scripts/audita-estreito.mjs` e trate cada família de achado com o padrão já existente no repo.",
+        "last_updated": "2026-09-16"
       },
       {
         "id": "leitura-agrupada-em-card",

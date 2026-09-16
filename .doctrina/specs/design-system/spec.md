@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
-**Last updated:** 2026-09-13
-**Version:** 0.18.0
+**Last updated:** 2026-09-16
+**Version:** 0.19.0
 
 ## Purpose
 
@@ -101,6 +101,8 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall montar todo estado vazio de lista de trabalho com marca visual, titulo da situacao, uma ou duas linhas dizendo o que mora ali, e a acao que resolve o vazio quando existe um proximo passo obvio, com a altura dada pelo conteudo.
 - The system shall distinguir a lista que nunca teve item da lista cujo filtro nao alcancou nenhum, oferecendo criar no primeiro caso e limpar o filtro no segundo, para que ninguem crie um item que ja existe escondido pelo recorte.
 - The system shall agrupar o menu por DONO do artefato e nao so por proximidade de fluxo — requisito e insumo do time de negocio e fica fora do grupo de trabalho de QA, antes dele, na ordem em que o fluxo acontece.
+- The system shall manter, em tela de 320 a 390 px, todo texto dentro do seu contêiner, nenhum rótulo escrito por cima do valor que ele nomeia, e nenhum controle com alvo de toque abaixo de 24 CSS px — salvo exceção declarada no próprio elemento, com o caminho equivalente nomeado.
+- The system shall empilhar as tabelas de dado em tela estreita, com cada linha virando cartão e cada célula carregando o rótulo da sua coluna, em vez de rolar de lado.
 
 ### Event-driven
 
@@ -123,6 +125,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall not oferecer no quadro nenhuma ação que exista apenas como arrastar; arrastar com precisão é o gesto que exclui quem tem limitação motora.
 - The system shall not trocar o tema escuro por claro como padrão do produto; a escolha é de quem lê, e o escuro continua sendo o ponto de partida.
 - The system shall not repetir no menu lateral a navegação que o menu da conta já oferece; o perfil é da pessoa e pertence ao avatar, o menu lateral é do workspace.
+- The system shall not tratar o estouro horizontal da página como prova de layout responsivo; a verificação percorre as telas medindo texto cortado, rótulo sobreposto, corte pelo ancestral e alvo de toque.
 
 ## Acceptance criteria
 
@@ -190,6 +193,7 @@ e prova a sua fatia, citando o teste/artefato. -->
 27. [unverified] Em 390 px a linha de um passo de execucao cai em duas faixas (numero e texto; acoes e status) e em 1440 px continua numa faixa so — verified by `frontend/src/styles.css` + `frontend/src/components/Executions.tsx`.
 28. [unverified] Num workspace novo as telas de test cases, requisitos, execucoes, defeitos e afazeres mostram estado vazio com marca, titulo, corpo e ao menos uma acao; com filtro que nao casa aparece o vazio de filtro, cuja acao e limpar — verified by `frontend/src/components/EmptyState.tsx` + `frontend/src/styles.css`.
 29. [unverified] O menu apresenta Requisitos como item sem cabecalho de grupo, entre Hoje e o grupo Testes, que passa a conter apenas Test cases e Execucoes — verified by `frontend/src/App.tsx`.
+30. [verified] As quinze telas do menu, incluindo as cinco faixas da observabilidade, não acusam nenhum achado a 390 px nem a 320 px no detector `frontend/scripts/audita-estreito.mjs`; e o detector, com a causa reintroduzida por CSS injetado, volta a acusar o rótulo sobreposto — verified by `frontend/scripts/audita-estreito.mjs`.
 
 ## Maturity
 

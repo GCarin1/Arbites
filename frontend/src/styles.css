@@ -3599,6 +3599,52 @@ button.link-chip-btn:disabled {
 .obs-pizza-rotulo { flex: 1; min-width: 0; }
 .obs-pizza-valor { font-variant-numeric: tabular-nums; }
 
+/* Serie rolavel quando ha ponto demais (change 0181).
+
+   Uma serie que reune varios repositorios chega a dezenas de pontos, e eles
+   se espremem ate ficarem a 3px um do outro — em QUALQUER largura. Nesse
+   espaco nenhum toque acerta o ponto que se quer, e a linha vira borrao.
+   A serie passa a ter uma largura minima proporcional ao numero de pontos
+   (`--pontos`, vindo do React, porque o CSS nao sabe contar) e rola dentro do
+   cartao quando nao cabe. */
+.obs-serie-rolagem { overflow-x: auto; overscroll-behavior-x: contain; }
+.obs-serie { min-width: calc(var(--pontos, 1) * 12px); }
+
+/* Revisao de layout em tela estreita (change 0181).
+
+   Duas familias de defeito, as duas invisiveis para o `scrollWidth` da
+   PAGINA — que era o unico teste que estas telas passavam:
+
+   1. TEXTO CORTADO. `text-overflow: ellipsis` numa linha so e otimo em tela
+      larga, onde a reticencia sinaliza "tem mais". Em 390px ela come a frase
+      inteira: "Analisou 30 dia(s) de observabilidade: atencao" virava
+      "Analisou 30 dia(s)...". Em telefone, duas linhas valem mais que uma
+      reticencia.
+   2. ALVO DE TOQUE. WCAG 2.5.8 (AA) pede 24x24 CSS px. Um botao com
+      `height: auto` herda a altura da linha de texto — 16 a 18px — e vira
+      alvo ruim justamente na tela onde so ha dedo. O padding vertical cresce
+      a area de acerto sem mexer na caixa de linha, entao nada muda de altura.
+*/
+@media (max-width: 720px) {
+  /* 1. deixa respirar em vez de cortar */
+  .metric-formula,
+  .exec-item-msg {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  /* 2. alvo de toque */
+  table.dense td a,
+  table.dense td .link-btn,
+  .obs-lista-paginas a,
+  .link-btn,
+  .link-chip-btn {
+    padding-block: 4px;
+  }
+}
+
 /* Galeria de evidencias do periodo (change 0180). */
 .obs-filtros-evidencia { flex-wrap: wrap; align-items: center; gap: var(--s1); }
 /* O `select` do sistema nasce com largura total (e o que se quer num
@@ -3644,7 +3690,10 @@ button.link-chip-btn:disabled {
 /* Botao que nao parece botao: e um atalho dentro da legenda, e o estilo base
    de button centralizaria e daria altura de controle. */
 .obs-evidencia-run {
-  background: none; border: 0; padding: 0; height: auto;
+  background: none; border: 0; padding: 0;
+  /* WCAG 2.5.8 pede 24x24 CSS px de alvo. `height: auto` deixava este em
+     18px — e a aba ao lado justamente cobra esse criterio. */
+  height: auto; min-height: 24px;
   display: inline-flex; align-items: center; gap: 5px;
   justify-content: flex-start; text-align: left;
   font-size: var(--fs-caption); color: var(--accent, #388bfd);
@@ -4125,6 +4174,12 @@ button.link-chip-btn:disabled {
     grid-template-columns: 34% minmax(0, 1fr);
     align-items: baseline;
     gap: var(--s1);
+    /* Empilhada, a celula deixa de ser coluna e vira linha de cartao: o
+       `nowrap` que mantem a tabela larga alinhada aqui so faz o valor
+       transbordar. `b3/app-investidor-mobile` nao tem onde quebrar sozinho
+       (change 0181). */
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   /* o `<span>` do e-mail é um ELEMENTO, então vira item próprio do grid e
      caía na coluna do rótulo; preso à coluna 2, ele desce como segunda
@@ -4139,6 +4194,16 @@ button.link-chip-btn:disabled {
     font-size: var(--fs-caption);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    /* Um rotulo longo ("REPOSITÓRIO DE ORIGEM") transbordava a faixa de 34%
+       e ia POR CIMA do valor. Duas causas, as duas precisam cair:
+       `white-space: nowrap` herdado da celula (sem isto `overflow-wrap` nao
+       tem onde quebrar) e a fonte MONO herdada de `td.mono` — o rotulo e
+       cromo de interface, nao dado, e em mono ele fica bem mais largo.
+       (change 0181) */
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-family: var(--font-ui);
   }
   /* célula de ações: sem rótulo, ocupando a largura, botões quebrando */
   table.dense.stack-narrow td[data-label=""] {
@@ -4267,6 +4332,11 @@ button.link-chip-btn:disabled {
   border-radius: 50%; border: 2px solid var(--surface);
   background: var(--accent, #58a6ff); cursor: pointer; min-width: 0;
 }
+/* Tentei crescer a area de acerto com um `::after` invisivel de 24x24 e o
+   efeito foi o OPOSTO: com os pontos a poucos pixels um do outro, a area
+   invisivel do vizinho passa por cima e rouba o toque do ponto visivel.
+   Area de acerto so resolve alvo isolado; alvo denso precisa de ESPACO, que
+   e o que a rolagem abaixo da. */
 .obs-ponto-falha { background: var(--danger); }
 .obs-ponto-ativo { outline: 2px solid var(--text); outline-offset: 1px; }
 

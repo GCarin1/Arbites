@@ -145,7 +145,14 @@ function Serie({
     return <p className="obs-sem-ponto">sem medida neste período</p>;
   }
   return (
-    <div className="obs-serie">
+    // `--pontos` vai para o CSS porque ele nao sabe contar: e o que da a
+    // largura minima da serie e impede que dezenas de pontos virem um borrao
+    // de 3px em que nenhum toque acerta (change 0181).
+    <div className="obs-serie-rolagem">
+    <div
+      className="obs-serie"
+      style={{ "--pontos": pontos.length } as React.CSSProperties}
+    >
       <svg viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" aria-hidden="true">
         {geometria.metaY !== null && geometria.metaY !== undefined && (
           <line
@@ -166,6 +173,12 @@ function Serie({
             className={`obs-ponto ${
               ponto.conclusion && ponto.conclusion !== "success" ? "obs-ponto-falha" : ""
             } ${selecionado === ponto.run_id ? "obs-ponto-ativo" : ""}`.trim()}
+            /* WCAG 2.5.8 pede 24x24, e este circulo tem 16. Cresce-lo faria
+               os pontos da serie se sobreporem, e a excecao "Equivalente" do
+               proprio criterio se aplica: a tabela Execucoes recentes abre a
+               MESMA descida, com linha de altura cheia. A excecao fica
+               declarada aqui, e nao escondida no detector. */
+            data-alvo-pequeno="equivalente: tabela Execuções recentes"
             style={{
               left: `${pontos.length === 1 ? 50 : (i / (pontos.length - 1)) * 100}%`,
               bottom: `${geometria.coords[i] ? 100 - (geometria.coords[i].y / altura) * 100 : 50}%`,
@@ -179,6 +192,7 @@ function Serie({
           </button>
         ))}
       </div>
+    </div>
     </div>
   );
 }
@@ -749,7 +763,7 @@ function Analise({ dias, onError }: {
             sobrevive a um reindex porque é arquivo no workspace.
           </p>
           <div className="table-wrap">
-            <table className="dense">
+            <table className="dense stack-narrow">
               <thead>
                 <tr>
                   <th>Análise</th>
@@ -904,7 +918,7 @@ function Recorte({ titulo, pergunta, itens }: {
       <h3>{titulo}</h3>
       <p className="obs-pergunta">{pergunta}</p>
       <div className="table-wrap">
-        <table className="dense">
+        <table className="dense stack-narrow">
           <thead>
             <tr>
               <th>{titulo}</th>
@@ -1041,7 +1055,7 @@ function Acessibilidade({ achados, dias }: {
           que é como a norma cobra.
         </p>
         <div className="table-wrap">
-          <table className="dense">
+          <table className="dense stack-narrow">
             <thead>
               <tr>
                 <th>Regra</th>
