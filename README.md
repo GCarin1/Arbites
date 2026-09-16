@@ -847,6 +847,28 @@ automáticas — e com isso reduzir o acúmulo — ajuste
 > nome parecido: ele é contínuo e imutável de propósito, e não existe rota
 > que o apague. Registro que o próprio suspeito apaga não prova nada.
 
+## Depois de um `git pull`, reconstrua o frontend
+
+`frontend/dist/` **não** é versionado — é artefato, e versioná-lo encheria o
+histórico de bundle minificado. A consequência é que um `git pull` atualiza o
+**código** e não o que o servidor entrega:
+
+```
+git pull
+npm --prefix frontend run build     # <- sem isto, a tela continua a anterior
+python -m arbites serve
+```
+
+Pular o build faz um conserto que "não apareceu" ficar indistinguível de um
+conserto que não funcionou. Por isso o `serve` agora **avisa no arranque**
+quando o código é mais recente que o build, com o comando pronto — e o mesmo
+aviso entra na aba **Problemas** (a API está atual mesmo quando o bundle está
+velho, então a tela antiga consegue mostrá-lo).
+
+No Docker isso não se aplica: o `docker compose build` roda o `npm run build`
+dentro da imagem. A imagem copia só o `dist`, sem o código ao lado, e nesse
+caso nada é afirmado — sem o que comparar, a resposta é "não sei".
+
 ## Conferir o layout em telefone
 
 O Arbites é usado no celular — no corredor, na reunião, na fila. Medir se a

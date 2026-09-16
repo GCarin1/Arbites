@@ -15,6 +15,11 @@ when: O agente vai criar ou alterar qualquer tela, cartão, tabela ou controle d
 
 ## Procedure
 
+0. **Reconstrua o frontend antes de conferir qualquer coisa.**
+   `frontend/dist/` não é versionado: sem `npm --prefix frontend run build` o
+   servidor entrega o bundle anterior, e você vai medir a tela errada. O
+   `serve` avisa no arranque (change 0182), mas o hábito é seu.
+
 1. Suba a aplicação e rode o detector nas duas larguras que importam:
 
    ```
@@ -70,6 +75,9 @@ when: O agente vai criar ou alterar qualquer tela, cartão, tabela ou controle d
   `::before`: a CAIXA continua com a largura da faixa e o TEXTO escapa por
   cima do valor. Nenhuma medida de `getBoundingClientRect` pega isso — mede-se
   a largura natural do texto com a fonte do pseudo-elemento.
+- **Conferir sem reconstruir.** Um defeito que "continua lá" depois do
+  conserto quase sempre é o `dist` antigo. Antes de reabrir a investigação,
+  confirme que o build é mais novo que o código.
 - **Silenciar um achado no detector.** Se um alvo pequeno é aceitável, a
   exceção se declara no elemento (`data-alvo-pequeno="equivalente: ..."`), com
   o caminho equivalente escrito ali. Quem declara assume; quem lê o markup vê

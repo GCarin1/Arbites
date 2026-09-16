@@ -48,7 +48,7 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import ci_analise, ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import build_front, ci_analise, ci_ingest, ci_retencao, integrations_bulk as bulk_ops
 from . import notifications as notif_ops
 from . import todolists as list_ops
 from . import integrations_file as file_ops, mcp_write
@@ -1008,10 +1008,14 @@ def _register_routes(app: FastAPI) -> None:
         # inteira, enquanto um aviso de integridade é de um arquivo só.
         credencial: CredentialState = request.app.state.credential
         tokens = request.app.state.tokens
+        # Build velho do frontend (change 0182): DERIVADO a cada leitura, como
+        # o da credencial. A tela que mostra este aviso é a antiga — e é
+        # justamente por isso que ela precisa mostrá-lo: a API está atual.
+        do_build = build_front.aviso(_dist_do_frontend())
         return credencial.problemas(
             tokens.get() is not None,
             gravavel=tokens.available(), origem=tokens.source(),
-        ) + avisos
+        ) + ([do_build] if do_build else []) + avisos
 
     @app.get(API_PREFIX + "/warnings")
     async def get_warnings(request: Request):
@@ -5443,12 +5447,18 @@ def _register_auth(app: FastAPI) -> None:
         _set_session_cookie(response, request, token)
         return response
 
-def _mount_frontend(app: FastAPI) -> None:
-    """Serve o build da SPA (frontend/dist) como estático — um comando sobe tudo."""
-    dist = os.environ.get(
+def _dist_do_frontend() -> str:
+    """Onde a SPA é servida. Um lugar só, porque o gate de build (change 0182)
+    precisa olhar exatamente a mesma pasta que o mount serve."""
+    return os.environ.get(
         "ARBITES_FRONTEND_DIST",
         str(Path(__file__).resolve().parents[2] / "frontend" / "dist"),
     )
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve o build da SPA (frontend/dist) como estático — um comando sobe tudo."""
+    dist = _dist_do_frontend()
     if Path(dist).is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="spa")
 
