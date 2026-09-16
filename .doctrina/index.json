@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-15",
+  "last_updated": "2026-09-16",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -56,8 +56,8 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.6.0",
-        "last_updated": "2026-09-15",
+        "version": "0.7.0",
+        "last_updated": "2026-09-16",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC6"
@@ -2710,6 +2710,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0174-exportar-painel-observabilidade-graficos",
+        "title": "exportar o painel de observabilidade e os graficos dos sinais",
+        "path": ".doctrina/changes/archive/2026-09-16-0174-exportar-painel-observabilidade-graficos",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2754,6 +2767,12 @@
         "path": ".doctrina/skills/config-deriva-do-projeto-nao-fixa-campos.md",
         "description": "Catálogos/formulários de configuração de um projeto-alvo devem ser DERIVADOS do próprio projeto (ex.: `.env`/`.env.example`), nunca uma lista fixa embutida de campos de um projeto específico.",
         "last_updated": "2026-07-21"
+      },
+      {
+        "id": "configuracao-que-a-tela-nao-alcanca",
+        "path": ".doctrina/skills/configuracao-que-a-tela-nao-alcanca.md",
+        "description": "Toda configuração que uma funcionalidade EXIGE precisa de campo na tela; sem isso o erro correto (\"falta X no arquivo\") não tem onde ser resolvido, e um modelo Pydantic sem o campo ainda APAGA o que foi escrito à mão no arquivo ao salvar pela tela.",
+        "last_updated": "2026-09-15"
       },
       {
         "id": "conteudo-longo-em-tabela-overflow",
@@ -3006,12 +3025,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "configuracao-que-a-tela-nao-alcanca",
-        "path": ".doctrina/skills/configuracao-que-a-tela-nao-alcanca.md",
-        "description": "Toda configuração que uma funcionalidade EXIGE precisa de campo na tela; sem isso o erro correto (\"falta X no arquivo\") não tem onde ser resolvido, e um modelo Pydantic sem o campo ainda APAGA o que foi escrito à mão no arquivo ao salvar pela tela.",
-        "last_updated": "2026-09-15"
       }
     ],
     "contracts": [

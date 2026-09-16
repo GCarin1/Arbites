@@ -229,6 +229,10 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ sources }),
     }),
+  /** URL de download do painel — `<a download>` em vez de fetch: o navegador
+   *  cuida do arquivo, e a sessão vai no cookie como em qualquer navegação. */
+  observabilityExportUrl: (format: "pdf" | "md" | "csv", days: number) =>
+    `${BASE}/ci/observability/export?format=${format}&days=${days}`,
   ciRetention: () => request<CiRetention>("/ci/retention"),
   ciRetentionApply: () =>
     request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(

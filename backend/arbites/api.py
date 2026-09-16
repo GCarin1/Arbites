@@ -2995,6 +2995,42 @@ def _register_routes(app: FastAPI) -> None:
             raise _error(422, "invalid_period", "days deve estar entre 1 e 365")
         return ci_ingest.painel(ws_of(request), conn_of(request), days)
 
+    @app.get(API_PREFIX + "/ci/observability/export")
+    async def export_observability(request: Request, format: str = "pdf",
+                                   days: int = 30):
+        """O painel inteiro em arquivo (change 0174).
+
+        Três formatos porque são três perguntas: a série crua para a planilha
+        (csv), o painel em texto para ata e wiki (md), e o painel COM os
+        gráficos para anexar e mandar (pdf).
+        """
+        from . import export_obs
+
+        painel = ci_ingest.painel(ws_of(request), conn_of(request), days)
+        sufixo = (painel.get("period") or {}).get("until", "")[:10] or "hoje"
+        if format == "csv":
+            return PlainTextResponse(
+                export_obs.sinais_csv(painel),
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition":
+                         f'attachment; filename="observabilidade-{sufixo}.csv"'},
+            )
+        if format == "md":
+            return PlainTextResponse(
+                export_obs.painel_markdown(painel),
+                media_type="text/markdown; charset=utf-8",
+                headers={"Content-Disposition":
+                         f'attachment; filename="observabilidade-{sufixo}.md"'},
+            )
+        if format == "pdf":
+            return Response(
+                content=export_obs.painel_pdf(painel),
+                media_type="application/pdf",
+                headers={"Content-Disposition":
+                         f'attachment; filename="observabilidade-{sufixo}.pdf"'},
+            )
+        raise _error(422, "invalid_format", "format deve ser pdf, md ou csv")
+
     @app.get(API_PREFIX + "/ci/retention")
     async def ci_retention_preview(request: Request):
         """O que está ocupado e o que a próxima limpeza levaria — ANTES de

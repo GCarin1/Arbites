@@ -4,8 +4,8 @@
 **Status:** deprecated
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
-**Last updated:** 2026-09-15
-**Version:** 0.6.0
+**Last updated:** 2026-09-16
+**Version:** 0.7.0
 
 ## Purpose
 
@@ -43,6 +43,7 @@ workflow/jobs/steps do workflow.
 - The system shall aceitar a credencial de CI pela variavel de ambiente do processo onde o cofre do sistema operacional nao existe, com precedencia sobre o cofre, sem nunca devolver o valor nem grava-lo no workspace.
 - The system shall oferecer na tela de configuração do alvo os campos de repositório, workflow e branch do GitHub, e preservá-los em toda gravação — nenhuma configuração feita à mão no `arbites.yaml` pode ser descartada por um salvamento pela tela.
 - The system shall permitir declarar e remover as origens da observabilidade pela própria tela, gravando-as no `arbites.yaml`, sem exigir que o operador edite o arquivo à mão.
+- The system shall exportar o painel de observabilidade do período escolhido em PDF com os gráficos desenhados, em CSV com uma linha por medida, e em Markdown legível sem leitor especial.
 
 ### Event-driven
 
@@ -71,6 +72,8 @@ workflow/jobs/steps do workflow.
   `GET /settings/github/token` (status apenas).
 - The system shall not gravar um bloco `github` pela metade; repositório sem workflow (ou o contrário) é descartado, porque um bloco incompleto faz o disparo acusar falta de configuração com o bloco aparentemente presente no arquivo.
 - The system shall not gravar `workflow` ou `artifact` vazios como valor; ausentes significam "todos", e a chave vazia faria a ingestão procurar um nome que nunca existe.
+- The system shall not depender de captura de tela para exportar os gráficos; a série é desenhada no próprio arquivo, porque exportar não pode exigir um navegador aberto.
+- The system shall not afirmar melhora ou piora de um sinal sem direção declarada na exportação, pela mesma razão que não afirma na tela — a semântica é de quem instala.
 
 ### Optional
 
@@ -93,6 +96,7 @@ workflow/jobs/steps do workflow.
 5. [unverified] Instancia sem cofre responde a tela de problemas e o status do token sem erro, anuncia a falta com o remedio, recusa a gravacao explicando, e aceita a credencial pelo ambiente sem vazar o valor nem toca-lo no disco — verified by `backend/tests/test_sem_cofre.py`.
 6. [verified] O bloco `github` sobrevive a duas gravações seguidas pela tela e continua no `arbites.yaml`; um bloco pela metade não é gravado; um alvo sem GitHub continua válido para execução local; e a recusa do disparo aponta Automação → Configurar — verified by `backend/tests/test_alvo_github.py`.
 7. [verified] Instalação nova responde lista vazia; declarar grava no `arbites.yaml` e é exatamente o que a ingestão enxerga; workflow e artifact em branco não viram chave; origem sem repositório é descartada; escrever exige `admin` e ler não — verified by `backend/tests/test_origens_observabilidade.py`.
+8. [verified] Os três formatos saem como anexo nomeado pelo período; o CSV traz uma linha por medida com a execução de origem; o Markdown não afirma piora de sinal sem direção declarada; o PDF é PDF com painel vazio, com série constante e com várias mudanças — verified by `backend/tests/test_export_observabilidade.py`.
 
 ## Maturity
 

@@ -531,6 +531,34 @@ export function Observability({ onError }: { onError: (message: string) => void 
           <button type="button" onClick={() => void ingerir()} disabled={ingerindo}>
             {ingerindo ? "Buscando…" : "Buscar execuções"}
           </button>
+          {/* Exportar o que está na tela, no período escolhido (change 0174):
+              PDF leva os gráficos, CSV leva a série para a planilha, MD entra
+              em ata e wiki. São três perguntas diferentes, não três botões
+              para a mesma. */}
+          <a
+            className="button-link"
+            href={api.observabilityExportUrl("pdf", dias)}
+            download
+            title="Painel com os gráficos, para anexar"
+          >
+            PDF
+          </a>
+          <a
+            className="button-link"
+            href={api.observabilityExportUrl("csv", dias)}
+            download
+            title="Série de cada sinal, uma linha por medida"
+          >
+            CSV
+          </a>
+          <a
+            className="button-link"
+            href={api.observabilityExportUrl("md", dias)}
+            download
+            title="O painel em texto, para ata e wiki"
+          >
+            MD
+          </a>
         </div>
       </header>
 

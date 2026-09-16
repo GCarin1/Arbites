@@ -406,6 +406,7 @@ PUT  /api/v1/ci/sources           # declara (admin) — o que a aba usa
 POST /api/v1/ci/ingest            # puxa o que ainda não está no disco
 GET  /api/v1/ci/runs?limit=50     # runs ingeridos, com sinais e anexos
 GET  /api/v1/ci/signals           # que sinais existem (descobertos, não fixos)
+GET  /api/v1/ci/observability/export?format=pdf|csv|md&days=30   # o painel em arquivo
 GET  /api/v1/ci/signals/{name}?since=&until=   # a série de um sinal no tempo
 ```
 
@@ -414,6 +415,23 @@ com os sinais no frontmatter e os anexos ao lado, hasheados. O índice SQLite
 é descartável (ADR 0001): apagá-lo e reconstruir devolve meses de série.
 Ingerir duas vezes o mesmo run não duplica — a marca d'água é o disco, não um
 contador guardado à parte.
+
+### Exportar o painel
+
+No cabeçalho da aba, ao lado do período, há **PDF**, **CSV** e **MD**. São três
+perguntas diferentes, não três botões para a mesma:
+
+- **PDF** — o painel *com os gráficos*, para anexar num e-mail ou levar para
+  uma reunião. A série é desenhada dentro do arquivo, não capturada da tela:
+  exportar não depende de haver um navegador aberto.
+- **CSV** — uma linha por **medida** (sinal, quando, valor, meta, execução de
+  origem, conclusão, URL). É o formato que a planilha filtra e agrupa sem
+  ninguém desempilhar nada antes, para cruzar com o que o Arbites não conhece.
+- **MD** — o painel em texto, para ata, issue e wiki; continua legível daqui a
+  um ano sem leitor especial.
+
+O arquivo sai nomeado pelo fim do período (`observabilidade-2026-09-16.pdf`) e
+respeita o período escolhido no seletor.
 
 ### A aba Observabilidade
 
