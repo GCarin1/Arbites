@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.11.0",
+        "version": "0.12.0",
         "last_updated": "2026-09-16",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2780,6 +2780,19 @@
         "id": "0179-agente-analise-observabilidade-historico",
         "title": "agente de analise da observabilidade com historico e comparativo entre analises",
         "path": ".doctrina/changes/archive/2026-09-16-0179-agente-analise-observabilidade-historico",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0180-galeria-evidencias-periodo-prints",
+        "title": "galeria de evidencias do periodo com prints e logs dos runs",
+        "path": ".doctrina/changes/archive/2026-09-16-0180-galeria-evidencias-periodo-prints",
         "status": "applied",
         "applied": "2026-09-16",
         "specs_affected": [

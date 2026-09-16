@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-16
-**Version:** 0.11.0
+**Version:** 0.12.0
 
 ## Purpose
 
@@ -54,6 +54,8 @@ workflow/jobs/steps do workflow.
 - The system shall registrar por execução o repositório de origem que disparou a suíte, com ambiente e referência, declarado no bloco `trigger` do manifesto ou num rótulo de nome conhecido.
 - The system shall responder a saúde e o volume de falhas recortados por repositório de origem, ao lado do recorte por repositório de teste — um repositório de teste serve vários produtos e só o primeiro recorte responde qual produto está quebrando.
 - The system shall manter o histórico das análises lido do disco, de modo que reconstruir o índice não apague o registro que justifica uma decisão técnica.
+- The system shall responder os anexos de todas as execuções do período como uma superfície própria, filtrável por tipo e por repositório de origem, e restringível às execuções que falharam.
+- The system shall entregar em cada evidência o contexto da execução que a produziu — identificador, resultado, repositório de teste, repositório de origem e data — porque um anexo sem execução não é evidência de nada.
 
 ### Event-driven
 
@@ -90,6 +92,7 @@ workflow/jobs/steps do workflow.
 - The system shall not deixar a cor de uma fatia carregar sozinha o significado; rótulo, valor e porcentagem acompanham cada fatia na legenda.
 - The system shall not inferir o repositório de origem de uma execução que não o declara; sem declaração a execução fica fora do recorte, porque adivinhar a topologia erraria na primeira exceção.
 - The system shall not analisar um período sem execução ingerida; recusa dizendo que não há o que analisar, em vez de devolver um veredito sobre o vazio.
+- The system shall not cortar a lista de evidências em silêncio nem deixar o limite pedido virar varredura da base; a lista anuncia quando foi truncada e o limite tem teto próprio.
 
 ### Optional
 
@@ -118,6 +121,7 @@ workflow/jobs/steps do workflow.
 11. [verified] Um `analysis.md` no anexo não entra na marca d'água, um anexo nomeado como a chave de outro run não faz esse run ser pulado, e a marca atravessa a virada de ano — verified by `backend/tests/test_marca_dagua.py`.
 12. [verified] O bloco `trigger` é lido com nomes alternativos de campo e ganha do rótulo; a ausência não inventa origem; um repositório de teste servindo dois produtos responde uma taxa por produto; e o gráfico de erros conta volume de falha, não taxa — verified by `backend/tests/test_origem_do_disparo.py`.
 13. [verified] O dossiê é recorte e não cópia do painel, marca o sinal sem direção declarada e destaca a instabilidade nova; a análise vira arquivo com o dossiê junto e sobrevive a um reindex; duas análises no mesmo dia não colidem; identificador com travessia de caminho é recusado; e o comparativo vai sempre da mais antiga para a mais recente, com os números das duas — verified by `backend/tests/test_analise_observabilidade.py`.
+14. [verified] Cada evidência traz o contexto da execução; o recorte por falha e os filtros de tipo e origem funcionam; a ordem é da mais recente para a mais antiga; o resumo por tipo não encolhe com os filtros; o truncamento é anunciado e o limite tem teto; e o caminho do anexo não escapa de `ci/` — verified by `backend/tests/test_evidencias_periodo.py`.
 
 ## Maturity
 

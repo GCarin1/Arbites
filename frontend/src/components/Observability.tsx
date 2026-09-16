@@ -12,6 +12,8 @@ import type {
   CiAnalise,
   CiAnaliseResumo,
   CiComparativo,
+  CiEvidencia,
+  CiEvidencias,
   CiRecorte,
   CiSource,
   Observability as Painel,
@@ -425,14 +427,24 @@ function Retencao({
   );
 }
 
-type Aba = "painel" | "acessibilidade" | "analise" | "config";
+type Aba = "painel" | "acessibilidade" | "evidencias" | "analise" | "config";
 
 const ABAS = [
   ["painel", "Painel"],
   ["acessibilidade", "Acessibilidade"],
+  ["evidencias", "Evidências"],
   ["analise", "Análise"],
   ["config", "Configuração"],
 ] as const satisfies readonly (readonly [Aba, string])[];
+
+const TIPOS_DE_ANEXO: Record<string, string> = {
+  screenshot: "prints",
+  log: "logs",
+  analysis: "análises do pipeline",
+  cucumber: "resultados",
+  axe: "varreduras de acessibilidade",
+  file: "outros",
+};
 
 const SAUDE: Record<string, string> = {
   boa: "obs-ok",
@@ -446,6 +458,169 @@ const VEREDITO: Record<string, string> = {
   estavel: "obs-atencao",
   misto: "obs-atencao",
 };
+
+/**
+ * Galeria de evidências do período (change 0180).
+ *
+ * Até aqui a evidência só existia dentro da descida: para ver o print da
+ * falha era preciso já saber em qual execução ela aconteceu — o que inverte a
+ * ordem natural, porque muitas vezes é justamente o print que diz onde olhar.
+ *
+ * Cada peça carrega o contexto do run: sem ele um print solto não é evidência
+ * de nada. E o recorte que se usa de verdade — "só das falhas" — vem ligado,
+ * porque o print de um run verde quase nunca é o que se procura.
+ */
+function Evidencias({ dias, origens, onError, onAbrirRun }: {
+  dias: number;
+  origens: string[];
+  onError: (message: string) => void;
+  onAbrirRun: (runId: string) => void;
+}) {
+  const [dados, setDados] = useState<CiEvidencias | null>(null);
+  const [tipo, setTipo] = useState("screenshot");
+  const [origem, setOrigem] = useState("");
+  const [soFalhas, setSoFalhas] = useState(true);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    api
+      .ciEvidencias({ days: dias, kind: tipo, origin: origem, failuresOnly: soFalhas })
+      .then((r) => vivo && setDados(r))
+      .catch((e) => vivo && onError((e as Error).message))
+      .finally(() => vivo && setCarregando(false));
+    return () => {
+      vivo = false;
+    };
+  }, [dias, tipo, origem, soFalhas, onError]);
+
+  const ehImagem = (e: CiEvidencia) => e.kind === "screenshot";
+
+  return (
+    <>
+      <section className="card">
+        <div className="card-head">
+          <h3>Evidências do período</h3>
+          <span className="spacer" />
+          {dados && (
+            <span className="caption muted">
+              {formatarBytes(dados.total_bytes)} no total
+            </span>
+          )}
+        </div>
+        <p className="obs-pergunta">
+          O que os testes deixaram para trás — print, log, varredura — com a
+          execução que o produziu ao lado. Clique numa peça para abrir o
+          arquivo; clique na execução para descer até ela.
+        </p>
+        <div className="toolbar obs-filtros-evidencia">
+          <label className="caption" htmlFor="ev-tipo">Tipo</label>
+          <select id="ev-tipo" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+            <option value="">todos</option>
+            {(dados?.by_kind ?? []).map((f) => (
+              <option key={f.label} value={f.label}>
+                {TIPOS_DE_ANEXO[f.label] ?? f.label} ({f.value})
+              </option>
+            ))}
+          </select>
+          <label className="caption" htmlFor="ev-origem">Origem</label>
+          <select
+            id="ev-origem"
+            value={origem}
+            onChange={(e) => setOrigem(e.target.value)}
+          >
+            <option value="">todas</option>
+            {origens.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+          <label className="caption obs-so-falhas">
+            <input
+              type="checkbox"
+              checked={soFalhas}
+              onChange={(e) => setSoFalhas(e.target.checked)}
+            />
+            só das execuções que falharam
+          </label>
+        </div>
+      </section>
+
+      {carregando && <p className="empty">Carregando evidências…</p>}
+
+      {!carregando && dados && dados.items.length === 0 && (
+        <EmptyState icon="dashboard" title="Nenhuma evidência com esses filtros">
+          Os anexos entram junto com a execução, declarados no{" "}
+          <code>arbites.json</code> do artifact. Se a busca está vazia, ou o
+          período não tem execução com anexo, ou os filtros estão apertados
+          demais — tente desmarcar “só das execuções que falharam”.
+        </EmptyState>
+      )}
+
+      {!carregando && dados && dados.items.length > 0 && (
+        <section className="card">
+          {dados.truncated && (
+            <p className="caption muted">
+              Mostrando as mais recentes; há mais evidência no período do que
+              cabe nesta lista.
+            </p>
+          )}
+          <div className="obs-galeria">
+            {dados.items.map((item) => (
+              <figure key={`${item.run_id}:${item.path}`} className="obs-evidencia">
+                <a
+                  href={api.ciAttachmentUrl(item.path)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="obs-evidencia-peca"
+                >
+                  {ehImagem(item) ? (
+                    <img
+                      src={api.ciAttachmentUrl(item.path)}
+                      alt={item.title ?? item.path.split("/").pop() ?? ""}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="obs-evidencia-tipo">
+                      {TIPOS_DE_ANEXO[item.kind] ?? item.kind}
+                    </span>
+                  )}
+                </a>
+                <figcaption>
+                  <span className="obs-evidencia-nome">
+                    {item.title ?? item.path.split("/").pop()}
+                  </span>
+                  {/* O contexto do run: sem ele um print solto não é
+                      evidência de nada. */}
+                  <button
+                    type="button"
+                    className="obs-evidencia-run"
+                    onClick={() => onAbrirRun(item.run_id)}
+                  >
+                    <span
+                      className={`status-dot ${
+                        item.conclusion === "success"
+                          ? "dot-col-passed"
+                          : "dot-col-failed"
+                      }`}
+                    />
+                    {item.trigger_repo ?? item.repo ?? item.run_id}
+                  </button>
+                  <span className="caption muted">
+                    {formatarData(item.at)}
+                    {item.bytes ? ` · ${formatarBytes(item.bytes)}` : ""}
+                  </span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
 
 /**
  * Agente de análise, histórico e comparativo (change 0179).
@@ -1187,6 +1362,16 @@ export function Observability({ onError }: { onError: (message: string) => void 
           achados de acessibilidade, prints, logs e a análise em Markdown
           entram sozinhos a partir daí.
         </EmptyState>
+      ) : aba === "evidencias" ? (
+        <Evidencias
+          dias={dias}
+          origens={painel.by_origin.map((o) => o.name)}
+          onError={onError}
+          onAbrirRun={(id) => {
+            setAba("painel");
+            void abrirRun(id);
+          }}
+        />
       ) : aba === "analise" ? (
         <Analise dias={dias} onError={onError} />
       ) : aba === "acessibilidade" ? (

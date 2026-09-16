@@ -18,6 +18,7 @@ import type {
   CiAnalise,
   CiAnaliseResumo,
   CiComparativo,
+  CiEvidencias,
   CiRetention,
   CiSource,
   CiRun,
@@ -253,6 +254,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ a, b }),
     }),
+  ciEvidencias: (params: {
+    days: number;
+    kind?: string;
+    origin?: string;
+    failuresOnly?: boolean;
+  }) => {
+    const qs = new URLSearchParams({ days: String(params.days) });
+    if (params.kind) qs.set("kind", params.kind);
+    if (params.origin) qs.set("origin", params.origin);
+    if (params.failuresOnly) qs.set("failures_only", "true");
+    return request<CiEvidencias>(`/ci/evidences?${qs.toString()}`);
+  },
   ciRetention: () => request<CiRetention>("/ci/retention"),
   ciRetentionApply: () =>
     request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(

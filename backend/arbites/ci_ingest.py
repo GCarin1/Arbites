@@ -645,6 +645,65 @@ def listar_runs(conn, limite: int = 50, workflow: str | None = None) -> list[dic
     return saida
 
 
+def evidencias(conn, inicio: str, fim: str, kind: str | None = None,
+               origem: str | None = None, so_falhas: bool = False,
+               limite: int = 120) -> dict[str, Any]:
+    """Prints, logs e demais anexos do PERÍODO, não de um run só (0180).
+
+    Até aqui a evidência só existia dentro da descida: para ver o print da
+    falha era preciso já saber em qual execução ela aconteceu — o que inverte
+    a ordem natural, porque muitas vezes é justamente o print que diz onde
+    olhar. Aqui a evidência vira uma superfície do período, com o contexto do
+    run colado em cada peça: sem ele um print solto não é evidência de nada.
+
+    `so_falhas` é o recorte que se usa de verdade: o print de um run verde
+    quase nunca é o que se procura.
+    """
+    sql = (
+        "SELECT a.kind, a.path, a.title, a.bytes, a.sha256,"
+        " r.id AS run_id, r.workflow, r.conclusion, r.repo, r.trigger_repo,"
+        " r.url, COALESCE(r.started_at, r.ingested_at) AS at"
+        " FROM ci_attachments a JOIN ci_runs r ON r.id = a.run_id"
+        " WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
+        " AND COALESCE(r.started_at, r.ingested_at) < ?"
+    )
+    args: list[Any] = [inicio, fim]
+    if kind:
+        sql += " AND a.kind = ?"
+        args.append(kind)
+    if origem:
+        sql += " AND r.trigger_repo = ?"
+        args.append(origem)
+    if so_falhas:
+        sql += " AND r.conclusion IS NOT NULL AND r.conclusion != 'success'"
+    # Mais recente primeiro: a evidência de ontem vale mais que a do mês
+    # passado, e quem abre a aba está atrás do que acabou de quebrar.
+    sql += " ORDER BY at DESC, a.kind, a.path LIMIT ?"
+    args.append(max(1, min(limite, 500)))
+    itens = [dict(r) for r in conn.execute(sql, args)]
+
+    tipos = [
+        (r["kind"] or "file", r["c"]) for r in conn.execute(
+            "SELECT a.kind, COUNT(*) c FROM ci_attachments a"
+            " JOIN ci_runs r ON r.id = a.run_id"
+            " WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
+            " AND COALESCE(r.started_at, r.ingested_at) < ?"
+            " GROUP BY a.kind", (inicio, fim))
+    ]
+    total_bytes = conn.execute(
+        "SELECT COALESCE(SUM(a.bytes), 0) t FROM ci_attachments a"
+        " JOIN ci_runs r ON r.id = a.run_id"
+        " WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
+        " AND COALESCE(r.started_at, r.ingested_at) < ?", (inicio, fim)
+    ).fetchone()["t"]
+    return {
+        "items": itens,
+        "by_kind": _fatias(tipos),
+        "total_bytes": int(total_bytes or 0),
+        "truncated": len(itens) >= max(1, min(limite, 500)),
+    }
+
+
 def run_detalhado(ws, conn, run_id: str) -> dict[str, Any]:
     """Um run com o CORPO: a análise que o pipeline escreveu, renderizada na
     tela ao lado dos sinais em vez de reescrita aqui."""

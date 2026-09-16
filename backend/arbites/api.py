@@ -3119,6 +3119,21 @@ def _register_routes(app: FastAPI) -> None:
     async def ci_run_detail(request: Request, run_id: str):
         return ci_ingest.run_detalhado(ws_of(request), conn_of(request), run_id)
 
+    @app.get(API_PREFIX + "/ci/evidences")
+    async def ci_evidencias(request: Request, days: int = 30,
+                            kind: str = "", origin: str = "",
+                            failures_only: bool = False, limit: int = 120):
+        """Prints e logs do PERÍODO (change 0180).
+
+        Até aqui a evidência só existia dentro da descida: para ver o print da
+        falha era preciso já saber em qual execução ela aconteceu.
+        """
+        _, inicio, fim = ci_ingest._dias_atras(days)
+        return ci_ingest.evidencias(
+            conn_of(request), inicio, fim, kind or None, origin or None,
+            failures_only, limit,
+        )
+
     @app.get(API_PREFIX + "/ci/attachment")
     async def ci_attachment(request: Request, path: str):
         """Serve o print/log/anexo do run. O caminho vem do índice, mas a

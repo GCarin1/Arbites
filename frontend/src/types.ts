@@ -1063,3 +1063,27 @@ export interface CiComparativo {
   permanece: string[];
   proximo_passo: string;
 }
+
+/** Uma evidência do período, com o contexto do run colado (change 0180). */
+export interface CiEvidencia {
+  kind: string;
+  path: string;
+  title: string | null;
+  bytes: number | null;
+  sha256: string | null;
+  run_id: string;
+  workflow: string | null;
+  conclusion: string | null;
+  repo: string | null;
+  trigger_repo: string | null;
+  url: string | null;
+  at: string | null;
+}
+
+export interface CiEvidencias {
+  items: CiEvidencia[];
+  by_kind: CiFatia[];
+  total_bytes: number;
+  /** O limite foi atingido: há mais evidência do que a lista mostra. */
+  truncated: boolean;
+}

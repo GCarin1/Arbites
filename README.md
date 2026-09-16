@@ -476,6 +476,21 @@ manifesto continua válida.
 Log, print e análise em Markdown viram anexos hasheados ao lado do run e
 aparecem na descida (gráfico → execução → job → arquivo).
 
+### A aba Evidências
+
+Print, log, varredura e a análise que o pipeline escreveu ficam guardados ao
+lado de cada execução, hasheados. Em **Observabilidade → Evidências** eles
+viram uma superfície do **período**, e não de um run só: até aqui, para ver o
+print da falha era preciso já saber em qual execução ela aconteceu — o que
+inverte a ordem natural, porque muitas vezes é o print que diz onde olhar.
+
+Cada peça carrega o contexto da execução que a produziu (o repositório de
+origem, o resultado, a data) — sem isso um print solto não é evidência de
+nada. Clique na peça para abrir o arquivo; clique na execução para descer até
+ela. Os filtros são tipo, repositório de origem e **só das execuções que
+falharam**, que vem ligado: o print de um run verde quase nunca é o que se
+procura.
+
 ### A aba Análise: o agente que junta tudo
 
 O painel responde perguntas isoladas — "está piorando?", "qual produto
