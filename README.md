@@ -560,6 +560,16 @@ O contrário não acontece: um `result.json` que **não** tem essa forma não é
 classificado como relatório, porque chamar de cenário o que não é troca um
 silêncio por uma mentira.
 
+**A taxa de sucesso conta só o que deu veredito.** Uma execução
+**cancelada** não é falha do produto — alguém apertou o botão, ou um push novo
+substituiu a fila — e uma **skipped** nem chegou a rodar. As duas ficam fora
+do denominador, e `timed_out` fica dentro, porque estourar o tempo é falhar
+com um motivo. O total de execuções continua sendo o total de verdade: o que
+saiu da conta aparece ao lado do número ("12 fora da conta") e embaixo da
+pizza, porque sair da conta não é sair da tela. Um período inteiro de
+canceladas responde "—", nunca 0%: zero diria que tudo quebrou, quando a
+verdade é que nada foi medido.
+
 **A busca é incremental.** "Buscar execuções" usa o período que está no
 topo da tela como janela e varre **só a lacuna** dela: se você já buscou 30
 dias e troca para 90, ele procura os 60 que faltam, não os 90 de novo. O

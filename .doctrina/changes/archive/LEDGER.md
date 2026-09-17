@@ -199,3 +199,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-17 — 0188-comando-monta-bundle-ca — onde achar o `.pem` certo (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0189-cenarios-resultado-vazio-porque — cenário reconhecido pela forma, não pelo nome (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0190-busca-execucoes-incremental-janela — buscar só o que falta (specs: ci-automation MODIFIED)
+- 2026-09-17 — 0191-taxa-sucesso-falhas-contando — cancelada não é falha (specs: ci-automation MODIFIED)

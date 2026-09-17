@@ -932,7 +932,14 @@ function Recorte({ titulo, pergunta, itens }: {
             {itens.map((item) => (
               <tr key={item.name}>
                 <td data-label={titulo} className="mono">{item.name}</td>
-                <td data-label="Execuções">{item.runs}</td>
+                <td data-label="Execuções">
+                  {item.runs}
+                  {item.inconclusive > 0 && (
+                    <span className="caption muted">
+                      {` (${item.inconclusive} fora da conta)`}
+                    </span>
+                  )}
+                </td>
                 <td data-label="Falhas">{item.failures}</td>
                 <td data-label="Taxa de sucesso">
                   <span
@@ -1572,9 +1579,16 @@ export function Observability({ onError }: { onError: (message: string) => void 
                 {saude.success_rate === null ? "—" : `${saude.success_rate}%`}
               </strong>
               <span className="muted">
-                {saude.success_rate_previous === null
-                  ? "sem base anterior"
-                  : `${saude.success_rate_previous}% antes`}
+                {/* O denominador junto do número: cancelada e skipped saíram
+                    da conta (change 0191), e uma taxa que não fecha com o
+                    card ao lado sem explicação parece defeito. */}
+                {`de ${saude.conclusive_runs} conclusiva${
+                  saude.conclusive_runs === 1 ? "" : "s"
+                }`}
+                {saude.inconclusive_runs > 0 &&
+                  ` · ${saude.inconclusive_runs} fora da conta`}
+                {saude.success_rate_previous !== null &&
+                  ` · ${saude.success_rate_previous}% antes`}
                 {saude.goal !== null && ` · meta ${saude.goal}%`}
               </span>
             </div>
@@ -1597,9 +1611,18 @@ export function Observability({ onError }: { onError: (message: string) => void 
           <div className="obs-pizzas">
             <Pizza
               titulo="Execuções por resultado"
-              pergunta="Quanto do período foi verde."
+              pergunta="Quanto do período foi verde, entre as que deram veredito."
               fatias={painel.distribution.runs_by_conclusion}
               rotulos={CONCLUSOES}
+              rodape={
+                painel.distribution.inconclusive_total > 0
+                  ? `${painel.distribution.inconclusive_total} fora da conta: `
+                    + painel.distribution.runs_inconclusive
+                        .map((f) => `${f.value} ${CONCLUSOES[f.label] ?? f.label}`)
+                        .join(", ")
+                    + " — não chegaram a um veredito sobre o produto."
+                  : undefined
+              }
             />
             <Pizza
               titulo="Cenários por resultado"

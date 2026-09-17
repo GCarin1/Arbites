@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.15.0
+**Version:** 0.15.1
 
 ## Purpose
 
@@ -57,6 +57,7 @@ workflow/jobs/steps do workflow.
 - The system shall responder os anexos de todas as execuções do período como uma superfície própria, filtrável por tipo e por repositório de origem, e restringível às execuções que falharam.
 - The system shall entregar em cada evidência o contexto da execução que a produziu — identificador, resultado, repositório de teste, repositório de origem e data — porque um anexo sem execução não é evidência de nada.
 - The system shall aceitar um bundle de CA declarado por variável de ambiente e usá-lo na verificação TLS de toda chamada externa, para funcionar em rede que re-assina o tráfego.
+- The system shall calcular taxa de sucesso e contagem de falhas apenas sobre execuções que deram veredito sobre o produto — concluída com sucesso, com falha, ou por estouro de tempo —, e apresentar junto do número o denominador e quantas ficaram de fora.
 
 ### Event-driven
 
@@ -111,6 +112,7 @@ workflow/jobs/steps do workflow.
 - The system shall not sobrescrever no reprocessamento o que veio do provedor — conclusão, commit, horários —, porque esses campos não estão nos anexos e regravá-los só pode perder informação.
 - The system shall not registrar cobertura de um intervalo cuja varredura parou antes do fim, nem incluir na cobertura as últimas horas, porque uma execução longa conclui depois da varredura que a procuraria e o filtro do provedor é pela data de criação.
 - The system shall not interromper a paginação ao encontrar uma página inteiramente já ingerida; quem decide a parada é a data, e parar pela página torna o passado mais antigo inalcançável.
+- The system shall not contar execução cancelada ou pulada como falha, nem responder 0% num período em que nenhuma execução deu veredito; zero afirma que tudo quebrou, e a verdade é que nada foi medido.
 
 ### Optional
 
@@ -146,6 +148,7 @@ workflow/jobs/steps do workflow.
 18. [verified] O diagnóstico nomeia o emissor do certificado apresentado pelo destino e não derruba nada quando o destino está inalcançável — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
 19. [verified] O relatório Cucumber é reconhecido com qualquer nome de arquivo, JSON que não tem a forma não vira cenário, arquivo grande demais não é desserializado, o manifesto declarado continua vencendo a forma, e o reprocessamento do disco recupera o cenário perdido sem tocar nos campos do provedor e sem mudar nada na segunda passada — verified by `backend/tests/test_cenarios_por_forma.py`.
 20. [verified] A segunda busca do mesmo período lista uma janela de dois dias em vez de trinta e não rebaixa artifact; ampliar de 30 para 90 dias varre só os 60 que faltam; a borda recente é sempre reconferida; uma execução antiga fora da última página deixa de ser inalcançável; reconferir varre sem apagar; e uma parada no meio não registra cobertura — verified by `backend/tests/test_busca_incremental.py`.
+21. [verified] A taxa é calculada sobre as conclusivas (25 de 32, não de 45), estouro de tempo conta como falha, cancelada e pulada ficam fora do denominador e aparecem nomeadas ao lado, um período só de canceladas responde ausência em vez de zero, e a contagem de falhas por repositório deixa de somar o que não falhou — verified by `backend/tests/test_execucao_conclusiva.py`.
 
 ## Maturity
 

@@ -53,6 +53,37 @@ VERSAO_MANIFESTO = 2
 # apareceria mais nunca — porque a data que o provedor filtra é a de CRIAÇÃO.
 # Duas listagens a mais por busca é o preço de não ter buraco permanente.
 MARGEM_HORAS = 48
+
+# Uma execução CANCELADA não é uma falha do produto: alguém apertou o botão,
+# ou um push novo substituiu a fila. Uma SKIPPED nem chegou a rodar. Contá-las
+# como fracasso é o que fazia 25 verdes em 45 virarem "55.6% de sucesso"
+# quando a verdade era 25 de 32 — e a diferença entre 55% e 78% é a diferença
+# entre uma suíte que parece quebrada e uma que parece saudável (change 0191).
+#
+# `timed_out` fica DENTRO: estourar o tempo é falhar, com um motivo.
+CONCLUSIVAS = ("success", "failure", "timed_out")
+SUCESSO = "success"
+
+
+def e_conclusiva(conclusion: str | None) -> bool:
+    """A execução chegou a um veredito sobre o produto?"""
+    return (conclusion or "") in CONCLUSIVAS
+
+
+def taxa_de_sucesso(conclusoes) -> tuple[float | None, int, int]:
+    """(taxa, conclusivas, inconclusivas) — a conta feita num lugar só.
+
+    Devolve as três porque a tela precisa das três: a taxa, o denominador que
+    a produziu, e quantas ficaram de fora. Esconder a terceira transformaria
+    um recorte honesto num número sem procedência.
+    """
+    lista = list(conclusoes)
+    conclusivas = [c for c in lista if e_conclusiva(c)]
+    if not conclusivas:
+        return None, 0, len(lista)
+    ok = sum(1 for c in conclusivas if c == SUCESSO)
+    return (round(ok / len(conclusivas) * 100, 1), len(conclusivas),
+            len(lista) - len(conclusivas))
 VERSOES_ACEITAS = (1, 2)
 
 # Convenção de nome — o FALLBACK, para quando o workflow não pode ser
@@ -942,12 +973,11 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
         ]
 
     atuais, anteriores = runs_entre(inicio, fim), runs_entre(inicio_anterior, inicio)
+    _, conclusivas_agora, inconclusivas_agora = taxa_de_sucesso(
+        r["conclusion"] for r in atuais)
 
     def taxa(runs: list[dict]) -> float | None:
-        if not runs:
-            return None
-        ok = sum(1 for r in runs if r["conclusion"] == "success")
-        return round(ok / len(runs) * 100, 1)
+        return taxa_de_sucesso(r["conclusion"] for r in runs)[0]
 
     ultimo = conn.execute(
         "SELECT COALESCE(started_at, ingested_at) AS at FROM ci_runs"
@@ -963,6 +993,10 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
 
     saude = {
         "runs": len(atuais), "runs_previous": len(anteriores),
+        # O denominador viaja junto do número: uma taxa sem procedência é um
+        # número que ninguém consegue conferir.
+        "conclusive_runs": conclusivas_agora,
+        "inconclusive_runs": inconclusivas_agora,
         "success_rate": taxa(atuais), "success_rate_previous": taxa(anteriores),
         "last_run_at": ultimo["at"] if ultimo else None,
         "days_since_last_run": silencio,
@@ -1065,9 +1099,15 @@ def distribuicao(conn, inicio: str, fim: str) -> dict[str, Any]:
             "SELECT status, COUNT(*) c FROM ci_scenarios"
             " WHERE at >= ? AND at < ? GROUP BY status", (inicio, fim))
     ]
+    # A pizza mostra o VEREDITO: passou ou falhou. Cancelada e skipped saem
+    # da fatia e viram uma linha ao lado — some da conta, não some da tela
+    # (change 0191).
+    dentro = [(c, n) for c, n in conclusoes if e_conclusiva(c)]
+    fora = [(c, n) for c, n in conclusoes if not e_conclusiva(c)]
     return {
-        "runs_by_conclusion": _fatias(
-            conclusoes, ("success", "failure", "cancelled", "timed_out")),
+        "runs_by_conclusion": _fatias(dentro, ("success", "failure", "timed_out")),
+        "runs_inconclusive": _fatias(fora, ("cancelled", "skipped")),
+        "inconclusive_total": sum(n for _, n in fora),
         "scenarios_by_status": _fatias(
             cenarios, ("passed", "failed", "blocked", "skipped")),
     }
@@ -1141,9 +1181,14 @@ def _recorte(conn, coluna: str, tabela: str, inicio_anterior: str,
     componentes atrás de uma taxa só escondem exatamente o que se quer ver.
     """
     def linhas(desde: str, ate: str) -> dict[str, dict]:
+        # `conclusivas` é o denominador da taxa; `total` continua sendo o
+        # total de verdade, porque a tela mostra os dois.
+        dentro = ", ".join("?" * len(CONCLUSIVAS))
         sql = (
             f"SELECT {coluna} AS chave,"
             " SUM(CASE WHEN r.conclusion = 'success' THEN 1 ELSE 0 END) ok,"
+            f" SUM(CASE WHEN r.conclusion IN ({dentro}) THEN 1 ELSE 0 END)"
+            " conclusivas,"
             " COUNT(*) total, MAX(COALESCE(r.started_at, r.ingested_at)) ultimo"
             f" FROM {tabela} WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
             " AND COALESCE(r.started_at, r.ingested_at) < ?"
@@ -1151,20 +1196,29 @@ def _recorte(conn, coluna: str, tabela: str, inicio_anterior: str,
             + f" GROUP BY {coluna}"
         )
         return {
-            r["chave"]: {"runs": r["total"], "ok": r["ok"], "last_run_at": r["ultimo"]}
-            for r in conn.execute(sql, (desde, ate, *args)) if r["chave"]
+            r["chave"]: {"runs": r["total"], "ok": r["ok"],
+                         "conclusivas": r["conclusivas"],
+                         "last_run_at": r["ultimo"]}
+            for r in conn.execute(sql, (*CONCLUSIVAS, desde, ate, *args))
+            if r["chave"]
         }
 
     agora, antes = linhas(inicio, fim), linhas(inicio_anterior, inicio)
     saida = []
     for chave, dados in agora.items():
-        taxa = round(dados["ok"] / dados["runs"] * 100, 1) if dados["runs"] else None
+        conclusivas = dados["conclusivas"]
+        taxa = (round(dados["ok"] / conclusivas * 100, 1)
+                if conclusivas else None)
         anterior = antes.get(chave)
-        taxa_antes = (round(anterior["ok"] / anterior["runs"] * 100, 1)
-                      if anterior and anterior["runs"] else None)
+        taxa_antes = (round(anterior["ok"] / anterior["conclusivas"] * 100, 1)
+                      if anterior and anterior["conclusivas"] else None)
         saida.append({
             "name": chave, "runs": dados["runs"],
-            "failures": dados["runs"] - dados["ok"],
+            "conclusive": conclusivas,
+            "inconclusive": dados["runs"] - conclusivas,
+            # Falha é o que FALHOU, não "tudo que não passou": cancelada e
+            # skipped nunca foram falha de ninguém.
+            "failures": conclusivas - dados["ok"],
             "success_rate": taxa, "success_rate_previous": taxa_antes,
             "delta_pct": _variacao(taxa, taxa_antes),
             "last_run_at": dados["last_run_at"],

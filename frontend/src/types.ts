@@ -881,6 +881,9 @@ export interface Observability {
   health: {
     runs: number;
     runs_previous: number;
+    /** O denominador da taxa: só as execuções que deram um veredito. */
+    conclusive_runs: number;
+    inconclusive_runs: number;
     success_rate: number | null;
     success_rate_previous: number | null;
     last_run_at: string | null;
@@ -893,7 +896,11 @@ export interface Observability {
   runs: CiRun[];
   /** Divisões do período — a pergunta "de que é feito", que a série não responde. */
   distribution: {
+    /** Só o veredito: passou, falhou, estourou o tempo. */
     runs_by_conclusion: CiFatia[];
+    /** Cancelada e skipped — fora da conta, dentro da tela (change 0191). */
+    runs_inconclusive: CiFatia[];
+    inconclusive_total: number;
     scenarios_by_status: CiFatia[];
   };
   findings: CiAchados;
@@ -916,6 +923,8 @@ export interface CiFatia {
 export interface CiRecorte {
   name: string;
   runs: number;
+  conclusive: number;
+  inconclusive: number;
   failures: number;
   success_rate: number | null;
   success_rate_previous: number | null;

@@ -64,6 +64,7 @@ export function Pizza({
   fatias,
   rotulos = {},
   vazio = "sem dado no período",
+  rodape,
 }: {
   titulo: string;
   /** A pergunta que o bloco responde, para o gráfico não virar enfeite. */
@@ -72,6 +73,9 @@ export function Pizza({
   /** Tradução do rótulo técnico para o que se lê na tela. */
   rotulos?: Record<string, string>;
   vazio?: string;
+  /** O que ficou FORA da fatia. Sair da conta não é sair da tela: um total
+      que não bate com o card ao lado, sem explicação, parece defeito. */
+  rodape?: string;
 }) {
   const id = useId();
   const total = useMemo(() => fatias.reduce((s, f) => s + f.value, 0), [fatias]);
@@ -89,6 +93,7 @@ export function Pizza({
       <div className="obs-pizza">
         <h4>{titulo}</h4>
         <p className="obs-sem-ponto">{vazio}</p>
+        {rodape && <p className="caption muted">{rodape}</p>}
       </div>
     );
   }
@@ -116,6 +121,7 @@ export function Pizza({
           ))}
         </ul>
       </div>
+      {rodape && <p className="caption muted obs-pizza-rodape">{rodape}</p>}
     </div>
   );
 }

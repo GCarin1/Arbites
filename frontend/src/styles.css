@@ -4634,3 +4634,12 @@ button.link-chip-btn:disabled {
   .lista-vincular { max-width: none; flex: 1; }
   .lista-topo .status-select { flex: 1; }
 }
+
+/* O que ficou FORA da pizza (change 0191). Sair da conta não é sair da tela:
+   um total que não bate com o card ao lado, sem explicação, parece defeito.
+   `overflow-wrap` porque a frase é longa e a coluna, em telefone, é estreita. */
+.obs-pizza-rodape {
+  margin: var(--sp-2) 0 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
