@@ -5,7 +5,7 @@
 **Implementation:** verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)
 **Realizes:** SC1
 **Last updated:** 2026-09-17
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 ## Purpose
 
@@ -56,6 +56,9 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
   system shall ajustar o contador para `max(existente)+1` no reindex.
 - When o processo sobe e o código do frontend é mais recente que o build servido, the system shall avisar no arranque que a interface entregue é a anterior, nomeando o comando de reconstrução com o caminho desta instalação.
 - When uma exceção não prevista escapa de uma rota, the system shall responder um erro legível com identificador de rastreio e registrar o traceback completo no log sob o mesmo identificador.
+- When o operador pede diagnóstico pela CLI, the system shall imprimir o que ESTE processo enxerga — o caminho onde o `.env` foi procurado, as chaves reconhecidas, as linhas descartadas com número e motivo, o valor literal de cada variável de CA, o resultado de abrir cada bundle apontado, uma conexão HTTPS real ao destino e as fontes de observabilidade configuradas.
+- When o processo arranca, the system shall procurar o `.env` a partir do diretório atual e subindo até cinco pastas acima, e imprimir o caminho do arquivo efetivamente lido junto das chaves aplicadas.
+- When um `.env` é lido, the system shall aceitar o marcador de ordem de bytes que o Bloco de Notas do Windows grava, para que a primeira linha do arquivo valha como as demais.
 
 ### State-driven
 
@@ -73,6 +76,8 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
 - The system shall not tratar ausência de build como build velho, nem afirmar obsolescência quando o código-fonte não está ao lado do `dist`; sem o que comparar a resposta é "não sei", e a comparação por data de arquivo só justifica aviso, nunca recusa.
 - The system shall not inventar identidade de código quando não há checkout ao lado; nesse caso declara a ausência, porque um identificador plausível e errado é pior que nenhum.
 - The system shall not repassar na resposta o texto de uma exceção não prevista; ela pode carregar caminho de arquivo, trecho de consulta ou credencial, e essa resposta chega ao navegador.
+- The system shall not imprimir valor de token ou de senha em nenhuma saída de diagnóstico; nome da chave, origem e comprimento bastam para reconhecer o erro, e um relatório feito para ser colado num chat vaza o que imprime.
+- The system shall not descartar em silêncio uma linha de `.env` que se parece com atribuição; um arquivo que parece certo e não chega ao processo não tem o que depurar.
 
 ### Optional
 
@@ -98,6 +103,8 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
 7. [verified] Build em dia não avisa; `dist` mais antigo que `src` avisa no arranque e na lista de problemas, com o comando e o caminho corretos; `index.html`, `package.json` e `vite.config.ts` contam como fonte e `node_modules` não; e `dist` sem código ao lado (o caso do container) não afirma nada — verified by `backend/tests/test_build_desatualizado.py`.
 8. [verified] Em checkout git a identidade traz commit, ramo e o estado de alteração local; sem git, ou sem o binário do git, responde a ausência sem derrubar o processo; a rota de saúde devolve isso e continua aberta sem sessão — verified by `backend/tests/test_versao_em_execucao.py`.
 9. [verified] Uma rota real que levanta exceção responde 500 com código `internal_error` e identificador próprio a cada falha, sem traceback nem o texto da exceção no corpo; o traceback e o texto vão para o log sob o mesmo identificador; e os erros já previstos continuam com a mensagem deles — verified by `backend/tests/test_falha_inesperada.py`.
+10. [verified] O `.env` da raiz do projeto é lido quando o comando roda de `backend/`, o caminho usado é impresso, e a busca para no quinto nível para não sequestrar um `.env` alheio — verified by `backend/tests/test_diagnostico.py`.
+11. [verified] O diagnóstico nomeia o diretório onde procurou o `.env`, aponta a linha descartada com número e motivo, denuncia o valor com barra duplicada, aspas, espaço ou `%VAR%`, diz quando a primeira variável de CA quebrada mascara uma seguinte válida, separa falha de certificado de falha de rede e PAT recusado, e não imprime senha nem token — verified by `backend/tests/test_diagnostico.py`.
 
 ## Maturity
 

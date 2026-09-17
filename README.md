@@ -164,6 +164,39 @@ python -m arbites unlock --email voce@exemplo.com
 (Redefinir a senha pelo `admin` já destrava a conta junto — quem chegou lá
 provavelmente errou a senha algumas vezes.)
 
+### Nada do `.env` chega ao Arbites? Pergunte ao processo
+
+Configuração é o lugar onde o arquivo certo e o processo errado se parecem.
+Este comando não deduz nada — imprime o que **este processo** enxerga:
+
+```
+python -m arbites diagnostico                 # rode do MESMO lugar que o `serve`
+python -m arbites diagnostico --sem-rede      # sem tentar a conexão HTTPS
+```
+
+Ele diz, em ordem: qual versão do código está rodando e por qual Python;
+**qual arquivo `.env` foi lido** (a busca começa no diretório atual e sobe
+até cinco pastas, então o `.env` na raiz do projeto vale mesmo com o
+`cd backend`); quais chaves foram reconhecidas e **quais linhas foram
+descartadas, com número e motivo**; o valor literal de cada variável de CA,
+se o arquivo existe e se o bundle abre; se há credencial do GitHub e de onde
+ela veio; o resultado de uma **conexão HTTPS de verdade** — anônima primeiro,
+com o PAT depois, o que separa "a rede não passa" de "o PAT não serve"; e as
+fontes de observabilidade configuradas.
+
+Senha e token **nunca** aparecem na saída: o relatório existe para ser
+colado num chat. Só as chaves, a origem e o comprimento.
+
+> **Três armadilhas que ele resolve de uma vez:** o `.env` que estava na
+> pasta errada; a linha que o leitor descartou em silêncio (o Bloco de Notas
+> grava um marcador invisível no começo do arquivo, e ele comia a primeira
+> chave); e a variável que já existia no ambiente e **vence** o arquivo.
+
+> **Caminho no Windows:** o `.env` não interpreta escapes. Escreva
+> `C:/Users/voce/certs/ca.pem` com barra normal — o Python aceita — ou uma
+> barra invertida só. `C:\\Users\\...` chega ao Python com as duas barras
+> mesmo, e o arquivo "não existe".
+
 ### 3. Subir a plataforma (um comando sobe tudo)
 
 ```powershell

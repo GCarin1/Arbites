@@ -30,6 +30,24 @@ ADMIN_PASSWORD = "senha-de-teste-longa-1"
 
 
 @pytest.fixture(autouse=True)
+def ambiente_limpo():
+    """O ambiente do processo volta ao que era depois de cada teste.
+
+    `monkeypatch` só desfaz o que passou por ele; um teste que escreve em
+    `os.environ` direto — ou que exercita algo que escreve, como o leitor de
+    `.env` — vaza a variável para o resto da sessão. Uma variável vazada de
+    CA inválida faz a lista de problemas crescer e derruba um teste em outro
+    arquivo, que passa sozinho e falha na suíte (change 0187).
+    """
+    import os
+
+    antes = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(antes)
+
+
+@pytest.fixture(autouse=True)
 def auth_env(monkeypatch):
     """Todo app montado num teste nasce com o admin de bootstrap disponivel,
     inclusive os rigs que chamam create_app por conta propria."""
