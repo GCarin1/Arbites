@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="arbites")
     parser.add_argument(
         "command", nargs="?", default="serve",
-        choices=["serve", "reindex", "unlock", "admin"],
+        choices=["serve", "reindex", "unlock", "admin", "diagnostico"],
     )
     parser.add_argument(
         "--workspace",
@@ -24,6 +25,10 @@ def main() -> None:
              " admin: a conta a criar ou redefinir",
     )
     parser.add_argument(
+        "--sem-rede", dest="sem_rede", action="store_true",
+        help="diagnostico: não tenta a conexão HTTPS de verdade",
+    )
+    parser.add_argument(
         "--password", default="",
         help="admin: define a senha desta conta (12 caracteres ou mais)",
     )
@@ -32,12 +37,29 @@ def main() -> None:
     # O `.env` do diretório atual, ANTES de qualquer coisa ler o ambiente
     # (change 0165). Fora do container ninguém fazia isso — quem lê o arquivo
     # no Docker é o Compose, não o Arbites — e a instância subia sem admin.
-    from .envfile import carregar
+    from .envfile import carregar, localizar
 
+    # QUAL arquivo, não só "um arquivo": a busca sobe até a raiz do projeto,
+    # e dizer o caminho é o que a torna honesta. O silêncio daqui custou
+    # quatro rodadas de depuração por captura de tela (change 0187).
+    achado = localizar()
     aplicadas = carregar()
-    if aplicadas:
+    if achado is None:
+        print(f"(nenhum .env a partir de {Path.cwd()} — só o ambiente do"
+              " processo vale)")
+    else:
         # As CHAVES, nunca os valores: este arquivo costuma ter senha dentro.
-        print(f".env aplicado: {', '.join(sorted(aplicadas))}")
+        aplicado = ", ".join(sorted(aplicadas)) or "nada (tudo já vinha do ambiente)"
+        print(f".env lido de {achado} — aplicado: {aplicado}")
+
+    if args.command == "diagnostico":
+        # O fim do "me manda um print": este comando imprime o que o PROCESSO
+        # enxerga, que é a única coisa que decide o comportamento.
+        from .diagnostico import relatorio
+
+        for linha in relatorio(args.workspace, rede=not args.sem_rede):
+            print(linha)
+        return
 
     if args.command == "admin":
         # "Por que 401?" tem TRÊS respostas possíveis — conta inexistente,

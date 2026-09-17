@@ -267,7 +267,7 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.7.0",
+        "version": "0.8.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
@@ -2879,6 +2879,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0187-comando-diagnostico-mostra-processo",
+        "title": "o comando que mostra o que o processo enxerga",
+        "path": ".doctrina/changes/archive/2026-09-17-0187-comando-diagnostico-mostra-processo",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -3187,6 +3200,12 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
+      },
+      {
+        "id": "configuracao-que-o-processo-nunca-leu",
+        "path": ".doctrina/skills/configuracao-que-o-processo-nunca-leu.md",
+        "description": "Diagnosticar configuração que \"não funciona\" olhando o que o PROCESSO enxerga, não o arquivo que a pessoa mandou por captura de tela.",
+        "last_updated": "2026-09-17"
       }
     ],
     "contracts": [

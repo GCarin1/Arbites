@@ -52,7 +52,15 @@ def problema_do_bundle() -> str | None:
     nome, valor = atual
     caminho = Path(valor)
     if not caminho.exists():
-        return f"{nome} aponta para `{valor}`, que não existe neste computador"
+        # A pista vai JUNTO da falha, na tela. Quem só lê a mensagem "não
+        # existe" confere o Explorador, vê o arquivo lá, e conclui que a
+        # ferramenta está mentindo — quando o que difere é o valor que chegou
+        # ao processo, não o arquivo (change 0187).
+        from .envfile import pista_do_valor
+
+        pista = pista_do_valor(valor)
+        base = f"{nome} aponta para `{valor}`, que não existe neste computador"
+        return f"{base} — {pista}" if pista else base
     if not caminho.is_file():
         return f"{nome} aponta para `{valor}`, que é uma pasta, não um arquivo"
     try:
@@ -145,7 +153,12 @@ def explicacao(destino: str) -> str:
         " com uma CA da empresa, que o Python não conhece. Aponte o bundle da"
         " sua empresa numa destas variáveis (no `.env` ou no ambiente):"
         f" {', '.join(VARIAVEIS)}."
-        " Exemplo: ARBITES_CA_BUNDLE=C:\\\\certs\\\\empresa.pem"
+        " Exemplo: ARBITES_CA_BUNDLE=C:/certs/empresa.pem (barra normal"
+        " funciona no Windows e não vira escape)."
+        " Já declarou e a mensagem continua? Então a variável não chegou a"
+        " este processo: rode `python -m arbites diagnostico` na MESMA pasta"
+        " e pelo MESMO Python com que sobe o Arbites — ele diz onde o `.env`"
+        " foi procurado e o que chegou."
     )
 
 
