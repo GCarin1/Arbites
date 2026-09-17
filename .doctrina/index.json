@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-16",
+  "last_updated": "2026-09-17",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -56,8 +56,8 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.12.0",
-        "last_updated": "2026-09-16",
+        "version": "0.13.0",
+        "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC6"
@@ -2824,6 +2824,19 @@
         "specs_affected": [
           {
             "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0183-certificado-corporativo-derruba-busca",
+        "title": "certificado corporativo derruba a busca de actions com 500 e traceback",
+        "path": ".doctrina/changes/archive/2026-09-17-0183-certificado-corporativo-derruba-busca",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
             "operation": "MODIFIED"
           }
         ]

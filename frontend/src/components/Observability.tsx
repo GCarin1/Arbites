@@ -1181,7 +1181,12 @@ export function Observability({ onError }: { onError: (message: string) => void 
       const r = await api.ciIngest();
       // "Parado por credencial" NÃO é "não há run novo": os dois parecem
       // iguais (nenhum dado novo) e pedem ações opostas (change 0157).
-      if (r.stopped === "bad_credential") {
+      if (r.stopped === "tls_untrusted") {
+        // Certificado e rede pedem ações opostas — configurar e esperar. A
+        // mensagem já vem pronta do backend com as variáveis; repeti-la aqui
+        // criaria duas verdades (change 0183).
+        onError(r.errors?.[0]?.message ?? "certificado não reconhecido");
+      } else if (r.stopped === "bad_credential") {
         onError(
           "a ingestão parou porque o GitHub recusou a credencial — reponha o"
           + " token em Automação → Configurar. O intervalo perdido volta inteiro.",

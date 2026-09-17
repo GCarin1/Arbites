@@ -4,8 +4,8 @@
 **Status:** deprecated
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
-**Last updated:** 2026-09-16
-**Version:** 0.12.0
+**Last updated:** 2026-09-17
+**Version:** 0.13.0
 
 ## Purpose
 
@@ -56,6 +56,7 @@ workflow/jobs/steps do workflow.
 - The system shall manter o histórico das análises lido do disco, de modo que reconstruir o índice não apague o registro que justifica uma decisão técnica.
 - The system shall responder os anexos de todas as execuções do período como uma superfície própria, filtrável por tipo e por repositório de origem, e restringível às execuções que falharam.
 - The system shall entregar em cada evidência o contexto da execução que a produziu — identificador, resultado, repositório de teste, repositório de origem e data — porque um anexo sem execução não é evidência de nada.
+- The system shall aceitar um bundle de CA declarado por variável de ambiente e usá-lo na verificação TLS de toda chamada externa, para funcionar em rede que re-assina o tráfego.
 
 ### Event-driven
 
@@ -71,6 +72,7 @@ workflow/jobs/steps do workflow.
 - When o disparo é pedido para um alvo sem repositório e workflow, the system shall recusá-lo nomeando a tela onde se configura, em vez de citar apenas a chave do arquivo de configuração.
 - When uma análise da observabilidade é pedida, the system shall montar o dossiê do período — saúde, sinais com meta e direção, instabilidade, achados de acessibilidade e os recortes por repositório de teste e de origem — e gravá-la como artefato do workspace junto com esse dossiê.
 - When duas análises são comparadas, the system shall entregar os dois dossiês e os dois vereditos ao modelo, ordenados da mais antiga para a mais recente, em vez de calcular melhora no código.
+- When uma chamada externa falha no transporte, the system shall recusá-la com mensagem própria distinguindo certificado não confiável de destino inalcançável, em vez de deixar a exceção subir como erro interno.
 
 ### State-driven
 
@@ -93,6 +95,7 @@ workflow/jobs/steps do workflow.
 - The system shall not inferir o repositório de origem de uma execução que não o declara; sem declaração a execução fica fora do recorte, porque adivinhar a topologia erraria na primeira exceção.
 - The system shall not analisar um período sem execução ingerida; recusa dizendo que não há o que analisar, em vez de devolver um veredito sobre o vazio.
 - The system shall not cortar a lista de evidências em silêncio nem deixar o limite pedido virar varredura da base; a lista anuncia quando foi truncada e o limite tem teto próprio.
+- The system shall not oferecer desligar a verificação de certificado; a credencial do provedor viaja nessa conexão, e sem verificar o certificado não há como saber para quem.
 
 ### Optional
 
@@ -122,6 +125,7 @@ workflow/jobs/steps do workflow.
 12. [verified] O bloco `trigger` é lido com nomes alternativos de campo e ganha do rótulo; a ausência não inventa origem; um repositório de teste servindo dois produtos responde uma taxa por produto; e o gráfico de erros conta volume de falha, não taxa — verified by `backend/tests/test_origem_do_disparo.py`.
 13. [verified] O dossiê é recorte e não cópia do painel, marca o sinal sem direção declarada e destaca a instabilidade nova; a análise vira arquivo com o dossiê junto e sobrevive a um reindex; duas análises no mesmo dia não colidem; identificador com travessia de caminho é recusado; e o comparativo vai sempre da mais antiga para a mais recente, com os números das duas — verified by `backend/tests/test_analise_observabilidade.py`.
 14. [verified] Cada evidência traz o contexto da execução; o recorte por falha e os filtros de tipo e origem funcionam; a ordem é da mais recente para a mais antiga; o resumo por tipo não encolhe com os filtros; o truncamento é anunciado e o limite tem teto; e o caminho do anexo não escapa de `ci/` — verified by `backend/tests/test_evidencias_periodo.py`.
+15. [verified] Qualquer das três variáveis aponta o bundle, na ordem declarada, e um caminho inexistente cai no padrão em vez de estourar; erro de certificado e queda de rede saem com códigos e mensagens diferentes; e a ingestão registra o erro no resumo, sem exceção não tratada — verified by `backend/tests/test_tls_corporativo.py`.
 
 ## Maturity
 

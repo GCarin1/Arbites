@@ -646,6 +646,28 @@ POST /api/v1/ci/retention/apply    # executa exatamente a prévia, para a lixeir
 
 Uma execução que passa até da janela do **sinal** sai inteira, anexos junto.
 
+### Rede corporativa: `CERTIFICATE_VERIFY_FAILED`
+
+Se "Buscar execuções" responder algo como *"o certificado de api.github.com
+não foi reconhecido"*, o problema não é o seu PAT. Em rede de empresa o
+tráfego HTTPS costuma passar por um proxy que **re-assina** os certificados
+com uma CA interna; o Python só conhece as CAs públicas do `certifi`.
+
+Aponte o bundle da sua empresa — peça o `.pem` a quem cuida da rede:
+
+```
+ARBITES_CA_BUNDLE=C:\certs\empresa.pem
+```
+
+Valem também `REQUESTS_CA_BUNDLE` e `SSL_CERT_FILE`, que a máquina
+corporativa costuma já ter definidas; o Arbites usa a primeira que apontar
+para um arquivo existente. A mesma variável resolve o provider de IA na
+nuvem, que morre pelo mesmo motivo.
+
+**Não existe** opção de desligar a verificação, e não deve existir: o Arbites
+manda o PAT do GitHub nessa conexão, e sem verificar o certificado não há
+como saber para quem.
+
 ### A credencial vai falhar um dia — e isso não pode ser em silêncio
 
 Não há data de descontinuação anunciada para o PAT classic; o GitHub apenas

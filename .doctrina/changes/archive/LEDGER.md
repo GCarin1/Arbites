@@ -191,3 +191,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-16 — 0180-galeria-evidencias-periodo-prints — galeria de evidencias do periodo com prints e logs dos runs (specs: ci-automation MODIFIED)
 - 2026-09-16 — 0181-revisao-layout-tela-estreita — revisao de layout em tela estreita com detector reutilizavel (specs: design-system MODIFIED)
 - 2026-09-16 — 0182-build-frontend-desatualizado-servido — build do frontend desatualizado e servido em silencio apos um git pull (specs: workspace-core MODIFIED)
+- 2026-09-17 — 0183-certificado-corporativo-derruba-busca — certificado corporativo derruba a busca de actions com 500 e traceback (specs: ci-automation MODIFIED)
