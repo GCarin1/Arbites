@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.20.0",
+        "version": "0.21.0",
         "last_updated": "2026-09-16",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -455,8 +455,8 @@
         "title": "medida derivada do run é sinal de primeira classe, marcada como derivada",
         "status": "accepted",
         "date": "2026-09-17",
-        "summary": "Existem duas origens de sinal, e ambas produzem série:",
-        "landed": "2026-09-17 — `backend/arbites/ci_derivados.py`, `backend/tests/test_sinais_derivados.py`"
+        "landed": "2026-09-17 — `backend/arbites/ci_derivados.py`, `backend/tests/test_sinais_derivados.py`",
+        "summary": "Existem duas origens de sinal, e ambas produzem série:"
       }
     ],
     "changes": [],
@@ -2989,6 +2989,19 @@
         "specs_affected": [
           {
             "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0195-graficos-serie-eixo-rolagem",
+        "title": "o gráfico que não dizia nada",
+        "path": ".doctrina/changes/archive/2026-09-17-0195-graficos-serie-eixo-rolagem",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]

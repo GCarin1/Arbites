@@ -3607,8 +3607,11 @@ button.link-chip-btn:disabled {
    A serie passa a ter uma largura minima proporcional ao numero de pontos
    (`--pontos`, vindo do React, porque o CSS nao sabe contar) e rola dentro do
    cartao quando nao cabe. */
-.obs-serie-rolagem { overflow-x: auto; overscroll-behavior-x: contain; }
-.obs-serie { min-width: calc(var(--pontos, 1) * 12px); }
+/* A rolagem lateral da série SAIU (change 0195). Ela existia para dar
+   espaço aos pontos clicáveis, e cobrava um preço alto demais: um gráfico
+   que só se vê por pedaços nunca é lido inteiro. A área de acerto agora
+   cresce na ALTURA — uma faixa por ponto —, que não disputa espaço com o
+   vizinho. */
 
 /* Revisao de layout em tela estreita (change 0181).
 
@@ -4319,12 +4322,48 @@ button.link-chip-btn:disabled {
 .obs-meta { margin: 0; font-size: 0.72rem; color: var(--text-muted); }
 .obs-sem-ponto { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
 
-.obs-serie { position: relative; height: 48px; }
+.obs-serie-figura { margin: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.obs-serie-quadro { display: flex; gap: 0.4rem; align-items: stretch; }
+/* A escala fica FORA do SVG: texto dentro de um viewBox esticado por
+   `preserveAspectRatio="none"` sairia deformado. */
+.obs-serie-escala {
+  display: flex; flex-direction: column; justify-content: space-between;
+  font-size: 0.66rem; color: var(--text-muted); font-variant-numeric: tabular-nums;
+  text-align: right; min-width: 2.2rem; padding: 1px 0;
+}
+.obs-serie-escala-unica { justify-content: center; }
+.obs-serie-tempo {
+  display: flex; justify-content: space-between; gap: 0.5rem;
+  font-size: 0.66rem; color: var(--text-muted);
+  padding-left: 2.6rem;
+}
+.obs-serie-frase {
+  margin: 0; font-size: 0.72rem; color: var(--text-muted); line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.obs-serie { position: relative; height: 56px; flex: 1; min-width: 0; }
 .obs-serie svg { width: 100%; height: 100%; display: block; }
 .obs-linha { fill: none; stroke: var(--accent, #58a6ff); stroke-width: 1.5;
   vector-effect: non-scaling-stroke; }
 .obs-meta-linha { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3;
   vector-effect: non-scaling-stroke; opacity: 0.6; }
+.obs-marca { fill: var(--accent, #58a6ff); }
+.obs-marca-falha { fill: var(--danger); }
+.obs-marca-ativa { stroke: var(--text); stroke-width: 1.5; }
+
+/* Uma faixa invisível por ponto, da altura inteira do gráfico. */
+.obs-faixas { position: absolute; inset: 0; display: flex; }
+.obs-faixa {
+  flex: 1 1 0; min-width: 0; padding: 0; margin: 0; height: 100%;
+  border: 0; background: transparent; cursor: pointer; border-radius: 0;
+}
+.obs-faixa:hover, .obs-faixa:focus-visible {
+  background: color-mix(in srgb, var(--accent, #58a6ff) 18%, transparent);
+}
+.obs-faixa-ativa {
+  background: color-mix(in srgb, var(--accent, #58a6ff) 26%, transparent);
+}
+
 .obs-pontos { position: absolute; inset: 0; }
 /* O ponto é BOTÃO, não enfeite: é ele que começa a descida até o print. */
 .obs-ponto {

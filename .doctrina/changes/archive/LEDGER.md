@@ -203,3 +203,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-17 — 0192-limpar-toda-observabilidade-confirmacao — limpar tudo, com o tamanho do estrago na frente (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0193-exportacao-carregamento-nenhum-sinal — o clique que não respondia (specs: design-system MODIFIED)
 - 2026-09-17 — 0194-sinais-tempo-vazio-porque — a série que existia e não aparecia (specs: ci-automation MODIFIED)
+- 2026-09-17 — 0195-graficos-serie-eixo-rolagem — o gráfico que não dizia nada (specs: design-system MODIFIED)
