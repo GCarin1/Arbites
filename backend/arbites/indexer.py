@@ -100,7 +100,8 @@ CREATE TABLE IF NOT EXISTS ci_runs(
   ingest_warning TEXT, path TEXT, mtime REAL,
   trigger_repo TEXT, trigger_environment TEXT, trigger_ref TEXT);
 CREATE TABLE IF NOT EXISTS ci_signals(
-  run_id TEXT, kind TEXT, name TEXT, value REAL, unit TEXT, at TEXT);
+  run_id TEXT, kind TEXT, name TEXT, value REAL, unit TEXT, at TEXT,
+  source TEXT);
 CREATE TABLE IF NOT EXISTS ci_jobs(
   run_id TEXT, name TEXT, conclusion TEXT, started_at TEXT,
   finished_at TEXT, url TEXT, ord INTEGER);
@@ -140,6 +141,10 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         "ALTER TABLE ci_runs ADD COLUMN trigger_repo TEXT",
         "ALTER TABLE ci_runs ADD COLUMN trigger_environment TEXT",
         "ALTER TABLE ci_runs ADD COLUMN trigger_ref TEXT",
+        # A ORIGEM do sinal viaja até a tela (ADR 0019): um número calculado
+        # pelo Arbites apresentado como se o pipeline o tivesse medido seria
+        # uma mentira de procedência.
+        "ALTER TABLE ci_signals ADD COLUMN source TEXT",
         "ALTER TABLE results ADD COLUMN assignee TEXT",
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
         "ALTER TABLE testcases ADD COLUMN created TEXT",
@@ -804,10 +809,11 @@ def _insert_ci_run(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
         except (TypeError, ValueError):
             continue
         conn.execute(
-            "INSERT INTO ci_signals(run_id, kind, name, value, unit, at)"
-            " VALUES (?,?,?,?,?,?)",
+            "INSERT INTO ci_signals(run_id, kind, name, value, unit, at,"
+            " source) VALUES (?,?,?,?,?,?,?)",
             (run_id, sinal.get("kind") or "custom", str(sinal["name"]), valor,
-             sinal.get("unit"), sinal.get("at") or meta.get("started_at")),
+             sinal.get("unit"), sinal.get("at") or meta.get("started_at"),
+             sinal.get("source") or "declarado"),
         )
     conn.execute("DELETE FROM ci_jobs WHERE run_id = ?", (run_id,))
     for ordem, job in enumerate(meta.get("jobs") or []):

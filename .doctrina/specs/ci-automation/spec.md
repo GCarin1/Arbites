@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.16.0
+**Version:** 0.17.0
 
 ## Purpose
 
@@ -58,6 +58,7 @@ workflow/jobs/steps do workflow.
 - The system shall entregar em cada evidência o contexto da execução que a produziu — identificador, resultado, repositório de teste, repositório de origem e data — porque um anexo sem execução não é evidência de nada.
 - The system shall aceitar um bundle de CA declarado por variável de ambiente e usá-lo na verificação TLS de toda chamada externa, para funcionar em rede que re-assina o tráfego.
 - The system shall calcular taxa de sucesso e contagem de falhas apenas sobre execuções que deram veredito sobre o produto — concluída com sucesso, com falha, ou por estouro de tempo —, e apresentar junto do número o denominador e quantas ficaram de fora.
+- The system shall carregar a origem de cada sinal — declarado pelo produtor ou derivado pelo Arbites — em toda leitura da série, até a tela.
 
 ### Event-driven
 
@@ -82,6 +83,7 @@ workflow/jobs/steps do workflow.
 - When a busca é pedida com reconferência explícita, the system shall ignorar a cobertura registrada e varrer a janela inteira, sem apagar nem rebaixar o que já está no disco.
 - When a limpeza total da observabilidade é pedida, the system shall responder antes quantas execuções, quantos anexos, quanto espaço e que intervalo de datas seriam removidos, para que a confirmação seja informada.
 - When a limpeza total é confirmada, the system shall mover execuções e anexos para a lixeira, esquecer a cobertura de busca junto, e preservar as origens declaradas.
+- When uma execução é gravada, the system shall calcular as medidas que já apurou sobre ela — duração, veredito, jobs falhos, cenários e sua taxa, violações de acessibilidade por gravidade e critérios WCAG distintos —, emitindo-as como sinais marcados com a origem derivada.
 
 ### State-driven
 
@@ -116,6 +118,8 @@ workflow/jobs/steps do workflow.
 - The system shall not interromper a paginação ao encontrar uma página inteiramente já ingerida; quem decide a parada é a data, e parar pela página torna o passado mais antigo inalcançável.
 - The system shall not contar execução cancelada ou pulada como falha, nem responder 0% num período em que nenhuma execução deu veredito; zero afirma que tudo quebrou, e a verdade é que nada foi medido.
 - The system shall not apagar a observabilidade fora da lixeira nem executar a limpeza total para quem não administra a instância.
+- The system shall not emitir medida derivada cujo nome já tenha sido declarado no manifesto, nem medida cuja fonte não exista na execução; um zero inventado é um ponto no gráfico afirmando o que não foi medido.
+- The system shall not derivar sinal de arquivo cuja forma não reconhece; reconhecer um formato documentado é leitura, adivinhar o significado de um número solto é invenção.
 
 ### Optional
 
@@ -153,6 +157,7 @@ workflow/jobs/steps do workflow.
 20. [verified] A segunda busca do mesmo período lista uma janela de dois dias em vez de trinta e não rebaixa artifact; ampliar de 30 para 90 dias varre só os 60 que faltam; a borda recente é sempre reconferida; uma execução antiga fora da última página deixa de ser inalcançável; reconferir varre sem apagar; e uma parada no meio não registra cobertura — verified by `backend/tests/test_busca_incremental.py`.
 21. [verified] A taxa é calculada sobre as conclusivas (25 de 32, não de 45), estouro de tempo conta como falha, cancelada e pulada ficam fora do denominador e aparecem nomeadas ao lado, um período só de canceladas responde ausência em vez de zero, e a contagem de falhas por repositório deixa de somar o que não falhou — verified by `backend/tests/test_execucao_conclusiva.py`.
 22. [verified] A prévia informa execuções, anexos, bytes e intervalo sem remover nada; a limpeza manda tudo para a lixeira e o índice esquece junto; a cobertura de busca é descartada com o dado; as origens declaradas permanecem; e quem não é admin recebe recusa — verified by `backend/tests/test_limpar_observabilidade.py`.
+23. [verified] Sem nenhum manifesto a série existe, com duração vinda dos horários do provedor, cenários do relatório e acessibilidade dos achados; cancelada não vira zero; nome declarado desliga o derivado homônimo; ausência de fonte não vira sinal; toda medida carrega a origem até o painel; e reprocessar do disco cria a série do que já estava ingerido — verified by `backend/tests/test_sinais_derivados.py`.
 
 ## Maturity
 

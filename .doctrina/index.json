@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.16.0",
+        "version": "0.17.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -448,6 +448,15 @@
         "date": "2026-09-14",
         "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`",
         "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas"
+      },
+      {
+        "id": "0019",
+        "path": ".doctrina/decisions/0019-medida-derivada-do-run-e-sinal-de-primeira-classe-marcada-como-derivada.md",
+        "title": "medida derivada do run é sinal de primeira classe, marcada como derivada",
+        "status": "accepted",
+        "date": "2026-09-17",
+        "summary": "Existem duas origens de sinal, e ambas produzem série:",
+        "landed": "2026-09-17 — `backend/arbites/ci_derivados.py`, `backend/tests/test_sinais_derivados.py`"
       }
     ],
     "changes": [],
@@ -2967,6 +2976,19 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0194-sinais-tempo-vazio-porque",
+        "title": "a série que existia e não aparecia",
+        "path": ".doctrina/changes/archive/2026-09-17-0194-sinais-tempo-vazio-porque",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
             "operation": "MODIFIED"
           }
         ]

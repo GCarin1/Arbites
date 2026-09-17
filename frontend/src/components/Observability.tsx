@@ -47,6 +47,22 @@ const PERIODOS = [
   { dias: 90, rotulo: "90 dias" },
 ];
 
+/** O nome técnico é chave de série, não título de cartão. Os derivados são
+    um conjunto fechado (ADR 0019), então a tradução cabe aqui — e um nome
+    fora da lista aparece como veio, porque um declarado não se traduz. */
+const NOME_DO_SINAL: Record<string, string> = {
+  duracao_min: "Duração da execução",
+  resultado: "Passou (1) ou falhou (0)",
+  jobs_falhos: "Jobs que falharam",
+  cenarios: "Cenários executados",
+  cenarios_falhos: "Cenários que falharam",
+  cenarios_taxa: "Cenários aprovados",
+  acessibilidade_violacoes: "Violações de acessibilidade",
+  acessibilidade_critical: "Violações críticas",
+  acessibilidade_serious: "Violações graves",
+  wcag_criterios_violados: "Critérios WCAG violados",
+};
+
 function formatarData(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -1809,14 +1825,12 @@ export function Observability({ onError }: { onError: (message: string) => void 
               que o produziu.
             </p>
             {painel.signals.length === 0 ? (
-              <EmptyState
-                compact
-                icon="dashboard"
-                title="Nenhum sinal declarado"
-              >
-                As execuções chegaram, mas sem <code>arbites.json</code> nenhuma
-                medida foi extraída. Declare os sinais no manifesto do artifact
-                para a série começar.
+              <EmptyState compact icon="dashboard" title="Nenhuma série ainda">
+                Nenhuma execução foi ingerida neste período — sem execução não
+                há o que medir. Depois de buscar, o Arbites calcula sozinho
+                duração, resultado, cenários e acessibilidade; para métrica
+                própria do seu pipeline, declare os sinais no{" "}
+                <code>arbites.json</code> do artifact.
               </EmptyState>
             ) : (
               <div className="obs-grade-sinais">
@@ -1824,8 +1838,20 @@ export function Observability({ onError }: { onError: (message: string) => void 
                   <article key={sinal.name} className="obs-sinal">
                     <header>
                       <span className="obs-sinal-nome">
-                        {sinal.name}
-                        <span className="obs-sinal-kind">{sinal.kind}</span>
+                        {NOME_DO_SINAL[sinal.name] ?? sinal.name}
+                        {sinal.source === "derivado" ? (
+                          <span
+                            className="obs-sinal-kind"
+                            title={
+                              "calculado pelo Arbites a partir da própria"
+                              + " execução — o pipeline não mediu isto"
+                            }
+                          >
+                            derivado
+                          </span>
+                        ) : (
+                          <span className="obs-sinal-kind">{sinal.kind}</span>
+                        )}
                       </span>
                       <strong>{formatarValor(sinal.current, sinal.unit)}</strong>
                     </header>

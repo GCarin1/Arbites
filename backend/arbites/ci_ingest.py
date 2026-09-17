@@ -412,6 +412,10 @@ def escrever_run(
             except UnicodeDecodeError:
                 corpo_analise = ""
 
+    cenarios = extrair_cenarios(manifesto, arquivos)
+    rotulos = normalizar_rotulos(manifesto)
+    achados_do_run = extrair_achados(manifesto, arquivos)
+
     meta = {
         "id": chave,
         "provider": run["provider"],
@@ -429,11 +433,19 @@ def escrever_run(
         "signals": sinais,
         "attachments": anexos,
         "jobs": run.get("jobs") or [],
-        "scenarios": extrair_cenarios(manifesto, arquivos),
-        "labels": normalizar_rotulos(manifesto),
-        "findings": extrair_achados(manifesto, arquivos),
-        "trigger": normalizar_gatilho(manifesto, normalizar_rotulos(manifesto)),
+        "scenarios": cenarios,
+        "labels": rotulos,
+        "findings": achados_do_run,
+        "trigger": normalizar_gatilho(manifesto, rotulos),
     }
+    # As medidas que o Arbites calcula sobre a execução (ADR 0019). Vêm
+    # DEPOIS porque dependem de cenários, achados e jobs já resolvidos, e o
+    # nome declarado desliga o derivado homônimo.
+    from .ci_derivados import derivar
+
+    sinais = sinais + derivar(meta, sinais,
+                              run.get("started_at") or run["ingested_at"])
+    meta["signals"] = sinais
     if aviso:
         meta["ingest_warning"] = aviso
 
@@ -786,7 +798,7 @@ def listar_runs(conn, limite: int = 50, workflow: str | None = None) -> list[dic
         item = dict(row)
         item["signals"] = [
             dict(s) for s in conn.execute(
-                "SELECT kind, name, value, unit, at FROM ci_signals"
+                "SELECT kind, name, value, unit, at, source FROM ci_signals"
                 " WHERE run_id = ? ORDER BY name", (row["id"],),
             )
         ]
@@ -869,7 +881,7 @@ def run_detalhado(ws, conn, run_id: str) -> dict[str, Any]:
     item = dict(row)
     item["signals"] = [
         dict(s) for s in conn.execute(
-            "SELECT kind, name, value, unit, at FROM ci_signals"
+            "SELECT kind, name, value, unit, at, source FROM ci_signals"
             " WHERE run_id = ? ORDER BY name", (run_id,))
     ]
     item["attachments"] = [
@@ -910,8 +922,8 @@ def serie(conn, name: str, since: str | None = None,
 def nomes_de_sinal(conn) -> list[dict[str, Any]]:
     return [
         dict(r) for r in conn.execute(
-            "SELECT name, kind, unit, COUNT(*) AS points,"
-            " MAX(at) AS last_at, MIN(at) AS first_at"
+            "SELECT name, kind, unit, MAX(source) AS source,"
+            " COUNT(*) AS points, MAX(at) AS last_at, MIN(at) AS first_at"
             " FROM ci_signals GROUP BY name, kind, unit ORDER BY name"
         )
     ]
@@ -1007,7 +1019,8 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
     # -- sinais: a série e o que ela fez em relação ao período anterior -----
     sinais = []
     for linha in conn.execute(
-        "SELECT name, kind, unit FROM ci_signals GROUP BY name, kind, unit"
+        "SELECT name, kind, unit, MAX(source) AS source FROM ci_signals"
+        " GROUP BY name, kind, unit"
         " ORDER BY name"
     ):
         nome = linha["name"]
@@ -1030,6 +1043,10 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
         meta = metas.get(nome) or {}
         sinais.append({
             "name": nome, "kind": linha["kind"], "unit": linha["unit"],
+            # A origem vai junto: um número calculado pelo Arbites mostrado
+            # como se o pipeline o tivesse medido seria uma mentira de
+            # procedência (ADR 0019).
+            "source": linha["source"] or "declarado",
             "points": pontos,
             "current": pontos[-1]["value"] if pontos else None,
             "average": media_atual, "previous_average": media_antes,
@@ -1492,11 +1509,13 @@ def reprocessar(ws, conn) -> dict[str, Any]:
 def _reprocessar_um(ws, conn, caminho: Path) -> bool:
     post = frontmatter.load(caminho)
     anexos = post.metadata.get("attachments") or []
-    if not anexos:
-        return False
 
     # Os bytes voltam do disco pelo caminho que o próprio documento registra.
     # Um anexo que sumiu é pulado, não é erro: o documento continua válido.
+    # E a ausência deles NÃO encerra o reprocessamento — horário, conclusão e
+    # jobs continuam ali, e são eles que produzem a maior parte das medidas
+    # derivadas (ADR 0019). Sair cedo aqui deixava sem série justamente a
+    # execução cujos anexos a retenção já levou.
     arquivos: dict[str, bytes] = {}
     for item in anexos:
         rel = item.get("path")
@@ -1505,8 +1524,6 @@ def _reprocessar_um(ws, conn, caminho: Path) -> bool:
         no_disco = ws.root / rel
         if no_disco.is_file():
             arquivos[rel] = no_disco.read_bytes()
-    if not arquivos:
-        return False
 
     manifesto = {"version": VERSAO_MANIFESTO, "signals": [],
                  "attachments": [{"kind": i.get("kind"), "path": i.get("path")}
@@ -1515,10 +1532,21 @@ def _reprocessar_um(ws, conn, caminho: Path) -> bool:
         "scenarios": extrair_cenarios(manifesto, arquivos),
         "findings": extrair_achados(manifesto, arquivos),
     }
+    # Os derivados saem do que acabou de ser recalculado, não do que estava
+    # gravado: reprocessar existe justamente para quando o reconhecimento
+    # melhorou (ADR 0019).
+    from .ci_derivados import ORIGEM, derivar
+
+    declarados = [s for s in (post.metadata.get("signals") or [])
+                  if isinstance(s, dict) and s.get("source") != ORIGEM]
+    base = {**post.metadata, **novos}
+    novos["signals"] = declarados + derivar(
+        base, declarados,
+        post.metadata.get("started_at") or post.metadata.get("ingested_at") or "")
     # Kind corrigido também vale: um anexo classificado como nada passa a
     # aparecer como `cucumber` na galeria de evidências.
     kinds = {}
-    convencao = _por_convencao(arquivos)
+    convencao = _por_convencao(arquivos) if arquivos else {"attachments": []}
     for item in convencao.get("attachments") or []:
         kinds[item["path"]] = item["kind"]
     corrigidos = []

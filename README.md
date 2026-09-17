@@ -560,6 +560,25 @@ O contrário não acontece: um `result.json` que **não** tem essa forma não é
 classificado como relatório, porque chamar de cenário o que não é troca um
 silêncio por uma mentira.
 
+**A série existe desde a primeira ingestão.** Além dos sinais que o pipeline
+declara no `arbites.json`, o Arbites calcula sozinho as medidas que ele já
+apurou sobre cada execução: duração, passou/falhou, jobs que falharam,
+cenários executados/falhos e a taxa deles, violações de acessibilidade (total,
+críticas e graves) e quantos critérios WCAG distintos foram violados. Cada uma
+aparece marcada como **derivado** — um número calculado aqui, mostrado como se
+o pipeline o tivesse medido, seria uma mentira de procedência.
+
+Três regras, e elas são o contrato (ADR 0019): o **nome declarado vence** (se
+o manifesto declara `duracao_min`, o derivado homônimo não é emitido);
+**sem fonte não há sinal** (sem relatório Cucumber não há série de cenário —
+zero inventado é pior que ausência, porque zero é um ponto no gráfico); e o
+conjunto derivado é **fechado, no código**, nunca aberto ao conteúdo do
+artifact. Reconhecer um formato documentado é leitura; adivinhar o significado
+de um número solto é invenção, e essa continua proibida.
+
+Já tem execuções ingeridas? **Configuração → Reprocessar do disco** cria a
+série delas sem baixar nada.
+
 **Recomeçar do zero.** Em **Observabilidade → Configuração**, *Limpar toda
 a observabilidade* remove todas as execuções, seus anexos e o registro de até
 onde a busca já olhou. Antes de confirmar, o modal diz o tamanho do estrago —
