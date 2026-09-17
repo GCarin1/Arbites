@@ -72,11 +72,16 @@ def test_arquivo_que_nao_e_certificado(monkeypatch, tmp_path):
 
 def test_bundle_legivel_mas_sem_a_CA_tem_mensagem_propria(monkeypatch, ca_de_teste):
     """Legível e ainda assim recusado é outro problema: o arquivo está certo,
-    a autoridade é que é outra."""
+    a autoridade é que é outra.
+
+    A dica daqui já foi "costuma ser o certificado RAIZ do proxy" — correta e
+    inútil: nomeava o erro e deixava a pessoa procurando o arquivo sozinha.
+    Agora a mensagem aponta o comando que MONTA o bundle (change 0188).
+    """
     monkeypatch.setenv("ARBITES_CA_BUNDLE", str(ca_de_teste))
     texto = tls_ops.explicacao("api.github.com")
     assert "não contém a CA" in texto
-    assert "RAIZ do proxy" in texto     # a dica que resolve na prática
+    assert "arbites bundle-ca" in texto   # onde achar o certo, não só o erro
 
 
 # -- chega sem clicar --------------------------------------------------------

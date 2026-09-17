@@ -140,12 +140,20 @@ def explicacao(destino: str) -> str:
         )
     atual = declarado()
     if atual:
+        # Dizer "não contém a CA que assina este destino" e parar aí é
+        # correto e inútil: nomeia o erro e não diz onde achar o certo. A CA
+        # da empresa JÁ está instalada nesta máquina — sem ela o navegador não
+        # abriria nada —, então o caminho mais curto é montar o bundle a
+        # partir dali (change 0188).
         return (
             f"o certificado de {destino} não foi aceito mesmo com o bundle de"
             f" {atual}. O arquivo é legível, mas não contém a CA que assina"
-            " este destino — confirme com quem cuida da rede qual bundle usar"
-            " (numa rede com Zscaler ou similar, costuma ser o certificado"
-            " RAIZ do proxy, não o do site)."
+            " este destino — provavelmente foi exportado o certificado do"
+            " site, ou o intermediário no lugar da raiz. O jeito curto de"
+            " acertar é montar o bundle a partir dos certificados que o"
+            " Windows já confia: `python -m arbites bundle-ca`. Ele escreve o"
+            " arquivo e imprime a linha do `.env` pronta. Para ver o nome de"
+            " quem assinou este destino: `python -m arbites diagnostico`."
         )
     return (
         f"o certificado de {destino} não foi reconhecido. Em rede corporativa"

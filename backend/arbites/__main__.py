@@ -11,7 +11,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="arbites")
     parser.add_argument(
         "command", nargs="?", default="serve",
-        choices=["serve", "reindex", "unlock", "admin", "diagnostico"],
+        choices=["serve", "reindex", "unlock", "admin", "diagnostico",
+                 "bundle-ca"],
     )
     parser.add_argument(
         "--workspace",
@@ -27,6 +28,10 @@ def main() -> None:
     parser.add_argument(
         "--sem-rede", dest="sem_rede", action="store_true",
         help="diagnostico: não tenta a conexão HTTPS de verdade",
+    )
+    parser.add_argument(
+        "--saida", default="arbites-ca.pem",
+        help="bundle-ca: onde escrever o bundle (default: ./arbites-ca.pem)",
     )
     parser.add_argument(
         "--password", default="",
@@ -58,6 +63,16 @@ def main() -> None:
         from .diagnostico import relatorio
 
         for linha in relatorio(args.workspace, rede=not args.sem_rede):
+            print(linha)
+        return
+
+    if args.command == "bundle-ca":
+        # Junta as raízes públicas com o que a MÁQUINA já confia, escreve o
+        # arquivo, e devolve a linha do `.env` pronta. Quem declara a
+        # confiança continua sendo a pessoa — o comando só junta e mostra.
+        from .bundle_ca import relatorio
+
+        for linha in relatorio(args.saida):
             print(linha)
         return
 
