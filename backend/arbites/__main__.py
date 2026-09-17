@@ -159,6 +159,12 @@ def main() -> None:
     # que este processo entrega. Sem este aviso, um conserto que "não
     # apareceu" é indistinguível de um conserto que não funcionou — e quem
     # está depurando gasta a tarde na tela errada (change 0182).
+    from . import versao as versao_ops
+
+    # A primeira linha do terminal diz o que está rodando: é onde a pergunta
+    # "atualizei mesmo?" acontece (change 0184).
+    print(f"\n{versao_ops.linha()}")
+
     situacao = build_front.estado(_dist_do_frontend())
     if situacao.get("desatualizado"):
         print(

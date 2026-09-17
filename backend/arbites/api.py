@@ -48,7 +48,8 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import build_front, ci_analise, ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import build_front, ci_analise, ci_ingest
+from . import versao as versao_ops, ci_retencao, integrations_bulk as bulk_ops
 from . import notifications as notif_ops
 from . import todolists as list_ops
 from . import integrations_file as file_ops, mcp_write
@@ -776,6 +777,37 @@ def create_app(
         return JSONResponse(
             status_code=422,
             content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(Exception)
+    async def _falha_inesperada(request: Request, exc: Exception):
+        """A rede de segurança: nenhuma exceção desconhecida vira traceback.
+
+        O traceback continua indo para o LOG do servidor — é onde ele serve,
+        para quem vai corrigir. O que muda é a resposta: quem clicou recebia
+        500 com uma parede de stack trace e nenhuma instrução, e o motivo
+        real ficava enterrado no meio (change 0185).
+
+        A mensagem não repassa `str(exc)`: uma exceção qualquer pode carregar
+        caminho de arquivo, trecho de SQL ou pedaço de credencial, e essa
+        resposta sai para o navegador. O identificador amarra a resposta à
+        linha do log, que tem tudo.
+        """
+        import traceback
+        import uuid
+
+        marca = uuid.uuid4().hex[:8]
+        print(f"[arbites:{marca}] falha não tratada em"
+              f" {request.method} {request.url.path}")
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
+        return JSONResponse(
+            status_code=500,
+            content={"error": {
+                "code": "internal_error",
+                "message": ("falha inesperada no servidor. O detalhe está no"
+                            f" log do terminal, marcado como [arbites:{marca}]."),
+                "trace_id": marca,
+            }},
         )
 
     @app.exception_handler(CIError)
@@ -5238,7 +5270,10 @@ def _register_auth(app: FastAPI) -> None:
 
     @app.get(API_PREFIX + "/health")
     async def health():
-        return {"status": "ok", "version": __version__}
+        # Qual CÓDIGO está rodando, não só qual versão do pacote (change
+        # 0184): "atualizei e o erro continua" tem duas leituras, e sem isto
+        # não havia como separar "não funcionou" de "não está rodando".
+        return {"status": "ok", "version": __version__, **versao_ops.identidade()}
 
     @app.post(API_PREFIX + "/auth/register", status_code=201)
     async def register(request: Request, payload: RegisterIn):

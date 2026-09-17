@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from . import executions as exec_ops
+from . import tls as tls_ops
 from .behave_json import BehaveJsonError, parse_behave_json
 from .indexer import clear_needs_rerun, reindex_file
 from .workspace import Workspace
@@ -148,10 +149,21 @@ class HttpxGitHub:
             "X-GitHub-Api-Version": "2022-11-28",
         }
         for attempt in range(4):
-            resp = httpx.request(
-                method, f"https://api.github.com{path}",
-                headers=headers, timeout=30, **kwargs,
-            )
+            try:
+                resp = httpx.request(
+                    method, f"https://api.github.com{path}",
+                    headers=headers, timeout=30,
+                    # Rede corporativa re-assina o TLS com uma CA própria; sem
+                    # apontar o bundle, toda chamada morre em
+                    # CERTIFICATE_VERIFY_FAILED (change 0183).
+                    verify=tls_ops.verify(), **kwargs,
+                )
+            except httpx.TransportError as exc:
+                # Sem isto o erro subia cru e virava 500 com traceback: quem
+                # clicou em "Buscar execuções" via uma parede de stack trace
+                # em vez do que fazer. A ingestão é retomável (a marca d'água
+                # é o disco), então recusar limpo não perde nada.
+                raise self._sem_alcance(exc) from exc
             # 401 é credencial, sempre — e repetir uma credencial ruim só
             # gasta tempo e chega ao mesmo lugar (change 0157).
             if resp.status_code == 401:
@@ -173,6 +185,22 @@ class HttpxGitHub:
                 self.credential.registrar_sucesso()
             return resp
         raise CIError("rate_limited", "rate limit persistente na API do GitHub")
+
+    def _sem_alcance(self, exc: Exception) -> CIError:
+        """Falha de transporte vira recusa explicada.
+
+        Certificado e rede pedem ações opostas — configurar um bundle e
+        esperar — então não podem sair com a mesma mensagem.
+        """
+        if tls_ops.e_erro_de_certificado(exc):
+            return CIError("tls_untrusted",
+                           tls_ops.explicacao("api.github.com"), status=502)
+        return CIError(
+            "unreachable",
+            f"não foi possível falar com api.github.com: {exc}."
+            " Verifique a conexão e o proxy da rede.",
+            status=502,
+        )
 
     def _recusa(self, status: int, corpo: str) -> CIError:
         mensagem = _motivo(corpo)

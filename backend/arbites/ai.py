@@ -21,6 +21,8 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field, ValidationError
 
+from . import tls as tls_ops
+
 AI_KEYRING_SERVICE = "arbites-ai"
 
 
@@ -394,11 +396,31 @@ class _BaseProvider:
     def _client(self) -> httpx.Client:
         # modelos locais de raciocínio (glm/qwen) podem levar minutos p/ um
         # documento longo — timeout curto derruba a geração no meio.
-        return httpx.Client(timeout=self.timeout, transport=self.transport)
+        #
+        # `verify` só quando não há transporte injetado: o transporte falso
+        # dos testes não fala TLS, e passar `verify` junto seria configurar
+        # uma conexão que não existe (change 0183).
+        if self.transport is not None:
+            return httpx.Client(timeout=self.timeout, transport=self.transport)
+        return httpx.Client(timeout=self.timeout, verify=tls_ops.verify())
 
     def _post(self, url: str, headers: dict, payload: dict) -> dict:
-        with self._client() as client:
-            resp = client.post(url, headers=headers, json=payload)
+        try:
+            with self._client() as client:
+                resp = client.post(url, headers=headers, json=payload)
+        except httpx.TransportError as exc:
+            # Mesmo proxy corporativo, mesma conversa: o provider de nuvem
+            # morre igual, e um 500 cru aqui esconde que o conserto é o
+            # bundle de CA (change 0183).
+            if tls_ops.e_erro_de_certificado(exc):
+                raise AIProviderError(
+                    "tls_untrusted",
+                    tls_ops.explicacao(httpx.URL(url).host),
+                ) from exc
+            raise AIProviderError(
+                "unreachable",
+                f"não foi possível falar com {httpx.URL(url).host}: {exc}",
+            ) from exc
         if resp.status_code >= 400:
             raise AIProviderError(
                 "provider_error",

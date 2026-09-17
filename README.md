@@ -646,6 +646,28 @@ POST /api/v1/ci/retention/apply    # executa exatamente a prévia, para a lixeir
 
 Uma execução que passa até da janela do **sinal** sai inteira, anexos junto.
 
+### Rede corporativa: `CERTIFICATE_VERIFY_FAILED`
+
+Se "Buscar execuções" responder algo como *"o certificado de api.github.com
+não foi reconhecido"*, o problema não é o seu PAT. Em rede de empresa o
+tráfego HTTPS costuma passar por um proxy que **re-assina** os certificados
+com uma CA interna; o Python só conhece as CAs públicas do `certifi`.
+
+Aponte o bundle da sua empresa — peça o `.pem` a quem cuida da rede:
+
+```
+ARBITES_CA_BUNDLE=C:\certs\empresa.pem
+```
+
+Valem também `REQUESTS_CA_BUNDLE` e `SSL_CERT_FILE`, que a máquina
+corporativa costuma já ter definidas; o Arbites usa a primeira que apontar
+para um arquivo existente. A mesma variável resolve o provider de IA na
+nuvem, que morre pelo mesmo motivo.
+
+**Não existe** opção de desligar a verificação, e não deve existir: o Arbites
+manda o PAT do GitHub nessa conexão, e sem verificar o certificado não há
+como saber para quem.
+
 ### A credencial vai falhar um dia — e isso não pode ser em silêncio
 
 Não há data de descontinuação anunciada para o PAT classic; o GitHub apenas
@@ -846,6 +868,35 @@ automáticas — e com isso reduzir o acúmulo — ajuste
 > O **log de atividade** (aba Administração → Atividade) é outra coisa, com
 > nome parecido: ele é contínuo e imutável de propósito, e não existe rota
 > que o apague. Registro que o próprio suspeito apaga não prova nada.
+
+## "Atualizei e o erro continua": qual código está rodando?
+
+A frase tem duas leituras — o conserto não funcionou, ou o conserto não está
+rodando — e elas pedem coisas opostas. O Arbites responde isso em dois
+lugares.
+
+No arranque, a primeira linha do terminal:
+
+```
+Arbites 0.1.0 · develop@cc41416 de 17/09/2026 12:56 UTC
+```
+
+E pela API, sem precisar estar logado (o 401 é justamente um dos sintomas
+que se quer diagnosticar):
+
+```
+curl http://127.0.0.1:8000/api/v1/health
+{"status":"ok","version":"0.1.0","commit":"cc41416","branch":"develop",
+ "commit_at":"2026-09-17T12:56:01+00:00","dirty":false}
+```
+
+Compare o `commit` com o `git log -1 --format=%h` do seu checkout: se forem
+diferentes, o processo está com código velho — reinicie. `dirty: true` avisa
+que há alteração local não commitada, porque nesse caso o commit sozinho
+mentiria por semelhança.
+
+Sem checkout git ao lado (imagem de container, cópia baixada) a resposta diz
+isso, em vez de inventar um identificador plausível e errado.
 
 ## Depois de um `git pull`, reconstrua o frontend
 
