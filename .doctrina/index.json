@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.13.1",
+        "version": "0.14.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2892,6 +2892,19 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0188-comando-monta-bundle-ca",
+        "title": "onde achar o `.pem` certo",
+        "path": ".doctrina/changes/archive/2026-09-17-0188-comando-monta-bundle-ca",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2942,6 +2955,12 @@
         "path": ".doctrina/skills/configuracao-que-a-tela-nao-alcanca.md",
         "description": "Toda configuração que uma funcionalidade EXIGE precisa de campo na tela; sem isso o erro correto (\"falta X no arquivo\") não tem onde ser resolvido, e um modelo Pydantic sem o campo ainda APAGA o que foi escrito à mão no arquivo ao salvar pela tela.",
         "last_updated": "2026-09-15"
+      },
+      {
+        "id": "configuracao-que-o-processo-nunca-leu",
+        "path": ".doctrina/skills/configuracao-que-o-processo-nunca-leu.md",
+        "description": "Diagnosticar configuração que \"não funciona\" olhando o que o PROCESSO enxerga, não o arquivo que a pessoa mandou por captura de tela.",
+        "last_updated": "2026-09-17"
       },
       {
         "id": "conteudo-longo-em-tabela-overflow",
@@ -3200,12 +3219,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "configuracao-que-o-processo-nunca-leu",
-        "path": ".doctrina/skills/configuracao-que-o-processo-nunca-leu.md",
-        "description": "Diagnosticar configuração que \"não funciona\" olhando o que o PROCESSO enxerga, não o arquivo que a pessoa mandou por captura de tela.",
-        "last_updated": "2026-09-17"
       }
     ],
     "contracts": [

@@ -197,6 +197,49 @@ colado num chat. Só as chaves, a origem e o comprimento.
 > barra invertida só. `C:\\Users\\...` chega ao Python com as duas barras
 > mesmo, e o arquivo "não existe".
 
+### Rede corporativa: onde achar o `.pem` certo
+
+Se as chamadas ao GitHub falham com certificado não confiável, o tráfego da
+sua empresa passa por um proxy (Zscaler ou parecido) que **re-assina** os
+certificados. A CA dessa empresa já está instalada no seu Windows — senão o
+navegador não abriria nada. O Python é que não a enxerga: ele traz só as CAs
+públicas.
+
+Não saia caçando arquivo. Monte o bundle a partir do que a máquina já confia:
+
+```
+python -m arbites bundle-ca --saida C:/Users/voce/arbites-ca.pem
+```
+
+Ele junta as raízes públicas com os certificados do armazenamento do Windows,
+confere que o arquivo carrega, e imprime a linha pronta para colar no `.env`:
+
+```
+ARBITES_CA_BUNDLE=C:/Users/voce/arbites-ca.pem
+```
+
+Reinicie o Arbites — o arranque dirá qual bundle está em uso.
+
+> **Por que um comando, e não leitura automática:** decidir em quem confiar é
+> de quem opera a máquina, e precisa ser visível. O comando **escreve um
+> arquivo**; declarar esse arquivo continua sendo um ato seu, por escrito.
+
+**Ainda recusa?** `python -m arbites diagnostico` mostra o **emissor** do
+certificado que o destino apresentou — é esse nome (ou a raiz dele) que
+precisa estar no bundle, e é ele que você procura no `certmgr.msc` se
+preferir exportar à mão (Autoridades de Certificação Raiz Confiáveis →
+Certificados → botão direito → Todas as tarefas → Exportar → **X.509 codificado
+na Base 64**).
+
+**Exportar sem `certmgr`,** pelo PowerShell:
+
+```powershell
+Get-ChildItem Cert:\LocalMachine\Root | Where-Object Subject -match 'Zscaler'
+```
+
+O `bundle-ca` acima já faz isso por você, com as públicas junto — só use a
+exportação manual se precisar mandar o certificado para outra pessoa.
+
 ### 3. Subir a plataforma (um comando sobe tudo)
 
 ```powershell

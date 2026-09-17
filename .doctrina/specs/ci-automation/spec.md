@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.13.1
+**Version:** 0.14.0
 
 ## Purpose
 
@@ -73,6 +73,8 @@ workflow/jobs/steps do workflow.
 - When uma análise da observabilidade é pedida, the system shall montar o dossiê do período — saúde, sinais com meta e direção, instabilidade, achados de acessibilidade e os recortes por repositório de teste e de origem — e gravá-la como artefato do workspace junto com esse dossiê.
 - When duas análises são comparadas, the system shall entregar os dois dossiês e os dois vereditos ao modelo, ordenados da mais antiga para a mais recente, em vez de calcular melhora no código.
 - When uma chamada externa falha no transporte, the system shall recusá-la com mensagem própria distinguindo certificado não confiável de destino inalcançável, em vez de deixar a exceção subir como erro interno.
+- When o operador pede o bundle de CA pela CLI, the system shall escrever um arquivo com as raízes públicas somadas aos certificados de autenticação de servidor do armazenamento do sistema operacional, conferir que o arquivo carrega, e imprimir a linha de declaração pronta.
+- When o certificado de um destino não é aceito, the system shall dizer o nome de quem o emitiu, porque é esse nome que se procura na hora de obter o certificado certo.
 
 ### State-driven
 
@@ -98,6 +100,8 @@ workflow/jobs/steps do workflow.
 - The system shall not cortar a lista de evidências em silêncio nem deixar o limite pedido virar varredura da base; a lista anuncia quando foi truncada e o limite tem teto próprio.
 - The system shall not oferecer desligar a verificação de certificado; a credencial do provedor viaja nessa conexão, e sem verificar o certificado não há como saber para quem.
 - The system shall not pedir que se declare um bundle de CA quando já há um declarado; existir, ser arquivo e ser um bundle carregável são condições distintas, e cada falha tem a sua mensagem.
+- The system shall not ler o armazenamento de certificados do sistema por conta própria numa chamada externa; ampliar a própria confiança sem que ninguém tenha dito nada é decisão de quem opera a máquina, e o comando que monta o bundle só escreve um arquivo que continua precisando ser declarado.
+- The system shall not incluir no bundle certificado que não esteja habilitado para autenticar servidor; o armazenamento do sistema guarda também autoridades de assinatura de código e de e-mail.
 
 ### Optional
 
@@ -129,6 +133,8 @@ workflow/jobs/steps do workflow.
 14. [verified] Cada evidência traz o contexto da execução; o recorte por falha e os filtros de tipo e origem funcionam; a ordem é da mais recente para a mais antiga; o resumo por tipo não encolhe com os filtros; o truncamento é anunciado e o limite tem teto; e o caminho do anexo não escapa de `ci/` — verified by `backend/tests/test_evidencias_periodo.py`.
 15. [verified] Qualquer das três variáveis aponta o bundle, na ordem declarada, e um caminho inexistente cai no padrão em vez de estourar; erro de certificado e queda de rede saem com códigos e mensagens diferentes; e a ingestão registra o erro no resumo, sem exceção não tratada — verified by `backend/tests/test_tls_corporativo.py`.
 16. [verified] Caminho inexistente, pasta no lugar do arquivo e arquivo que não é bundle são nomeados com a variável e o caminho; bundle carregável mas sem a CA do destino tem mensagem própria apontando o certificado raiz do proxy; e o problema aparece na lista sem ninguém disparar chamada externa — verified by `backend/tests/test_bundle_ca_quebrado.py`.
+17. [verified] O bundle montado soma as raízes públicas às do armazenamento do sistema, carrega de verdade, descarta certificado sem uso de servidor e não duplica o que aparece em dois armazéns; fora do Windows o comando diz isso e aponta os caminhos usuais; sem nenhum certificado da máquina o recado é que a CA não está instalada; e a linha de declaração sai com barra normal — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
+18. [verified] O diagnóstico nomeia o emissor do certificado apresentado pelo destino e não derruba nada quando o destino está inalcançável — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
 
 ## Maturity
 

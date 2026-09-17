@@ -30,7 +30,9 @@ segredo.
 from __future__ import annotations
 
 import os
+import ssl
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any
 
 # `pista_do_valor` mora em `envfile` porque a mensagem de TLS na TELA também
@@ -142,8 +144,6 @@ def secao_ca() -> list[str]:
 
 
 def _carrega(caminho: str) -> str:
-    import ssl
-
     try:
         contexto = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         contexto.load_verify_locations(cafile=caminho)
@@ -189,6 +189,9 @@ def secao_rede(destino: str = DESTINO, token: str | None = None) -> list[str]:
     linhas.append(f"  anonimo: {resultado}")
     if not ok and "CERTIFICADO" in resultado:
         linhas.append(f"  -> {tls_ops.explicacao(destino)}")
+        # Dizer "não contém a CA que assina este destino" sem dizer QUAL CA é
+        # deixa a pessoa procurando no escuro — foi o que aconteceu.
+        linhas += quem_assinou(urlparse(destino).hostname or destino)
         return linhas
 
     if token:
@@ -199,6 +202,49 @@ def secao_rede(destino: str = DESTINO, token: str | None = None) -> list[str]:
                           " colado com espaço/quebra de linha).")
     else:
         linhas.append("  com o PAT: nao ha credencial configurada")
+    return linhas
+
+
+def quem_assinou(host: str, porta: int = 443) -> list[str]:
+    """Quem emitiu o certificado que ESTE destino apresenta.
+
+    Esta é a resposta para "qual `.pem` eu preciso?". Numa rede que
+    re-assina TLS, o emissor não é a CA pública do site: é a CA da empresa,
+    e o nome dela dito por extenso é o que se procura no armazenamento do
+    Windows na hora de exportar.
+
+    O handshake aqui é feito SEM verificar, de propósito e sem exceção à
+    regra: nenhuma credencial, nenhum cabeçalho e nenhum byte de aplicação
+    viajam nele — o socket fecha assim que o certificado chega. É o que
+    `openssl s_client` faz. A regra que proíbe `verify=False` vale para as
+    chamadas que carregam o PAT, e esta não carrega nada.
+    """
+    import socket
+
+    linhas = [f"  certificado apresentado por {host}:"]
+    contexto = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    contexto.check_hostname = False
+    contexto.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((host, porta), timeout=15) as cru:
+            with contexto.wrap_socket(cru, server_hostname=host) as seguro:
+                der = seguro.getpeercert(binary_form=True)
+    except OSError as exc:
+        linhas.append(f"    nao deu para olhar: {exc}")
+        return linhas
+    if not der:
+        linhas.append("    o destino nao apresentou certificado.")
+        return linhas
+    try:
+        from cryptography import x509
+    except ImportError:
+        linhas.append("    (instale `cryptography` para ver o emissor)")
+        return linhas
+    cert = x509.load_der_x509_certificate(der)
+    linhas.append(f"    assunto: {cert.subject.rfc4514_string()}")
+    linhas.append(f"    EMISSOR: {cert.issuer.rfc4514_string()}")
+    linhas.append("    -> e ESTE emissor (ou a raiz dele) que precisa estar"
+                  " no seu bundle.")
     return linhas
 
 

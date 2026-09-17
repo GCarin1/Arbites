@@ -9,6 +9,12 @@ python-multipart>=0.0.9
 fpdf2>=2.7
 gherkin-official>=29
 httpx>=0.27
+
+# Só para LER um certificado e dizer quem o assinou no diagnostico (change
+# 0188). Em rede que re-assina TLS, o nome do emissor e a resposta para "qual
+# .pem eu preciso?" — e uma resposta que so aparece quando a biblioteca esta
+# instalada nao serve para quem esta travado.
+cryptography>=42
 keyring>=25
 argon2-cffi>=23.1
 
