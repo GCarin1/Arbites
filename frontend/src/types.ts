@@ -803,6 +803,11 @@ export interface CiSignalPoint {
 }
 
 export interface CiSignalSeries {
+  /** De onde o número veio: `declarado` pelo pipeline, ou `derivado` — o
+      Arbites calculou a partir do que ele mesmo apurou (ADR 0019). Mostrar
+      um derivado como se o pipeline o tivesse medido seria mentir sobre a
+      procedência. */
+  source?: "declarado" | "derivado";
   name: string;
   kind: string;
   unit: string | null;

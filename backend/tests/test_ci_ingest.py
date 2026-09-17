@@ -277,7 +277,8 @@ def test_print_log_e_analise_chegam_como_anexo_hasheado(rig):
         assert len(anexo["sha256"]) == 64  # evidência hasheada, como a de execução
         assert (rig.ws.root / anexo["path"]).exists()
     # e nenhum deles virou sinal: anexo não é número
-    assert [s["name"] for s in run["signals"]] == ["falhas"]
+    declarados = [s for s in run["signals"] if s.get("source") != "derivado"]
+    assert [s["name"] for s in declarados] == ["falhas"]
     # a análise que o pipeline já escreveu vira o corpo do documento
     assert corpo.strip() in (rig.ws.root / "ci/2026/github-101.md").read_text(
         encoding="utf-8")
@@ -296,7 +297,10 @@ def test_sem_manifesto_cai_na_convencao_e_diz_que_caiu(rig):
     assert run["ingest_warning"]
     assert MANIFESTO in run["ingest_warning"]
     assert {a["kind"] for a in run["attachments"]} == {"analysis", "log"}
-    assert run["signals"] == []  # número sem nome e sem unidade não é sinal
+    # Nenhum sinal DECLARADO: número sem nome e sem unidade não é sinal, e
+    # sem manifesto não há o que declarar. Os derivados são outra coisa — o
+    # Arbites calcula sobre o que ele mesmo apurou (ADR 0019).
+    assert [s for s in run["signals"] if s.get("source") != "derivado"] == []
 
 
 def test_manifesto_de_versao_futura_recusa_aquele_run_e_segue(rig):
