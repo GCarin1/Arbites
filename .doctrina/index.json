@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.13.0",
+        "version": "0.13.1",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2863,6 +2863,19 @@
         "specs_affected": [
           {
             "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0186-bundle-ca-apontado-mas",
+        "title": "bundle de CA apontado mas ilegivel manda declarar a variavel que ja foi declarada",
+        "path": ".doctrina/changes/archive/2026-09-17-0186-bundle-ca-apontado-mas",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
             "operation": "MODIFIED"
           }
         ]

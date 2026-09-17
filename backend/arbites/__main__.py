@@ -165,6 +165,12 @@ def main() -> None:
     # "atualizei mesmo?" acontece (change 0184).
     print(f"\n{versao_ops.linha()}")
 
+    from . import tls as tls_ops
+
+    linha_ca = tls_ops.linha_do_arranque()
+    if linha_ca:
+        print(linha_ca)
+
     situacao = build_front.estado(_dist_do_frontend())
     if situacao.get("desatualizado"):
         print(

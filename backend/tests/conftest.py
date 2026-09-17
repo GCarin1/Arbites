@@ -105,3 +105,23 @@ def indexed(ws):
     conn = connect(ws)
     reindex_full(ws, conn)
     return conn
+
+
+@pytest.fixture()
+def ca_de_teste(tmp_path):
+    """Um certificado de CA de VERDADE, em arquivo.
+
+    `ssl.load_verify_locations` recusa qualquer coisa que não seja um bundle
+    real, então um `-----BEGIN CERTIFICATE-----` de mentira não serve para
+    exercitar o caminho feliz (change 0186).
+    """
+    import subprocess
+
+    destino = tmp_path / "ca-de-teste.pem"
+    subprocess.run(
+        ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+         "-keyout", "/dev/null", "-out", str(destino), "-days", "1",
+         "-subj", "/CN=CA-de-teste"],
+        check=True, capture_output=True,
+    )
+    return destino

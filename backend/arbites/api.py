@@ -49,6 +49,7 @@ from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
 from . import build_front, ci_analise, ci_ingest
+from . import tls as tls_ops
 from . import versao as versao_ops, ci_retencao, integrations_bulk as bulk_ops
 from . import notifications as notif_ops
 from . import todolists as list_ops
@@ -1044,10 +1045,14 @@ def _register_routes(app: FastAPI) -> None:
         # o da credencial. A tela que mostra este aviso é a antiga — e é
         # justamente por isso que ela precisa mostrá-lo: a API está atual.
         do_build = build_front.aviso(_dist_do_frontend())
+        # Bundle de CA quebrado (change 0186): aparece sem ninguém clicar em
+        # nada. Uma configuração que não funciona só se revelava na primeira
+        # chamada externa, e até lá parecia que estava tudo certo.
+        do_ca = tls_ops.aviso()
         return credencial.problemas(
             tokens.get() is not None,
             gravavel=tokens.available(), origem=tokens.source(),
-        ) + ([do_build] if do_build else []) + avisos
+        ) + ([do_ca] if do_ca else []) + ([do_build] if do_build else []) + avisos
 
     @app.get(API_PREFIX + "/warnings")
     async def get_warnings(request: Request):

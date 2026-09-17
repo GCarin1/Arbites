@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.13.0
+**Version:** 0.13.1
 
 ## Purpose
 
@@ -80,6 +80,7 @@ workflow/jobs/steps do workflow.
   dos steps do workflow (não dos steps Gherkin — indisponíveis ao vivo).
 - While a instancia nao tem cofre de credenciais do sistema operacional, the system shall responder que nao ha credencial em vez de falhar, mantendo a aplicacao inteira utilizavel.
 - While nenhuma origem está declarada, the system shall dizer isso na tela de observabilidade junto do campo que a declara, em vez de apenas informar que nenhuma execução chegou.
+- While o bundle de CA apontado por variável de ambiente não puder ser usado, the system shall dizer qual variável, qual caminho e por quê — no arranque e na lista de problemas —, em vez de cair no bundle padrão em silêncio.
 
 ### Unwanted-behavior (must-not)
 
@@ -96,6 +97,7 @@ workflow/jobs/steps do workflow.
 - The system shall not analisar um período sem execução ingerida; recusa dizendo que não há o que analisar, em vez de devolver um veredito sobre o vazio.
 - The system shall not cortar a lista de evidências em silêncio nem deixar o limite pedido virar varredura da base; a lista anuncia quando foi truncada e o limite tem teto próprio.
 - The system shall not oferecer desligar a verificação de certificado; a credencial do provedor viaja nessa conexão, e sem verificar o certificado não há como saber para quem.
+- The system shall not pedir que se declare um bundle de CA quando já há um declarado; existir, ser arquivo e ser um bundle carregável são condições distintas, e cada falha tem a sua mensagem.
 
 ### Optional
 
@@ -126,6 +128,7 @@ workflow/jobs/steps do workflow.
 13. [verified] O dossiê é recorte e não cópia do painel, marca o sinal sem direção declarada e destaca a instabilidade nova; a análise vira arquivo com o dossiê junto e sobrevive a um reindex; duas análises no mesmo dia não colidem; identificador com travessia de caminho é recusado; e o comparativo vai sempre da mais antiga para a mais recente, com os números das duas — verified by `backend/tests/test_analise_observabilidade.py`.
 14. [verified] Cada evidência traz o contexto da execução; o recorte por falha e os filtros de tipo e origem funcionam; a ordem é da mais recente para a mais antiga; o resumo por tipo não encolhe com os filtros; o truncamento é anunciado e o limite tem teto; e o caminho do anexo não escapa de `ci/` — verified by `backend/tests/test_evidencias_periodo.py`.
 15. [verified] Qualquer das três variáveis aponta o bundle, na ordem declarada, e um caminho inexistente cai no padrão em vez de estourar; erro de certificado e queda de rede saem com códigos e mensagens diferentes; e a ingestão registra o erro no resumo, sem exceção não tratada — verified by `backend/tests/test_tls_corporativo.py`.
+16. [verified] Caminho inexistente, pasta no lugar do arquivo e arquivo que não é bundle são nomeados com a variável e o caminho; bundle carregável mas sem a CA do destino tem mensagem própria apontando o certificado raiz do proxy; e o problema aparece na lista sem ninguém disparar chamada externa — verified by `backend/tests/test_bundle_ca_quebrado.py`.
 
 ## Maturity
 
