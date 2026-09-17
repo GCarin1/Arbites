@@ -560,6 +560,24 @@ O contrário não acontece: um `result.json` que **não** tem essa forma não é
 classificado como relatório, porque chamar de cenário o que não é troca um
 silêncio por uma mentira.
 
+**A busca é incremental.** "Buscar execuções" usa o período que está no
+topo da tela como janela e varre **só a lacuna** dela: se você já buscou 30
+dias e troca para 90, ele procura os 60 que faltam, não os 90 de novo. O
+registro de até onde já se olhou fica em `ci/cobertura.json`, por origem —
+apagá-lo custa tempo, nunca dados, porque quem impede a duplicação continua
+sendo o disco (o nome do arquivo é a chave do run).
+
+Duas coisas de propósito: a **borda recente** (48 horas) é sempre
+reconferida, porque um run começado às 23h e concluído às 01h não aparece na
+varredura da véspera e, se a véspera constasse coberta, ele não apareceria
+mais nunca; e uma busca que **para no meio** (limite de taxa, credencial
+recusada) não registra cobertura nenhuma, porque marcar como varrido um
+pedaço que não chegou ao fim deixaria esses runs para trás.
+
+Quer conferir tudo de novo mesmo assim? **Observabilidade → Configuração →
+Reconferir período**. Ele ignora o registro e revarre a janela selecionada —
+sem apagar nada e sem rebaixar o que já está no disco.
+
 **Melhorou o reconhecimento depois de já ter ingerido?** Os anexos estão no
 disco, ao lado de cada execução. Em **Observabilidade → Configuração**, o
 botão **Reprocessar do disco** relê esses arquivos e refaz só o que é

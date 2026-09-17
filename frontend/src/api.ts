@@ -223,9 +223,16 @@ export const api = {
   observability: (days: number) =>
     request<Observability>(`/ci/observability?days=${days}`),
   ciRun: (id: string) => request<CiRun>(`/ci/runs/${encodeURIComponent(id)}`),
-  ciIngest: () =>
+  /** Busca só a LACUNA da janela pedida; `refresh` reconfere tudo. */
+  ciIngest: (days: number, refresh = false) =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
-              stopped?: string }>("/ci/ingest", { method: "POST" }),
+              stopped?: string;
+              window?: { desde: string; ate: string; dias: number };
+              scanned?: { repo: string; desde: string; ate: string;
+                          novos: number }[];
+              reused?: { repo: string }[] }>(
+      `/ci/ingest?days=${days}${refresh ? "&refresh=true" : ""}`,
+      { method: "POST" }),
   /** Relê os anexos que já estão no disco — sem rede, sem rebuscar nada. */
   ciReprocess: () =>
     request<{ lidos: number; atualizados: string[];

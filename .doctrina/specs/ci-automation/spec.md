@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.14.1
+**Version:** 0.15.0
 
 ## Purpose
 
@@ -77,6 +77,8 @@ workflow/jobs/steps do workflow.
 - When o certificado de um destino não é aceito, the system shall dizer o nome de quem o emitiu, porque é esse nome que se procura na hora de obter o certificado certo.
 - When um artifact chega sem manifesto, the system shall reconhecer o relatório Cucumber pela forma do conteúdo — uma lista de features com `elements` —, e não pelo nome do arquivo.
 - When o operador pede o reprocessamento, the system shall reler os anexos já gravados no disco e refazer apenas o que é derivado deles, sem nenhuma chamada externa.
+- When a busca de execuções é pedida, the system shall varrer apenas os intervalos da janela pedida que ainda não constam como cobertos, e registrar a cobertura por origem depois de varrer cada intervalo até o fim.
+- When a busca é pedida com reconferência explícita, the system shall ignorar a cobertura registrada e varrer a janela inteira, sem apagar nem rebaixar o que já está no disco.
 
 ### State-driven
 
@@ -85,6 +87,7 @@ workflow/jobs/steps do workflow.
 - While a instancia nao tem cofre de credenciais do sistema operacional, the system shall responder que nao ha credencial em vez de falhar, mantendo a aplicacao inteira utilizavel.
 - While nenhuma origem está declarada, the system shall dizer isso na tela de observabilidade junto do campo que a declara, em vez de apenas informar que nenhuma execução chegou.
 - While o bundle de CA apontado por variável de ambiente não puder ser usado, the system shall dizer qual variável, qual caminho e por quê — no arranque e na lista de problemas —, em vez de cair no bundle padrão em silêncio.
+- While a janela pedida já estiver inteiramente coberta, the system shall dizer que reaproveitou o período em vez de devolver um resultado vazio indistinguível de "não há execução nova".
 
 ### Unwanted-behavior (must-not)
 
@@ -106,6 +109,8 @@ workflow/jobs/steps do workflow.
 - The system shall not incluir no bundle certificado que não esteja habilitado para autenticar servidor; o armazenamento do sistema guarda também autoridades de assinatura de código e de e-mail.
 - The system shall not classificar um anexo por um nome que o conteúdo desmente; um `result.json` que não é uma lista de features não é um relatório Cucumber, e chamá-lo assim troca um silêncio por uma mentira.
 - The system shall not sobrescrever no reprocessamento o que veio do provedor — conclusão, commit, horários —, porque esses campos não estão nos anexos e regravá-los só pode perder informação.
+- The system shall not registrar cobertura de um intervalo cuja varredura parou antes do fim, nem incluir na cobertura as últimas horas, porque uma execução longa conclui depois da varredura que a procuraria e o filtro do provedor é pela data de criação.
+- The system shall not interromper a paginação ao encontrar uma página inteiramente já ingerida; quem decide a parada é a data, e parar pela página torna o passado mais antigo inalcançável.
 
 ### Optional
 
@@ -140,6 +145,7 @@ workflow/jobs/steps do workflow.
 17. [verified] O bundle montado soma as raízes públicas às do armazenamento do sistema, carrega de verdade, descarta certificado sem uso de servidor e não duplica o que aparece em dois armazéns; fora do Windows o comando diz isso e aponta os caminhos usuais; sem nenhum certificado da máquina o recado é que a CA não está instalada; e a linha de declaração sai com barra normal — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
 18. [verified] O diagnóstico nomeia o emissor do certificado apresentado pelo destino e não derruba nada quando o destino está inalcançável — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
 19. [verified] O relatório Cucumber é reconhecido com qualquer nome de arquivo, JSON que não tem a forma não vira cenário, arquivo grande demais não é desserializado, o manifesto declarado continua vencendo a forma, e o reprocessamento do disco recupera o cenário perdido sem tocar nos campos do provedor e sem mudar nada na segunda passada — verified by `backend/tests/test_cenarios_por_forma.py`.
+20. [verified] A segunda busca do mesmo período lista uma janela de dois dias em vez de trinta e não rebaixa artifact; ampliar de 30 para 90 dias varre só os 60 que faltam; a borda recente é sempre reconferida; uma execução antiga fora da última página deixa de ser inalcançável; reconferir varre sem apagar; e uma parada no meio não registra cobertura — verified by `backend/tests/test_busca_incremental.py`.
 
 ## Maturity
 

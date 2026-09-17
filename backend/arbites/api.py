@@ -3026,9 +3026,13 @@ def _register_routes(app: FastAPI) -> None:
                 "max_runs_per_poll": observabilidade.get("max_runs_per_poll") or 50}
 
     @app.post(API_PREFIX + "/ci/ingest")
-    async def ci_ingest_now(request: Request, limit: int | None = None):
+    async def ci_ingest_now(request: Request, limit: int | None = None,
+                            days: int | None = None, refresh: bool = False):
+        # `days` é o período que está na tela: a busca varre só a LACUNA
+        # dessa janela, não a janela toda (change 0190). `refresh` ignora a
+        # cobertura registrada e reconfere tudo.
         ingestor: CIIngestor = request.app.state.ci_ingest
-        return await asyncio.to_thread(ingestor.ingerir, limit)
+        return await asyncio.to_thread(ingestor.ingerir, limit, days, refresh)
 
     @app.post(API_PREFIX + "/ci/reprocess")
     async def ci_reprocess(request: Request):

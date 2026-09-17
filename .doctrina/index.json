@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.14.1",
+        "version": "0.15.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2910,6 +2910,19 @@
         "id": "0189-cenarios-resultado-vazio-porque",
         "title": "cenário reconhecido pela forma, não pelo nome",
         "path": ".doctrina/changes/archive/2026-09-17-0189-cenarios-resultado-vazio-porque",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0190-busca-execucoes-incremental-janela",
+        "title": "buscar só o que falta",
+        "path": ".doctrina/changes/archive/2026-09-17-0190-busca-execucoes-incremental-janela",
         "status": "applied",
         "applied": "2026-09-17",
         "specs_affected": [

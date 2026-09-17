@@ -46,6 +46,13 @@ MANIFESTO = "arbites.json"
 # manifesto antigo não pode parar de ser lido porque o formato cresceu
 # (change 0175).
 VERSAO_MANIFESTO = 2
+
+# A borda recente NUNCA entra na cobertura. Um run começado às 23h de ontem e
+# concluído às 01h de hoje não aparece na varredura de ontem (a listagem pede
+# `status=completed`) e, se o dia de ontem já constasse como coberto, não
+# apareceria mais nunca — porque a data que o provedor filtra é a de CRIAÇÃO.
+# Duas listagens a mais por busca é o preço de não ter buraco permanente.
+MARGEM_HORAS = 48
 VERSOES_ACEITAS = (1, 2)
 
 # Convenção de nome — o FALLBACK, para quando o workflow não pode ser
@@ -507,9 +514,23 @@ class CIIngestor:
 
     # -- ingestão ----------------------------------------------------------
 
-    def ingerir(self, limite: int | None = None) -> dict[str, Any]:
+    def ingerir(self, limite: int | None = None, dias: int | None = None,
+                refazer: bool = False) -> dict[str, Any]:
+        """Traz o que falta da janela pedida — só a LACUNA, não a janela toda.
+
+        `dias` é o período que está na tela. Sem ele a janela é a do
+        `observability.window_days`, para quem chama de script.
+
+        `refazer=True` ignora a cobertura registrada e varre a janela inteira
+        de novo. Não apaga nada: o disco continua impedindo a duplicação, e
+        quem desconfia do que está na tela precisa poder mandar reconferir
+        (change 0190).
+        """
+        from . import ci_cobertura
+
         config = self.ws.config().get("observability") or {}
         limite = limite or int(config.get("max_runs_per_poll") or 50)
+        dias = dias or int(config.get("window_days") or 30)
         fontes = self.fontes()
         if not fontes:
             raise IngestError(
@@ -517,9 +538,31 @@ class CIIngestor:
                 "nenhuma fonte de observabilidade em arbites.yaml"
                 " (observability.sources)",
             )
-        resumo: dict[str, Any] = {"ingested": [], "skipped": 0, "errors": []}
+        agora = datetime.now(timezone.utc)
+        ate = agora.isoformat()
+        desde = (agora - timedelta(days=dias)).isoformat()
+
+        resumo: dict[str, Any] = {
+            "ingested": [], "skipped": 0, "errors": [],
+            "window": {"desde": desde, "ate": ate, "dias": dias},
+            "scanned": [], "reused": [],
+        }
         for fonte in fontes:
-            self._ingerir_fonte(fonte, limite, resumo)
+            cobertos = ([] if refazer
+                        else ci_cobertura.cobertura_da_fonte(self.ws, fonte))
+            faltando = ci_cobertura.lacunas(cobertos, desde, ate)
+            if not faltando:
+                # A janela inteira já foi varrida: não há o que listar. Este é
+                # o caso comum de quem clica "Buscar" duas vezes seguidas.
+                resumo["reused"].append({"repo": fonte["repo"],
+                                         "desde": desde, "ate": ate})
+                continue
+            for lacuna in faltando:
+                if limite <= 0:
+                    break
+                usados = self._ingerir_fonte(fonte, limite, resumo,
+                                             lacuna[0], lacuna[1])
+                limite -= usados
         return resumo
 
     @staticmethod
@@ -530,48 +573,74 @@ class CIIngestor:
             return "bad_credential"
         return "rate_limited" if code in ("rate_limited", "github_error") else code
 
-    def _pendentes(self, fonte: dict, limite: int) -> list[dict]:
-        """Percorre as páginas do provedor até só encontrar run já ingerido.
+    def _pendentes(self, fonte: dict, limite: int, desde: str,
+                   ate: str) -> tuple[list[dict], bool]:
+        """Os runs da janela [desde, ate] que ainda não estão no disco.
 
-        Parar na primeira página conhecida seria errado quando a instância
-        ficou dias fora: o intervalo perdido está DEPOIS dela.
+        Devolve também se a janela foi varrida ATÉ O FIM. Essa segunda
+        resposta é o que autoriza registrar a cobertura: parar no limite e
+        registrar mesmo assim afirmaria ter olhado um pedaço que ninguém
+        olhou, e esse pedaço nunca mais seria varrido (change 0190).
+
+        A parada antiga — "página inteira já conhecida, o passado está
+        coberto" — era falsa e escondia um buraco permanente. Ela só valeria
+        para quem tivesse ingerido desde sempre. Para quem tem 30 dias no
+        disco e pede 90, a primeira página é inteiramente conhecida, a busca
+        parava ali, e os 60 dias mais antigos nunca chegavam. Agora quem
+        decide a parada é a DATA, que é a pergunta de verdade.
         """
         vistos = self.ja_ingeridos()
         pendentes: list[dict] = []
         pagina = 1
+        fim_alcancado = False
+        # O provedor filtra por data no servidor: alcançar uma lacuna antiga
+        # deixa de custar paginar por tudo que veio depois dela.
+        janela = f"{desde[:10]}..{ate[:10]}"
         while len(pendentes) < limite and pagina <= 10:
             lote = self.client.list_workflow_runs(
-                fonte["repo"], fonte.get("workflow"), page=pagina, per_page=50,
+                fonte["repo"], fonte.get("workflow"), page=pagina,
+                per_page=50, created=janela,
             )
             if not lote:
+                fim_alcancado = True
                 break
-            novos_na_pagina = 0
             for bruto in lote:
+                quando = _iso(bruto.get("created_at") or bruto.get("run_started_at"))
+                if quando and quando < desde:
+                    fim_alcancado = True
+                    break
+                if quando and quando > ate:
+                    continue  # mais novo que a janela: não é desta lacuna
                 chave = run_key(fonte["provider"], bruto.get("id"))
                 if chave in vistos:
-                    continue
-                novos_na_pagina += 1
+                    continue  # já no disco — pular NÃO é motivo para parar
                 pendentes.append(bruto)
                 if len(pendentes) >= limite:
                     break
-            if novos_na_pagina == 0:
-                break  # página inteira já conhecida: o passado está coberto
+            if fim_alcancado or len(lote) < 50:
+                fim_alcancado = fim_alcancado or len(lote) < 50
+                break
             pagina += 1
         # do mais velho para o mais novo: a série temporal nasce em ordem
         pendentes.reverse()
-        return pendentes
+        return pendentes, fim_alcancado
 
-    def _ingerir_fonte(self, fonte: dict, limite: int, resumo: dict) -> None:
+    def _ingerir_fonte(self, fonte: dict, limite: int, resumo: dict,
+                       desde: str, ate: str) -> int:
+        """Ingere uma lacuna. Devolve quantos runs consumiu do limite."""
+        from . import ci_cobertura
         from .ci import CIError
         from .indexer import reindex_file
 
         try:
-            pendentes = self._pendentes(fonte, limite)
+            pendentes, fim_alcancado = self._pendentes(fonte, limite, desde, ate)
         except CIError as e:
             resumo["errors"].append({"repo": fonte["repo"], "code": e.code,
                                      "message": e.message})
             resumo["stopped"] = self._motivo_da_parada(e.code)
-            return
+            return 0
+        resumo["scanned"].append({"repo": fonte["repo"], "desde": desde,
+                                  "ate": ate, "novos": len(pendentes)})
 
         for bruto in pendentes:
             chave = run_key(fonte["provider"], bruto.get("id"))
@@ -583,7 +652,11 @@ class CIIngestor:
                 resumo["errors"].append({"run": chave, "code": e.code,
                                          "message": e.message})
                 resumo["stopped"] = self._motivo_da_parada(e.code)
-                return
+                # Sem registrar cobertura: parar no meio e dizer que varreu
+                # deixaria para trás os que ainda não chegaram. A próxima
+                # busca refaz a lacuna e o disco pula os que já gravou —
+                # listagem custa, download não.
+                return len(pendentes)
             except IngestError as e:
                 # Artifact quebrado é problema DAQUELE run, não da ingestão:
                 # registra e segue, senão um zip corrompido trava a série.
@@ -592,6 +665,15 @@ class CIIngestor:
                 continue
             reindex_file(self.ws, self.conn, self.ws.root / gravado["path"])
             resumo["ingested"].append(gravado["id"])
+
+        if fim_alcancado:
+            # Só aqui, e só agora: a lacuna foi varrida inteira e tudo que
+            # havia nela está no disco. E só até a margem — o que é recente
+            # demais fica de fora de propósito (ver MARGEM_HORAS).
+            seguro = (datetime.now(timezone.utc)
+                      - timedelta(hours=MARGEM_HORAS)).isoformat()
+            ci_cobertura.registrar(self.ws, fonte, desde, min(ate, seguro))
+        return len(pendentes)
 
     def _ingerir_run(self, fonte: dict, bruto: dict, chave: str) -> dict[str, Any]:
         run = {

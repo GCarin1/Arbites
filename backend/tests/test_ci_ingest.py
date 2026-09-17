@@ -37,6 +37,13 @@ def manifesto(sinais: list[dict], anexos: list[dict] | None = None) -> bytes:
     }).encode("utf-8")
 
 
+def _ha_dias(dias: float) -> str:
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc)
+            - timedelta(days=dias)).isoformat().replace("+00:00", "Z")
+
+
 class FakeGitHub:
     """Runs e artifacts em memória, do mais novo para o mais velho."""
 
@@ -44,11 +51,16 @@ class FakeGitHub:
         self.runs: list[dict] = []
         self.artifacts: dict[int, bytes] = {}
         self.chamadas_de_download = 0
+        self.listagens: list[str | None] = []  # o `created` de cada listagem
         self.falhar_em: set[int] = set()  # run_ids que respondem com erro
         self.erro: CIError | None = None  # qual erro (padrão: limite de taxa)
 
     def adicionar(self, run_id: int, *, event="schedule", conclusion="success",
-                  artifact: bytes | None = None, started="2026-09-10T03:00:00Z"):
+                  artifact: bytes | None = None, started=None):
+        # Data relativa a AGORA por padrão: a busca passou a ter janela
+        # (change 0190), e datas fixas tornariam a suíte dependente do
+        # relógio — passando hoje e falhando daqui a um mês.
+        started = started or _ha_dias(1)
         self.runs.insert(0, {
             "id": run_id, "name": "qa-nightly", "event": event,
             "conclusion": conclusion, "head_sha": f"sha{run_id}",
@@ -60,9 +72,18 @@ class FakeGitHub:
 
     # -- superfície consumida pelo ingestor --------------------------------
 
-    def list_workflow_runs(self, repo, workflow=None, page=1, per_page=50):
+    def list_workflow_runs(self, repo, workflow=None, page=1, per_page=50,
+                           created=None):
+        # O fake HONRA o filtro de data do provedor: sem isso o teste de
+        # busca incremental provaria uma coisa e a produção faria outra.
+        self.listagens.append(created)
+        runs = self.runs
+        if created and ".." in created:
+            ini, fim = created.split("..", 1)
+            runs = [r for r in runs
+                    if ini <= (r.get("run_started_at") or "")[:10] <= fim]
         inicio = (page - 1) * per_page
-        return self.runs[inicio:inicio + per_page]
+        return runs[inicio:inicio + per_page]
 
     def list_artifacts(self, repo, run_id):
         if run_id in self.falhar_em:

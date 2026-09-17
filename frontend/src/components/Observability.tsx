@@ -1197,10 +1197,13 @@ export function Observability({ onError }: { onError: (message: string) => void 
     [onError],
   );
 
-  const ingerir = async () => {
+  const ingerir = async (refazer = false) => {
     setIngerindo(true);
     try {
-      const r = await api.ciIngest();
+      // O período da TELA vira a janela da busca, e só a lacuna dela é
+      // varrida (change 0190): trocar 30 por 90 busca os 60 que faltam, não
+      // os 90 de novo.
+      const r = await api.ciIngest(dias, refazer);
       // "Parado por credencial" NÃO é "não há run novo": os dois parecem
       // iguais (nenhum dado novo) e pedem ações opostas (change 0157).
       if (r.stopped === "tls_untrusted") {
@@ -1215,6 +1218,13 @@ export function Observability({ onError }: { onError: (message: string) => void 
         );
       } else if (r.errors?.length) {
         onError(r.errors[0].message);
+      } else if (r.ingested.length === 0 && (r.reused?.length ?? 0) > 0) {
+        // "Nada novo" e "nem olhei" parecem iguais na tela e pedem ações
+        // opostas — a mesma lição da change 0157.
+        onError(
+          `o período já estava coberto; nada foi buscado de novo.`
+          + ` Use "Reconferir período" para varrer mesmo assim.`,
+        );
       }
       await carregar();
     } catch (e) {
@@ -1300,6 +1310,25 @@ export function Observability({ onError }: { onError: (message: string) => void 
             De onde as execuções são puxadas e por quanto tempo ficam. É o que
             se preenche uma vez — por isso saiu do meio do painel.
           </p>
+          <section className="card">
+            <div className="card-head">
+              <h3>Reconferir período</h3>
+            </div>
+            <p className="caption muted">
+              A busca guarda até onde já olhou, por origem, e varre só o que
+              falta — trocar 30 por 90 dias busca os 60 que faltam, não os 90
+              de novo. Isto ignora esse registro e revarre a janela inteira
+              que está selecionada no topo. Não apaga nada: o que já está no
+              disco não é baixado de novo.
+            </p>
+            <button
+              type="button"
+              onClick={() => void ingerir(true)}
+              disabled={ingerindo}
+            >
+              {ingerindo ? "Reconferindo…" : "Reconferir período"}
+            </button>
+          </section>
           <section className="card">
             <div className="card-head">
               <h3>Reprocessar do disco</h3>
