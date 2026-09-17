@@ -204,3 +204,6 @@ One line per archived change, newest last. Appended by
 - 2026-09-17 — 0193-exportacao-carregamento-nenhum-sinal — o clique que não respondia (specs: design-system MODIFIED)
 - 2026-09-17 — 0194-sinais-tempo-vazio-porque — a série que existia e não aparecia (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0195-graficos-serie-eixo-rolagem — o gráfico que não dizia nada (specs: design-system MODIFIED)
+- 2026-09-17 — 0196-mudou-testes-instaveis-topo — notícia depois do estado (specs: ci-automation MODIFIED)
+- 2026-09-17 — 0197-area-diagnostico-fim-cenario — onde doer (specs: ci-automation MODIFIED)
+- 2026-09-17 — 0198-quanto-contexto-vai-ia — quanto isso custa, antes de custar (specs: ai-assist MODIFIED)

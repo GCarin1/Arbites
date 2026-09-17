@@ -3057,6 +3057,22 @@ def _register_routes(app: FastAPI) -> None:
         return await asyncio.to_thread(
             ci_retencao.limpar_tudo, ws_of(request), conn_of(request))
 
+    @app.get(API_PREFIX + "/ci/analysis/size")
+    async def ci_analysis_size(request: Request, days: int = 30):
+        # Quanto texto a análise vai mandar, ANTES de mandar (change 0198).
+        painel = await asyncio.to_thread(
+            ci_ingest.painel, ws_of(request), conn_of(request), days)
+        return ci_analise.tamanho_do_contexto(painel)
+
+    @app.get(API_PREFIX + "/ci/diagnostic")
+    async def ci_diagnostic(request: Request, days: int = 30,
+                            repo: str | None = None):
+        # "Qual cenário falhou mais" e "qual erro se repete" eram perguntas
+        # que só se respondia abrindo execução por execução (change 0197).
+        return await asyncio.to_thread(
+            ci_ingest.diagnostico, ws_of(request), conn_of(request), days,
+            repo or None)
+
     @app.get(API_PREFIX + "/ci/runs")
     async def ci_runs(request: Request, limit: int = 50,
                       workflow: str | None = None):

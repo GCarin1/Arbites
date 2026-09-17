@@ -1101,3 +1101,40 @@ export interface CiEvidencias {
   /** O limite foi atingido: há mais evidência do que a lista mostra. */
   truncated: boolean;
 }
+
+
+/** A área de diagnóstico do fim da Observabilidade (change 0197). */
+export interface CiDiagnostico {
+  period: { since: string; until: string; days: number };
+  repo: string | null;
+  scenarios: {
+    mais_falharam: CiCenarioRanking[];
+    nunca_falharam: CiCenarioRanking[];
+    total_cenarios: number;
+    com_falha: number;
+  };
+  errors: CiErroAgrupado[];
+  jobs: { name: string; total: number; falhas: number }[];
+  repos: string[];
+}
+
+export interface CiCenarioRanking {
+  scenario: string;
+  testcase_id: string | null;
+  total: number;
+  falhas: number;
+  taxa_falha: number;
+  ultima_falha: string | null;
+  run_id: string | null;
+}
+
+export interface CiErroAgrupado {
+  /** A mensagem com os valores que variam trocados por marcadores — é o que
+      permite agrupar defeitos iguais escritos com números diferentes. */
+  pattern: string;
+  exemplo: string;
+  count: number;
+  cenarios: number;
+  ultima: string | null;
+  run_id: string | null;
+}

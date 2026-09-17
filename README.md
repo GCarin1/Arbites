@@ -579,6 +579,28 @@ de um número solto é invenção, e essa continua proibida.
 Já tem execuções ingeridas? **Configuração → Reprocessar do disco** cria a
 série delas sem baixar nada.
 
+**Onde doer — a área de consulta do fim da aba.** Qual cenário falhou mais (e
+qual nunca falhou, com pelo menos três execuções — um que rodou uma vez e
+passou não provou estabilidade nenhuma), qual **mensagem de erro** mais se
+repete, e qual etapa do pipeline mais quebra. Tudo com filtro por
+repositório: com mais de um repositório de teste, a lista global mistura
+times que não se conhecem.
+
+A mensagem de erro vem do passo que falhou no relatório Cucumber — ela já
+chegava e era descartada. Erros iguais escritos com números diferentes
+("esperado 3, recebido 4" e "esperado 7, recebido 9") caem no mesmo grupo,
+porque os valores que variam a cada execução são trocados por marcadores
+antes de agrupar. Conteúdo de `.log` **não** é analisado: os logs continuam
+anexos que se abre, não texto indexado.
+
+**Quanto a análise de IA custa, antes de custar.** A aba Análise diz quantos
+caracteres e quantos tokens (estimativa grosseira) o agente vai ler. O dossiê
+é **agregado**: dobrar as execuções não dobra o texto — no caso de 45
+execuções em 30 dias são ~1,5 mil caracteres, contra ~128 mil se fosse o
+painel cru. O que cresce é a variedade, e por isso a lista de instáveis para
+em 15 (os novos e os de mais viradas primeiro) e os recortes de repositório
+em 20, com o total real declarado junto.
+
 **Recomeçar do zero.** Em **Observabilidade → Configuração**, *Limpar toda
 a observabilidade* remove todas as execuções, seus anexos e o registro de até
 onde a busca já olhou. Antes de confirmar, o modal diz o tamanho do estrago —

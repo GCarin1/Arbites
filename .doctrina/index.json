@@ -26,7 +26,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.15.0",
+        "version": "0.16.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.17.0",
+        "version": "0.18.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -3002,6 +3002,45 @@
         "specs_affected": [
           {
             "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0196-mudou-testes-instaveis-topo",
+        "title": "notícia depois do estado",
+        "path": ".doctrina/changes/archive/2026-09-17-0196-mudou-testes-instaveis-topo",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0197-area-diagnostico-fim-cenario",
+        "title": "onde doer",
+        "path": ".doctrina/changes/archive/2026-09-17-0197-area-diagnostico-fim-cenario",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0198-quanto-contexto-vai-ia",
+        "title": "quanto isso custa, antes de custar",
+        "path": ".doctrina/changes/archive/2026-09-17-0198-quanto-contexto-vai-ia",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
             "operation": "MODIFIED"
           }
         ]

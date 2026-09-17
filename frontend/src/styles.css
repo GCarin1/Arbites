@@ -4759,3 +4759,30 @@ button.link-chip-btn:disabled {
   flex-basis: 100%;
   width: 100%;
 }
+
+
+/* Onde doer (change 0197). A área de consulta do fim: várias tabelas curtas
+   com um cabeçalho cada, e não uma tabela larga com tudo. */
+.obs-diagnostico h4 {
+  margin: var(--sp-4) 0 var(--sp-1);
+  font-size: 0.86rem;
+}
+.obs-diagnostico h4:first-of-type { margin-top: var(--sp-2); }
+/* O molde do erro é texto de máquina e pode ser longo: quebra em qualquer
+   ponto em vez de esticar a tabela até a rolagem. */
+.obs-erro-molde {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+  display: inline-block;
+  max-width: 44ch;
+}
+.obs-estaveis {
+  margin: 0; padding-left: 1.1rem; columns: 2; column-gap: var(--sp-4);
+  font-size: 0.82rem;
+}
+.obs-estaveis li { break-inside: avoid; margin-bottom: 0.2rem; }
+@media (max-width: 720px) {
+  .obs-estaveis { columns: 1; }
+  .obs-erro-molde { max-width: 100%; }
+}

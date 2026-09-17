@@ -364,6 +364,7 @@ def extrair_cenarios(manifesto: dict[str, Any],
                 "feature": cenario.get("feature"),
                 "testcase_id": cenario.get("testcase_id"),
                 "status": cenario.get("status"),
+                "error": cenario.get("error"),
             })
     return saida
 
@@ -1567,3 +1568,140 @@ def _reprocessar_um(ws, conn, caminho: Path) -> bool:
             post.metadata.pop(chave, None)
     caminho.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
     return True
+
+
+# ---------------------------------------------------------------------------
+# Diagnóstico: onde doer (change 0197)
+
+
+# A mensagem de erro varia no detalhe e repete no essencial: o mesmo defeito
+# aparece como "esperado 3, recebido 4" e "esperado 7, recebido 9". Agrupar
+# pelo texto cru produziria uma lista de linhas únicas — que é o mesmo que
+# não agrupar. O molde apaga o que varia e mantém o que identifica.
+_RUIDO = [
+    (re.compile(r"0x[0-9a-f]{4,}", re.I), "<end>"),
+    (re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
+                re.I), "<id>"),
+    (re.compile(r"https?://\S+"), "<url>"),
+    (re.compile(r"\b\d+(\.\d+)?(ms|s)\b", re.I), "<tempo>"),
+    (re.compile(r"\b\d+\b"), "<n>"),
+    (re.compile(r"\s+"), " "),
+]
+
+
+def molde_do_erro(mensagem: str | None) -> str | None:
+    """A forma da mensagem, sem os valores que mudam a cada execução."""
+    if not mensagem:
+        return None
+    texto = mensagem.strip()
+    for regex, marca in _RUIDO:
+        texto = regex.sub(marca, texto)
+    texto = texto.strip()
+    return texto[:200] or None
+
+
+def _filtro_de_repo(repo: str | None) -> tuple[str, tuple]:
+    if not repo:
+        return "", ()
+    return (" AND s.run_id IN (SELECT id FROM ci_runs WHERE repo = ?"
+            " OR trigger_repo = ?)", (repo, repo))
+
+
+def cenarios_por_falha(conn, inicio: str, fim: str, repo: str | None = None,
+                       limite: int = 15) -> dict[str, Any]:
+    """Quem mais quebra, e quem nunca quebrou.
+
+    "Qual cenário falhou mais" é a pergunta que abre um plano de correção, e
+    até aqui só dava para responder abrindo execução por execução. O outro
+    lado importa igual: um cenário que nunca falhou em 45 execuções é
+    candidato a rodar menos vezes, e ninguém olha para ele porque ele não
+    incomoda.
+    """
+    filtro, args = _filtro_de_repo(repo)
+    linhas = [dict(r) for r in conn.execute(
+        "SELECT s.scenario, s.testcase_id, COUNT(*) total,"
+        " SUM(CASE WHEN s.status IN ('failed','blocked') THEN 1 ELSE 0 END) falhas,"
+        " MAX(CASE WHEN s.status IN ('failed','blocked') THEN s.at END) ultima_falha,"
+        " MAX(s.run_id) run_id"
+        " FROM ci_scenarios s WHERE s.at >= ? AND s.at < ?" + filtro +
+        " GROUP BY s.scenario ORDER BY falhas DESC, total DESC",
+        (inicio, fim, *args))]
+    for linha in linhas:
+        linha["taxa_falha"] = (round(linha["falhas"] / linha["total"] * 100, 1)
+                               if linha["total"] else 0.0)
+    com_falha = [l for l in linhas if l["falhas"]]
+    return {
+        "mais_falharam": com_falha[:limite],
+        # Só quem tem histórico: um cenário que rodou uma vez e passou não
+        # provou estabilidade nenhuma, e listá-lo como "sempre passou" seria
+        # dar a ele um atestado que ele não tem.
+        "nunca_falharam": [l for l in linhas
+                           if not l["falhas"] and l["total"] >= 3][:limite],
+        "total_cenarios": len(linhas),
+        "com_falha": len(com_falha),
+    }
+
+
+def erros_mais_comuns(conn, inicio: str, fim: str, repo: str | None = None,
+                      limite: int = 12) -> list[dict[str, Any]]:
+    """As mensagens que mais aparecem, agrupadas pelo molde.
+
+    A mensagem já vinha no relatório e era descartada. É ela que responde
+    "por que falhou?" sem abrir execução nenhuma — e agrupada, responde "o
+    que consertar primeiro", que é outra pergunta e a mais cara das duas.
+    """
+    filtro, args = _filtro_de_repo(repo)
+    grupos: dict[str, dict[str, Any]] = {}
+    for linha in conn.execute(
+        "SELECT s.error, s.scenario, s.at, s.run_id FROM ci_scenarios s"
+        " WHERE s.at >= ? AND s.at < ? AND s.error IS NOT NULL"
+        " AND s.error != ''" + filtro, (inicio, fim, *args)
+    ):
+        molde = molde_do_erro(linha["error"])
+        if not molde:
+            continue
+        item = grupos.setdefault(molde, {
+            "pattern": molde, "exemplo": linha["error"], "count": 0,
+            "cenarios": set(), "ultima": None, "run_id": None,
+        })
+        item["count"] += 1
+        item["cenarios"].add(linha["scenario"])
+        if item["ultima"] is None or (linha["at"] or "") > item["ultima"]:
+            item["ultima"] = linha["at"]
+            item["run_id"] = linha["run_id"]
+    saida = [{**g, "cenarios": len(g["cenarios"])} for g in grupos.values()]
+    saida.sort(key=lambda g: (-g["count"], g["pattern"]))
+    return saida[:limite]
+
+
+def jobs_por_falha(conn, inicio: str, fim: str, repo: str | None = None,
+                   limite: int = 10) -> list[dict[str, Any]]:
+    """Qual etapa do pipeline quebra mais — a pergunta de quem cuida da
+    esteira, e não do teste."""
+    filtro = " AND r.repo = ?" if repo else ""
+    args = (repo,) if repo else ()
+    return [dict(r) for r in conn.execute(
+        "SELECT j.name, COUNT(*) total,"
+        " SUM(CASE WHEN j.conclusion NOT IN ('success','skipped')"
+        "     THEN 1 ELSE 0 END) falhas"
+        " FROM ci_jobs j JOIN ci_runs r ON r.id = j.run_id"
+        " WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
+        " AND COALESCE(r.started_at, r.ingested_at) < ?" + filtro +
+        " GROUP BY j.name HAVING falhas > 0 ORDER BY falhas DESC LIMIT ?",
+        (inicio, fim, *args, limite))]
+
+
+def diagnostico(ws, conn, dias: int = 30,
+                repo: str | None = None) -> dict[str, Any]:
+    """A área de "onde doer", respondida por consulta e não por leitura."""
+    _, inicio, fim = _dias_atras(dias)
+    return {
+        "period": {"since": inicio, "until": fim, "days": dias},
+        "repo": repo,
+        "scenarios": cenarios_por_falha(conn, inicio, fim, repo),
+        "errors": erros_mais_comuns(conn, inicio, fim, repo),
+        "jobs": jobs_por_falha(conn, inicio, fim, repo),
+        "repos": [r["repo"] for r in conn.execute(
+            "SELECT DISTINCT repo FROM ci_runs WHERE repo IS NOT NULL"
+            " ORDER BY repo")],
+    }

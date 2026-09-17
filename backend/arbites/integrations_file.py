@@ -235,6 +235,15 @@ def ler_cucumber(bruto: bytes | str) -> list[dict[str, Any]]:
             falhou = any(
                 (p.get("result") or {}).get("status") == "failed" for p in passos
             )
+            # A MENSAGEM do passo que quebrou (change 0197). Ela já vem no
+            # relatório e era descartada — e é ela que responde "por que
+            # falhou?" sem abrir execução nenhuma. Só a primeira linha: o
+            # resto é pilha de chamada, que agrupa mal e não cabe numa tabela.
+            erro = next(
+                ((p.get("result") or {}).get("error_message") or "").strip()
+                for p in passos
+                if (p.get("result") or {}).get("status") == "failed"
+            ) if falhou else ""
             saida.append({
                 "feature": (feature or {}).get("name"),
                 "scenario": elemento.get("name"),
@@ -242,6 +251,7 @@ def ler_cucumber(bruto: bytes | str) -> list[dict[str, Any]]:
                 "tags": tags,
                 "status": elemento.get("status")
                 or ("failed" if falhou else "passed"),
+                "error": erro.splitlines()[0][:300] if erro else None,
                 "steps": len(passos),
             })
     return saida
