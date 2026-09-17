@@ -552,6 +552,21 @@ manifesto continua válida.
 Log, print e análise em Markdown viram anexos hasheados ao lado do run e
 aparecem na descida (gráfico → execução → job → arquivo).
 
+**O relatório Cucumber é reconhecido pela forma, não pelo nome.** Qualquer
+`.json` do artifact que seja uma lista de features com `elements` vira
+cenário — `cucumber-report.json`, `results.json`, `report-trader.json`, tanto
+faz. Isso vale mesmo sem manifesto; com manifesto, o que ele declara vence.
+O contrário não acontece: um `result.json` que **não** tem essa forma não é
+classificado como relatório, porque chamar de cenário o que não é troca um
+silêncio por uma mentira.
+
+**Melhorou o reconhecimento depois de já ter ingerido?** Os anexos estão no
+disco, ao lado de cada execução. Em **Observabilidade → Configuração**, o
+botão **Reprocessar do disco** relê esses arquivos e refaz só o que é
+derivado deles — cenários e achados. Não usa rede e não rebusca nada; o que
+veio do provedor (conclusão, commit, horários) fica intocado, porque isso não
+está nos anexos e regravar só poderia perder informação.
+
 ### A aba Evidências
 
 Print, log, varredura e a análise que o pipeline escreveu ficam guardados ao

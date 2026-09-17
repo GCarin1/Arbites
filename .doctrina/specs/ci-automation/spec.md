@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.14.0
+**Version:** 0.14.1
 
 ## Purpose
 
@@ -75,6 +75,8 @@ workflow/jobs/steps do workflow.
 - When uma chamada externa falha no transporte, the system shall recusá-la com mensagem própria distinguindo certificado não confiável de destino inalcançável, em vez de deixar a exceção subir como erro interno.
 - When o operador pede o bundle de CA pela CLI, the system shall escrever um arquivo com as raízes públicas somadas aos certificados de autenticação de servidor do armazenamento do sistema operacional, conferir que o arquivo carrega, e imprimir a linha de declaração pronta.
 - When o certificado de um destino não é aceito, the system shall dizer o nome de quem o emitiu, porque é esse nome que se procura na hora de obter o certificado certo.
+- When um artifact chega sem manifesto, the system shall reconhecer o relatório Cucumber pela forma do conteúdo — uma lista de features com `elements` —, e não pelo nome do arquivo.
+- When o operador pede o reprocessamento, the system shall reler os anexos já gravados no disco e refazer apenas o que é derivado deles, sem nenhuma chamada externa.
 
 ### State-driven
 
@@ -102,6 +104,8 @@ workflow/jobs/steps do workflow.
 - The system shall not pedir que se declare um bundle de CA quando já há um declarado; existir, ser arquivo e ser um bundle carregável são condições distintas, e cada falha tem a sua mensagem.
 - The system shall not ler o armazenamento de certificados do sistema por conta própria numa chamada externa; ampliar a própria confiança sem que ninguém tenha dito nada é decisão de quem opera a máquina, e o comando que monta o bundle só escreve um arquivo que continua precisando ser declarado.
 - The system shall not incluir no bundle certificado que não esteja habilitado para autenticar servidor; o armazenamento do sistema guarda também autoridades de assinatura de código e de e-mail.
+- The system shall not classificar um anexo por um nome que o conteúdo desmente; um `result.json` que não é uma lista de features não é um relatório Cucumber, e chamá-lo assim troca um silêncio por uma mentira.
+- The system shall not sobrescrever no reprocessamento o que veio do provedor — conclusão, commit, horários —, porque esses campos não estão nos anexos e regravá-los só pode perder informação.
 
 ### Optional
 
@@ -135,6 +139,7 @@ workflow/jobs/steps do workflow.
 16. [verified] Caminho inexistente, pasta no lugar do arquivo e arquivo que não é bundle são nomeados com a variável e o caminho; bundle carregável mas sem a CA do destino tem mensagem própria apontando o certificado raiz do proxy; e o problema aparece na lista sem ninguém disparar chamada externa — verified by `backend/tests/test_bundle_ca_quebrado.py`.
 17. [verified] O bundle montado soma as raízes públicas às do armazenamento do sistema, carrega de verdade, descarta certificado sem uso de servidor e não duplica o que aparece em dois armazéns; fora do Windows o comando diz isso e aponta os caminhos usuais; sem nenhum certificado da máquina o recado é que a CA não está instalada; e a linha de declaração sai com barra normal — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
 18. [verified] O diagnóstico nomeia o emissor do certificado apresentado pelo destino e não derruba nada quando o destino está inalcançável — verified by `backend/tests/test_bundle_ca_do_sistema.py`.
+19. [verified] O relatório Cucumber é reconhecido com qualquer nome de arquivo, JSON que não tem a forma não vira cenário, arquivo grande demais não é desserializado, o manifesto declarado continua vencendo a forma, e o reprocessamento do disco recupera o cenário perdido sem tocar nos campos do provedor e sem mudar nada na segunda passada — verified by `backend/tests/test_cenarios_por_forma.py`.
 
 ## Maturity
 

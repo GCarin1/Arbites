@@ -56,8 +56,43 @@ CONVENCAO = {
     "axe": re.compile(r"(axe|a11y|acessibilidade)[^/]*\.json$", re.I),
     "log": re.compile(r"\.(log|txt)$", re.I),
     "screenshot": re.compile(r"\.(png|jpe?g|webp)$", re.I),
-    "cucumber": re.compile(r"(result|cucumber)\.json$", re.I),
+    # `cucumber` saiu daqui de propósito (change 0189): o relatório é
+    # reconhecido pela FORMA do conteúdo, não pelo nome. Um `result.json` que
+    # não é uma lista de features não é um relatório Cucumber, e dizer que é
+    # seria trocar um silêncio por uma mentira.
 }
+
+
+# Um JSON acima disto não é examinado para descobrir a forma: um `axe.json`
+# de suíte grande passa de 100 MB, e desserializá-lo só para descobrir que
+# não é Cucumber sairia caro em toda ingestão.
+LIMITE_FORMA = 64 * 1024 * 1024
+
+
+def e_relatorio_cucumber(bruto: bytes) -> bool:
+    """O JSON tem a FORMA de um relatório Cucumber?
+
+    Reconhecer pelo NOME não funciona e não tinha como funcionar:
+    `cucumber-report.json`, `results.json`, `report-trader.json`,
+    `cucumber_2026-09-17.json` — cada pipeline nomeia do seu jeito, e a lista
+    de nomes prováveis não termina. Foi o que aconteceu: 45 execuções
+    ingeridas, centenas de anexos, e a pizza "Cenários por resultado" vazia
+    porque o arquivo não terminava na palavra certa (change 0189).
+
+    A FORMA, essa é fixa e está no padrão: uma LISTA de features, cada uma
+    com `elements`. Isso não é inferir semântica — é reconhecer um formato
+    documentado, exatamente como o relatório do axe-core já é reconhecido.
+    """
+    if not bruto or len(bruto) > LIMITE_FORMA:
+        return False
+    if bruto.lstrip()[:1] != b"[":
+        return False  # barato: descarta objeto e texto sem desserializar
+    try:
+        dados = json.loads(bruto.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return False
+    return (isinstance(dados, list) and bool(dados)
+            and isinstance(dados[0], dict) and "elements" in dados[0])
 
 
 class IngestError(Exception):
@@ -123,6 +158,12 @@ def _por_convencao(arquivos: dict[str, bytes]) -> dict[str, Any]:
     dois seria pior que não ter."""
     anexos = []
     for nome in sorted(arquivos):
+        # A forma vem ANTES do nome: um relatório Cucumber chamado
+        # `report.json` seria classificado como nada, e um chamado
+        # `resultado.log` nem seria olhado.
+        if nome.lower().endswith(".json") and e_relatorio_cucumber(arquivos[nome]):
+            anexos.append({"kind": "cucumber", "path": nome})
+            continue
         for kind, regex in CONVENCAO.items():
             if regex.search(nome):
                 anexos.append({"kind": kind, "path": nome})
@@ -266,7 +307,9 @@ def extrair_cenarios(manifesto: dict[str, Any],
         if item.get("kind") == "cucumber" and item.get("path")
     ]
     if not caminhos:
-        caminhos = [n for n in arquivos if CONVENCAO["cucumber"].search(n)]
+        caminhos = [n for n in sorted(arquivos)
+                    if n.lower().endswith(".json")
+                    and e_relatorio_cucumber(arquivos[n])]
 
     saida: list[dict[str, Any]] = []
     for caminho in caminhos:
@@ -1271,3 +1314,92 @@ def _o_que_mudou(atuais: list[dict], anteriores: list[dict],
             ),
         })
     return mudancas
+
+
+# ---------------------------------------------------------------------------
+# Reprocessar o que já está no disco
+
+
+def reprocessar(ws, conn) -> dict[str, Any]:
+    """Refaz o que é DERIVADO dos anexos já gravados, sem tocar na rede.
+
+    Quando o reconhecimento melhora — foi o caso do relatório Cucumber na
+    change 0189 —, os runs já ingeridos continuam com o resultado antigo. A
+    alternativa seria apagar e buscar tudo de novo: horas de download para
+    reler arquivos que já estão aqui do lado.
+
+    Só o que é derivado é recalculado (`scenarios`, `findings`). O que veio do
+    provedor — conclusão, commit, horários — não se toca: reprocessar não é
+    re-ingerir, e sobrescrever com menos informação seria uma perda.
+    """
+    from .indexer import reindex_file
+
+    base = ws.root / "ci"
+    resumo: dict[str, Any] = {"lidos": 0, "atualizados": [], "erros": []}
+    if not base.exists():
+        return resumo
+
+    for ano in sorted(p for p in base.iterdir() if p.is_dir()):
+        for caminho in sorted(ano.glob("*.md")):
+            resumo["lidos"] += 1
+            try:
+                mudou = _reprocessar_um(ws, conn, caminho)
+            except OSError as e:
+                resumo["erros"].append({"run": caminho.stem, "message": str(e)})
+                continue
+            if mudou:
+                reindex_file(ws, conn, caminho)
+                resumo["atualizados"].append(caminho.stem)
+    return resumo
+
+
+def _reprocessar_um(ws, conn, caminho: Path) -> bool:
+    post = frontmatter.load(caminho)
+    anexos = post.metadata.get("attachments") or []
+    if not anexos:
+        return False
+
+    # Os bytes voltam do disco pelo caminho que o próprio documento registra.
+    # Um anexo que sumiu é pulado, não é erro: o documento continua válido.
+    arquivos: dict[str, bytes] = {}
+    for item in anexos:
+        rel = item.get("path")
+        if not rel:
+            continue
+        no_disco = ws.root / rel
+        if no_disco.is_file():
+            arquivos[rel] = no_disco.read_bytes()
+    if not arquivos:
+        return False
+
+    manifesto = {"version": VERSAO_MANIFESTO, "signals": [],
+                 "attachments": [{"kind": i.get("kind"), "path": i.get("path")}
+                                 for i in anexos]}
+    novos = {
+        "scenarios": extrair_cenarios(manifesto, arquivos),
+        "findings": extrair_achados(manifesto, arquivos),
+    }
+    # Kind corrigido também vale: um anexo classificado como nada passa a
+    # aparecer como `cucumber` na galeria de evidências.
+    kinds = {}
+    convencao = _por_convencao(arquivos)
+    for item in convencao.get("attachments") or []:
+        kinds[item["path"]] = item["kind"]
+    corrigidos = []
+    for item in anexos:
+        novo = dict(item)
+        achado = kinds.get(item.get("path"))
+        if achado and achado != item.get("kind"):
+            novo["kind"] = achado
+        corrigidos.append(novo)
+    novos["attachments"] = corrigidos
+
+    if all(post.metadata.get(k) == v for k, v in novos.items()):
+        return False
+    for chave, valor in novos.items():
+        if valor:
+            post.metadata[chave] = valor
+        else:
+            post.metadata.pop(chave, None)
+    caminho.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+    return True

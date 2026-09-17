@@ -197,3 +197,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-17 — 0186-bundle-ca-apontado-mas — bundle de CA apontado mas ilegivel manda declarar a variavel que ja foi declarada (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0187-comando-diagnostico-mostra-processo — o comando que mostra o que o processo enxerga (specs: workspace-core MODIFIED)
 - 2026-09-17 — 0188-comando-monta-bundle-ca — onde achar o `.pem` certo (specs: ci-automation MODIFIED)
+- 2026-09-17 — 0189-cenarios-resultado-vazio-porque — cenário reconhecido pela forma, não pelo nome (specs: ci-automation MODIFIED)

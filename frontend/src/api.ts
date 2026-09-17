@@ -226,6 +226,11 @@ export const api = {
   ciIngest: () =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
               stopped?: string }>("/ci/ingest", { method: "POST" }),
+  /** Relê os anexos que já estão no disco — sem rede, sem rebuscar nada. */
+  ciReprocess: () =>
+    request<{ lidos: number; atualizados: string[];
+              erros: { run: string; message: string }[] }>(
+      "/ci/reprocess", { method: "POST" }),
   ciSources: () =>
     request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
   ciSourcesSave: (sources: CiSource[]) =>

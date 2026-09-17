@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.14.0",
+        "version": "0.14.1",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2897,6 +2897,19 @@
         "id": "0188-comando-monta-bundle-ca",
         "title": "onde achar o `.pem` certo",
         "path": ".doctrina/changes/archive/2026-09-17-0188-comando-monta-bundle-ca",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0189-cenarios-resultado-vazio-porque",
+        "title": "cenário reconhecido pela forma, não pelo nome",
+        "path": ".doctrina/changes/archive/2026-09-17-0189-cenarios-resultado-vazio-porque",
         "status": "applied",
         "applied": "2026-09-17",
         "specs_affected": [

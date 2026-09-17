@@ -1122,6 +1122,7 @@ export function Observability({ onError }: { onError: (message: string) => void 
   const [origens, setOrigens] = useState<CiSource[]>([]);
   const [novaOrigem, setNovaOrigem] = useState<CiSource>({ repo: "" });
   const [salvandoOrigem, setSalvandoOrigem] = useState(false);
+  const [reprocessando, setReprocessando] = useState(false);
   // Configuração sai do meio do painel e vira aba (change 0176): quem lê o
   // painel todo dia não quer tropeçar no formulário que se preenche uma vez.
   const [aba, setAba] = useState<Aba>("painel");
@@ -1161,6 +1162,27 @@ export function Observability({ onError }: { onError: (message: string) => void 
       onError((e as Error).message);
     } finally {
       setSalvandoOrigem(false);
+    }
+  };
+
+  const reprocessar = async () => {
+    // Sem rede: relê os anexos que já estão no disco. O reconhecimento do
+    // relatório Cucumber melhorou (change 0189), e rebuscar tudo do GitHub
+    // só para reler arquivos locais seriam horas de download.
+    setReprocessando(true);
+    try {
+      const r = await api.ciReprocess();
+      await carregar();
+      onError(
+        r.atualizados.length > 0
+          ? `${r.atualizados.length} de ${r.lidos} execução(ões) ganharam dado`
+            + " novo a partir dos anexos que já estavam no disco."
+          : `${r.lidos} execução(ões) relidas; nada mudou.`,
+      );
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setReprocessando(false);
     }
   };
 
@@ -1278,6 +1300,24 @@ export function Observability({ onError }: { onError: (message: string) => void 
             De onde as execuções são puxadas e por quanto tempo ficam. É o que
             se preenche uma vez — por isso saiu do meio do painel.
           </p>
+          <section className="card">
+            <div className="card-head">
+              <h3>Reprocessar do disco</h3>
+            </div>
+            <p className="caption muted">
+              Relê os anexos das execuções que já foram ingeridas e refaz o que
+              é derivado deles — cenários e achados. Não usa rede e não busca
+              nada: serve para quando o reconhecimento de um formato melhorou e
+              as execuções antigas ficaram com o resultado anterior.
+            </p>
+            <button
+              type="button"
+              onClick={() => void reprocessar()}
+              disabled={reprocessando}
+            >
+              {reprocessando ? "Relendo…" : "Reprocessar do disco"}
+            </button>
+          </section>
           <section className="card obs-origens">
             <div className="card-head">
               <h3>Origens</h3>

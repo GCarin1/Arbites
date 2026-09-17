@@ -3030,6 +3030,14 @@ def _register_routes(app: FastAPI) -> None:
         ingestor: CIIngestor = request.app.state.ci_ingest
         return await asyncio.to_thread(ingestor.ingerir, limit)
 
+    @app.post(API_PREFIX + "/ci/reprocess")
+    async def ci_reprocess(request: Request):
+        # Relê os anexos que JÁ estão no disco. Quando o reconhecimento
+        # melhora, apagar tudo e rebuscar custaria horas de download para
+        # reler arquivos que estão aqui do lado (change 0189).
+        ws, conn = ws_of(request), conn_of(request)
+        return await asyncio.to_thread(ci_ingest.reprocessar, ws, conn)
+
     @app.get(API_PREFIX + "/ci/runs")
     async def ci_runs(request: Request, limit: int = 50,
                       workflow: str | None = None):
