@@ -97,9 +97,11 @@ feito para ser compartilhado (ADR 0008). Chave de IA vai para o cofre do SO
 > os blocos que interessam.
 
 > **Cuidado ao editar `automation_targets` à mão:** salvar os targets pela tela
-> (Automação → Configurar) reescreve o bloco inteiro e **apaga o sub-bloco
-> `github:`** escrito à mão, sem avisar. Hoje os dois caminhos são
-> incompatíveis; está registrado para correção.
+> (Automação → Configurar) reescrevia o bloco inteiro e **apagava o sub-bloco
+> `github:`** escrito à mão. Corrigido na change 0172: repositório, workflow
+> e branch têm campos próprios na tela e sobrevivem ao salvamento. Um bloco
+> pela metade (repositório sem workflow) não é gravado — ele só produziria um
+> erro de disparo com o bloco aparentemente configurado no YAML.
 
 ### Não consigo entrar
 
@@ -136,6 +138,19 @@ python -m arbites admin --email voce@exemplo.com --password uma-senha-de-12-ou-m
 >   existe um admin ativo, esse mesmo e-mail volta a nascer pendente;
 > - sem nada declarado, use o `python -m arbites admin --email ... --password
 >   ...` acima, que promove a conta que já existe e destrava o login junto.
+
+### Trocar a senha
+
+No **Perfil** (menu do avatar, canto superior direito) há o cartão **Senha**:
+senha atual, nova e confirmação. Trocar derruba as **outras** sessões da
+conta — a que você está usando continua aberta. Mínimo de 12 caracteres.
+
+Quando a conta nasce pelo `python -m arbites admin` ou pelo bootstrap por
+ambiente, ela vem com **troca obrigatória**: a senha passou pelo histórico do
+shell ou pelo `docker inspect`, então serve para entrar uma vez. Nesse caso o
+login abre direto a tela "Definir uma senha", e até a troca acontecer o
+backend recusa todas as outras rotas com `password_change_required` — a SPA
+devolve você à tela de troca em vez de ficar pedindo dados que não virão.
 
 **Trancado fora por tentativas?** Cinco falhas em 15 minutos bloqueiam a conta
 e o IP. Você pode esperar os 15 minutos contados a partir da última tentativa,
@@ -354,7 +369,13 @@ print. Puxa, não recebe por webhook: uma instância local não é alcançável
 pela internet, e puxar dá de graça a retomada (ficar dias desligado traz o
 intervalo inteiro, não só o run mais recente).
 
-Declare as fontes no `arbites.yaml` do workspace:
+**Pelo jeito mais curto:** a aba Observabilidade tem o bloco **Origens** —
+repositório, workflow e artifact (os dois últimos opcionais: em branco valem
+"todos"). Ele grava no `arbites.yaml` por você, e aparece justamente quando
+ainda não há execução nenhuma, que é quando a pergunta "por que não achou
+nada?" surge. Declarar exige papel `admin`; ver o que está declarado, não.
+
+Pelo arquivo, se preferir editar à mão:
 
 ```yaml
 observability:
@@ -380,9 +401,12 @@ observability:
 Depois:
 
 ```
+GET  /api/v1/ci/sources           # o que está declarado
+PUT  /api/v1/ci/sources           # declara (admin) — o que a aba usa
 POST /api/v1/ci/ingest            # puxa o que ainda não está no disco
 GET  /api/v1/ci/runs?limit=50     # runs ingeridos, com sinais e anexos
 GET  /api/v1/ci/signals           # que sinais existem (descobertos, não fixos)
+GET  /api/v1/ci/observability/export?format=pdf|csv|md&days=30   # o painel em arquivo
 GET  /api/v1/ci/signals/{name}?since=&until=   # a série de um sinal no tempo
 ```
 
@@ -391,6 +415,131 @@ com os sinais no frontmatter e os anexos ao lado, hasheados. O índice SQLite
 é descartável (ADR 0001): apagá-lo e reconstruir devolve meses de série.
 Ingerir duas vezes o mesmo run não duplica — a marca d'água é o disco, não um
 contador guardado à parte.
+
+### O manifesto: o que o artifact declara
+
+O `arbites.json` publicado junto do artifact é o contrato. Versão 2:
+
+```json
+{
+  "version": 2,
+  "labels": {
+    "componente": "carteira-mfe",
+    "ambiente": "hml",
+    "stack": "front",
+    "versao": "1.24.0"
+  },
+  "signals": [
+    { "kind": "performance", "name": "lcp_ms", "value": 2410, "unit": "ms" },
+    { "kind": "coverage", "name": "cobertura_pct", "value": 82, "unit": "%" }
+  ],
+  "attachments": [
+    { "kind": "analysis",   "path": "analysis.md",  "title": "Análise do deploy" },
+    { "kind": "cucumber",   "path": "result.json" },
+    { "kind": "axe",        "path": "axe.json",     "title": "Varredura axe-core" },
+    { "kind": "log",        "path": "suite.log" },
+    { "kind": "screenshot", "path": "print-falha.png", "title": "Tela na falha" }
+  ]
+}
+```
+
+**`trigger` diz quem MANDOU rodar.** Três repositórios diferentes participam
+do mesmo evento: onde o teste mora (`b3/e2e-web`), onde a aplicação mora
+(`b3/app-trader-web`, que fez o deploy) e quem disparou o workflow. A pergunta
+"qual **produto** está quebrando" é sobre o segundo — e um repositório de teste
+que serve trader, ordens e app reunia os três numa taxa só. Declare:
+
+```json
+"trigger": { "repo": "b3/app-trader-web", "environment": "prd", "ref": "v1.24.0" }
+```
+
+A aba mostra os dois recortes lado a lado, e um gráfico de **erros por
+repositório de origem** — volume de falha, não taxa: 90% em mil execuções são
+cem falhas, e 50% em duas são uma. Quem já usa `labels` pode declarar
+`repo_origem` em vez do bloco.
+
+**`labels` é o que resolve micro-frontend.** O repositório onde o workflow
+mora **não** é o que está sob teste: o mesmo repositório de testes valida
+vários componentes, e vários repositórios de deploy chamam a mesma suíte. Sem
+rótulo, a taxa de sucesso vira a média de coisas diferentes, que não é a saúde
+de nada. A chave é livre — a topologia é sua, não do Arbites. Rótulos com um
+único valor, ou com um valor por execução (`versao`), ficam fora do recorte:
+um não divide e o outro é identificador.
+
+**`kind: "axe"` é lido nativamente.** Publique o JSON cru do axe-core e o
+Arbites extrai regra, gravidade, critério da WCAG (da tag `wcag143` → `1.4.3`),
+nível (A/AA/AAA), quantos **elementos** violam e em que página. Aceita o
+resultado de uma rota (objeto) e de várias (lista). Quem usa outra ferramenta
+declara `findings` direto no manifesto, com a mesma forma. A versão 1 do
+manifesto continua válida.
+
+Log, print e análise em Markdown viram anexos hasheados ao lado do run e
+aparecem na descida (gráfico → execução → job → arquivo).
+
+### A aba Evidências
+
+Print, log, varredura e a análise que o pipeline escreveu ficam guardados ao
+lado de cada execução, hasheados. Em **Observabilidade → Evidências** eles
+viram uma superfície do **período**, e não de um run só: até aqui, para ver o
+print da falha era preciso já saber em qual execução ela aconteceu — o que
+inverte a ordem natural, porque muitas vezes é o print que diz onde olhar.
+
+Cada peça carrega o contexto da execução que a produziu (o repositório de
+origem, o resultado, a data) — sem isso um print solto não é evidência de
+nada. Clique na peça para abrir o arquivo; clique na execução para descer até
+ela. Os filtros são tipo, repositório de origem e **só das execuções que
+falharam**, que vem ligado: o print de um run verde quase nunca é o que se
+procura.
+
+### A aba Análise: o agente que junta tudo
+
+O painel responde perguntas isoladas — "está piorando?", "qual produto
+quebra?", "onde estão as violações?". Ninguém junta as três no fim do dia.
+
+Em **Observabilidade → Análise**, o agente lê o período inteiro (saúde, sinais
+com meta e direção declaradas, cenários instáveis, acessibilidade com WCAG e os
+dois recortes de repositório) e escreve o veredito: síntese, saúde em uma
+palavra, riscos com o número que os sustenta, e o que fazer — cada ação com o
+alvo, que costuma ser um repositório de origem.
+
+A análise vira **arquivo** em `workspace/ci/analises/ANL-AAAAMMDD-N.md`, com o
+**dossiê no frontmatter** e o veredito no corpo. Guardar os números junto do
+texto é o que permite comparar depois: comparar só o texto seria resenha de
+resenha, e no dia em que a retenção apagar os runs antigos nem o texto teria
+com o que ser conferido. Sendo arquivo, o histórico sobrevive a um reindex
+(ADR 0001).
+
+**Comparar duas análises** entrega os dois dossiês e os dois vereditos ao
+modelo e pede o julgamento — que é o que um humano faria com as duas folhas
+lado a lado. "Melhorou" não se calcula no código: `success_rate` subiu e
+`lcp_ms` também não diz se o produto está melhor. A comparação vai sempre da
+mais antiga para a mais recente, e separa **melhorou**, **piorou** e
+**continua igual** — o que ficou parado costuma ser o que ninguém pegou.
+
+Exige um provider de IA configurado em **IA → Providers**; sem ele a
+plataforma segue inteira, só sem esta aba.
+
+### Exportar o painel
+
+No cabeçalho da aba, ao lado do período, há **PDF**, **CSV** e **MD**. São três
+perguntas diferentes, não três botões para a mesma:
+
+- **PDF** — o painel *com os gráficos*, para anexar num e-mail ou levar para
+  uma reunião. A série é desenhada dentro do arquivo, não capturada da tela:
+  exportar não depende de haver um navegador aberto.
+- **CSV** — uma linha por **medida** (sinal, quando, valor, meta, execução de
+  origem, conclusão, URL). É o formato que a planilha filtra e agrupa sem
+  ninguém desempilhar nada antes, para cruzar com o que o Arbites não conhece.
+- **MD** — o painel em texto, para ata, issue e wiki; continua legível daqui a
+  um ano sem leitor especial.
+- **CSV de acessibilidade** (botão na aba Acessibilidade) — as regras violadas
+  com gravidade, critério WCAG e número de elementos, para priorizar fora daqui.
+
+O PDF leva as **pizzas**, a saúde **por repositório** e a seção de
+**acessibilidade** com os critérios da WCAG, além das séries.
+
+O arquivo sai nomeado pelo fim do período (`observabilidade-2026-09-16.pdf`) e
+respeita o período escolhido no seletor.
 
 ### A aba Observabilidade
 
@@ -697,6 +846,55 @@ automáticas — e com isso reduzir o acúmulo — ajuste
 > O **log de atividade** (aba Administração → Atividade) é outra coisa, com
 > nome parecido: ele é contínuo e imutável de propósito, e não existe rota
 > que o apague. Registro que o próprio suspeito apaga não prova nada.
+
+## Depois de um `git pull`, reconstrua o frontend
+
+`frontend/dist/` **não** é versionado — é artefato, e versioná-lo encheria o
+histórico de bundle minificado. A consequência é que um `git pull` atualiza o
+**código** e não o que o servidor entrega:
+
+```
+git pull
+npm --prefix frontend run build     # <- sem isto, a tela continua a anterior
+python -m arbites serve
+```
+
+Pular o build faz um conserto que "não apareceu" ficar indistinguível de um
+conserto que não funcionou. Por isso o `serve` agora **avisa no arranque**
+quando o código é mais recente que o build, com o comando pronto — e o mesmo
+aviso entra na aba **Problemas** (a API está atual mesmo quando o bundle está
+velho, então a tela antiga consegue mostrá-lo).
+
+No Docker isso não se aplica: o `docker compose build` roda o `npm run build`
+dentro da imagem. A imagem copia só o `dist`, sem o código ao lado, e nesse
+caso nada é afirmado — sem o que comparar, a resposta é "não sei".
+
+## Conferir o layout em telefone
+
+O Arbites é usado no celular — no corredor, na reunião, na fila. Medir se a
+página estoura horizontalmente **não** prova que a tela está inteira: o que
+quebra em 390px passa por baixo desse número. Texto some dentro de um cartão
+que tem `overflow: hidden`, rótulo de coluna é escrito por cima do valor,
+botão fica com alvo de 16px. A página não estoura em nenhum desses casos.
+
+```
+node frontend/scripts/audita-estreito.mjs \
+  --url http://127.0.0.1:8000 --email voce@exemplo.com --senha ... --largura 390
+```
+
+Ele percorre as telas do menu (e as faixas internas da observabilidade)
+medindo cinco famílias de quebra: `passa-da-viewport`,
+`cortado-pelo-ancestral`, `texto-cortado`, `rotulo-sobre-o-valor` e
+`alvo-pequeno` (WCAG 2.5.8 pede 24×24 CSS px). Sai com código 1 se achar
+algo, então serve de gate. Rode também com `--largura 320`.
+
+Playwright **não** é dependência do projeto — instalá-lo puxaria centenas de
+MB para quem só quer rodar o Arbites. Aponte uma instalação existente com
+`PLAYWRIGHT_ROOT=/caminho/para/node_modules`, ou
+`npm i -D playwright && npx playwright install chromium`.
+
+Tela nova? Acrescente-a à lista `TELAS` do script: uma tela que o detector
+não visita é uma tela sem revisão.
 
 ## Estrutura do repositório
 

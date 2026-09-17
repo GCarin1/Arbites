@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-14",
+  "last_updated": "2026-09-16",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -45,8 +45,8 @@
         "id": "auth",
         "path": ".doctrina/specs/auth/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-09-14",
+        "version": "0.5.1",
+        "last_updated": "2026-09-15",
         "implementation": "verified — `backend/arbites/auth.py`, `backend/arbites/api.py` (rotas /auth/* + gate), `frontend/src/components/AuthGate.tsx`",
         "realizes": [
           "SC15"
@@ -56,8 +56,8 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.4.0",
-        "last_updated": "2026-07-09",
+        "version": "0.12.0",
+        "last_updated": "2026-09-16",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC6"
@@ -105,8 +105,8 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.18.0",
-        "last_updated": "2026-09-13",
+        "version": "0.19.0",
+        "last_updated": "2026-09-16",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
       {
@@ -155,8 +155,8 @@
         "id": "local-automation",
         "path": ".doctrina/specs/local-automation/spec.md",
         "status": "deprecated",
-        "version": "0.14.0",
-        "last_updated": "2026-07-21",
+        "version": "0.15.1",
+        "last_updated": "2026-09-15",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
           "SC5"
@@ -267,8 +267,8 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.4.0",
-        "last_updated": "2026-07-20",
+        "version": "0.5.0",
+        "last_updated": "2026-09-16",
         "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
           "SC1"
@@ -446,8 +446,8 @@
         "title": "Instancia sem admin ativo revela o estado e o e-mail do ambiente vira dono no cadastro",
         "status": "accepted",
         "date": "2026-09-14",
-        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas",
-        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`"
+        "landed": "2026-09-14 — `backend/arbites/auth.py`, `backend/arbites/api.py`, `backend/tests/test_primeiro_dono.py`",
+        "summary": "Numa instância sem nenhum admin ativo, o Arbites passa a fazer duas"
       }
     ],
     "changes": [],
@@ -2645,6 +2645,188 @@
             "operation": "MODIFIED"
           }
         ]
+      },
+      {
+        "id": "0169-tela-troca-senha-obrigatoria",
+        "title": "tela de troca de senha obrigatoria nunca aparece e a sessao acaba entrando no app com todas as chamadas em 403",
+        "path": ".doctrina/changes/archive/2026-09-15-0169-tela-troca-senha-obrigatoria",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "auth",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0170-run-local-cria-execution",
+        "title": "run local cria execution vazia e a falha de arranque do processo nao chega em lugar nenhum",
+        "path": ".doctrina/changes/archive/2026-09-15-0170-run-local-cria-execution",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0171-cts-criados-sincronizacao-caem",
+        "title": "CTs criados pela sincronizacao de feature caem todos numa pasta so em vez de espelhar a arvore dos arquivos",
+        "path": ".doctrina/changes/archive/2026-09-15-0171-cts-criados-sincronizacao-caem",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "local-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0172-bloco-github-alvo-existe",
+        "title": "bloco github do alvo nao existe na UI e o dispatch responde 422 sem dizer o que falta, e salvar pela tela apaga o bloco escrito a mao",
+        "path": ".doctrina/changes/archive/2026-09-15-0172-bloco-github-alvo-existe",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0173-origens-observabilidade-so-existem",
+        "title": "origens da observabilidade so existem no yaml e nao ha onde declara-las pela tela",
+        "path": ".doctrina/changes/archive/2026-09-15-0173-origens-observabilidade-so-existem",
+        "status": "applied",
+        "applied": "2026-09-15",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0174-exportar-painel-observabilidade-graficos",
+        "title": "exportar o painel de observabilidade e os graficos dos sinais",
+        "path": ".doctrina/changes/archive/2026-09-16-0174-exportar-painel-observabilidade-graficos",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0175-manifesto-declara-rotulos-achados",
+        "title": "manifesto declara rotulos e achados estruturados de acessibilidade, com leitor nativo de axe",
+        "path": ".doctrina/changes/archive/2026-09-16-0175-manifesto-declara-rotulos-achados",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0176-painel-ganha-pizzas-recorte",
+        "title": "painel ganha pizzas recorte por repositorio e componente aba de acessibilidade e configuracao em aba separada",
+        "path": ".doctrina/changes/archive/2026-09-16-0176-painel-ganha-pizzas-recorte",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0177-marca-dagua-ingestao-conta",
+        "title": "marca dagua da ingestao conta anexo markdown como run ja ingerido",
+        "path": ".doctrina/changes/archive/2026-09-16-0177-marca-dagua-ingestao-conta",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0178-erros-repositorio-origem-disparou",
+        "title": "erros por repositorio de origem que disparou a suite de teste",
+        "path": ".doctrina/changes/archive/2026-09-16-0178-erros-repositorio-origem-disparou",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0179-agente-analise-observabilidade-historico",
+        "title": "agente de analise da observabilidade com historico e comparativo entre analises",
+        "path": ".doctrina/changes/archive/2026-09-16-0179-agente-analise-observabilidade-historico",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0180-galeria-evidencias-periodo-prints",
+        "title": "galeria de evidencias do periodo com prints e logs dos runs",
+        "path": ".doctrina/changes/archive/2026-09-16-0180-galeria-evidencias-periodo-prints",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0181-revisao-layout-tela-estreita",
+        "title": "revisao de layout em tela estreita com detector reutilizavel",
+        "path": ".doctrina/changes/archive/2026-09-16-0181-revisao-layout-tela-estreita",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0182-build-frontend-desatualizado-servido",
+        "title": "build do frontend desatualizado e servido em silencio apos um git pull",
+        "path": ".doctrina/changes/archive/2026-09-16-0182-build-frontend-desatualizado-servido",
+        "status": "applied",
+        "applied": "2026-09-16",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
       }
     ],
     "skills": [
@@ -2689,6 +2871,12 @@
         "path": ".doctrina/skills/config-deriva-do-projeto-nao-fixa-campos.md",
         "description": "Catálogos/formulários de configuração de um projeto-alvo devem ser DERIVADOS do próprio projeto (ex.: `.env`/`.env.example`), nunca uma lista fixa embutida de campos de um projeto específico.",
         "last_updated": "2026-07-21"
+      },
+      {
+        "id": "configuracao-que-a-tela-nao-alcanca",
+        "path": ".doctrina/skills/configuracao-que-a-tela-nao-alcanca.md",
+        "description": "Toda configuração que uma funcionalidade EXIGE precisa de campo na tela; sem isso o erro correto (\"falta X no arquivo\") não tem onde ser resolvido, e um modelo Pydantic sem o campo ainda APAGA o que foi escrito à mão no arquivo ao salvar pela tela.",
+        "last_updated": "2026-09-15"
       },
       {
         "id": "conteudo-longo-em-tabela-overflow",
@@ -2793,6 +2981,12 @@
         "last_updated": "2026-07-12"
       },
       {
+        "id": "layout-em-tela-estreita",
+        "path": ".doctrina/skills/layout-em-tela-estreita.md",
+        "description": "Conferir layout estreito medindo `scrollWidth` da PÁGINA não pega quase nada — texto cortado dentro do cartão, rótulo escrito por cima do valor, filho cortado pelo ancestral e alvo de toque abaixo de 24px passam todos por baixo desse número; rode `frontend/scripts/audita-estreito.mjs` e trate cada família de achado com o padrão já existente no repo.",
+        "last_updated": "2026-09-16"
+      },
+      {
         "id": "leitura-agrupada-em-card",
         "path": ".doctrina/skills/leitura-agrupada-em-card.md",
         "description": "Como estruturar telas de leitura no frontend Arbites — agrupar metadados num card com cabeçalho (título/status/ações), evitando campos flutuantes sobre o fundo.",
@@ -2803,6 +2997,12 @@
         "path": ".doctrina/skills/lista-vazia-nao-e-sem-filtro.md",
         "description": "Num filtro multi-seleção serializado como string (CSV em query param), a seleção VAZIA e a ausência de filtro colapsam no mesmo valor \"\" — a UI deve tratar seleção vazia localmente (mostrar nada) em vez de mandar \"\" e receber tudo.",
         "last_updated": "2026-07-13"
+      },
+      {
+        "id": "mesmo-componente-em-dois-ramos-mantem-estado",
+        "path": ".doctrina/skills/mesmo-componente-em-dois-ramos-mantem-estado.md",
+        "description": "Dois ramos de um `if` que renderizam o MESMO componente na mesma posição fazem o React reaproveitar a instância — o `useState` inicial não roda de novo e o componente aparece com o estado do ramo anterior; a saída é uma `key` distinta por ramo.",
+        "last_updated": "2026-09-15"
       },
       {
         "id": "metricas-resultado-liquido",
@@ -2851,6 +3051,12 @@
         "path": ".doctrina/skills/progresso-ao-vivo-fonte-oficial-reconcilia.md",
         "description": "Progresso em tempo real parseado de um stream de texto é sempre best-effort — pode e deve existir para UX, mas a fonte oficial estruturada (JSON/artefato final) SEMPRE reconcilia o estado no fim; o live nunca é a verdade final.",
         "last_updated": "2026-07-17"
+      },
+      {
+        "id": "replace-requirement-troca-so-a-primeira-linha",
+        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
+        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
+        "last_updated": "2026-09-14"
       },
       {
         "id": "responsividade-se-verifica-no-navegador-nao-no-css",
@@ -2929,12 +3135,6 @@
         "path": ".doctrina/skills/watcher-vs-handler-mesma-rajada-database-locked.md",
         "description": "Uma operação em lote no filesystem (mover/renomear uma pasta com vários arquivos) dispara uma rajada de eventos no filesystem watcher — cada um reindexando numa conexão SQLite própria — que colide com o loop de reindex do próprio handler HTTP (outra conexão), mesmo com busy_timeout configurado. Só aparece com carga real, nunca no TestClient (watch=False).",
         "last_updated": "2026-07-10"
-      },
-      {
-        "id": "replace-requirement-troca-so-a-primeira-linha",
-        "path": ".doctrina/skills/replace-requirement-troca-so-a-primeira-linha.md",
-        "description": "O op `replace-requirement` de um delta troca apenas a PRIMEIRA linha do bullet alvo — as linhas de continuação de um requisito quebrado em várias linhas sobrevivem e viram texto órfão dentro da spec, sem que analyze, apply ou validate reclamem.",
-        "last_updated": "2026-09-14"
       }
     ],
     "contracts": [

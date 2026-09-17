@@ -4,8 +4,8 @@
 **Status:** active
 **Implementation:** verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)
 **Realizes:** SC1
-**Last updated:** 2026-07-20
-**Version:** 0.4.0
+**Last updated:** 2026-09-16
+**Version:** 0.5.0
 
 ## Purpose
 
@@ -42,6 +42,7 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
   oferece listar/restaurar/esvaziar na aba Problemas.
 - The system shall gerar o arquivo de configuracao inicial comentado e cobrindo todos os blocos que o produto consulta, incluindo os opcionais, porque configuracao que nao aparece no arquivo e configuracao que ninguem descobre.
 - The system shall declarar no proprio arquivo de configuracao que segredo nao entra nele e onde ele mora, ja que o arquivo fica dentro do workspace versionavel.
+- The system shall incluir esse mesmo aviso na lista de problemas da API, para que a interface desatualizada — que continua consultando a API atual — possa mostrá-lo a quem não viu o terminal.
 
 ### Event-driven
 
@@ -52,6 +53,7 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
   `<nome>.arbtrash` com o caminho de origem e a data de moção.
 - When um arquivo criado à mão traz ID manual maior que o contador, the
   system shall ajustar o contador para `max(existente)+1` no reindex.
+- When o processo sobe e o código do frontend é mais recente que o build servido, the system shall avisar no arranque que a interface entregue é a anterior, nomeando o comando de reconstrução com o caminho desta instalação.
 
 ### State-driven
 
@@ -66,6 +68,7 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
   usuário organiza como quiser e a UI espelha a árvore real.
 - The system shall not gravar segredos (PAT GitHub, chaves de IA) em
   arquivos do workspace; segredos vivem no keyring do SO.
+- The system shall not tratar ausência de build como build velho, nem afirmar obsolescência quando o código-fonte não está ao lado do `dist`; sem o que comparar a resposta é "não sei", e a comparação por data de arquivo só justifica aviso, nunca recusa.
 
 ### Optional
 
@@ -88,6 +91,7 @@ existe no disco em formatos abertos (Markdown, YAML, JSON, Gherkin).
    sobrescrever (sufixa em colisão); esvaziar limpa a lixeira — verified by
    `backend/tests/test_trash.py`.
 6. [unverified] O arquivo gerado traz os onze blocos consultados pelo codigo, nasce comentado, avisa que segredo nao entra nele, carrega como a configuracao padrao e nao sobrescreve um arquivo existente — verified by `backend/tests/test_config_padrao.py`.
+7. [verified] Build em dia não avisa; `dist` mais antigo que `src` avisa no arranque e na lista de problemas, com o comando e o caminho corretos; `index.html`, `package.json` e `vite.config.ts` contam como fonte e `node_modules` não; e `dist` sem código ao lado (o caso do container) não afirma nada — verified by `backend/tests/test_build_desatualizado.py`.
 
 ## Maturity
 

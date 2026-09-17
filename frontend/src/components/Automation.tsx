@@ -7,6 +7,12 @@ import type { GithubTokenStatus } from "../types";
 
 const BASE = "/api/v1";
 
+interface GithubTarget {
+  repo: string;
+  workflow: string;
+  ref?: string | null;
+}
+
 interface Target {
   name: string;
   kind: string;
@@ -15,6 +21,8 @@ interface Target {
   python_path: string | null;
   working_dir: string | null;
   timeout_minutes: number | null;
+  /** Onde o workflow deste alvo mora — sem isto o disparo no GitHub não sai. */
+  github: GithubTarget | null;
   scenarios: number;
   queue_length: number;
 }
@@ -483,7 +491,7 @@ function HistoryCard({
   onGoSetup: () => void;
 }) {
   const [runs, setRuns] = useState<
-    { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]
+    { id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number>; abort_reason?: string | null }[]
   >([]);
   const [summary, setSummary] = useState<{
     total_runs: number;
@@ -496,10 +504,10 @@ function HistoryCard({
   useEffect(() => {
     let alive = true;
     Promise.all([
-      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number>; abort_reason?: string | null }[]>(
         `${BASE}/executions?origin=local_run`,
       ),
-      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number> }[]>(
+      json<{ id: string; name: string; origin: string; created_at: string; result_counts: Record<string, number>; abort_reason?: string | null }[]>(
         `${BASE}/executions?origin=github_actions`,
       ),
       json<{
@@ -524,7 +532,15 @@ function HistoryCard({
     };
   }, []);
 
-  function outcomeOf(counts: Record<string, number>): { label: string; dot: string } {
+  function outcomeOf(
+    counts: Record<string, number>,
+    abortReason?: string | null,
+  ): { label: string; dot: string; title?: string } {
+    // O aborto vem primeiro: um run que nem chegou a rodar não é "failed"
+    // nem "sem resultados" — ele tem um motivo, e o motivo é o que resolve
+    // o problema de quem está olhando (change 0170).
+    if (abortReason)
+      return { label: "não executou", dot: "dot-col-blocked", title: abortReason };
     if ((counts["failed"] ?? 0) > 0) return { label: "failed", dot: "dot-col-failed" };
     if ((counts["blocked"] ?? 0) > 0) return { label: "blocked", dot: "dot-col-blocked" };
     if ((counts["passed"] ?? 0) > 0) return { label: "passed", dot: "dot-col-passed" };
@@ -624,14 +640,21 @@ function HistoryCard({
             </thead>
             <tbody>
               {runs.map((r) => {
-                const o = outcomeOf(r.result_counts);
+                const o = outcomeOf(r.result_counts, r.abort_reason);
                 return (
                   <tr key={r.id}>
                     <td className="mono">{r.id}</td>
-                    <td>{r.name}</td>
+                    <td>
+                      {r.name}
+                      {o.title && (
+                        <span className="run-motivo caption">{o.title}</span>
+                      )}
+                    </td>
                     <td className="caption muted">{r.origin}</td>
                     <td>
-                      <span className={`status-dot ${o.dot} caption`}>{o.label}</span>
+                      <span className={`status-dot ${o.dot} caption`} title={o.title}>
+                        {o.label}
+                      </span>
                     </td>
                     <td className="caption muted">{when(r.created_at)}</td>
                   </tr>
@@ -677,6 +700,7 @@ function emptyTarget(): Target {
     python_path: null,
     working_dir: null,
     timeout_minutes: null,
+    github: null,
     scenarios: 0,
     queue_length: 0,
   };
@@ -738,6 +762,14 @@ function TargetsCard({
       python_path: form.python_path?.trim() || null,
       working_dir: form.working_dir?.trim() || null,
       timeout_minutes: timeoutText.trim() ? Number(timeoutText) : null,
+      github:
+        form.github?.repo?.trim() && form.github?.workflow?.trim()
+          ? {
+              repo: form.github.repo.trim(),
+              workflow: form.github.workflow.trim(),
+              ref: form.github.ref?.trim() || null,
+            }
+          : null,
     };
   }
 
@@ -795,6 +827,7 @@ function TargetsCard({
             python_path: t.python_path,
             working_dir: t.working_dir,
             timeout_minutes: t.timeout_minutes,
+            github: t.github,
           })),
         }),
       });
@@ -936,6 +969,70 @@ function TargetsCard({
             value={form.working_dir ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, working_dir: e.target.value }))}
             placeholder="vazio = usa o caminho do repositório"
+          />
+        </div>
+        <div className="field wide">
+          <label>Disparo no GitHub Actions (opcional)</label>
+          <span className="caption muted">
+            Preencha os dois para poder executar este alvo no GitHub. Sem eles
+            só a execução local funciona — o disparo não tem para onde ir.
+          </span>
+        </div>
+        <div className="field">
+          <label htmlFor="alvo-gh-repo">Repositório</label>
+          <input
+            id="alvo-gh-repo"
+            className="mono"
+            value={form.github?.repo ?? ""}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                github: {
+                  repo: e.target.value,
+                  workflow: f.github?.workflow ?? "",
+                  ref: f.github?.ref ?? null,
+                },
+              }))
+            }
+            placeholder="organizacao/repositorio"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="alvo-gh-workflow">Workflow</label>
+          <input
+            id="alvo-gh-workflow"
+            className="mono"
+            value={form.github?.workflow ?? ""}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                github: {
+                  repo: f.github?.repo ?? "",
+                  workflow: e.target.value,
+                  ref: f.github?.ref ?? null,
+                },
+              }))
+            }
+            placeholder="e2e.yml"
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="alvo-gh-ref">Branch (opcional)</label>
+          <input
+            id="alvo-gh-ref"
+            className="mono"
+            value={form.github?.ref ?? ""}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                github: {
+                  repo: f.github?.repo ?? "",
+                  workflow: f.github?.workflow ?? "",
+                  ref: e.target.value,
+                },
+              }))
+            }
+            placeholder="vazio = main"
           />
         </div>
       </div>

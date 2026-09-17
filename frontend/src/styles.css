@@ -3547,6 +3547,226 @@ button.link-chip-btn:disabled {
 }
 /* Aviso de instancia sem admin: quem cadastra precisa saber ANTES que o
    pedido nao tem quem aprove (change 0168). */
+/* Motivo de um run que nao chegou a executar (change 0170): fica na linha,
+   nao so no title, porque em telefone nao ha hover. */
+/* Pizza: divisao do periodo (change 0176). A cor nunca carrega o significado
+   sozinha — a legenda repete rotulo e numero ao lado. */
+.obs-pizzas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+}
+.obs-pizza {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--s2);
+}
+.obs-pizza h4 { margin: 0 0 2px; font-size: var(--fs-body); }
+.obs-pizza-pergunta {
+  margin: 0 0 var(--s1);
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+}
+.obs-pizza-corpo {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.obs-pizza-corpo svg { width: 108px; height: 108px; flex: none; }
+.obs-pizza-legenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.obs-pizza-legenda li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--fs-caption);
+}
+.obs-bolinha {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  transform: translateY(1px);
+}
+.obs-pizza-rotulo { flex: 1; min-width: 0; }
+.obs-pizza-valor { font-variant-numeric: tabular-nums; }
+
+/* Serie rolavel quando ha ponto demais (change 0181).
+
+   Uma serie que reune varios repositorios chega a dezenas de pontos, e eles
+   se espremem ate ficarem a 3px um do outro — em QUALQUER largura. Nesse
+   espaco nenhum toque acerta o ponto que se quer, e a linha vira borrao.
+   A serie passa a ter uma largura minima proporcional ao numero de pontos
+   (`--pontos`, vindo do React, porque o CSS nao sabe contar) e rola dentro do
+   cartao quando nao cabe. */
+.obs-serie-rolagem { overflow-x: auto; overscroll-behavior-x: contain; }
+.obs-serie { min-width: calc(var(--pontos, 1) * 12px); }
+
+/* Revisao de layout em tela estreita (change 0181).
+
+   Duas familias de defeito, as duas invisiveis para o `scrollWidth` da
+   PAGINA — que era o unico teste que estas telas passavam:
+
+   1. TEXTO CORTADO. `text-overflow: ellipsis` numa linha so e otimo em tela
+      larga, onde a reticencia sinaliza "tem mais". Em 390px ela come a frase
+      inteira: "Analisou 30 dia(s) de observabilidade: atencao" virava
+      "Analisou 30 dia(s)...". Em telefone, duas linhas valem mais que uma
+      reticencia.
+   2. ALVO DE TOQUE. WCAG 2.5.8 (AA) pede 24x24 CSS px. Um botao com
+      `height: auto` herda a altura da linha de texto — 16 a 18px — e vira
+      alvo ruim justamente na tela onde so ha dedo. O padding vertical cresce
+      a area de acerto sem mexer na caixa de linha, entao nada muda de altura.
+*/
+@media (max-width: 720px) {
+  /* 1. deixa respirar em vez de cortar */
+  .metric-formula,
+  .exec-item-msg {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  /* 2. alvo de toque */
+  table.dense td a,
+  table.dense td .link-btn,
+  .obs-lista-paginas a,
+  .link-btn,
+  .link-chip-btn {
+    padding-block: 4px;
+  }
+}
+
+/* Galeria de evidencias do periodo (change 0180). */
+.obs-filtros-evidencia { flex-wrap: wrap; align-items: center; gap: var(--s1); }
+/* O `select` do sistema nasce com largura total (e o que se quer num
+   formulario); aqui ele e filtro numa barra, e tres filtros empilhados
+   ocupavam meia tela a toa. */
+.obs-filtros-evidencia select {
+  width: auto;
+  min-width: 11rem;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+.obs-so-falhas {
+  display: inline-flex; align-items: center; gap: 6px; white-space: normal;
+}
+.obs-so-falhas input { width: auto; margin: 0; }
+.obs-galeria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--s2);
+}
+.obs-evidencia { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.obs-evidencia-peca {
+  display: flex; align-items: center; justify-content: center;
+  /* Altura fixa para a grade nao virar escada: print de 4k e de 320px
+     convivem na mesma linha. */
+  height: 120px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--bg-inset, rgba(0, 0, 0, 0.06));
+  overflow: hidden;
+}
+.obs-evidencia-peca img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.obs-evidencia-tipo {
+  font-size: var(--fs-caption); color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.obs-evidencia figcaption {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.obs-evidencia-nome {
+  font-size: var(--fs-caption); overflow-wrap: anywhere;
+}
+/* Botao que nao parece botao: e um atalho dentro da legenda, e o estilo base
+   de button centralizaria e daria altura de controle. */
+.obs-evidencia-run {
+  background: none; border: 0; padding: 0;
+  /* WCAG 2.5.8 pede 24x24 CSS px de alvo. `height: auto` deixava este em
+     18px — e a aba ao lado justamente cobra esse criterio. */
+  height: auto; min-height: 24px;
+  display: inline-flex; align-items: center; gap: 5px;
+  justify-content: flex-start; text-align: left;
+  font-size: var(--fs-caption); color: var(--accent, #388bfd);
+  cursor: pointer; white-space: normal; overflow-wrap: anywhere;
+}
+.obs-evidencia-run:hover { text-decoration: underline; }
+
+/* Analise da observabilidade (change 0179). */
+.obs-analise { margin-bottom: var(--s2); }
+.obs-comparar { flex-wrap: wrap; align-items: center; gap: var(--s1); }
+.obs-comparar select { min-width: 0; flex: 1 1 200px; }
+.obs-comparativo { margin-top: var(--s1); }
+.obs-comparativo h4 { margin: var(--s1) 0 2px; font-size: var(--fs-caption); }
+.obs-comparativo ul { margin: 0; padding-left: 1.1rem; }
+.obs-comparativo li { font-size: var(--fs-caption); }
+
+.obs-nota-origem p { margin: 0 0 var(--s1); }
+.obs-nota-origem h4 { margin: 0 0 var(--s1); font-size: var(--fs-body); }
+
+/* Recorte por repositorio/rotulo: a media global nao e a saude de nada
+   quando sao varios micro-frontends (change 0176). */
+.obs-recorte { margin-bottom: var(--s2); }
+.obs-recortes .obs-recorte {
+  background: transparent; border: 0; padding: 0; margin: var(--s1) 0 0;
+}
+.obs-ok { color: var(--success); font-weight: 600; }
+.obs-atencao { color: var(--warning); font-weight: 600; }
+.obs-ruim { color: var(--danger); font-weight: 600; }
+.obs-impacto-critical { color: var(--danger); border-color: var(--danger); }
+.obs-impacto-serious { color: #f0883e; border-color: #f0883e; }
+.obs-impacto-moderate { color: var(--warning); border-color: var(--warning); }
+.obs-impacto-minor { color: #58a6ff; border-color: #58a6ff; }
+.obs-lista-paginas {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.obs-lista-paginas li {
+  display: flex; gap: var(--s1); align-items: baseline; flex-wrap: wrap;
+}
+.obs-lista-paginas li .mono { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.obs-config-nota { margin: var(--s1) 0; }
+
+/* Origens da observabilidade (change 0173). */
+.obs-lista-origens {
+  list-style: none;
+  margin: 0 0 var(--s1);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.obs-lista-origens li {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+.obs-lista-origens li .mono,
+.obs-lista-origens li .caption {
+  /* `owner/repo` longo e `mono` nao tem espaco onde quebrar: sem isto a
+     linha estourava o cartao em 390px (defeito da 0173). */
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.run-motivo {
+  display: block;
+  margin-top: 2px;
+  color: var(--warning, #d29922);
+  white-space: normal;
+}
+
 .login-sem-admin {
   border: 1px solid var(--warning, #d29922);
   background: rgba(210, 153, 34, 0.1);
@@ -3954,6 +4174,12 @@ button.link-chip-btn:disabled {
     grid-template-columns: 34% minmax(0, 1fr);
     align-items: baseline;
     gap: var(--s1);
+    /* Empilhada, a celula deixa de ser coluna e vira linha de cartao: o
+       `nowrap` que mantem a tabela larga alinhada aqui so faz o valor
+       transbordar. `b3/app-investidor-mobile` nao tem onde quebrar sozinho
+       (change 0181). */
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   /* o `<span>` do e-mail é um ELEMENTO, então vira item próprio do grid e
      caía na coluna do rótulo; preso à coluna 2, ele desce como segunda
@@ -3968,6 +4194,16 @@ button.link-chip-btn:disabled {
     font-size: var(--fs-caption);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    /* Um rotulo longo ("REPOSITÓRIO DE ORIGEM") transbordava a faixa de 34%
+       e ia POR CIMA do valor. Duas causas, as duas precisam cair:
+       `white-space: nowrap` herdado da celula (sem isto `overflow-wrap` nao
+       tem onde quebrar) e a fonte MONO herdada de `td.mono` — o rotulo e
+       cromo de interface, nao dado, e em mono ele fica bem mais largo.
+       (change 0181) */
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-family: var(--font-ui);
   }
   /* célula de ações: sem rótulo, ocupando a largura, botões quebrando */
   table.dense.stack-narrow td[data-label=""] {
@@ -4040,7 +4276,10 @@ button.link-chip-btn:disabled {
   font-size: 0.82rem; max-width: 70ch;
 }
 
-.obs-saude { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, 1fr); }
+/* Faixa de tres numeros. `obs-saude` e o caso do painel; `obs-cartoes` e a
+   mesma faixa em qualquer outro bloco (change 0176). */
+.obs-saude,
+.obs-cartoes { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, 1fr); }
 .obs-cartao { display: flex; flex-direction: column; gap: 0.15rem; }
 .obs-rotulo {
   font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;
@@ -4093,6 +4332,11 @@ button.link-chip-btn:disabled {
   border-radius: 50%; border: 2px solid var(--surface);
   background: var(--accent, #58a6ff); cursor: pointer; min-width: 0;
 }
+/* Tentei crescer a area de acerto com um `::after` invisivel de 24x24 e o
+   efeito foi o OPOSTO: com os pontos a poucos pixels um do outro, a area
+   invisivel do vizinho passa por cima e rouba o toque do ponto visivel.
+   Area de acerto so resolve alvo isolado; alvo denso precisa de ESPACO, que
+   e o que a rolagem abaixo da. */
 .obs-ponto-falha { background: var(--danger); }
 .obs-ponto-ativo { outline: 2px solid var(--text); outline-offset: 1px; }
 
@@ -4153,7 +4397,7 @@ button.link-chip-btn:disabled {
 @media (max-width: 860px) {
   /* Três cartões lado a lado viram três colunas de 90 px em 390 px, e o
      número de 1.6rem quebra no meio. Uma coluna é mais honesto. */
-  .obs-saude { grid-template-columns: 1fr; }
+  .obs-saude, .obs-cartoes { grid-template-columns: 1fr; }
   .obs-grade-sinais { grid-template-columns: 1fr; }
   .obs-topo { flex-direction: column; align-items: stretch; }
   .obs-controles { justify-content: flex-start; }

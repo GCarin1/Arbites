@@ -152,7 +152,27 @@ def main() -> None:
     import uvicorn
 
     os.environ["ARBITES_WORKSPACE"] = args.workspace
-    from .api import create_app
+    from .api import _dist_do_frontend, create_app
+    from . import build_front
+
+    # `frontend/dist/` não é versionado: `git pull` atualiza o CÓDIGO e não o
+    # que este processo entrega. Sem este aviso, um conserto que "não
+    # apareceu" é indistinguível de um conserto que não funcionou — e quem
+    # está depurando gasta a tarde na tela errada (change 0182).
+    situacao = build_front.estado(_dist_do_frontend())
+    if situacao.get("desatualizado"):
+        print(
+            "\nATENÇÃO: o código do frontend é mais recente que o build em"
+            f" {situacao['servindo']}.\n"
+            "A interface servida é a ANTERIOR. Reconstrua antes de conferir:\n"
+            f"  {build_front.comando(_dist_do_frontend())}\n"
+        )
+    elif not situacao.get("existe"):
+        print(
+            f"\nAVISO: não há build do frontend em {situacao['servindo']};"
+            " só a API será servida.\n"
+            f"  {build_front.comando(_dist_do_frontend())}\n"
+        )
 
     uvicorn.run(create_app(args.workspace), host="127.0.0.1", port=args.port)
 

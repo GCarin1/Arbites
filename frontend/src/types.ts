@@ -891,6 +891,58 @@ export interface Observability {
   flaky: CiFlaky[];
   changes: CiChange[];
   runs: CiRun[];
+  /** Divisões do período — a pergunta "de que é feito", que a série não responde. */
+  distribution: {
+    runs_by_conclusion: CiFatia[];
+    scenarios_by_status: CiFatia[];
+  };
+  findings: CiAchados;
+  /** Saúde por repositório de teste e por rótulo declarado no manifesto. */
+  by_repo: CiRecorte[];
+  /** Saúde por repositório que DISPAROU a suíte — a aplicação, não o teste. */
+  by_origin: CiRecorte[];
+  errors_by_origin: CiFatia[];
+  label_names: string[];
+  by_label: Record<string, CiRecorte[]>;
+}
+
+export interface CiFatia {
+  label: string;
+  value: number;
+  /** Calculada no servidor: duas telas dividindo por conta própria discordam. */
+  pct: number;
+}
+
+export interface CiRecorte {
+  name: string;
+  runs: number;
+  failures: number;
+  success_rate: number | null;
+  success_rate_previous: number | null;
+  delta_pct: number | null;
+  last_run_at: string | null;
+}
+
+export interface CiRegra {
+  rule: string;
+  impact: string;
+  wcag: string | null;
+  level: string | null;
+  count: number;
+  runs: number;
+  help: string | null;
+  help_url: string | null;
+}
+
+export interface CiAchados {
+  total: number;
+  previous_total: number;
+  delta_pct: number | null;
+  by_impact: CiFatia[];
+  by_category: CiFatia[];
+  top_rules: CiRegra[];
+  by_wcag: { wcag: string; level: string | null; count: number }[];
+  top_pages: { page: string; count: number }[];
 }
 
 export interface GithubTokenStatus {
@@ -967,4 +1019,71 @@ export interface TodoList {
   items: TodoListItem[];
   progress: { total: number; done: number; open: number };
   body: string;
+}
+
+/** Repositório de onde a observabilidade puxa execuções (change 0173). */
+export interface CiSource {
+  provider?: string;
+  repo: string;
+  /** Vazio = todos os workflows do repositório. */
+  workflow?: string | null;
+  /** Vazio = todos os artifacts do run. */
+  artifact?: string | null;
+}
+
+/** Uma análise da observabilidade guardada no workspace (change 0179). */
+export interface CiAnaliseResumo {
+  id: string;
+  created_at: string;
+  days: number | null;
+  provider: string | null;
+  saude_geral: string | null;
+  sintese: string | null;
+  runs: number | null;
+  success_rate: number | null;
+  findings_total: number | null;
+  riscos: number;
+  path: string;
+}
+
+export interface CiAnalise extends CiAnaliseResumo {
+  body: string;
+  riscos_detalhe?: { titulo: string; evidencia: string; gravidade: string }[];
+}
+
+export interface CiComparativo {
+  from: string;
+  to: string;
+  from_at: string | null;
+  to_at: string | null;
+  veredito: string;
+  sintese: string;
+  melhoras: string[];
+  pioras: string[];
+  permanece: string[];
+  proximo_passo: string;
+}
+
+/** Uma evidência do período, com o contexto do run colado (change 0180). */
+export interface CiEvidencia {
+  kind: string;
+  path: string;
+  title: string | null;
+  bytes: number | null;
+  sha256: string | null;
+  run_id: string;
+  workflow: string | null;
+  conclusion: string | null;
+  repo: string | null;
+  trigger_repo: string | null;
+  url: string | null;
+  at: string | null;
+}
+
+export interface CiEvidencias {
+  items: CiEvidencia[];
+  by_kind: CiFatia[];
+  total_bytes: number;
+  /** O limite foi atingido: há mais evidência do que a lista mostra. */
+  truncated: boolean;
 }

@@ -11,6 +11,7 @@ entram no mesmo execution.json do fluxo manual, via o adapter
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import shutil
 import sqlite3
@@ -48,6 +49,54 @@ def load_env_file(path: Path) -> dict[str, str]:
         if key:
             values[key] = value.strip().strip('"').strip("'")
     return values
+
+
+class PythonPathError(Exception):
+    """`python_path` do target não aponta para um interpretador utilizável."""
+
+
+def resolver_python(bruto: str | None) -> str:
+    """Resolve o interpretador do target, ou explica por que não dá.
+
+    `python_path` é o EXECUTÁVEL do Python — mas o nome sugere `PYTHONPATH`, e
+    quem preenche costuma pôr ali a pasta do projeto, a do virtualenv ou o
+    `.env`. Sem isto o valor errado ia direto para `create_subprocess_exec`,
+    que levanta PermissionError lá no worker: a execution nascia vazia e a
+    tela dizia só "sem resultados" (change 0170).
+
+    Apontar para a PASTA de um virtualenv é comum o bastante para valer o
+    conserto em vez da recusa: `<venv>/Scripts/python.exe` e `<venv>/bin/python`
+    são procurados antes de desistir.
+    """
+    valor = (bruto or "").strip()
+    if not valor:
+        return sys.executable
+    caminho = Path(valor)
+    if caminho.is_dir():
+        for relativo in ("Scripts/python.exe", "bin/python", "bin/python3",
+                         "Scripts/python3.exe"):
+            candidato = caminho / relativo
+            if candidato.is_file():
+                return str(candidato)
+        raise PythonPathError(
+            f"python_path aponta para a pasta '{valor}', e não há"
+            " Scripts/python.exe nem bin/python dentro dela."
+            " Informe o executável do Python (ex.:"
+            " C:\\...\\.venv\\Scripts\\python.exe) ou deixe em branco"
+            " para usar o Python que roda o Arbites."
+        )
+    if not caminho.exists():
+        raise PythonPathError(
+            f"python_path '{valor}' não existe. Informe o executável do Python"
+            " ou deixe em branco para usar o Python que roda o Arbites."
+        )
+    if not os.access(str(caminho), os.X_OK):
+        raise PythonPathError(
+            f"python_path '{valor}' existe mas não é executável — parece um"
+            " arquivo de configuração, não um interpretador. O `.env` do"
+            " projeto já é lido sozinho; este campo quer o python.exe."
+        )
+    return str(caminho)
 
 
 def build_run_env(
@@ -200,6 +249,12 @@ class RunManager:
                 continue
             try:
                 await self._execute(run)
+            except PythonPathError as exc:
+                # Erro de configuração, não defeito do runner: a mensagem já
+                # diz o que corrigir e vai inteira para a execution.
+                run.emit(f"[arbites] {exc}")
+                self._mark_pending(run, "blocked", str(exc))
+                run.finish("failed")
             except Exception as exc:  # nunca derruba o worker do target
                 run.emit(f"[arbites] erro interno do runner: {exc}")
                 self._mark_pending(run, "blocked", f"runner error: {exc}")
@@ -215,7 +270,7 @@ class RunManager:
         evidence_dir = workdir / "evidences"
         evidence_dir.mkdir()
 
-        python = str(target.get("python_path") or sys.executable)
+        python = resolver_python(target.get("python_path"))
         # sem path posicional o behave resolve ./features via cwd=local_path;
         # com run.feature, o arquivo .feature específico entra como posicional
         # (behave <arquivo>.feature --tags=<tag>) — doc de ajustes §1.5.1
@@ -228,8 +283,6 @@ class RunManager:
             cmd.append(f"--tags={','.join(run.tags)}")
         cmd.extend(run.features)  # 1..N .feature posicionais (0076)
         run.emit(f"[arbites] $ {' '.join(cmd)}")
-
-        import os
 
         # 0099: injeta o `.env` do projeto-alvo — sem isto o Behave/WebDriver
         # não vê BASE_URL/LOCAL_BROWSER/credenciais e o browser abre sem destino.
@@ -391,17 +444,20 @@ class RunManager:
             execution = exec_ops.load(self.ws, run.exec_id)
         except exec_ops.ExecutionError:
             return
-        changed = False
         for result in execution["results"]:
             if result["status"] in ("pending", "in_progress"):
                 result["status"] = status
                 result["column"] = status
                 result["error"] = error
-                changed = True
-        if changed:
-            execution["history"].append(
-                {"at": _now(), "who": "arbites", "event": "run_aborted",
-                 "reason": error}
-            )
-            path = exec_ops.save(self.ws, execution)
-            reindex_file(self.ws, self.conn, path)
+        # O registro do aborto NÃO depende de haver resultado para marcar
+        # (change 0170). Uma execution sem CT vinculado — legítima desde a
+        # 0067, o vínculo é rastreabilidade e não pré-requisito — perdia o
+        # motivo inteiro: a tela mostrava "sem resultados" e o porquê morria
+        # no log do run, que some quando se troca de aba.
+        execution["aborted"] = {"at": _now(), "reason": error}
+        execution["history"].append(
+            {"at": _now(), "who": "arbites", "event": "run_aborted",
+             "reason": error}
+        )
+        path = exec_ops.save(self.ws, execution)
+        reindex_file(self.ws, self.conn, path)

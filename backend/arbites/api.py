@@ -48,7 +48,7 @@ from . import ai as ai_ops
 from . import daily as daily_ops
 from . import xray_import as xray_ops
 from .ai import AIKeyStore, AIProviderError
-from . import ci_ingest, ci_retencao, integrations_bulk as bulk_ops
+from . import build_front, ci_analise, ci_ingest, ci_retencao, integrations_bulk as bulk_ops
 from . import notifications as notif_ops
 from . import todolists as list_ops
 from . import integrations_file as file_ops, mcp_write
@@ -67,7 +67,7 @@ from .gherkin_scan import (
     list_feature_files,
     scan_target,
 )
-from .runner import RunManager
+from .runner import PythonPathError, RunManager, resolver_python
 from .xray_import import XrayImportError
 from .indexer import clear_needs_rerun, connect, reindex_file, reindex_full
 from .parser import parse_markdown
@@ -355,6 +355,46 @@ class AIProvidersIn(BaseModel):
     keys: dict[str, str] = {}  # name → chave; vai direto ao keyring
 
 
+class AnaliseCIIn(BaseModel):
+    days: int = 30
+    provider: str | None = None
+
+
+class CompararAnalisesIn(BaseModel):
+    a: str
+    b: str
+    provider: str | None = None
+
+
+class ObservabilitySourceIn(BaseModel):
+    """Um repositório de onde a observabilidade puxa execuções (change 0173).
+
+    `workflow` e `artifact` vazios significam "todos" — é o caso comum e
+    exigir os dois só faria o operador adivinhar nomes.
+    """
+
+    provider: str = "github"
+    repo: str
+    workflow: str | None = None
+    artifact: str | None = None
+
+
+class ObservabilitySourcesIn(BaseModel):
+    sources: list[ObservabilitySourceIn] = []
+    max_runs_per_poll: int | None = None
+
+
+class GithubTargetIn(BaseModel):
+    """Onde o workflow deste alvo mora. Sem `repo` e `workflow` o dispatch
+    não tem para onde ir — e este bloco não tinha representação no modelo,
+    então salvar o alvo pela tela APAGAVA o que estivesse escrito à mão no
+    `arbites.yaml` (change 0172)."""
+
+    repo: str = ""       # "owner/repo"
+    workflow: str = ""   # nome do arquivo, ex.: "e2e.yml"
+    ref: str | None = None
+
+
 class AutomationTargetIn(BaseModel):
     name: str
     kind: str = "behave"
@@ -363,6 +403,7 @@ class AutomationTargetIn(BaseModel):
     python_path: str | None = None
     working_dir: str | None = None
     timeout_minutes: float | None = None
+    github: GithubTargetIn | None = None
 
 
 class AutomationTargetsIn(BaseModel):
@@ -967,10 +1008,14 @@ def _register_routes(app: FastAPI) -> None:
         # inteira, enquanto um aviso de integridade é de um arquivo só.
         credencial: CredentialState = request.app.state.credential
         tokens = request.app.state.tokens
+        # Build velho do frontend (change 0182): DERIVADO a cada leitura, como
+        # o da credencial. A tela que mostra este aviso é a antiga — e é
+        # justamente por isso que ela precisa mostrá-lo: a API está atual.
+        do_build = build_front.aviso(_dist_do_frontend())
         return credencial.problemas(
             tokens.get() is not None,
             gravavel=tokens.available(), origem=tokens.source(),
-        ) + avisos
+        ) + ([do_build] if do_build else []) + avisos
 
     @app.get(API_PREFIX + "/warnings")
     async def get_warnings(request: Request):
@@ -2355,6 +2400,7 @@ def _register_routes(app: FastAPI) -> None:
                     "python_path": target.get("python_path"),
                     "working_dir": target.get("working_dir"),
                     "timeout_minutes": target.get("timeout_minutes"),
+                    "github": target.get("github") or None,
                     "scenarios": scenarios,
                     "queue_length": runner.queue_length(str(name)),
                 }
@@ -2378,9 +2424,25 @@ def _register_routes(app: FastAPI) -> None:
         import yaml as _yaml
 
         config = ws.config()
-        config["automation_targets"] = [
-            t.model_dump(exclude_none=True) for t in payload.targets
-        ]
+        # Recusar aqui poupa a viagem inteira (change 0170): o valor errado
+        # em `python_path` só falhava na hora de executar, e a execution
+        # nascia vazia dizendo "sem resultados".
+        for alvo in payload.targets:
+            try:
+                resolver_python(alvo.python_path)
+            except PythonPathError as exc:
+                raise _error(422, "bad_python_path",
+                             f"alvo '{alvo.name}': {exc}")
+        alvos = []
+        for t in payload.targets:
+            bruto = t.model_dump(exclude_none=True)
+            gh = bruto.get("github") or {}
+            # Bloco pela metade é pior que bloco ausente: o dispatch acusaria
+            # "sem repo/workflow" com o bloco na cara de quem olha o YAML.
+            if not (gh.get("repo") and gh.get("workflow")):
+                bruto.pop("github", None)
+            alvos.append(bruto)
+        config["automation_targets"] = alvos
         ws.config_path.write_text(
             _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
@@ -2445,10 +2507,15 @@ def _register_routes(app: FastAPI) -> None:
             return feat, sc
 
         created: list[str] = []
-        folder = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
-        target_dir = _safe_area_dir(ws, "testcases", folder)
+        raiz = (payload.folder or f"automacao/{slugify(payload.target)}").strip("/")
         for item in payload.create:
             feat, sc = find_scenario(item.feature_path, item.scenario_name)
+            # Uma pasta por arquivo `.feature`, espelhando a árvore do
+            # repositório (change 0171). Antes tudo caía em `raiz` e um
+            # projeto com dezenas de features virava uma lista chapada.
+            sub = feature_sync_ops.pasta_do_cenario(item.feature_path, glob)
+            folder = f"{raiz}/{sub}".strip("/") if sub else raiz
+            target_dir = _safe_area_dir(ws, "testcases", folder)
             new_id = ws.next_id("testcase")
             today = date.today().isoformat()
             meta = {
@@ -2879,6 +2946,48 @@ def _register_routes(app: FastAPI) -> None:
     # O que já foi ingerido é respondido pelo DISCO, então repetir a ingestão
     # não duplica e uma semana desligado volta inteira.
 
+    @app.get(API_PREFIX + "/ci/sources")
+    async def get_ci_sources(request: Request):
+        config = ws_of(request).config().get("observability") or {}
+        return {"sources": config.get("sources") or [],
+                "max_runs_per_poll": config.get("max_runs_per_poll") or 50}
+
+    @app.put(API_PREFIX + "/ci/sources")
+    async def put_ci_sources(request: Request, payload: ObservabilitySourcesIn):
+        """Declara as origens sem abrir o YAML na mão (change 0173).
+
+        Antes só existiam no arquivo: quem clicava em "Buscar execuções" numa
+        instalação nova recebia "nenhuma fonte" e não tinha onde declarar uma.
+        """
+        ws = ws_of(request)
+        import yaml as _yaml
+
+        config = ws.config()
+        observabilidade = dict(config.get("observability") or {})
+        fontes = []
+        for fonte in payload.sources:
+            if not fonte.repo.strip():
+                continue
+            limpa: dict[str, Any] = {"provider": fonte.provider or "github",
+                                     "repo": fonte.repo.strip()}
+            # Vazio quer dizer "todos": gravar a chave com "" faria a
+            # ingestão procurar um workflow chamado string vazia.
+            if (fonte.workflow or "").strip():
+                limpa["workflow"] = fonte.workflow.strip()
+            if (fonte.artifact or "").strip():
+                limpa["artifact"] = fonte.artifact.strip()
+            fontes.append(limpa)
+        observabilidade["sources"] = fontes
+        if payload.max_runs_per_poll:
+            observabilidade["max_runs_per_poll"] = int(payload.max_runs_per_poll)
+        config["observability"] = observabilidade
+        ws.config_path.write_text(
+            _yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        return {"sources": fontes,
+                "max_runs_per_poll": observabilidade.get("max_runs_per_poll") or 50}
+
     @app.post(API_PREFIX + "/ci/ingest")
     async def ci_ingest_now(request: Request, limit: int | None = None):
         ingestor: CIIngestor = request.app.state.ci_ingest
@@ -2901,6 +3010,102 @@ def _register_routes(app: FastAPI) -> None:
             raise _error(422, "invalid_period", "days deve estar entre 1 e 365")
         return ci_ingest.painel(ws_of(request), conn_of(request), days)
 
+    @app.get(API_PREFIX + "/ci/observability/export")
+    async def export_observability(request: Request, format: str = "pdf",
+                                   days: int = 30):
+        """O painel inteiro em arquivo (change 0174).
+
+        Três formatos porque são três perguntas: a série crua para a planilha
+        (csv), o painel em texto para ata e wiki (md), e o painel COM os
+        gráficos para anexar e mandar (pdf).
+        """
+        from . import export_obs
+
+        painel = ci_ingest.painel(ws_of(request), conn_of(request), days)
+        sufixo = (painel.get("period") or {}).get("until", "")[:10] or "hoje"
+        if format == "findings":
+            # Os achados agregados, para a planilha priorizar fora do Arbites
+            # (change 0176) — outra pergunta que o csv de série não responde.
+            return PlainTextResponse(
+                export_obs.achados_csv(painel),
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition":
+                         f'attachment; filename="acessibilidade-{sufixo}.csv"'},
+            )
+        if format == "csv":
+            return PlainTextResponse(
+                export_obs.sinais_csv(painel),
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition":
+                         f'attachment; filename="observabilidade-{sufixo}.csv"'},
+            )
+        if format == "md":
+            return PlainTextResponse(
+                export_obs.painel_markdown(painel),
+                media_type="text/markdown; charset=utf-8",
+                headers={"Content-Disposition":
+                         f'attachment; filename="observabilidade-{sufixo}.md"'},
+            )
+        if format == "pdf":
+            return Response(
+                content=export_obs.painel_pdf(painel),
+                media_type="application/pdf",
+                headers={"Content-Disposition":
+                         f'attachment; filename="observabilidade-{sufixo}.pdf"'},
+            )
+        raise _error(422, "invalid_format",
+                     "format deve ser pdf, md, csv ou findings")
+
+    # -- agente de análise da observabilidade (change 0179) ---------------
+    #
+    # O painel responde perguntas isoladas; ninguém junta as três no fim do
+    # dia. O agente junta, escreve o veredito e GUARDA — como artefato do
+    # workspace, para o histórico sobreviver a um reindex (ADR 0001).
+
+    @app.post(API_PREFIX + "/ci/analysis")
+    async def criar_analise_ci(request: Request, payload: AnaliseCIIn):
+        ws, conn = ws_of(request), conn_of(request)
+        provider = _ai_provider(request, payload.provider)
+        nome = payload.provider or (_ai_config(ws).get("default_provider") or "")
+        quadro = ci_ingest.painel(ws, conn, payload.days)
+        if not (quadro.get("health") or {}).get("runs"):
+            raise _error(422, "no_runs",
+                         "não há execução ingerida no período; não há o que"
+                         " analisar")
+        analise = await asyncio.to_thread(
+            ci_analise.analisar, provider, ws, quadro, nome,
+            _with_memory(request, ""),
+        )
+        _log_agent_event(
+            ws, conn, "analyze_observability", analise["id"], analise["id"],
+            f"Analisou {payload.days} dia(s) de observabilidade:"
+            f" {analise.get('saude_geral')}",
+        )
+        return analise
+
+    @app.get(API_PREFIX + "/ci/analysis")
+    async def listar_analises_ci(request: Request, limit: int = 50):
+        return {"analyses": ci_analise.listar(ws_of(request), limit)}
+
+    @app.get(API_PREFIX + "/ci/analysis/{analise_id}")
+    async def ler_analise_ci(request: Request, analise_id: str):
+        try:
+            return ci_analise.ler(ws_of(request), analise_id)
+        except ci_analise.AnaliseError as e:
+            raise _error(e.status, e.code, e.message)
+
+    @app.post(API_PREFIX + "/ci/analysis/compare")
+    async def comparar_analises_ci(request: Request, payload: CompararAnalisesIn):
+        """Compara duas análises guardadas — sempre da mais velha para a mais
+        nova, porque "melhorou" depende de qual veio antes."""
+        ws = ws_of(request)
+        provider = _ai_provider(request, payload.provider)
+        try:
+            return await asyncio.to_thread(
+                ci_analise.comparar, provider, ws, payload.a, payload.b)
+        except ci_analise.AnaliseError as e:
+            raise _error(e.status, e.code, e.message)
+
     @app.get(API_PREFIX + "/ci/retention")
     async def ci_retention_preview(request: Request):
         """O que está ocupado e o que a próxima limpeza levaria — ANTES de
@@ -2917,6 +3122,21 @@ def _register_routes(app: FastAPI) -> None:
     @app.get(API_PREFIX + "/ci/runs/{run_id}")
     async def ci_run_detail(request: Request, run_id: str):
         return ci_ingest.run_detalhado(ws_of(request), conn_of(request), run_id)
+
+    @app.get(API_PREFIX + "/ci/evidences")
+    async def ci_evidencias(request: Request, days: int = 30,
+                            kind: str = "", origin: str = "",
+                            failures_only: bool = False, limit: int = 120):
+        """Prints e logs do PERÍODO (change 0180).
+
+        Até aqui a evidência só existia dentro da descida: para ver o print da
+        falha era preciso já saber em qual execução ela aconteceu.
+        """
+        _, inicio, fim = ci_ingest._dias_atras(days)
+        return ci_ingest.evidencias(
+            conn_of(request), inicio, fim, kind or None, origin or None,
+            failures_only, limit,
+        )
 
     @app.get(API_PREFIX + "/ci/attachment")
     async def ci_attachment(request: Request, path: str):
@@ -4845,6 +5065,10 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # lixeira. LER a prévia continua aberto — ver o que seria removido é o
     # que permite alguém discordar antes de acontecer.
     (r"/ci/retention/apply$", {"POST"}, "admin", None),
+    # Declarar de onde a observabilidade puxa é escrever no arbites.yaml, o
+    # mesmo alcance de PUT /targets e PUT /ai/providers. LER continua aberto:
+    # a tela precisa dizer "nenhuma origem declarada" a quem não é admin.
+    (r"/ci/sources$", {"PUT"}, "admin", None),
     (r"/audit$", {"DELETE"}, "admin", None),
     (r"/audit/[^/]+$", {"DELETE"}, "admin", None),
     (r"/admin/(?!switches$)", {"GET", "POST", "PUT", "DELETE"}, "admin", None),
@@ -5223,12 +5447,18 @@ def _register_auth(app: FastAPI) -> None:
         _set_session_cookie(response, request, token)
         return response
 
-def _mount_frontend(app: FastAPI) -> None:
-    """Serve o build da SPA (frontend/dist) como estático — um comando sobe tudo."""
-    dist = os.environ.get(
+def _dist_do_frontend() -> str:
+    """Onde a SPA é servida. Um lugar só, porque o gate de build (change 0182)
+    precisa olhar exatamente a mesma pasta que o mount serve."""
+    return os.environ.get(
         "ARBITES_FRONTEND_DIST",
         str(Path(__file__).resolve().parents[2] / "frontend" / "dist"),
     )
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve o build da SPA (frontend/dist) como estático — um comando sobe tudo."""
+    dist = _dist_do_frontend()
     if Path(dist).is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="spa")
 

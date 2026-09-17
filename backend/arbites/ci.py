@@ -285,9 +285,17 @@ class CIManager:
             if target.get("name") == name:
                 github = target.get("github") or {}
                 if not github.get("repo") or not github.get("workflow"):
-                    raise CIError("no_github",
-                                  f"target '{name}' sem bloco github (repo/workflow)",
-                                  422)
+                    # A mensagem antiga nomeava o bloco do YAML, que não tinha
+                    # campo na tela: quem levava o 422 não tinha onde mexer
+                    # (change 0172).
+                    raise CIError(
+                        "no_github",
+                        f"o alvo '{name}' não tem repositório e workflow do"
+                        " GitHub configurados, então não há para onde disparar."
+                        " Preencha os dois em Automação → Configurar; sem eles"
+                        " só a execução local funciona.",
+                        422,
+                    )
                 return target
         raise CIError("not_found", f"target '{name}' não configurado", 404)
 

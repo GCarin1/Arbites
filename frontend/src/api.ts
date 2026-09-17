@@ -15,7 +15,12 @@ import type {
   AuditHistoryEntry,
   AuditReport,
   AutomationReport,
+  CiAnalise,
+  CiAnaliseResumo,
+  CiComparativo,
+  CiEvidencias,
   CiRetention,
+  CiSource,
   CiRun,
   DailyContext,
   DailyDigestResult,
@@ -68,6 +73,17 @@ export function onUnauthenticated(listener: () => void): () => void {
   return () => unauthenticatedListeners.delete(listener);
 }
 
+// O mesmo, para a sessao que existe mas esta presa na troca de senha
+// obrigatoria (change 0169). O backend responde 403 `password_change_required`
+// em TODA rota que nao seja a troca; sem este canal a SPA fica montada
+// pedindo dados que nunca chegam, e a pessoa nao tem para onde ir.
+const passwordChangeListeners = new Set<() => void>();
+
+export function onPasswordChangeRequired(listener: () => void): () => void {
+  passwordChangeListeners.add(listener);
+  return () => passwordChangeListeners.delete(listener);
+}
+
 /**
  * Mensagem de falha de REDE (change 0134).
  *
@@ -104,6 +120,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (resp.status === 401 && !path.startsWith("/auth/")) {
     for (const listener of unauthenticatedListeners) listener();
+  }
+  if (resp.status === 403 && !path.startsWith("/auth/")) {
+    // Ler o corpo aqui consome o stream, entao usa-se um clone: o fluxo de
+    // erro abaixo ainda precisa da mensagem original.
+    try {
+      const data = await resp.clone().json();
+      if (data?.error?.code === "password_change_required") {
+        for (const listener of passwordChangeListeners) listener();
+      }
+    } catch {
+      /* corpo não-JSON: não é o nosso 403 */
+    }
   }
   if (!resp.ok) {
     let message = `${resp.status} ${resp.statusText}`;
@@ -198,6 +226,46 @@ export const api = {
   ciIngest: () =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
               stopped?: string }>("/ci/ingest", { method: "POST" }),
+  ciSources: () =>
+    request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
+  ciSourcesSave: (sources: CiSource[]) =>
+    request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources", {
+      method: "PUT",
+      body: JSON.stringify({ sources }),
+    }),
+  /** URL de download do painel — `<a download>` em vez de fetch: o navegador
+   *  cuida do arquivo, e a sessão vai no cookie como em qualquer navegação. */
+  observabilityExportUrl: (
+    format: "pdf" | "md" | "csv" | "findings",
+    days: number,
+  ) =>
+    `${BASE}/ci/observability/export?format=${format}&days=${days}`,
+  ciAnalises: () =>
+    request<{ analyses: CiAnaliseResumo[] }>("/ci/analysis"),
+  ciAnalise: (id: string) =>
+    request<CiAnalise & { body: string }>(`/ci/analysis/${encodeURIComponent(id)}`),
+  ciAnalisar: (days: number) =>
+    request<CiAnalise & { body: string }>("/ci/analysis", {
+      method: "POST",
+      body: JSON.stringify({ days }),
+    }),
+  ciCompararAnalises: (a: string, b: string) =>
+    request<CiComparativo>("/ci/analysis/compare", {
+      method: "POST",
+      body: JSON.stringify({ a, b }),
+    }),
+  ciEvidencias: (params: {
+    days: number;
+    kind?: string;
+    origin?: string;
+    failuresOnly?: boolean;
+  }) => {
+    const qs = new URLSearchParams({ days: String(params.days) });
+    if (params.kind) qs.set("kind", params.kind);
+    if (params.origin) qs.set("origin", params.origin);
+    if (params.failuresOnly) qs.set("failures_only", "true");
+    return request<CiEvidencias>(`/ci/evidences?${qs.toString()}`);
+  },
   ciRetention: () => request<CiRetention>("/ci/retention"),
   ciRetentionApply: () =>
     request<{ removed: { attachments: string[]; runs: string[]; bytes: number } }>(
