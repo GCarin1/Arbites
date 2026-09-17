@@ -192,3 +192,5 @@ One line per archived change, newest last. Appended by
 - 2026-09-16 — 0181-revisao-layout-tela-estreita — revisao de layout em tela estreita com detector reutilizavel (specs: design-system MODIFIED)
 - 2026-09-16 — 0182-build-frontend-desatualizado-servido — build do frontend desatualizado e servido em silencio apos um git pull (specs: workspace-core MODIFIED)
 - 2026-09-17 — 0183-certificado-corporativo-derruba-busca — certificado corporativo derruba a busca de actions com 500 e traceback (specs: ci-automation MODIFIED)
+- 2026-09-17 — 0184-saber-qual-codigo-processo — nao da para saber qual codigo o processo esta rodando (specs: workspace-core MODIFIED)
+- 2026-09-17 — 0185-falha-inesperada-vira-traceback — falha inesperada vira traceback cru na resposta em vez de erro legivel (specs: workspace-core MODIFIED)

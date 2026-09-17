@@ -869,6 +869,35 @@ automáticas — e com isso reduzir o acúmulo — ajuste
 > nome parecido: ele é contínuo e imutável de propósito, e não existe rota
 > que o apague. Registro que o próprio suspeito apaga não prova nada.
 
+## "Atualizei e o erro continua": qual código está rodando?
+
+A frase tem duas leituras — o conserto não funcionou, ou o conserto não está
+rodando — e elas pedem coisas opostas. O Arbites responde isso em dois
+lugares.
+
+No arranque, a primeira linha do terminal:
+
+```
+Arbites 0.1.0 · develop@cc41416 de 17/09/2026 12:56 UTC
+```
+
+E pela API, sem precisar estar logado (o 401 é justamente um dos sintomas
+que se quer diagnosticar):
+
+```
+curl http://127.0.0.1:8000/api/v1/health
+{"status":"ok","version":"0.1.0","commit":"cc41416","branch":"develop",
+ "commit_at":"2026-09-17T12:56:01+00:00","dirty":false}
+```
+
+Compare o `commit` com o `git log -1 --format=%h` do seu checkout: se forem
+diferentes, o processo está com código velho — reinicie. `dirty: true` avisa
+que há alteração local não commitada, porque nesse caso o commit sozinho
+mentiria por semelhança.
+
+Sem checkout git ao lado (imagem de container, cópia baixada) a resposta diz
+isso, em vez de inventar um identificador plausível e errado.
+
 ## Depois de um `git pull`, reconstrua o frontend
 
 `frontend/dist/` **não** é versionado — é artefato, e versioná-lo encheria o

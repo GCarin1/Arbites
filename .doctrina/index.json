@@ -267,8 +267,8 @@
         "id": "workspace-core",
         "path": ".doctrina/specs/workspace-core/spec.md",
         "status": "active",
-        "version": "0.5.0",
-        "last_updated": "2026-09-16",
+        "version": "0.7.0",
+        "last_updated": "2026-09-17",
         "implementation": "verified — M0 (backend/arbites/workspace.py, backend/arbites/api.py)",
         "realizes": [
           "SC1"
@@ -2837,6 +2837,32 @@
         "specs_affected": [
           {
             "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0184-saber-qual-codigo-processo",
+        "title": "nao da para saber qual codigo o processo esta rodando",
+        "path": ".doctrina/changes/archive/2026-09-17-0184-saber-qual-codigo-processo",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0185-falha-inesperada-vira-traceback",
+        "title": "falha inesperada vira traceback cru na resposta em vez de erro legivel",
+        "path": ".doctrina/changes/archive/2026-09-17-0185-falha-inesperada-vira-traceback",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "workspace-core",
             "operation": "MODIFIED"
           }
         ]
