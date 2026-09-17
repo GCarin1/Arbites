@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.19.0",
+        "version": "0.20.0",
         "last_updated": "2026-09-16",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -2954,6 +2954,19 @@
         "specs_affected": [
           {
             "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0193-exportacao-carregamento-nenhum-sinal",
+        "title": "o clique que não respondia",
+        "path": ".doctrina/changes/archive/2026-09-17-0193-exportacao-carregamento-nenhum-sinal",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "design-system",
             "operation": "MODIFIED"
           }
         ]

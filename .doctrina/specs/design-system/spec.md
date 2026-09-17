@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-16
-**Version:** 0.19.0
+**Version:** 0.20.0
 
 ## Purpose
 
@@ -108,11 +108,13 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 
 - When um caso muda de coluna, the system shall anunciar a mudança numa região viva, para que quem usa leitor de tela saiba o que aconteceu em vez de perceber o card sumir.
 - When uma requisição falha antes de obter resposta do servidor, the system shall informar que não foi possível falar com o servidor, em português e indicando o que verificar, em vez de repassar a mensagem interna do navegador.
+- When uma exportação é pedida, the system shall mostrar progresso enquanto o arquivo é gerado e transferido, desabilitando os disparadores até terminar, e entregar o arquivo com o nome que o servidor sugeriu.
 
 ### State-driven
 
 - While a gaveta de navegação está aberta, the system shall impedir a rolagem do conteúdo atrás dela e devolver o foco ao controle que a abriu quando ela fechar.
 - While a pessoa não tiver escolhido um tema, the system shall seguir a preferência declarada pelo sistema operacional dela.
+- While uma tela ainda não tem dado para mostrar, the system shall exibir o esqueleto do conteúdo que virá, em vez de uma frase solta.
 
 ### Unwanted-behavior (must-not)
 
@@ -126,6 +128,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall not trocar o tema escuro por claro como padrão do produto; a escolha é de quem lê, e o escuro continua sendo o ponto de partida.
 - The system shall not repetir no menu lateral a navegação que o menu da conta já oferece; o perfil é da pessoa e pertence ao avatar, o menu lateral é do workspace.
 - The system shall not tratar o estouro horizontal da página como prova de layout responsivo; a verificação percorre as telas medindo texto cortado, rótulo sobreposto, corte pelo ancestral e alvo de toque.
+- The system shall not exibir porcentagem de progresso quando o tamanho da resposta é desconhecido; uma barra que promete um número inexistente é pior que uma que só diz que está indo.
 
 ## Acceptance criteria
 
@@ -194,6 +197,7 @@ e prova a sua fatia, citando o teste/artefato. -->
 28. [unverified] Num workspace novo as telas de test cases, requisitos, execucoes, defeitos e afazeres mostram estado vazio com marca, titulo, corpo e ao menos uma acao; com filtro que nao casa aparece o vazio de filtro, cuja acao e limpar — verified by `frontend/src/components/EmptyState.tsx` + `frontend/src/styles.css`.
 29. [unverified] O menu apresenta Requisitos como item sem cabecalho de grupo, entre Hoje e o grupo Testes, que passa a conter apenas Test cases e Execucoes — verified by `frontend/src/App.tsx`.
 30. [verified] As quinze telas do menu, incluindo as cinco faixas da observabilidade, não acusam nenhum achado a 390 px nem a 320 px no detector `frontend/scripts/audita-estreito.mjs`; e o detector, com a causa reintroduzida por CSS injetado, volta a acusar o rótulo sobreposto — verified by `frontend/scripts/audita-estreito.mjs`.
+31. [verified] A exportação devolve tamanho e nome de arquivo em todos os formatos, inclusive num período sem dado — verified by `backend/tests/test_export_progresso.py`; e a barra em largura de telefone não estoura nem sobrepõe texto — verified by `frontend/scripts/audita-estreito.mjs`.
 
 ## Maturity
 

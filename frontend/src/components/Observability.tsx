@@ -3,6 +3,7 @@ import { api } from "../api";
 import { EmptyState } from "./EmptyState";
 import { ConfirmModal } from "./Modal";
 import { Pizza } from "./Pizza";
+import { Esqueleto, Progresso } from "./Progresso";
 import { TabBar } from "./TabBar";
 import { DocBody } from "./ReadView";
 import type {
@@ -563,7 +564,7 @@ function Evidencias({ dias, origens, onError, onAbrirRun }: {
         </div>
       </section>
 
-      {carregando && <p className="empty">Carregando evidências…</p>}
+      {carregando && <Esqueleto linhas={4} titulo="Carregando evidências" />}
 
       {!carregando && dados && dados.items.length === 0 && (
         <EmptyState icon="dashboard" title="Nenhuma evidência com esses filtros">
@@ -1132,6 +1133,9 @@ export function Observability({ onError }: { onError: (message: string) => void 
   const [salvandoOrigem, setSalvandoOrigem] = useState(false);
   const [reprocessando, setReprocessando] = useState(false);
   const [limpando, setLimpando] = useState(false);
+  const [exportando, setExportando] = useState<{
+    formato: string; fracao: number | null;
+  } | null>(null);
   const [previaLimpeza, setPreviaLimpeza] = useState<{
     runs: number; attachments: number; bytes: number;
     oldest: string | null; newest: string | null;
@@ -1196,6 +1200,27 @@ export function Observability({ onError }: { onError: (message: string) => void 
       onError((e as Error).message);
     } finally {
       setReprocessando(false);
+    }
+  };
+
+  const exportar = async (formato: "pdf" | "csv" | "md") => {
+    setExportando({ formato, fracao: 0 });
+    try {
+      const { blob, nome } = await api.observabilityBaixar(
+        formato, dias, (fracao) => setExportando({ formato, fracao }),
+      );
+      // O arquivo só chega ao disco depois de pronto: um download que
+      // aparece pela metade é pior que um que demora.
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = nome;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setExportando(null);
     }
   };
 
@@ -1274,7 +1299,18 @@ export function Observability({ onError }: { onError: (message: string) => void 
     }
   };
 
-  if (carregando && !painel) return <p className="empty">Carregando observabilidade…</p>;
+  // Esqueleto em vez de uma frase centralizada: ele diz o que vem depois, e
+  // quando o dado chega nada salta de posição (change 0193).
+  if (carregando && !painel) {
+    return (
+      <div className="obs">
+        <header className="obs-topo">
+          <div><h2>Observabilidade</h2></div>
+        </header>
+        <Esqueleto linhas={6} titulo="Carregando a observabilidade" />
+      </div>
+    );
+  }
   if (!painel) return null;
 
   const { health: saude } = painel;
@@ -1310,31 +1346,40 @@ export function Observability({ onError }: { onError: (message: string) => void 
               PDF leva os gráficos, CSV leva a série para a planilha, MD entra
               em ata e wiki. São três perguntas diferentes, não três botões
               para a mesma. */}
-          <a
-            className="button-link"
-            href={api.observabilityExportUrl("pdf", dias)}
-            download
+          {/* Botão em vez de `<a download>` (change 0193): o link não tinha
+              como dizer que o arquivo estava sendo gerado, e um clique sem
+              resposta visível convida ao segundo clique. */}
+          <button
+            type="button"
+            onClick={() => void exportar("pdf")}
+            disabled={exportando !== null}
             title="Painel com os gráficos, para anexar"
           >
             PDF
-          </a>
-          <a
-            className="button-link"
-            href={api.observabilityExportUrl("csv", dias)}
-            download
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportar("csv")}
+            disabled={exportando !== null}
             title="Série de cada sinal, uma linha por medida"
           >
             CSV
-          </a>
-          <a
-            className="button-link"
-            href={api.observabilityExportUrl("md", dias)}
-            download
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportar("md")}
+            disabled={exportando !== null}
             title="O painel em texto, para ata e wiki"
           >
             MD
-          </a>
+          </button>
         </div>
+        {exportando && (
+          <Progresso
+            valor={exportando.fracao}
+            rotulo={`Gerando o ${exportando.formato.toUpperCase()}…`}
+          />
+        )}
       </header>
 
       <TabBar
