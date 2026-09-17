@@ -73,7 +73,7 @@ def test_saude_traz_o_periodo_anterior_ao_lado(rig):
                        artifact=_zip({MANIFESTO: manifesto([])}))
     rig.fake.adicionar(2002, started=_hoje(3),
                        artifact=_zip({MANIFESTO: manifesto([])}))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     saude = rig.get("/api/v1/ci/observability?days=30").json()["health"]
     assert saude["runs"] == 2
@@ -93,7 +93,7 @@ def test_do_ponto_da_serie_chega_ao_run_ao_job_e_ao_anexo(rig):
         ),
         "home.png": b"\x89PNG\r\n\x1a\nfake",
     }))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     # 1. o ponto do gráfico carrega o run
     sinal = rig.get("/api/v1/ci/observability?days=30").json()["signals"][0]
@@ -117,7 +117,7 @@ def test_analise_da_ia_volta_como_corpo_do_run(rig):
         MANIFESTO: manifesto([], [{"kind": "analysis", "path": "analysis.md"}]),
         "analysis.md": corpo.encode("utf-8"),
     }))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     run = rig.get("/api/v1/ci/runs/github-101").json()
     assert "subiu 30%" in run["analysis"]
@@ -140,7 +140,7 @@ def test_sem_direcao_declarada_o_arbites_nao_julga(rig):
         MANIFESTO: manifesto([{"name": "lcp_ms", "value": 2000, "unit": "ms"}])}))
     rig.fake.adicionar(102, started=_hoje(2), artifact=_zip({
         MANIFESTO: manifesto([{"name": "lcp_ms", "value": 3000, "unit": "ms"}])}))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     mudancas = rig.get("/api/v1/ci/observability?days=30").json()["changes"]
     frase = next(m["text"] for m in mudancas if m.get("signal") == "lcp_ms")
@@ -156,7 +156,7 @@ def test_com_direcao_e_meta_declaradas_a_saude_e_dita_nao_inferida(ws):
             MANIFESTO: manifesto([{"name": "lcp_ms", "value": 2000, "unit": "ms"}])}))
         rig.fake.adicionar(102, started=_hoje(2), artifact=_zip({
             MANIFESTO: manifesto([{"name": "lcp_ms", "value": 3000, "unit": "ms"}])}))
-        rig.post("/api/v1/ci/ingest")
+        rig.post("/api/v1/ci/ingest?days=3650")
 
         painel = rig.get("/api/v1/ci/observability?days=30").json()
         sinal = next(s for s in painel["signals"] if s["name"] == "lcp_ms")
@@ -174,7 +174,7 @@ def test_silencio_da_ingestao_e_dito_em_vez_de_parecer_semana_tranquila(rig):
     armadilha de um painel — então ela é nomeada."""
     rig.fake.adicionar(101, started=_hoje(9),
                        artifact=_zip({MANIFESTO: manifesto([])}))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     painel = rig.get("/api/v1/ci/observability?days=30").json()
     silencio = next(m for m in painel["changes"] if m["kind"] == "silence")
@@ -188,7 +188,7 @@ def test_quebra_depois_de_sequencia_verde_aponta_o_run(rig):
                            artifact=_zip({MANIFESTO: manifesto([])}))
     rig.fake.adicionar(200, started=_hoje(1), conclusion="failure",
                        artifact=_zip({MANIFESTO: manifesto([])}))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     mudanca = next(m for m in rig.get("/api/v1/ci/observability?days=30")
                    .json()["changes"] if m["kind"] == "broke")
@@ -200,7 +200,7 @@ def test_quebra_depois_de_sequencia_verde_aponta_o_run(rig):
 def test_run_sem_manifesto_aparece_no_que_mudou(rig):
     rig.fake.adicionar(101, started=_hoje(1),
                        artifact=_zip({"erro.log": b"stacktrace\n"}))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     aviso = next(m for m in rig.get("/api/v1/ci/observability?days=30")
                  .json()["changes"] if m["kind"] == "convention")

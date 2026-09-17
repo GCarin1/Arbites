@@ -62,6 +62,14 @@ import type {
   WorkspaceInfo,
 } from "./types";
 
+/** O nome que o servidor sugeriu, se sugeriu: salvar como `download.bin`
+ *  obriga a renomear à mão todo arquivo exportado. */
+function nomeDoAnexo(resposta: Response): string | null {
+  const cabecalho = resposta.headers.get("content-disposition") || "";
+  const casou = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cabecalho);
+  return casou ? decodeURIComponent(casou[1]) : null;
+}
+
 const BASE = "/api/v1";
 
 // Assinantes avisados quando o backend recusa a sessao: o AuthGate devolve a
@@ -223,9 +231,29 @@ export const api = {
   observability: (days: number) =>
     request<Observability>(`/ci/observability?days=${days}`),
   ciRun: (id: string) => request<CiRun>(`/ci/runs/${encodeURIComponent(id)}`),
-  ciIngest: () =>
+  /** Busca só a LACUNA da janela pedida; `refresh` reconfere tudo. */
+  ciIngest: (days: number, refresh = false) =>
     request<{ ingested: string[]; errors: { code: string; message: string }[];
-              stopped?: string }>("/ci/ingest", { method: "POST" }),
+              stopped?: string;
+              window?: { desde: string; ate: string; dias: number };
+              scanned?: { repo: string; desde: string; ate: string;
+                          novos: number }[];
+              reused?: { repo: string }[] }>(
+      `/ci/ingest?days=${days}${refresh ? "&refresh=true" : ""}`,
+      { method: "POST" }),
+  /** Relê os anexos que já estão no disco — sem rede, sem rebuscar nada. */
+  ciReprocess: () =>
+    request<{ lidos: number; atualizados: string[];
+              erros: { run: string; message: string }[] }>(
+      "/ci/reprocess", { method: "POST" }),
+  /** O tamanho do estrago ANTES de confirmar. */
+  ciPurgePreview: () =>
+    request<{ runs: number; attachments: number; bytes: number;
+              oldest: string | null; newest: string | null }>(
+      "/ci/purge/preview"),
+  ciPurge: () =>
+    request<{ removed: { runs: number; attachments: number; bytes: number } }>(
+      "/ci/purge", { method: "POST" }),
   ciSources: () =>
     request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
   ciSourcesSave: (sources: CiSource[]) =>
@@ -233,8 +261,49 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ sources }),
     }),
-  /** URL de download do painel — `<a download>` em vez de fetch: o navegador
-   *  cuida do arquivo, e a sessão vai no cookie como em qualquer navegação. */
+  /** Baixa o export acompanhando o progresso (change 0193).
+   *
+   *  O `<a download>` era mais simples e não dava sinal nenhum: o clique não
+   *  mudava nada visível, e a reação natural é clicar de novo — o pior
+   *  desfecho, porque passam a ser dois arquivos sendo gerados. Aqui o
+   *  download vira fetch, o corpo é lido em pedaços, e `onProgresso` recebe
+   *  a fração quando o servidor manda `Content-Length` e `null` quando não
+   *  manda. Inventar porcentagem seria mentir.
+   */
+  observabilityBaixar: async (
+    format: "pdf" | "md" | "csv" | "findings",
+    days: number,
+    onProgresso: (fracao: number | null) => void,
+  ): Promise<{ blob: Blob; nome: string }> => {
+    const resposta = await fetch(
+      `${BASE}/ci/observability/export?format=${format}&days=${days}`,
+      { credentials: "same-origin" },
+    );
+    if (!resposta.ok) {
+      throw new Error(
+        `a exportação falhou (HTTP ${resposta.status}) — tente de novo`,
+      );
+    }
+    const total = Number(resposta.headers.get("content-length") || 0);
+    const nome = nomeDoAnexo(resposta) ?? `observabilidade.${format}`;
+    if (!resposta.body) {
+      onProgresso(null);
+      return { blob: await resposta.blob(), nome };
+    }
+    const leitor = resposta.body.getReader();
+    const pedacos: Uint8Array[] = [];
+    let lidos = 0;
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      pedacos.push(value);
+      lidos += value.length;
+      onProgresso(total > 0 ? lidos / total : null);
+    }
+    const tipo = resposta.headers.get("content-type") || undefined;
+    return { blob: new Blob(pedacos as BlobPart[], { type: tipo }), nome };
+  },
+  /** URL de download do painel — ainda usada por quem prefere o link direto. */
   observabilityExportUrl: (
     format: "pdf" | "md" | "csv" | "findings",
     days: number,

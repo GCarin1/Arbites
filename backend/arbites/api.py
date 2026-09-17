@@ -3026,9 +3026,36 @@ def _register_routes(app: FastAPI) -> None:
                 "max_runs_per_poll": observabilidade.get("max_runs_per_poll") or 50}
 
     @app.post(API_PREFIX + "/ci/ingest")
-    async def ci_ingest_now(request: Request, limit: int | None = None):
+    async def ci_ingest_now(request: Request, limit: int | None = None,
+                            days: int | None = None, refresh: bool = False):
+        # `days` é o período que está na tela: a busca varre só a LACUNA
+        # dessa janela, não a janela toda (change 0190). `refresh` ignora a
+        # cobertura registrada e reconfere tudo.
         ingestor: CIIngestor = request.app.state.ci_ingest
-        return await asyncio.to_thread(ingestor.ingerir, limit)
+        return await asyncio.to_thread(ingestor.ingerir, limit, days, refresh)
+
+    @app.post(API_PREFIX + "/ci/reprocess")
+    async def ci_reprocess(request: Request):
+        # Relê os anexos que JÁ estão no disco. Quando o reconhecimento
+        # melhora, apagar tudo e rebuscar custaria horas de download para
+        # reler arquivos que estão aqui do lado (change 0189).
+        ws, conn = ws_of(request), conn_of(request)
+        return await asyncio.to_thread(ci_ingest.reprocessar, ws, conn)
+
+    @app.get(API_PREFIX + "/ci/purge/preview")
+    async def ci_purge_preview(request: Request):
+        # O tamanho do estrago ANTES da confirmação: um "tem certeza?" que
+        # não diz quantas execuções vão embora não é confirmação nenhuma.
+        from . import ci_retencao
+
+        return ci_retencao.previa_total(ws_of(request))
+
+    @app.post(API_PREFIX + "/ci/purge")
+    async def ci_purge(request: Request):
+        from . import ci_retencao
+
+        return await asyncio.to_thread(
+            ci_retencao.limpar_tudo, ws_of(request), conn_of(request))
 
     @app.get(API_PREFIX + "/ci/runs")
     async def ci_runs(request: Request, limit: int = 50,
@@ -5102,6 +5129,9 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # lixeira. LER a prévia continua aberto — ver o que seria removido é o
     # que permite alguém discordar antes de acontecer.
     (r"/ci/retention/apply$", {"POST"}, "admin", None),
+    # Apagar a observabilidade inteira tem o mesmo alcance da limpeza por
+    # retenção — e mais consequência, porque não é seletiva (change 0192).
+    (r"/ci/purge$", {"POST"}, "admin", None),
     # Declarar de onde a observabilidade puxa é escrever no arbites.yaml, o
     # mesmo alcance de PUT /targets e PUT /ai/providers. LER continua aberto:
     # a tela precisa dizer "nenhuma origem declarada" a quem não é admin.

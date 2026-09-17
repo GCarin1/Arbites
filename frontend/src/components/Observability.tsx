@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { EmptyState } from "./EmptyState";
+import { ConfirmModal } from "./Modal";
 import { Pizza } from "./Pizza";
+import { Esqueleto, Progresso } from "./Progresso";
 import { TabBar } from "./TabBar";
 import { DocBody } from "./ReadView";
 import type {
@@ -562,7 +564,7 @@ function Evidencias({ dias, origens, onError, onAbrirRun }: {
         </div>
       </section>
 
-      {carregando && <p className="empty">Carregando evidências…</p>}
+      {carregando && <Esqueleto linhas={4} titulo="Carregando evidências" />}
 
       {!carregando && dados && dados.items.length === 0 && (
         <EmptyState icon="dashboard" title="Nenhuma evidência com esses filtros">
@@ -932,7 +934,14 @@ function Recorte({ titulo, pergunta, itens }: {
             {itens.map((item) => (
               <tr key={item.name}>
                 <td data-label={titulo} className="mono">{item.name}</td>
-                <td data-label="Execuções">{item.runs}</td>
+                <td data-label="Execuções">
+                  {item.runs}
+                  {item.inconclusive > 0 && (
+                    <span className="caption muted">
+                      {` (${item.inconclusive} fora da conta)`}
+                    </span>
+                  )}
+                </td>
                 <td data-label="Falhas">{item.failures}</td>
                 <td data-label="Taxa de sucesso">
                   <span
@@ -1122,6 +1131,15 @@ export function Observability({ onError }: { onError: (message: string) => void 
   const [origens, setOrigens] = useState<CiSource[]>([]);
   const [novaOrigem, setNovaOrigem] = useState<CiSource>({ repo: "" });
   const [salvandoOrigem, setSalvandoOrigem] = useState(false);
+  const [reprocessando, setReprocessando] = useState(false);
+  const [limpando, setLimpando] = useState(false);
+  const [exportando, setExportando] = useState<{
+    formato: string; fracao: number | null;
+  } | null>(null);
+  const [previaLimpeza, setPreviaLimpeza] = useState<{
+    runs: number; attachments: number; bytes: number;
+    oldest: string | null; newest: string | null;
+  } | null>(null);
   // Configuração sai do meio do painel e vira aba (change 0176): quem lê o
   // painel todo dia não quer tropeçar no formulário que se preenche uma vez.
   const [aba, setAba] = useState<Aba>("painel");
@@ -1164,6 +1182,75 @@ export function Observability({ onError }: { onError: (message: string) => void 
     }
   };
 
+  const reprocessar = async () => {
+    // Sem rede: relê os anexos que já estão no disco. O reconhecimento do
+    // relatório Cucumber melhorou (change 0189), e rebuscar tudo do GitHub
+    // só para reler arquivos locais seriam horas de download.
+    setReprocessando(true);
+    try {
+      const r = await api.ciReprocess();
+      await carregar();
+      onError(
+        r.atualizados.length > 0
+          ? `${r.atualizados.length} de ${r.lidos} execução(ões) ganharam dado`
+            + " novo a partir dos anexos que já estavam no disco."
+          : `${r.lidos} execução(ões) relidas; nada mudou.`,
+      );
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setReprocessando(false);
+    }
+  };
+
+  const exportar = async (formato: "pdf" | "csv" | "md") => {
+    setExportando({ formato, fracao: 0 });
+    try {
+      const { blob, nome } = await api.observabilityBaixar(
+        formato, dias, (fracao) => setExportando({ formato, fracao }),
+      );
+      // O arquivo só chega ao disco depois de pronto: um download que
+      // aparece pela metade é pior que um que demora.
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = nome;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setExportando(null);
+    }
+  };
+
+  const pedirLimpeza = async () => {
+    // A prévia vem ANTES do "tem certeza?": uma confirmação que não diz
+    // quantas execuções vão embora não é confirmação, é um obstáculo.
+    try {
+      setPreviaLimpeza(await api.ciPurgePreview());
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  };
+
+  const limparTudo = async () => {
+    setLimpando(true);
+    try {
+      const r = await api.ciPurge();
+      setPreviaLimpeza(null);
+      await carregar();
+      onError(
+        `${r.removed.runs} execução(ões) e ${r.removed.attachments} anexo(s)`
+        + " foram para a lixeira — de lá dá para restaurar.",
+      );
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setLimpando(false);
+    }
+  };
+
   const abrirRun = useCallback(
     async (runId: string) => {
       try {
@@ -1175,10 +1262,13 @@ export function Observability({ onError }: { onError: (message: string) => void 
     [onError],
   );
 
-  const ingerir = async () => {
+  const ingerir = async (refazer = false) => {
     setIngerindo(true);
     try {
-      const r = await api.ciIngest();
+      // O período da TELA vira a janela da busca, e só a lacuna dela é
+      // varrida (change 0190): trocar 30 por 90 busca os 60 que faltam, não
+      // os 90 de novo.
+      const r = await api.ciIngest(dias, refazer);
       // "Parado por credencial" NÃO é "não há run novo": os dois parecem
       // iguais (nenhum dado novo) e pedem ações opostas (change 0157).
       if (r.stopped === "tls_untrusted") {
@@ -1193,6 +1283,13 @@ export function Observability({ onError }: { onError: (message: string) => void 
         );
       } else if (r.errors?.length) {
         onError(r.errors[0].message);
+      } else if (r.ingested.length === 0 && (r.reused?.length ?? 0) > 0) {
+        // "Nada novo" e "nem olhei" parecem iguais na tela e pedem ações
+        // opostas — a mesma lição da change 0157.
+        onError(
+          `o período já estava coberto; nada foi buscado de novo.`
+          + ` Use "Reconferir período" para varrer mesmo assim.`,
+        );
       }
       await carregar();
     } catch (e) {
@@ -1202,7 +1299,18 @@ export function Observability({ onError }: { onError: (message: string) => void 
     }
   };
 
-  if (carregando && !painel) return <p className="empty">Carregando observabilidade…</p>;
+  // Esqueleto em vez de uma frase centralizada: ele diz o que vem depois, e
+  // quando o dado chega nada salta de posição (change 0193).
+  if (carregando && !painel) {
+    return (
+      <div className="obs">
+        <header className="obs-topo">
+          <div><h2>Observabilidade</h2></div>
+        </header>
+        <Esqueleto linhas={6} titulo="Carregando a observabilidade" />
+      </div>
+    );
+  }
   if (!painel) return null;
 
   const { health: saude } = painel;
@@ -1238,31 +1346,40 @@ export function Observability({ onError }: { onError: (message: string) => void 
               PDF leva os gráficos, CSV leva a série para a planilha, MD entra
               em ata e wiki. São três perguntas diferentes, não três botões
               para a mesma. */}
-          <a
-            className="button-link"
-            href={api.observabilityExportUrl("pdf", dias)}
-            download
+          {/* Botão em vez de `<a download>` (change 0193): o link não tinha
+              como dizer que o arquivo estava sendo gerado, e um clique sem
+              resposta visível convida ao segundo clique. */}
+          <button
+            type="button"
+            onClick={() => void exportar("pdf")}
+            disabled={exportando !== null}
             title="Painel com os gráficos, para anexar"
           >
             PDF
-          </a>
-          <a
-            className="button-link"
-            href={api.observabilityExportUrl("csv", dias)}
-            download
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportar("csv")}
+            disabled={exportando !== null}
             title="Série de cada sinal, uma linha por medida"
           >
             CSV
-          </a>
-          <a
-            className="button-link"
-            href={api.observabilityExportUrl("md", dias)}
-            download
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportar("md")}
+            disabled={exportando !== null}
             title="O painel em texto, para ata e wiki"
           >
             MD
-          </a>
+          </button>
         </div>
+        {exportando && (
+          <Progresso
+            valor={exportando.fracao}
+            rotulo={`Gerando o ${exportando.formato.toUpperCase()}…`}
+          />
+        )}
       </header>
 
       <TabBar
@@ -1278,6 +1395,63 @@ export function Observability({ onError }: { onError: (message: string) => void 
             De onde as execuções são puxadas e por quanto tempo ficam. É o que
             se preenche uma vez — por isso saiu do meio do painel.
           </p>
+          <section className="card obs-perigo">
+            <div className="card-head">
+              <h3>Limpar toda a observabilidade</h3>
+            </div>
+            <p className="caption muted">
+              Remove todas as execuções ingeridas, seus anexos e o registro de
+              até onde a busca já olhou. Vai para a lixeira, como todo o resto
+              do Arbites — de lá dá para restaurar enquanto ela não for
+              esvaziada. As origens declaradas ficam: o que some é o dado, não
+              a configuração.
+            </p>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => void pedirLimpeza()}
+              disabled={limpando}
+            >
+              {limpando ? "Limpando…" : "Limpar tudo…"}
+            </button>
+          </section>
+          <section className="card">
+            <div className="card-head">
+              <h3>Reconferir período</h3>
+            </div>
+            <p className="caption muted">
+              A busca guarda até onde já olhou, por origem, e varre só o que
+              falta — trocar 30 por 90 dias busca os 60 que faltam, não os 90
+              de novo. Isto ignora esse registro e revarre a janela inteira
+              que está selecionada no topo. Não apaga nada: o que já está no
+              disco não é baixado de novo.
+            </p>
+            <button
+              type="button"
+              onClick={() => void ingerir(true)}
+              disabled={ingerindo}
+            >
+              {ingerindo ? "Reconferindo…" : "Reconferir período"}
+            </button>
+          </section>
+          <section className="card">
+            <div className="card-head">
+              <h3>Reprocessar do disco</h3>
+            </div>
+            <p className="caption muted">
+              Relê os anexos das execuções que já foram ingeridas e refaz o que
+              é derivado deles — cenários e achados. Não usa rede e não busca
+              nada: serve para quando o reconhecimento de um formato melhorou e
+              as execuções antigas ficaram com o resultado anterior.
+            </p>
+            <button
+              type="button"
+              onClick={() => void reprocessar()}
+              disabled={reprocessando}
+            >
+              {reprocessando ? "Relendo…" : "Reprocessar do disco"}
+            </button>
+          </section>
           <section className="card obs-origens">
             <div className="card-head">
               <h3>Origens</h3>
@@ -1503,9 +1677,16 @@ export function Observability({ onError }: { onError: (message: string) => void 
                 {saude.success_rate === null ? "—" : `${saude.success_rate}%`}
               </strong>
               <span className="muted">
-                {saude.success_rate_previous === null
-                  ? "sem base anterior"
-                  : `${saude.success_rate_previous}% antes`}
+                {/* O denominador junto do número: cancelada e skipped saíram
+                    da conta (change 0191), e uma taxa que não fecha com o
+                    card ao lado sem explicação parece defeito. */}
+                {`de ${saude.conclusive_runs} conclusiva${
+                  saude.conclusive_runs === 1 ? "" : "s"
+                }`}
+                {saude.inconclusive_runs > 0 &&
+                  ` · ${saude.inconclusive_runs} fora da conta`}
+                {saude.success_rate_previous !== null &&
+                  ` · ${saude.success_rate_previous}% antes`}
                 {saude.goal !== null && ` · meta ${saude.goal}%`}
               </span>
             </div>
@@ -1528,9 +1709,18 @@ export function Observability({ onError }: { onError: (message: string) => void 
           <div className="obs-pizzas">
             <Pizza
               titulo="Execuções por resultado"
-              pergunta="Quanto do período foi verde."
+              pergunta="Quanto do período foi verde, entre as que deram veredito."
               fatias={painel.distribution.runs_by_conclusion}
               rotulos={CONCLUSOES}
+              rodape={
+                painel.distribution.inconclusive_total > 0
+                  ? `${painel.distribution.inconclusive_total} fora da conta: `
+                    + painel.distribution.runs_inconclusive
+                        .map((f) => `${f.value} ${CONCLUSOES[f.label] ?? f.label}`)
+                        .join(", ")
+                    + " — não chegaram a um veredito sobre o produto."
+                  : undefined
+              }
             />
             <Pizza
               titulo="Cenários por resultado"
@@ -1710,6 +1900,36 @@ export function Observability({ onError }: { onError: (message: string) => void 
           </section>
 
         </>
+      )}
+
+      {previaLimpeza && (
+        <ConfirmModal
+          danger
+          title="Limpar toda a observabilidade"
+          message={
+            <>
+              Isto remove <strong>{previaLimpeza.runs}</strong> execução(ões) e{" "}
+              <strong>{previaLimpeza.attachments}</strong> anexo(s)
+              {previaLimpeza.bytes > 0 &&
+                ` (${(previaLimpeza.bytes / 1024 / 1024).toFixed(1)} MB)`}
+              {previaLimpeza.oldest && previaLimpeza.newest && (
+                <>
+                  {" "}— de {formatarData(previaLimpeza.oldest)} a{" "}
+                  {formatarData(previaLimpeza.newest)}
+                </>
+              )}
+              {" "}A série temporal inteira some da tela.
+              <br />
+              <br />
+              Tudo vai para a <strong>lixeira</strong>, não para o apagador: de
+              lá dá para restaurar enquanto ela não for esvaziada. As origens
+              declaradas continuam onde estão.
+            </>
+          }
+          confirmLabel={`Limpar ${previaLimpeza.runs} execução(ões)`}
+          onConfirm={() => void limparTudo()}
+          onCancel={() => setPreviaLimpeza(null)}
+        />
       )}
     </div>
   );

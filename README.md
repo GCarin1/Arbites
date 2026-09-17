@@ -552,6 +552,58 @@ manifesto continua válida.
 Log, print e análise em Markdown viram anexos hasheados ao lado do run e
 aparecem na descida (gráfico → execução → job → arquivo).
 
+**O relatório Cucumber é reconhecido pela forma, não pelo nome.** Qualquer
+`.json` do artifact que seja uma lista de features com `elements` vira
+cenário — `cucumber-report.json`, `results.json`, `report-trader.json`, tanto
+faz. Isso vale mesmo sem manifesto; com manifesto, o que ele declara vence.
+O contrário não acontece: um `result.json` que **não** tem essa forma não é
+classificado como relatório, porque chamar de cenário o que não é troca um
+silêncio por uma mentira.
+
+**Recomeçar do zero.** Em **Observabilidade → Configuração**, *Limpar toda
+a observabilidade* remove todas as execuções, seus anexos e o registro de até
+onde a busca já olhou. Antes de confirmar, o modal diz o tamanho do estrago —
+quantas execuções, quantos anexos, quanto espaço e de que data a que data —,
+porque uma confirmação que não diz isso é um obstáculo, não uma decisão. Tudo
+vai para a **lixeira**, de onde volta enquanto ela não for esvaziada. As
+origens declaradas ficam: o que some é o dado, não a configuração. É operação
+de administrador.
+
+**A taxa de sucesso conta só o que deu veredito.** Uma execução
+**cancelada** não é falha do produto — alguém apertou o botão, ou um push novo
+substituiu a fila — e uma **skipped** nem chegou a rodar. As duas ficam fora
+do denominador, e `timed_out` fica dentro, porque estourar o tempo é falhar
+com um motivo. O total de execuções continua sendo o total de verdade: o que
+saiu da conta aparece ao lado do número ("12 fora da conta") e embaixo da
+pizza, porque sair da conta não é sair da tela. Um período inteiro de
+canceladas responde "—", nunca 0%: zero diria que tudo quebrou, quando a
+verdade é que nada foi medido.
+
+**A busca é incremental.** "Buscar execuções" usa o período que está no
+topo da tela como janela e varre **só a lacuna** dela: se você já buscou 30
+dias e troca para 90, ele procura os 60 que faltam, não os 90 de novo. O
+registro de até onde já se olhou fica em `ci/cobertura.json`, por origem —
+apagá-lo custa tempo, nunca dados, porque quem impede a duplicação continua
+sendo o disco (o nome do arquivo é a chave do run).
+
+Duas coisas de propósito: a **borda recente** (48 horas) é sempre
+reconferida, porque um run começado às 23h e concluído às 01h não aparece na
+varredura da véspera e, se a véspera constasse coberta, ele não apareceria
+mais nunca; e uma busca que **para no meio** (limite de taxa, credencial
+recusada) não registra cobertura nenhuma, porque marcar como varrido um
+pedaço que não chegou ao fim deixaria esses runs para trás.
+
+Quer conferir tudo de novo mesmo assim? **Observabilidade → Configuração →
+Reconferir período**. Ele ignora o registro e revarre a janela selecionada —
+sem apagar nada e sem rebaixar o que já está no disco.
+
+**Melhorou o reconhecimento depois de já ter ingerido?** Os anexos estão no
+disco, ao lado de cada execução. Em **Observabilidade → Configuração**, o
+botão **Reprocessar do disco** relê esses arquivos e refaz só o que é
+derivado deles — cenários e achados. Não usa rede e não rebusca nada; o que
+veio do provedor (conclusão, commit, horários) fica intocado, porque isso não
+está nos anexos e regravar só poderia perder informação.
+
 ### A aba Evidências
 
 Print, log, varredura e a análise que o pipeline escreveu ficam guardados ao

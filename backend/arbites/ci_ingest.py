@@ -46,6 +46,44 @@ MANIFESTO = "arbites.json"
 # manifesto antigo não pode parar de ser lido porque o formato cresceu
 # (change 0175).
 VERSAO_MANIFESTO = 2
+
+# A borda recente NUNCA entra na cobertura. Um run começado às 23h de ontem e
+# concluído às 01h de hoje não aparece na varredura de ontem (a listagem pede
+# `status=completed`) e, se o dia de ontem já constasse como coberto, não
+# apareceria mais nunca — porque a data que o provedor filtra é a de CRIAÇÃO.
+# Duas listagens a mais por busca é o preço de não ter buraco permanente.
+MARGEM_HORAS = 48
+
+# Uma execução CANCELADA não é uma falha do produto: alguém apertou o botão,
+# ou um push novo substituiu a fila. Uma SKIPPED nem chegou a rodar. Contá-las
+# como fracasso é o que fazia 25 verdes em 45 virarem "55.6% de sucesso"
+# quando a verdade era 25 de 32 — e a diferença entre 55% e 78% é a diferença
+# entre uma suíte que parece quebrada e uma que parece saudável (change 0191).
+#
+# `timed_out` fica DENTRO: estourar o tempo é falhar, com um motivo.
+CONCLUSIVAS = ("success", "failure", "timed_out")
+SUCESSO = "success"
+
+
+def e_conclusiva(conclusion: str | None) -> bool:
+    """A execução chegou a um veredito sobre o produto?"""
+    return (conclusion or "") in CONCLUSIVAS
+
+
+def taxa_de_sucesso(conclusoes) -> tuple[float | None, int, int]:
+    """(taxa, conclusivas, inconclusivas) — a conta feita num lugar só.
+
+    Devolve as três porque a tela precisa das três: a taxa, o denominador que
+    a produziu, e quantas ficaram de fora. Esconder a terceira transformaria
+    um recorte honesto num número sem procedência.
+    """
+    lista = list(conclusoes)
+    conclusivas = [c for c in lista if e_conclusiva(c)]
+    if not conclusivas:
+        return None, 0, len(lista)
+    ok = sum(1 for c in conclusivas if c == SUCESSO)
+    return (round(ok / len(conclusivas) * 100, 1), len(conclusivas),
+            len(lista) - len(conclusivas))
 VERSOES_ACEITAS = (1, 2)
 
 # Convenção de nome — o FALLBACK, para quando o workflow não pode ser
@@ -56,8 +94,43 @@ CONVENCAO = {
     "axe": re.compile(r"(axe|a11y|acessibilidade)[^/]*\.json$", re.I),
     "log": re.compile(r"\.(log|txt)$", re.I),
     "screenshot": re.compile(r"\.(png|jpe?g|webp)$", re.I),
-    "cucumber": re.compile(r"(result|cucumber)\.json$", re.I),
+    # `cucumber` saiu daqui de propósito (change 0189): o relatório é
+    # reconhecido pela FORMA do conteúdo, não pelo nome. Um `result.json` que
+    # não é uma lista de features não é um relatório Cucumber, e dizer que é
+    # seria trocar um silêncio por uma mentira.
 }
+
+
+# Um JSON acima disto não é examinado para descobrir a forma: um `axe.json`
+# de suíte grande passa de 100 MB, e desserializá-lo só para descobrir que
+# não é Cucumber sairia caro em toda ingestão.
+LIMITE_FORMA = 64 * 1024 * 1024
+
+
+def e_relatorio_cucumber(bruto: bytes) -> bool:
+    """O JSON tem a FORMA de um relatório Cucumber?
+
+    Reconhecer pelo NOME não funciona e não tinha como funcionar:
+    `cucumber-report.json`, `results.json`, `report-trader.json`,
+    `cucumber_2026-09-17.json` — cada pipeline nomeia do seu jeito, e a lista
+    de nomes prováveis não termina. Foi o que aconteceu: 45 execuções
+    ingeridas, centenas de anexos, e a pizza "Cenários por resultado" vazia
+    porque o arquivo não terminava na palavra certa (change 0189).
+
+    A FORMA, essa é fixa e está no padrão: uma LISTA de features, cada uma
+    com `elements`. Isso não é inferir semântica — é reconhecer um formato
+    documentado, exatamente como o relatório do axe-core já é reconhecido.
+    """
+    if not bruto or len(bruto) > LIMITE_FORMA:
+        return False
+    if bruto.lstrip()[:1] != b"[":
+        return False  # barato: descarta objeto e texto sem desserializar
+    try:
+        dados = json.loads(bruto.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return False
+    return (isinstance(dados, list) and bool(dados)
+            and isinstance(dados[0], dict) and "elements" in dados[0])
 
 
 class IngestError(Exception):
@@ -123,6 +196,12 @@ def _por_convencao(arquivos: dict[str, bytes]) -> dict[str, Any]:
     dois seria pior que não ter."""
     anexos = []
     for nome in sorted(arquivos):
+        # A forma vem ANTES do nome: um relatório Cucumber chamado
+        # `report.json` seria classificado como nada, e um chamado
+        # `resultado.log` nem seria olhado.
+        if nome.lower().endswith(".json") and e_relatorio_cucumber(arquivos[nome]):
+            anexos.append({"kind": "cucumber", "path": nome})
+            continue
         for kind, regex in CONVENCAO.items():
             if regex.search(nome):
                 anexos.append({"kind": kind, "path": nome})
@@ -266,7 +345,9 @@ def extrair_cenarios(manifesto: dict[str, Any],
         if item.get("kind") == "cucumber" and item.get("path")
     ]
     if not caminhos:
-        caminhos = [n for n in arquivos if CONVENCAO["cucumber"].search(n)]
+        caminhos = [n for n in sorted(arquivos)
+                    if n.lower().endswith(".json")
+                    and e_relatorio_cucumber(arquivos[n])]
 
     saida: list[dict[str, Any]] = []
     for caminho in caminhos:
@@ -464,9 +545,23 @@ class CIIngestor:
 
     # -- ingestão ----------------------------------------------------------
 
-    def ingerir(self, limite: int | None = None) -> dict[str, Any]:
+    def ingerir(self, limite: int | None = None, dias: int | None = None,
+                refazer: bool = False) -> dict[str, Any]:
+        """Traz o que falta da janela pedida — só a LACUNA, não a janela toda.
+
+        `dias` é o período que está na tela. Sem ele a janela é a do
+        `observability.window_days`, para quem chama de script.
+
+        `refazer=True` ignora a cobertura registrada e varre a janela inteira
+        de novo. Não apaga nada: o disco continua impedindo a duplicação, e
+        quem desconfia do que está na tela precisa poder mandar reconferir
+        (change 0190).
+        """
+        from . import ci_cobertura
+
         config = self.ws.config().get("observability") or {}
         limite = limite or int(config.get("max_runs_per_poll") or 50)
+        dias = dias or int(config.get("window_days") or 30)
         fontes = self.fontes()
         if not fontes:
             raise IngestError(
@@ -474,9 +569,31 @@ class CIIngestor:
                 "nenhuma fonte de observabilidade em arbites.yaml"
                 " (observability.sources)",
             )
-        resumo: dict[str, Any] = {"ingested": [], "skipped": 0, "errors": []}
+        agora = datetime.now(timezone.utc)
+        ate = agora.isoformat()
+        desde = (agora - timedelta(days=dias)).isoformat()
+
+        resumo: dict[str, Any] = {
+            "ingested": [], "skipped": 0, "errors": [],
+            "window": {"desde": desde, "ate": ate, "dias": dias},
+            "scanned": [], "reused": [],
+        }
         for fonte in fontes:
-            self._ingerir_fonte(fonte, limite, resumo)
+            cobertos = ([] if refazer
+                        else ci_cobertura.cobertura_da_fonte(self.ws, fonte))
+            faltando = ci_cobertura.lacunas(cobertos, desde, ate)
+            if not faltando:
+                # A janela inteira já foi varrida: não há o que listar. Este é
+                # o caso comum de quem clica "Buscar" duas vezes seguidas.
+                resumo["reused"].append({"repo": fonte["repo"],
+                                         "desde": desde, "ate": ate})
+                continue
+            for lacuna in faltando:
+                if limite <= 0:
+                    break
+                usados = self._ingerir_fonte(fonte, limite, resumo,
+                                             lacuna[0], lacuna[1])
+                limite -= usados
         return resumo
 
     @staticmethod
@@ -487,48 +604,74 @@ class CIIngestor:
             return "bad_credential"
         return "rate_limited" if code in ("rate_limited", "github_error") else code
 
-    def _pendentes(self, fonte: dict, limite: int) -> list[dict]:
-        """Percorre as páginas do provedor até só encontrar run já ingerido.
+    def _pendentes(self, fonte: dict, limite: int, desde: str,
+                   ate: str) -> tuple[list[dict], bool]:
+        """Os runs da janela [desde, ate] que ainda não estão no disco.
 
-        Parar na primeira página conhecida seria errado quando a instância
-        ficou dias fora: o intervalo perdido está DEPOIS dela.
+        Devolve também se a janela foi varrida ATÉ O FIM. Essa segunda
+        resposta é o que autoriza registrar a cobertura: parar no limite e
+        registrar mesmo assim afirmaria ter olhado um pedaço que ninguém
+        olhou, e esse pedaço nunca mais seria varrido (change 0190).
+
+        A parada antiga — "página inteira já conhecida, o passado está
+        coberto" — era falsa e escondia um buraco permanente. Ela só valeria
+        para quem tivesse ingerido desde sempre. Para quem tem 30 dias no
+        disco e pede 90, a primeira página é inteiramente conhecida, a busca
+        parava ali, e os 60 dias mais antigos nunca chegavam. Agora quem
+        decide a parada é a DATA, que é a pergunta de verdade.
         """
         vistos = self.ja_ingeridos()
         pendentes: list[dict] = []
         pagina = 1
+        fim_alcancado = False
+        # O provedor filtra por data no servidor: alcançar uma lacuna antiga
+        # deixa de custar paginar por tudo que veio depois dela.
+        janela = f"{desde[:10]}..{ate[:10]}"
         while len(pendentes) < limite and pagina <= 10:
             lote = self.client.list_workflow_runs(
-                fonte["repo"], fonte.get("workflow"), page=pagina, per_page=50,
+                fonte["repo"], fonte.get("workflow"), page=pagina,
+                per_page=50, created=janela,
             )
             if not lote:
+                fim_alcancado = True
                 break
-            novos_na_pagina = 0
             for bruto in lote:
+                quando = _iso(bruto.get("created_at") or bruto.get("run_started_at"))
+                if quando and quando < desde:
+                    fim_alcancado = True
+                    break
+                if quando and quando > ate:
+                    continue  # mais novo que a janela: não é desta lacuna
                 chave = run_key(fonte["provider"], bruto.get("id"))
                 if chave in vistos:
-                    continue
-                novos_na_pagina += 1
+                    continue  # já no disco — pular NÃO é motivo para parar
                 pendentes.append(bruto)
                 if len(pendentes) >= limite:
                     break
-            if novos_na_pagina == 0:
-                break  # página inteira já conhecida: o passado está coberto
+            if fim_alcancado or len(lote) < 50:
+                fim_alcancado = fim_alcancado or len(lote) < 50
+                break
             pagina += 1
         # do mais velho para o mais novo: a série temporal nasce em ordem
         pendentes.reverse()
-        return pendentes
+        return pendentes, fim_alcancado
 
-    def _ingerir_fonte(self, fonte: dict, limite: int, resumo: dict) -> None:
+    def _ingerir_fonte(self, fonte: dict, limite: int, resumo: dict,
+                       desde: str, ate: str) -> int:
+        """Ingere uma lacuna. Devolve quantos runs consumiu do limite."""
+        from . import ci_cobertura
         from .ci import CIError
         from .indexer import reindex_file
 
         try:
-            pendentes = self._pendentes(fonte, limite)
+            pendentes, fim_alcancado = self._pendentes(fonte, limite, desde, ate)
         except CIError as e:
             resumo["errors"].append({"repo": fonte["repo"], "code": e.code,
                                      "message": e.message})
             resumo["stopped"] = self._motivo_da_parada(e.code)
-            return
+            return 0
+        resumo["scanned"].append({"repo": fonte["repo"], "desde": desde,
+                                  "ate": ate, "novos": len(pendentes)})
 
         for bruto in pendentes:
             chave = run_key(fonte["provider"], bruto.get("id"))
@@ -540,7 +683,11 @@ class CIIngestor:
                 resumo["errors"].append({"run": chave, "code": e.code,
                                          "message": e.message})
                 resumo["stopped"] = self._motivo_da_parada(e.code)
-                return
+                # Sem registrar cobertura: parar no meio e dizer que varreu
+                # deixaria para trás os que ainda não chegaram. A próxima
+                # busca refaz a lacuna e o disco pula os que já gravou —
+                # listagem custa, download não.
+                return len(pendentes)
             except IngestError as e:
                 # Artifact quebrado é problema DAQUELE run, não da ingestão:
                 # registra e segue, senão um zip corrompido trava a série.
@@ -549,6 +696,15 @@ class CIIngestor:
                 continue
             reindex_file(self.ws, self.conn, self.ws.root / gravado["path"])
             resumo["ingested"].append(gravado["id"])
+
+        if fim_alcancado:
+            # Só aqui, e só agora: a lacuna foi varrida inteira e tudo que
+            # havia nela está no disco. E só até a margem — o que é recente
+            # demais fica de fora de propósito (ver MARGEM_HORAS).
+            seguro = (datetime.now(timezone.utc)
+                      - timedelta(hours=MARGEM_HORAS)).isoformat()
+            ci_cobertura.registrar(self.ws, fonte, desde, min(ate, seguro))
+        return len(pendentes)
 
     def _ingerir_run(self, fonte: dict, bruto: dict, chave: str) -> dict[str, Any]:
         run = {
@@ -817,12 +973,11 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
         ]
 
     atuais, anteriores = runs_entre(inicio, fim), runs_entre(inicio_anterior, inicio)
+    _, conclusivas_agora, inconclusivas_agora = taxa_de_sucesso(
+        r["conclusion"] for r in atuais)
 
     def taxa(runs: list[dict]) -> float | None:
-        if not runs:
-            return None
-        ok = sum(1 for r in runs if r["conclusion"] == "success")
-        return round(ok / len(runs) * 100, 1)
+        return taxa_de_sucesso(r["conclusion"] for r in runs)[0]
 
     ultimo = conn.execute(
         "SELECT COALESCE(started_at, ingested_at) AS at FROM ci_runs"
@@ -838,6 +993,10 @@ def painel(ws, conn, dias: int = 30) -> dict[str, Any]:
 
     saude = {
         "runs": len(atuais), "runs_previous": len(anteriores),
+        # O denominador viaja junto do número: uma taxa sem procedência é um
+        # número que ninguém consegue conferir.
+        "conclusive_runs": conclusivas_agora,
+        "inconclusive_runs": inconclusivas_agora,
         "success_rate": taxa(atuais), "success_rate_previous": taxa(anteriores),
         "last_run_at": ultimo["at"] if ultimo else None,
         "days_since_last_run": silencio,
@@ -940,9 +1099,15 @@ def distribuicao(conn, inicio: str, fim: str) -> dict[str, Any]:
             "SELECT status, COUNT(*) c FROM ci_scenarios"
             " WHERE at >= ? AND at < ? GROUP BY status", (inicio, fim))
     ]
+    # A pizza mostra o VEREDITO: passou ou falhou. Cancelada e skipped saem
+    # da fatia e viram uma linha ao lado — some da conta, não some da tela
+    # (change 0191).
+    dentro = [(c, n) for c, n in conclusoes if e_conclusiva(c)]
+    fora = [(c, n) for c, n in conclusoes if not e_conclusiva(c)]
     return {
-        "runs_by_conclusion": _fatias(
-            conclusoes, ("success", "failure", "cancelled", "timed_out")),
+        "runs_by_conclusion": _fatias(dentro, ("success", "failure", "timed_out")),
+        "runs_inconclusive": _fatias(fora, ("cancelled", "skipped")),
+        "inconclusive_total": sum(n for _, n in fora),
         "scenarios_by_status": _fatias(
             cenarios, ("passed", "failed", "blocked", "skipped")),
     }
@@ -1016,9 +1181,14 @@ def _recorte(conn, coluna: str, tabela: str, inicio_anterior: str,
     componentes atrás de uma taxa só escondem exatamente o que se quer ver.
     """
     def linhas(desde: str, ate: str) -> dict[str, dict]:
+        # `conclusivas` é o denominador da taxa; `total` continua sendo o
+        # total de verdade, porque a tela mostra os dois.
+        dentro = ", ".join("?" * len(CONCLUSIVAS))
         sql = (
             f"SELECT {coluna} AS chave,"
             " SUM(CASE WHEN r.conclusion = 'success' THEN 1 ELSE 0 END) ok,"
+            f" SUM(CASE WHEN r.conclusion IN ({dentro}) THEN 1 ELSE 0 END)"
+            " conclusivas,"
             " COUNT(*) total, MAX(COALESCE(r.started_at, r.ingested_at)) ultimo"
             f" FROM {tabela} WHERE COALESCE(r.started_at, r.ingested_at) >= ?"
             " AND COALESCE(r.started_at, r.ingested_at) < ?"
@@ -1026,20 +1196,29 @@ def _recorte(conn, coluna: str, tabela: str, inicio_anterior: str,
             + f" GROUP BY {coluna}"
         )
         return {
-            r["chave"]: {"runs": r["total"], "ok": r["ok"], "last_run_at": r["ultimo"]}
-            for r in conn.execute(sql, (desde, ate, *args)) if r["chave"]
+            r["chave"]: {"runs": r["total"], "ok": r["ok"],
+                         "conclusivas": r["conclusivas"],
+                         "last_run_at": r["ultimo"]}
+            for r in conn.execute(sql, (*CONCLUSIVAS, desde, ate, *args))
+            if r["chave"]
         }
 
     agora, antes = linhas(inicio, fim), linhas(inicio_anterior, inicio)
     saida = []
     for chave, dados in agora.items():
-        taxa = round(dados["ok"] / dados["runs"] * 100, 1) if dados["runs"] else None
+        conclusivas = dados["conclusivas"]
+        taxa = (round(dados["ok"] / conclusivas * 100, 1)
+                if conclusivas else None)
         anterior = antes.get(chave)
-        taxa_antes = (round(anterior["ok"] / anterior["runs"] * 100, 1)
-                      if anterior and anterior["runs"] else None)
+        taxa_antes = (round(anterior["ok"] / anterior["conclusivas"] * 100, 1)
+                      if anterior and anterior["conclusivas"] else None)
         saida.append({
             "name": chave, "runs": dados["runs"],
-            "failures": dados["runs"] - dados["ok"],
+            "conclusive": conclusivas,
+            "inconclusive": dados["runs"] - conclusivas,
+            # Falha é o que FALHOU, não "tudo que não passou": cancelada e
+            # skipped nunca foram falha de ninguém.
+            "failures": conclusivas - dados["ok"],
             "success_rate": taxa, "success_rate_previous": taxa_antes,
             "delta_pct": _variacao(taxa, taxa_antes),
             "last_run_at": dados["last_run_at"],
@@ -1271,3 +1450,92 @@ def _o_que_mudou(atuais: list[dict], anteriores: list[dict],
             ),
         })
     return mudancas
+
+
+# ---------------------------------------------------------------------------
+# Reprocessar o que já está no disco
+
+
+def reprocessar(ws, conn) -> dict[str, Any]:
+    """Refaz o que é DERIVADO dos anexos já gravados, sem tocar na rede.
+
+    Quando o reconhecimento melhora — foi o caso do relatório Cucumber na
+    change 0189 —, os runs já ingeridos continuam com o resultado antigo. A
+    alternativa seria apagar e buscar tudo de novo: horas de download para
+    reler arquivos que já estão aqui do lado.
+
+    Só o que é derivado é recalculado (`scenarios`, `findings`). O que veio do
+    provedor — conclusão, commit, horários — não se toca: reprocessar não é
+    re-ingerir, e sobrescrever com menos informação seria uma perda.
+    """
+    from .indexer import reindex_file
+
+    base = ws.root / "ci"
+    resumo: dict[str, Any] = {"lidos": 0, "atualizados": [], "erros": []}
+    if not base.exists():
+        return resumo
+
+    for ano in sorted(p for p in base.iterdir() if p.is_dir()):
+        for caminho in sorted(ano.glob("*.md")):
+            resumo["lidos"] += 1
+            try:
+                mudou = _reprocessar_um(ws, conn, caminho)
+            except OSError as e:
+                resumo["erros"].append({"run": caminho.stem, "message": str(e)})
+                continue
+            if mudou:
+                reindex_file(ws, conn, caminho)
+                resumo["atualizados"].append(caminho.stem)
+    return resumo
+
+
+def _reprocessar_um(ws, conn, caminho: Path) -> bool:
+    post = frontmatter.load(caminho)
+    anexos = post.metadata.get("attachments") or []
+    if not anexos:
+        return False
+
+    # Os bytes voltam do disco pelo caminho que o próprio documento registra.
+    # Um anexo que sumiu é pulado, não é erro: o documento continua válido.
+    arquivos: dict[str, bytes] = {}
+    for item in anexos:
+        rel = item.get("path")
+        if not rel:
+            continue
+        no_disco = ws.root / rel
+        if no_disco.is_file():
+            arquivos[rel] = no_disco.read_bytes()
+    if not arquivos:
+        return False
+
+    manifesto = {"version": VERSAO_MANIFESTO, "signals": [],
+                 "attachments": [{"kind": i.get("kind"), "path": i.get("path")}
+                                 for i in anexos]}
+    novos = {
+        "scenarios": extrair_cenarios(manifesto, arquivos),
+        "findings": extrair_achados(manifesto, arquivos),
+    }
+    # Kind corrigido também vale: um anexo classificado como nada passa a
+    # aparecer como `cucumber` na galeria de evidências.
+    kinds = {}
+    convencao = _por_convencao(arquivos)
+    for item in convencao.get("attachments") or []:
+        kinds[item["path"]] = item["kind"]
+    corrigidos = []
+    for item in anexos:
+        novo = dict(item)
+        achado = kinds.get(item.get("path"))
+        if achado and achado != item.get("kind"):
+            novo["kind"] = achado
+        corrigidos.append(novo)
+    novos["attachments"] = corrigidos
+
+    if all(post.metadata.get(k) == v for k, v in novos.items()):
+        return False
+    for chave, valor in novos.items():
+        if valor:
+            post.metadata[chave] = valor
+        else:
+            post.metadata.pop(chave, None)
+    caminho.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+    return True

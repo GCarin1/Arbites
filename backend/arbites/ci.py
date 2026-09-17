@@ -120,7 +120,8 @@ class GitHubClient(Protocol):
                           inputs: dict[str, str]) -> None: ...
     def list_recent_dispatch_runs(self, repo: str, workflow: str) -> list[dict]: ...
     def list_workflow_runs(self, repo: str, workflow: str | None,
-                           page: int, per_page: int) -> list[dict]: ...
+                           page: int, per_page: int,
+                           created: str | None = ...) -> list[dict]: ...
     def get_run(self, repo: str, run_id: int) -> dict: ...
     def get_jobs(self, repo: str, run_id: int) -> list[dict]: ...
     def list_artifacts(self, repo: str, run_id: int) -> list[dict]: ...
@@ -226,7 +227,8 @@ class HttpxGitHub:
         )
         return resp.json().get("workflow_runs", [])
 
-    def list_workflow_runs(self, repo, workflow=None, page=1, per_page=50):
+    def list_workflow_runs(self, repo, workflow=None, page=1, per_page=50,
+                           created=None):
         """Runs CONCLUÍDOS do repositório, do mais novo para o mais velho.
 
         Diferente de `list_recent_dispatch_runs`, aqui NÃO se filtra por
@@ -239,9 +241,15 @@ class HttpxGitHub:
             f"/repos/{repo}/actions/workflows/{workflow}/runs"
             if workflow else f"/repos/{repo}/actions/runs"
         )
-        resp = self._request(
-            "GET", f"{alvo}?status=completed&per_page={per_page}&page={page}"
-        )
+        consulta = f"status=completed&per_page={per_page}&page={page}"
+        if created:
+            # O provedor filtra por data no servidor (change 0190). Sem isto,
+            # alcançar uma lacuna antiga custa paginar por tudo que veio
+            # depois dela — trabalho que já foi feito uma vez.
+            from urllib.parse import quote
+
+            consulta += f"&created={quote(created, safe='')}"
+        resp = self._request("GET", f"{alvo}?{consulta}")
         return resp.json().get("workflow_runs", [])
 
     def get_run(self, repo, run_id):

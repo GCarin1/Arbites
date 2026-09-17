@@ -75,7 +75,7 @@ def test_cucumber_do_artifact_vira_resultado_por_cenario(rig):
         ("pagamento aprovado", "passed", "CT-0001"),
         ("pagamento recusado", "failed", "CT-0002"),
     ]))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     linhas = rig.app.state.conn.execute(
         "SELECT scenario, testcase_id, status FROM ci_scenarios ORDER BY scenario"
@@ -93,14 +93,14 @@ def test_cucumber_reconhecido_por_convencao_quando_nao_declarado(rig):
     o mesmo fallback que já vale para print e log."""
     rig.fake.adicionar(101, started=_ha(2),
                        artifact=_artifact([("x", "passed", None)], declarado=False))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
     assert rig.app.state.conn.execute(
         "SELECT COUNT(*) c FROM ci_scenarios").fetchone()["c"] == 1
 
 
 def test_artifact_sem_cucumber_nao_inventa_cenario(rig):
     rig.fake.adicionar(101, started=_ha(2), artifact=_zip({MANIFESTO: manifesto([])}))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
     assert rig.app.state.conn.execute(
         "SELECT COUNT(*) c FROM ci_scenarios").fetchone()["c"] == 0
 
@@ -112,7 +112,7 @@ def test_cenario_que_passa_e_falha_no_periodo_e_instavel(rig):
     for i, status in enumerate(["passed", "failed", "passed"]):
         rig.fake.adicionar(100 + i, started=_ha(6 - i * 2),
                            artifact=_artifact([("flapando", status, "CT-0001")]))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     instaveis = _painel(rig)["flaky"]
     assert len(instaveis) == 1
@@ -129,7 +129,7 @@ def test_cenario_sempre_verde_ou_sempre_vermelho_nao_e_instavel(rig):
             ("sempre verde", "passed", None),
             ("quebrado de vez", "failed", None),
         ]))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
     assert _painel(rig)["flaky"] == []
 
 
@@ -146,7 +146,7 @@ def test_o_que_mudou_so_anuncia_quem_VIROU_instavel(rig):
             ("velho conhecido", velho, None),
             ("recem chegado", novo, None),
         ]))
-    rig.post("/api/v1/ci/ingest?limit=100")
+    rig.post("/api/v1/ci/ingest?limit=100&days=3650")
 
     painel = _painel(rig)
     balancando = {f["scenario"]: f for f in painel["flaky"]}
@@ -166,7 +166,7 @@ def test_o_anuncio_usa_o_caso_de_teste_quando_a_tag_existe(rig):
     for i, status in enumerate(["passed", "failed"]):
         rig.fake.adicionar(100 + i, started=_ha(6 - i * 2),
                            artifact=_artifact([("qualquer nome", status, "CT-0042")]))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     anuncio = next(m for m in _painel(rig)["changes"] if m["kind"] == "flaky")
     assert anuncio["text"].startswith("CT-0042 virou instável")
@@ -177,7 +177,7 @@ def test_o_anuncio_aponta_a_execucao_para_a_descida_continuar(rig):
     for i, status in enumerate(["passed", "failed"]):
         rig.fake.adicionar(100 + i, started=_ha(6 - i * 2),
                            artifact=_artifact([("instavel", status, None)]))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     anuncio = next(m for m in _painel(rig)["changes"] if m["kind"] == "flaky")
     assert anuncio["run_id"] == "github-101"
@@ -189,7 +189,7 @@ def test_reindex_reconstroi_os_cenarios_do_disco(rig):
     for i, status in enumerate(["passed", "failed"]):
         rig.fake.adicionar(100 + i, started=_ha(6 - i * 2),
                            artifact=_artifact([("instavel", status, None)]))
-    rig.post("/api/v1/ci/ingest")
+    rig.post("/api/v1/ci/ingest?days=3650")
 
     from arbites.indexer import reindex_full
     conn = rig.app.state.conn

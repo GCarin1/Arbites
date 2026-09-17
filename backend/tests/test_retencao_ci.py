@@ -58,7 +58,7 @@ def rig(ws):
     client = _monta(ws, {"signals_days": 365, "attachments_days": 30})
     client.fake.adicionar(101, started=_ha(200), artifact=_zip(ARTIFACT))  # velho
     client.fake.adicionar(102, started=_ha(5), artifact=_zip(ARTIFACT))    # novo
-    client.post("/api/v1/ci/ingest")
+    client.post("/api/v1/ci/ingest?days=3650")
     yield client
     client.__exit__(None, None, None)
 
@@ -135,7 +135,7 @@ def test_run_alem_da_janela_do_sinal_sai_inteiro(ws):
     try:
         cliente.fake.adicionar(101, started=_ha(400), artifact=_zip(ARTIFACT))
         cliente.fake.adicionar(102, started=_ha(2), artifact=_zip(ARTIFACT))
-        cliente.post("/api/v1/ci/ingest")
+        cliente.post("/api/v1/ci/ingest?days=3650")
 
         previa = cliente.get("/api/v1/ci/retention").json()["would_remove"]
         assert [r["id"] for r in previa["runs"]] == ["github-101"]
@@ -151,7 +151,7 @@ def test_nada_a_remover_nao_remove_nada(ws):
     cliente = _monta(ws, {"signals_days": 365, "attachments_days": 365})
     try:
         cliente.fake.adicionar(101, started=_ha(3), artifact=_zip(ARTIFACT))
-        cliente.post("/api/v1/ci/ingest")
+        cliente.post("/api/v1/ci/ingest?days=3650")
 
         assert cliente.get("/api/v1/ci/retention").json()["would_remove"]["bytes"] == 0
         feito = cliente.post("/api/v1/ci/retention/apply").json()["removed"]

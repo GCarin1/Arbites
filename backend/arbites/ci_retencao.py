@@ -193,3 +193,62 @@ def _esquecer_anexos(ws, conn, run_id: str | None) -> None:
     from .indexer import reindex_file
 
     reindex_file(ws, conn, caminho)
+
+
+# ---------------------------------------------------------------------------
+# Limpar tudo (change 0192)
+
+
+def previa_total(ws) -> dict[str, Any]:
+    """O que um "limpar tudo" levaria — contado ANTES de qualquer confirmação.
+
+    Uma confirmação que não diz o tamanho do estrago não é confirmação, é um
+    obstáculo: quem clica em "sim" sem saber que são 45 execuções e 300 MB
+    não decidiu nada.
+    """
+    runs = _runs(ws)
+    anexos = 0
+    for caminho, doc in runs:
+        pasta = caminho.parent / caminho.stem
+        if pasta.exists():
+            anexos += len([p for p in pasta.rglob("*") if p.is_file()])
+    base = ws.root / "ci"
+    return {
+        "runs": len(runs),
+        "attachments": anexos,
+        "bytes": _bytes_de(base) if base.exists() else 0,
+        "oldest": min((_iso_de(d) for _, d in runs if _iso_de(d)), default=None),
+        "newest": max((_iso_de(d) for _, d in runs if _iso_de(d)), default=None),
+    }
+
+
+def _iso_de(doc: dict[str, Any]) -> str | None:
+    quando = _quando(doc)
+    return quando.isoformat() if quando else None
+
+
+def limpar_tudo(ws, conn) -> dict[str, Any]:
+    """Manda a observabilidade inteira para a lixeira — não para o `rm`.
+
+    "Limpar tudo" é a operação em que o produto mais precisa ser confiável:
+    quem a usa costuma estar irritado com um dado errado, e é exatamente aí
+    que se apaga o que não devia. Por isso vai para `.arbites/trash/`, como
+    todo o resto, e volta enquanto a lixeira não for esvaziada.
+
+    A cobertura vai junto, e tem de ir: mantê-la afirmaria que o período já
+    foi varrido quando não há mais nada dele no disco, e a próxima busca não
+    traria nada de volta (change 0190).
+    """
+    from . import ci_cobertura
+    from .indexer import reindex_file
+
+    plano = previa_total(ws)
+    for caminho, _ in _runs(ws):
+        pasta = caminho.parent / caminho.stem
+        if pasta.exists():
+            ws.trash(pasta)
+        if caminho.exists():
+            ws.trash(caminho)
+            reindex_file(ws, conn, caminho)
+    ci_cobertura.esquecer(ws)
+    return {"removed": plano}
