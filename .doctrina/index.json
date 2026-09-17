@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.15.1",
+        "version": "0.16.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -2936,6 +2936,19 @@
         "id": "0191-taxa-sucesso-falhas-contando",
         "title": "cancelada não é falha",
         "path": ".doctrina/changes/archive/2026-09-17-0191-taxa-sucesso-falhas-contando",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0192-limpar-toda-observabilidade-confirmacao",
+        "title": "limpar tudo, com o tamanho do estrago na frente",
+        "path": ".doctrina/changes/archive/2026-09-17-0192-limpar-toda-observabilidade-confirmacao",
         "status": "applied",
         "applied": "2026-09-17",
         "specs_affected": [

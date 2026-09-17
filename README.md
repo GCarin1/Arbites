@@ -560,6 +560,15 @@ O contrário não acontece: um `result.json` que **não** tem essa forma não é
 classificado como relatório, porque chamar de cenário o que não é troca um
 silêncio por uma mentira.
 
+**Recomeçar do zero.** Em **Observabilidade → Configuração**, *Limpar toda
+a observabilidade* remove todas as execuções, seus anexos e o registro de até
+onde a busca já olhou. Antes de confirmar, o modal diz o tamanho do estrago —
+quantas execuções, quantos anexos, quanto espaço e de que data a que data —,
+porque uma confirmação que não diz isso é um obstáculo, não uma decisão. Tudo
+vai para a **lixeira**, de onde volta enquanto ela não for esvaziada. As
+origens declaradas ficam: o que some é o dado, não a configuração. É operação
+de administrador.
+
 **A taxa de sucesso conta só o que deu veredito.** Uma execução
 **cancelada** não é falha do produto — alguém apertou o botão, ou um push novo
 substituiu a fila — e uma **skipped** nem chegou a rodar. As duas ficam fora

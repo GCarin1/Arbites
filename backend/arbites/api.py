@@ -3042,6 +3042,21 @@ def _register_routes(app: FastAPI) -> None:
         ws, conn = ws_of(request), conn_of(request)
         return await asyncio.to_thread(ci_ingest.reprocessar, ws, conn)
 
+    @app.get(API_PREFIX + "/ci/purge/preview")
+    async def ci_purge_preview(request: Request):
+        # O tamanho do estrago ANTES da confirmação: um "tem certeza?" que
+        # não diz quantas execuções vão embora não é confirmação nenhuma.
+        from . import ci_retencao
+
+        return ci_retencao.previa_total(ws_of(request))
+
+    @app.post(API_PREFIX + "/ci/purge")
+    async def ci_purge(request: Request):
+        from . import ci_retencao
+
+        return await asyncio.to_thread(
+            ci_retencao.limpar_tudo, ws_of(request), conn_of(request))
+
     @app.get(API_PREFIX + "/ci/runs")
     async def ci_runs(request: Request, limit: int = 50,
                       workflow: str | None = None):
@@ -5114,6 +5129,9 @@ _GOVERNED: tuple[tuple[str, set[str], str | None, str | None], ...] = (
     # lixeira. LER a prévia continua aberto — ver o que seria removido é o
     # que permite alguém discordar antes de acontecer.
     (r"/ci/retention/apply$", {"POST"}, "admin", None),
+    # Apagar a observabilidade inteira tem o mesmo alcance da limpeza por
+    # retenção — e mais consequência, porque não é seletiva (change 0192).
+    (r"/ci/purge$", {"POST"}, "admin", None),
     # Declarar de onde a observabilidade puxa é escrever no arbites.yaml, o
     # mesmo alcance de PUT /targets e PUT /ai/providers. LER continua aberto:
     # a tela precisa dizer "nenhuma origem declarada" a quem não é admin.

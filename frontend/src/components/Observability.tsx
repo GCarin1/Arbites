@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { EmptyState } from "./EmptyState";
+import { ConfirmModal } from "./Modal";
 import { Pizza } from "./Pizza";
 import { TabBar } from "./TabBar";
 import { DocBody } from "./ReadView";
@@ -1130,6 +1131,11 @@ export function Observability({ onError }: { onError: (message: string) => void 
   const [novaOrigem, setNovaOrigem] = useState<CiSource>({ repo: "" });
   const [salvandoOrigem, setSalvandoOrigem] = useState(false);
   const [reprocessando, setReprocessando] = useState(false);
+  const [limpando, setLimpando] = useState(false);
+  const [previaLimpeza, setPreviaLimpeza] = useState<{
+    runs: number; attachments: number; bytes: number;
+    oldest: string | null; newest: string | null;
+  } | null>(null);
   // Configuração sai do meio do painel e vira aba (change 0176): quem lê o
   // painel todo dia não quer tropeçar no formulário que se preenche uma vez.
   const [aba, setAba] = useState<Aba>("painel");
@@ -1190,6 +1196,33 @@ export function Observability({ onError }: { onError: (message: string) => void 
       onError((e as Error).message);
     } finally {
       setReprocessando(false);
+    }
+  };
+
+  const pedirLimpeza = async () => {
+    // A prévia vem ANTES do "tem certeza?": uma confirmação que não diz
+    // quantas execuções vão embora não é confirmação, é um obstáculo.
+    try {
+      setPreviaLimpeza(await api.ciPurgePreview());
+    } catch (e) {
+      onError((e as Error).message);
+    }
+  };
+
+  const limparTudo = async () => {
+    setLimpando(true);
+    try {
+      const r = await api.ciPurge();
+      setPreviaLimpeza(null);
+      await carregar();
+      onError(
+        `${r.removed.runs} execução(ões) e ${r.removed.attachments} anexo(s)`
+        + " foram para a lixeira — de lá dá para restaurar.",
+      );
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setLimpando(false);
     }
   };
 
@@ -1317,6 +1350,26 @@ export function Observability({ onError }: { onError: (message: string) => void 
             De onde as execuções são puxadas e por quanto tempo ficam. É o que
             se preenche uma vez — por isso saiu do meio do painel.
           </p>
+          <section className="card obs-perigo">
+            <div className="card-head">
+              <h3>Limpar toda a observabilidade</h3>
+            </div>
+            <p className="caption muted">
+              Remove todas as execuções ingeridas, seus anexos e o registro de
+              até onde a busca já olhou. Vai para a lixeira, como todo o resto
+              do Arbites — de lá dá para restaurar enquanto ela não for
+              esvaziada. As origens declaradas ficam: o que some é o dado, não
+              a configuração.
+            </p>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => void pedirLimpeza()}
+              disabled={limpando}
+            >
+              {limpando ? "Limpando…" : "Limpar tudo…"}
+            </button>
+          </section>
           <section className="card">
             <div className="card-head">
               <h3>Reconferir período</h3>
@@ -1802,6 +1855,36 @@ export function Observability({ onError }: { onError: (message: string) => void 
           </section>
 
         </>
+      )}
+
+      {previaLimpeza && (
+        <ConfirmModal
+          danger
+          title="Limpar toda a observabilidade"
+          message={
+            <>
+              Isto remove <strong>{previaLimpeza.runs}</strong> execução(ões) e{" "}
+              <strong>{previaLimpeza.attachments}</strong> anexo(s)
+              {previaLimpeza.bytes > 0 &&
+                ` (${(previaLimpeza.bytes / 1024 / 1024).toFixed(1)} MB)`}
+              {previaLimpeza.oldest && previaLimpeza.newest && (
+                <>
+                  {" "}— de {formatarData(previaLimpeza.oldest)} a{" "}
+                  {formatarData(previaLimpeza.newest)}
+                </>
+              )}
+              {" "}A série temporal inteira some da tela.
+              <br />
+              <br />
+              Tudo vai para a <strong>lixeira</strong>, não para o apagador: de
+              lá dá para restaurar enquanto ela não for esvaziada. As origens
+              declaradas continuam onde estão.
+            </>
+          }
+          confirmLabel={`Limpar ${previaLimpeza.runs} execução(ões)`}
+          onConfirm={() => void limparTudo()}
+          onCancel={() => setPreviaLimpeza(null)}
+        />
       )}
     </div>
   );

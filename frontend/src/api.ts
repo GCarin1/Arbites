@@ -238,6 +238,14 @@ export const api = {
     request<{ lidos: number; atualizados: string[];
               erros: { run: string; message: string }[] }>(
       "/ci/reprocess", { method: "POST" }),
+  /** O tamanho do estrago ANTES de confirmar. */
+  ciPurgePreview: () =>
+    request<{ runs: number; attachments: number; bytes: number;
+              oldest: string | null; newest: string | null }>(
+      "/ci/purge/preview"),
+  ciPurge: () =>
+    request<{ removed: { runs: number; attachments: number; bytes: number } }>(
+      "/ci/purge", { method: "POST" }),
   ciSources: () =>
     request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
   ciSourcesSave: (sources: CiSource[]) =>
