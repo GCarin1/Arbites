@@ -48,13 +48,12 @@ def test_sem_bundle_declarado_usa_o_padrao(monkeypatch):
 
 
 @pytest.mark.parametrize("variavel", tls_ops.VARIAVEIS)
-def test_qualquer_uma_das_variaveis_serve(monkeypatch, tmp_path, variavel):
+def test_qualquer_uma_das_variaveis_serve(monkeypatch, ca_de_teste, variavel):
     """As duas últimas são as que o ecossistema Python já usa: a máquina
     corporativa provavelmente já as tem definidas."""
     for nome in tls_ops.VARIAVEIS:
         monkeypatch.delenv(nome, raising=False)
-    bundle = tmp_path / "empresa.pem"
-    bundle.write_text("-----BEGIN CERTIFICATE-----\n")
+    bundle = ca_de_teste
     monkeypatch.setenv(variavel, str(bundle))
     assert tls_ops.ca_bundle() == str(bundle)
     assert tls_ops.verify() == str(bundle)
@@ -69,12 +68,12 @@ def test_caminho_inexistente_e_ignorado(monkeypatch, tmp_path):
     assert tls_ops.verify() is True
 
 
-def test_a_ordem_e_a_especifica_primeiro(monkeypatch, tmp_path):
-    a, b = tmp_path / "arbites.pem", tmp_path / "requests.pem"
-    a.write_text("a"); b.write_text("b")
-    monkeypatch.setenv("ARBITES_CA_BUNDLE", str(a))
-    monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(b))
-    assert tls_ops.ca_bundle() == str(a)
+def test_a_ordem_e_a_especifica_primeiro(monkeypatch, ca_de_teste, tmp_path):
+    outro = tmp_path / "requests.pem"
+    outro.write_bytes(ca_de_teste.read_bytes())
+    monkeypatch.setenv("ARBITES_CA_BUNDLE", str(ca_de_teste))
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(outro))
+    assert tls_ops.ca_bundle() == str(ca_de_teste)
 
 
 # -- distinguir confiança de rede --------------------------------------------
@@ -91,14 +90,12 @@ def test_queda_de_rede_nao_e_confundida_com_certificado():
     assert tls_ops.e_erro_de_certificado(httpx.ReadTimeout("tempo")) is False
 
 
-def test_a_mensagem_muda_conforme_ha_ou_nao_bundle(monkeypatch, tmp_path):
+def test_a_mensagem_muda_conforme_ha_ou_nao_bundle(monkeypatch, ca_de_teste):
     for nome in tls_ops.VARIAVEIS:
         monkeypatch.delenv(nome, raising=False)
     sem = tls_ops.explicacao("api.github.com")
     assert "ARBITES_CA_BUNDLE" in sem and "proxy" in sem
-    bundle = tmp_path / "e.pem"
-    bundle.write_text("x")
-    monkeypatch.setenv("ARBITES_CA_BUNDLE", str(bundle))
+    monkeypatch.setenv("ARBITES_CA_BUNDLE", str(ca_de_teste))
     com = tls_ops.explicacao("api.github.com")
     assert "mesmo com o bundle" in com
 
@@ -129,9 +126,8 @@ def test_rede_fora_do_ar_tem_codigo_proprio(monkeypatch):
     assert exc.value.code == "unreachable"
 
 
-def test_o_bundle_declarado_chega_no_httpx(monkeypatch, tmp_path):
-    bundle = tmp_path / "empresa.pem"
-    bundle.write_text("-----BEGIN CERTIFICATE-----\n")
+def test_o_bundle_declarado_chega_no_httpx(monkeypatch, ca_de_teste):
+    bundle = ca_de_teste
     monkeypatch.setenv("ARBITES_CA_BUNDLE", str(bundle))
     vistos = {}
 

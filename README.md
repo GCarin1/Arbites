@@ -661,8 +661,25 @@ ARBITES_CA_BUNDLE=C:\certs\empresa.pem
 
 Valem também `REQUESTS_CA_BUNDLE` e `SSL_CERT_FILE`, que a máquina
 corporativa costuma já ter definidas; o Arbites usa a primeira que apontar
-para um arquivo existente. A mesma variável resolve o provider de IA na
+para um bundle **utilizável**. A mesma variável resolve o provider de IA na
 nuvem, que morre pelo mesmo motivo.
+
+**Se o caminho estiver errado, o Arbites diz** — no arranque e na aba
+Problemas, sem você precisar clicar em nada:
+
+```
+ATENÇÃO: ARBITES_CA_BUNDLE aponta para `C:\...\zscaler-root.pem`, que não
+existe neste computador.
+```
+
+Quando está tudo certo, a linha é `CA da rede: usando o bundle de
+ARBITES_CA_BUNDLE.` — se ela não aparecer, o arquivo não está sendo usado.
+"Existe" não basta: um `.pem` truncado, um DER com extensão trocada ou um
+arquivo sem permissão de leitura também são recusados, e o motivo é dito.
+
+Numa rede com Zscaler ou similar, o arquivo certo costuma ser o certificado
+**raiz** do proxy, não o do site nem um intermediário. Se o bundle é legível
+mas o GitHub continua recusado, é isso que a mensagem vai dizer.
 
 **Não existe** opção de desligar a verificação, e não deve existir: o Arbites
 manda o PAT do GitHub nessa conexão, e sem verificar o certificado não há

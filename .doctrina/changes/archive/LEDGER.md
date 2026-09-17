@@ -194,3 +194,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-17 — 0183-certificado-corporativo-derruba-busca — certificado corporativo derruba a busca de actions com 500 e traceback (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0184-saber-qual-codigo-processo — nao da para saber qual codigo o processo esta rodando (specs: workspace-core MODIFIED)
 - 2026-09-17 — 0185-falha-inesperada-vira-traceback — falha inesperada vira traceback cru na resposta em vez de erro legivel (specs: workspace-core MODIFIED)
+- 2026-09-17 — 0186-bundle-ca-apontado-mas — bundle de CA apontado mas ilegivel manda declarar a variavel que ja foi declarada (specs: ci-automation MODIFIED)
