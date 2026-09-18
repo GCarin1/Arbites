@@ -5,7 +5,7 @@
 **Implementation:** planned — leituras na change 0146, escritas na 0147, tela na 0149
 **Realizes:** a decisao de escopo da ADR 0015 — o agente e a ponte, e o Arbites expoe em vez de transportar
 **Last updated:** 2026-09-13
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ## Purpose
 
@@ -54,11 +54,13 @@ alguem aparece na auditoria como qualquer outra escrita.
   casos correlacionados pelo mapa de risco, distinguindo as duas origens —
   vinculo explicito e correlacao sao confiancas diferentes.
 - When uma escrita MCP alcanca um artefato que ja tem vinculo com o sistema informado, the system shall atualizar o artefato existente em vez de criar outro, para que a mesma chamada repetida nao duplique.
+- When o diagnóstico do servidor MCP é pedido pela linha de comando, the system shall relatar em texto o endereço configurado, se há credencial e seu comprimento, e o resultado de uma chamada real à instância.
 
 ### State-driven
 
 - While o modulo correspondente esta desligado (ADR 0014), the system shall
   recusar as ferramentas MCP daquele modulo com o mesmo erro das rotas HTTP.
+- While a configuração do servidor MCP estiver incompleta, the system shall iniciar mesmo assim e responder o motivo por extenso na primeira ferramenta chamada, em vez de encerrar o processo.
 
 ### Unwanted-behavior (must-not)
 
@@ -69,6 +71,7 @@ alguem aparece na auditoria como qualquer outra escrita.
 - The system shall not devolver o workspace inteiro em nenhuma ferramenta de
   contexto.
 - The system shall not aceitar escrita MCP em artefato com conflito de sincronia aberto, recusando com o motivo em vez de escolher um lado.
+- The system shall not encerrar o processo do servidor MCP por configuração ausente, nem imprimir o valor da credencial em nenhuma saída de diagnóstico.
 
 ## Acceptance criteria
 
@@ -86,6 +89,7 @@ alguem aparece na auditoria como qualquer outra escrita.
 5. [unverified] Ferramenta de contexto sem escopo recusa, como o
    `context-pack` ja recusa — verified by `backend/tests/test_mcp_server.py`.
 6. [unverified] Duas chamadas iguais de criacao com o mesmo vinculo produzem um unico artefato, escrita em artefato em conflito e recusada, e toda escrita aparece no log de atividade com a conta de origem — verified by `backend/tests/test_mcp_server.py`.
+7. [verified] Sem credencial o servidor sobe e o motivo chega na primeira chamada; recusa por credencial, por módulo desligado e instância inalcançável têm mensagens próprias; e o diagnóstico informa o comprimento da credencial sem nunca imprimi-la — verified by `backend/tests/test_mcp_arranque.py`.
 
 ## Maturity
 

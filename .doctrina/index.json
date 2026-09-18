@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-17",
+  "last_updated": "2026-09-18",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -166,7 +166,7 @@
         "id": "mcp-server",
         "path": ".doctrina/specs/mcp-server/spec.md",
         "status": "active",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "last_updated": "2026-09-13",
         "implementation": "planned — leituras na change 0146, escritas na 0147, tela na 0149"
       },
@@ -459,7 +459,16 @@
         "summary": "Existem duas origens de sinal, e ambas produzem série:"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0199-relatorio-evolucao-contra-marco",
+        "title": "relatorio de evolucao contra um marco nomeado, exportavel",
+        "path": ".doctrina/changes/0199-relatorio-evolucao-contra-marco",
+        "status": "proposed",
+        "opened": "2026-09-18",
+        "lane": "product (uncertain)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -3041,6 +3050,19 @@
         "specs_affected": [
           {
             "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0200-servidor-mcp-morre-calado",
+        "title": "\"Connection closed\" não é um diagnóstico",
+        "path": ".doctrina/changes/archive/2026-09-18-0200-servidor-mcp-morre-calado",
+        "status": "applied",
+        "applied": "2026-09-18",
+        "specs_affected": [
+          {
+            "capability": "mcp-server",
             "operation": "MODIFIED"
           }
         ]

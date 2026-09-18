@@ -321,6 +321,25 @@ O token em claro aparece **uma vez**. Guarde-o.
 }
 ```
 
+**Não conectou? `Connection closed` não é um diagnóstico.** Esse erro é o
+cliente MCP dizendo que não sabe — ele aparece para qualquer falha no
+arranque, e a mensagem do servidor sai em stderr, que a maioria dos clientes
+não mostra. Pergunte ao próprio servidor:
+
+```
+ARBITES_URL=http://192.168.0.17:8347 ARBITES_TOKEN=arb_... \
+  python -m arbites.mcp --diagnostico
+```
+
+Ele responde em texto qual é o caso: variável não definida, instância fora do
+ar ou endereço errado (de outra máquina, `127.0.0.1` nunca vai funcionar),
+credencial recusada, ou o interruptor `mcp_server` desligado. O token nunca é
+impresso — só o comprimento, que é o que deixa reconhecer "colei metade dele".
+
+O servidor também **não morre mais** quando falta configuração: ele sobe, o
+cliente conecta, e o motivo chega escrito por extenso na primeira ferramenta
+que o agente chamar.
+
 **O que o agente ganha.** Só respostas que ele não calcula sozinho lendo o
 repositório — um espelho da REST não agregaria nada:
 
