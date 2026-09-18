@@ -5,7 +5,7 @@
 **Implementation:** planned — leituras na change 0146, escritas na 0147, tela na 0149
 **Realizes:** a decisao de escopo da ADR 0015 — o agente e a ponte, e o Arbites expoe em vez de transportar
 **Last updated:** 2026-09-13
-**Version:** 0.3.0
+**Version:** 0.4.0
 
 ## Purpose
 
@@ -46,6 +46,7 @@ alguem aparece na auditoria como qualquer outra escrita.
   montam contexto, pela mesma razao que o `context-pack` ja exige: pacote do
   workspace inteiro nao cabe em janela nenhuma e nao ajuda ninguem.
 - The system shall expor ferramentas MCP de escrita para caso de teste, resultado de execucao e vinculo externo, cada uma devolvendo um preview do que mudaria antes de aplicar e declarada como escrita para que o cliente peca confirmacao humana.
+- The system shall ser instalável como pacote, para que o comando do servidor MCP funcione a partir de qualquer diretório — o cliente lança o processo do diretório dele, não do projeto.
 
 ### Event-driven
 
@@ -55,6 +56,8 @@ alguem aparece na auditoria como qualquer outra escrita.
   vinculo explicito e correlacao sao confiancas diferentes.
 - When uma escrita MCP alcanca um artefato que ja tem vinculo com o sistema informado, the system shall atualizar o artefato existente em vez de criar outro, para que a mesma chamada repetida nao duplique.
 - When o diagnóstico do servidor MCP é pedido pela linha de comando, the system shall relatar em texto o endereço configurado, se há credencial e seu comprimento, e o resultado de uma chamada real à instância.
+- When o diagnóstico da instalação é pedido, the system shall aferir a partir de um diretório diferente do projeto se o módulo do servidor MCP é encontrado, e nomear o conserto quando não for.
+- When o diagnóstico do servidor MCP roda sem credencial no ambiente, the system shall avisar que o bloco de ambiente do cliente não vale no terminal e mostrar como passar endereço e credencial na mão.
 
 ### State-driven
 
@@ -72,6 +75,7 @@ alguem aparece na auditoria como qualquer outra escrita.
   contexto.
 - The system shall not aceitar escrita MCP em artefato com conflito de sincronia aberto, recusando com o motivo em vez de escolher um lado.
 - The system shall not encerrar o processo do servidor MCP por configuração ausente, nem imprimir o valor da credencial em nenhuma saída de diagnóstico.
+- The system shall not documentar o servidor MCP sem o diretório de trabalho ou a instalação do pacote; o comando copiado sem eles falha antes de falar protocolo e produz apenas um erro genérico.
 
 ## Acceptance criteria
 
@@ -90,6 +94,7 @@ alguem aparece na auditoria como qualquer outra escrita.
    `context-pack` ja recusa — verified by `backend/tests/test_mcp_server.py`.
 6. [unverified] Duas chamadas iguais de criacao com o mesmo vinculo produzem um unico artefato, escrita em artefato em conflito e recusada, e toda escrita aparece no log de atividade com a conta de origem — verified by `backend/tests/test_mcp_server.py`.
 7. [verified] Sem credencial o servidor sobe e o motivo chega na primeira chamada; recusa por credencial, por módulo desligado e instância inalcançável têm mensagens próprias; e o diagnóstico informa o comprimento da credencial sem nunca imprimi-la — verified by `backend/tests/test_mcp_arranque.py`.
+8. [verified] O módulo é encontrado a partir de outro diretório quando o diretório de trabalho é declarado ou o pacote instalado; o projeto declara como ser instalado e aceita a versão de Python que roda a suíte; o diagnóstico afere de fora e nomeia o conserto; ele aceita endereço e credencial na mão sem imprimir a credencial; e a documentação traz o diretório de trabalho — verified by `backend/tests/test_mcp_alcancavel.py` e `backend/tests/test_mcp_arranque.py`.
 
 ## Maturity
 

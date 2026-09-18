@@ -421,11 +421,20 @@ def client_from_env() -> ArbitesClient:
     return ArbitesClient(base, token, None if token else FALTA_TOKEN)
 
 
-async def diagnostico() -> list[str]:
+async def diagnostico(url: str | None = None,
+                      token_dado: str | None = None) -> list[str]:
     """Por que o servidor MCP não está servindo — dito em texto, não em
-    protocolo. Existe porque "Connection closed" não é um diagnóstico."""
-    base = os.environ.get("ARBITES_URL", "http://127.0.0.1:8347")
-    token = os.environ.get("ARBITES_TOKEN", "")
+    protocolo. Existe porque "Connection closed" não é um diagnóstico.
+
+    `url` e `token_dado` vêm da linha de comando porque o ambiente do
+    TERMINAL não é o ambiente do servidor: o bloco `env` do `mcp.json` é
+    entregue pelo cliente ao processo que ele lança, e não existe no
+    PowerShell. Sem essa passagem, o diagnóstico rodado à mão sempre
+    responderia "NAO DEFINIDO" e mandaria procurar um problema que não é o
+    da vez (change 0201).
+    """
+    base = url or os.environ.get("ARBITES_URL", "http://127.0.0.1:8347")
+    token = token_dado or os.environ.get("ARBITES_TOKEN", "")
     linhas = [
         "arbites.mcp — diagnóstico",
         f"  ARBITES_URL   = {base}",
@@ -439,6 +448,17 @@ async def diagnostico() -> list[str]:
                       " pontas.")
     if not token:
         linhas.append(f"  -> {FALTA_TOKEN}")
+        linhas.append("")
+        linhas.append("  ATENCAO, antes de sair procurando: o bloco `env` do"
+                      " mcp.json NAO vale neste terminal.")
+        linhas.append("  O cliente entrega aquelas variáveis ao processo que"
+                      " ELE lança; aqui elas não existem.")
+        linhas.append("  Para conferir o que você vai pôr no mcp.json, passe"
+                      " na mão:")
+        linhas.append("    python -m arbites.mcp --diagnostico"
+                      " --url http://SEU-IP:8347 --token arb_...")
+        linhas.append("  A credencial se gera na própria instância, na aba"
+                      " IA → MCP — a mesma da linha acima.")
         return linhas
     cliente = ArbitesClient(base, token)
     try:

@@ -141,3 +141,50 @@ def test_token_com_espaco_nas_pontas_e_denunciado(monkeypatch):
     saida = "\n".join(asyncio.run(diagnostico()))
 
     assert "espaço ou quebra de linha" in saida
+
+
+# --- o ambiente do terminal NAO e o do servidor -----------------------------
+
+
+def test_o_diagnostico_aceita_url_e_token_na_mao(monkeypatch):
+    """O bloco `env` do mcp.json é entregue pelo cliente ao processo que ELE
+    lança — no PowerShell aquelas variáveis não existem. Sem poder passá-las
+    na mão, o diagnóstico rodado à mão responderia sempre "NAO DEFINIDO" e
+    mandaria procurar o problema errado."""
+    monkeypatch.delenv("ARBITES_TOKEN", raising=False)
+    monkeypatch.delenv("ARBITES_URL", raising=False)
+
+    async def explode(*a, **k):
+        raise httpx.ConnectError("recusou")
+
+    monkeypatch.setattr(httpx.AsyncClient, "request", explode)
+    passado = "arb_passado_na_mao"
+    saida = "\n".join(asyncio.run(diagnostico("http://outro:9000", passado)))
+
+    assert "http://outro:9000" in saida
+    assert f"{len(passado)} caracteres" in saida
+    assert passado not in saida
+
+
+def test_sem_token_o_diagnostico_avisa_que_o_env_do_mcp_nao_vale_aqui(monkeypatch):
+    """A armadilha que este aviso evita: rodar no terminal, ler "NAO
+    DEFINIDO" e concluir que o mcp.json está errado quando ele podia estar
+    certo."""
+    monkeypatch.delenv("ARBITES_TOKEN", raising=False)
+
+    saida = "\n".join(asyncio.run(diagnostico()))
+
+    assert "NAO vale neste terminal" in saida
+    assert "--token" in saida
+
+
+def test_as_duas_mensagens_apontam_o_MESMO_lugar(monkeypatch):
+    """Duas instruções discordando sobre onde gerar a credencial mandam a
+    pessoa para a tela errada — e ela conclui que a funcionalidade não
+    existe."""
+    monkeypatch.delenv("ARBITES_TOKEN", raising=False)
+
+    saida = "\n".join(asyncio.run(diagnostico()))
+
+    assert saida.count("IA → MCP") >= 2
+    assert "Perfil →" not in saida

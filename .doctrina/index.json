@@ -166,7 +166,7 @@
         "id": "mcp-server",
         "path": ".doctrina/specs/mcp-server/spec.md",
         "status": "active",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "last_updated": "2026-09-13",
         "implementation": "planned — leituras na change 0146, escritas na 0147, tela na 0149"
       },
@@ -3058,6 +3058,19 @@
         "id": "0200-servidor-mcp-morre-calado",
         "title": "\"Connection closed\" não é um diagnóstico",
         "path": ".doctrina/changes/archive/2026-09-18-0200-servidor-mcp-morre-calado",
+        "status": "applied",
+        "applied": "2026-09-18",
+        "specs_affected": [
+          {
+            "capability": "mcp-server",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0201-cliente-mcp-acha-pacote",
+        "title": "o pacote que o cliente não achava",
+        "path": ".doctrina/changes/archive/2026-09-18-0201-cliente-mcp-acha-pacote",
         "status": "applied",
         "applied": "2026-09-18",
         "specs_affected": [

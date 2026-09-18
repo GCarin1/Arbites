@@ -208,3 +208,4 @@ One line per archived change, newest last. Appended by
 - 2026-09-17 — 0197-area-diagnostico-fim-cenario — onde doer (specs: ci-automation MODIFIED)
 - 2026-09-17 — 0198-quanto-contexto-vai-ia — quanto isso custa, antes de custar (specs: ai-assist MODIFIED)
 - 2026-09-18 — 0200-servidor-mcp-morre-calado — "Connection closed" não é um diagnóstico (specs: mcp-server MODIFIED)
+- 2026-09-18 — 0201-cliente-mcp-acha-pacote — o pacote que o cliente não achava (specs: mcp-server MODIFIED)
