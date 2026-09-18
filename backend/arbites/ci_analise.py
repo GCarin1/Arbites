@@ -135,6 +135,36 @@ def _numero(valor: Any) -> str:
     return str(valor)
 
 
+# O dossiê é agregado: dobrar as execuções não dobra o texto. O que cresce é
+# a variedade — cenários instáveis, repositórios, rótulos —, e é nela que os
+# tetos ficam. Sem eles, um dia ruim numa suíte grande manda para o modelo uma
+# lista de centenas de linhas que não muda a conclusão e custa em toda análise.
+TETO_FLAKY = 15
+TETO_RECORTE = 20
+TETO_MUDANCAS = 12
+
+# Estimativa grosseira e declarada como tal: ~4 caracteres por token é a regra
+# de bolso para português e inglês. Serve para dizer a ordem de grandeza na
+# tela, não para faturar nada.
+CHARS_POR_TOKEN = 4
+
+
+def tamanho_do_contexto(painel: dict[str, Any]) -> dict[str, Any]:
+    """Quanto texto a análise vai mandar — respondido ANTES de mandar.
+
+    "Se for muito, vai ser chato de API." A pergunta é justa e não tinha
+    resposta na tela: quem clica em Analisar não fazia ideia se aquilo custa
+    um décimo de centavo ou dez. Agora faz, antes de clicar.
+    """
+    corpo = dossie_markdown(dossie(painel))
+    return {
+        "chars": len(corpo),
+        "tokens_aprox": round(len(corpo) / CHARS_POR_TOKEN),
+        "caps": {"flaky": TETO_FLAKY, "recorte": TETO_RECORTE,
+                 "mudancas": TETO_MUDANCAS},
+    }
+
+
 def dossie(painel: dict[str, Any]) -> dict[str, Any]:
     """Os números que a análise viu, guardados junto dela.
 
@@ -156,12 +186,20 @@ def dossie(painel: dict[str, Any]) -> dict[str, Any]:
              "direction": s.get("direction"), "points": len(s.get("points") or [])}
             for s in painel.get("signals") or []
         ],
+        # Tetos explícitos (change 0198). O dossiê não cresce com o número de
+        # execuções — é agregado —, mas cresce com o número de CENÁRIOS
+        # instáveis e de repositórios. Numa suíte grande e num dia ruim, essa
+        # lista sozinha passaria de tudo o mais somado, e o que a análise
+        # precisa dela são os piores, não todos.
         "flaky": [
             {"scenario": f.get("scenario"), "testcase_id": f.get("testcase_id"),
              "runs": f.get("runs"), "failures": f.get("failures"),
              "flips": f.get("flips"), "newly_flaky": f.get("newly_flaky")}
-            for f in painel.get("flaky") or []
+            for f in sorted(painel.get("flaky") or [],
+                            key=lambda f: (-int(bool(f.get("newly_flaky"))),
+                                           -(f.get("flips") or 0)))[:TETO_FLAKY]
         ],
+        "flaky_total": len(painel.get("flaky") or []),
         "findings": {
             "total": achados.get("total"),
             "previous_total": achados.get("previous_total"),
@@ -171,11 +209,12 @@ def dossie(painel: dict[str, Any]) -> dict[str, Any]:
             "by_wcag": (achados.get("by_wcag") or [])[:8],
         },
         "distribution": painel.get("distribution") or {},
-        "by_repo": painel.get("by_repo") or [],
-        "by_origin": painel.get("by_origin") or [],
-        "errors_by_origin": painel.get("errors_by_origin") or [],
+        "by_repo": (painel.get("by_repo") or [])[:TETO_RECORTE],
+        "by_origin": (painel.get("by_origin") or [])[:TETO_RECORTE],
+        "errors_by_origin": (painel.get("errors_by_origin") or [])[:TETO_RECORTE],
         "by_label": painel.get("by_label") or {},
-        "changes": [c.get("text") for c in painel.get("changes") or []],
+        "changes": [c.get("text")
+                    for c in (painel.get("changes") or [])[:TETO_MUDANCAS]],
     }
 
 

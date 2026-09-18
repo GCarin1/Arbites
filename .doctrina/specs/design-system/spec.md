@@ -5,7 +5,7 @@
 **Implementation:** verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062).
 **Realizes:** n/a — capability transversal de UI/UX (a gramática visual que todas as telas compartilham); não realiza um success-criteria específico do intake, habilita todos
 **Last updated:** 2026-09-16
-**Version:** 0.20.0
+**Version:** 0.21.0
 
 ## Purpose
 
@@ -103,6 +103,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall agrupar o menu por DONO do artefato e nao so por proximidade de fluxo — requisito e insumo do time de negocio e fica fora do grupo de trabalho de QA, antes dele, na ordem em que o fluxo acontece.
 - The system shall manter, em tela de 320 a 390 px, todo texto dentro do seu contêiner, nenhum rótulo escrito por cima do valor que ele nomeia, e nenhum controle com alvo de toque abaixo de 24 CSS px — salvo exceção declarada no próprio elemento, com o caminho equivalente nomeado.
 - The system shall empilhar as tabelas de dado em tela estreita, com cada linha virando cartão e cada célula carregando o rótulo da sua coluna, em vez de rolar de lado.
+- The system shall apresentar toda série temporal com a escala do eixo de valores, as datas do primeiro e do último ponto, e uma frase que descreva a faixa e o extremo em linguagem corrente.
 
 ### Event-driven
 
@@ -129,6 +130,7 @@ changes 0060/0061/0062 e é marcado [unverified] até implementar. -->
 - The system shall not repetir no menu lateral a navegação que o menu da conta já oferece; o perfil é da pessoa e pertence ao avatar, o menu lateral é do workspace.
 - The system shall not tratar o estouro horizontal da página como prova de layout responsivo; a verificação percorre as telas medindo texto cortado, rótulo sobreposto, corte pelo ancestral e alvo de toque.
 - The system shall not exibir porcentagem de progresso quando o tamanho da resposta é desconhecido; uma barra que promete um número inexistente é pior que uma que só diz que está indo.
+- The system shall not resolver densidade de pontos com rolagem lateral dentro do gráfico; a área de acerto cresce na altura, porque um gráfico que só se vê por pedaços nunca é lido inteiro.
 
 ## Acceptance criteria
 
@@ -198,6 +200,7 @@ e prova a sua fatia, citando o teste/artefato. -->
 29. [unverified] O menu apresenta Requisitos como item sem cabecalho de grupo, entre Hoje e o grupo Testes, que passa a conter apenas Test cases e Execucoes — verified by `frontend/src/App.tsx`.
 30. [verified] As quinze telas do menu, incluindo as cinco faixas da observabilidade, não acusam nenhum achado a 390 px nem a 320 px no detector `frontend/scripts/audita-estreito.mjs`; e o detector, com a causa reintroduzida por CSS injetado, volta a acusar o rótulo sobreposto — verified by `frontend/scripts/audita-estreito.mjs`.
 31. [verified] A exportação devolve tamanho e nome de arquivo em todos os formatos, inclusive num período sem dado — verified by `backend/tests/test_export_progresso.py`; e a barra em largura de telefone não estoura nem sobrepõe texto — verified by `frontend/scripts/audita-estreito.mjs`.
+32. [verified] A série mostra mínimo, máximo e as duas datas, descreve-se em uma frase, não rola lateralmente e não corta o ponto extremo contra a borda; série sem variação mostra um valor só — verified by `frontend/scripts/audita-estreito.mjs` e verificação em navegador.
 
 ## Maturity
 

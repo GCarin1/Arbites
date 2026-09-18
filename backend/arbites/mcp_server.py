@@ -75,33 +75,69 @@ class McpRecusado(Exception):
 
 
 class ArbitesClient:
-    """HTTP contra a instância, com a credencial do agente no Bearer."""
+    """HTTP contra a instância, com a credencial do agente no Bearer.
 
-    def __init__(self, base: str, token: str) -> None:
+    `impedimento` guarda o motivo de este cliente não poder falar com nada —
+    falta de token, tipicamente. Ele NÃO derruba o processo (change 0200):
+    um servidor que morre no arranque vira "Connection closed" no cliente
+    MCP, que é o pior erro possível porque não diz nada. Subindo, o motivo
+    chega ao agente na primeira chamada, escrito por extenso.
+    """
+
+    def __init__(self, base: str, token: str,
+                 impedimento: str | None = None) -> None:
         self.base = base.rstrip("/")
         self.token = token
+        self.impedimento = impedimento
 
     async def post(self, path: str, corpo: dict[str, Any]) -> Any:
-        async with httpx.AsyncClient(timeout=60) as c:
-            r = await c.post(
-                f"{self.base}{API}{path}",
-                json=corpo,
-                headers={"Authorization": f"Bearer {self.token}"},
-            )
-        return self._ler(r)
+        if self.impedimento:
+            raise McpRecusado(self.impedimento)
+        return self._ler(await self._chamar(
+            "POST", f"{self.base}{API}{path}", json=corpo))
 
     async def get(self, path: str, **params: Any) -> Any:
+        if self.impedimento:
+            raise McpRecusado(self.impedimento)
         limpos = {k: v for k, v in params.items() if v not in ("", None)}
         url = f"{self.base}{API}{path}"
         if limpos:
             url += "?" + urlencode(limpos)
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.get(url, headers={"Authorization": f"Bearer {self.token}"})
-        return self._ler(r)
+        return self._ler(await self._chamar("GET", url))
+
+    async def _chamar(self, metodo: str, url: str, **kwargs):
+        """A queda de rede vira RECUSA legível, não exceção crua.
+
+        Um `ConnectError` subindo daqui aparece no agente como um traceback
+        de httpx, que não diz a coisa útil: a instância não está no ar, ou o
+        endereço está errado.
+        """
+        cabecalhos = {"Authorization": f"Bearer {self.token}"}
+        try:
+            async with httpx.AsyncClient(timeout=60) as c:
+                return await c.request(metodo, url, headers=cabecalhos, **kwargs)
+        except httpx.TransportError as e:
+            raise McpRecusado(
+                f"o Arbites não respondeu em {self.base} ({type(e).__name__})."
+                " Confira se ele está rodando e se ARBITES_URL aponta para"
+                " ele — de outra máquina, o endereço não pode ser 127.0.0.1."
+            ) from e
 
     @staticmethod
     def _ler(r) -> Any:
         if r.status_code >= 400:
+            # 401 sem corpo legível é o caso mais comum e o mais mudo: dizer
+            # só "HTTP 401" manda a pessoa procurar no lugar errado.
+            if r.status_code == 401:
+                raise McpRecusado(
+                    "a credencial do agente foi recusada (401). Gere outra em"
+                    " IA → MCP e ponha em ARBITES_TOKEN; um token revogado ou"
+                    " de outra instância responde exatamente assim.")
+            if r.status_code == 403:
+                raise McpRecusado(
+                    "a instância recusou (403) — em geral o interruptor"
+                    " `mcp_server` está desligado em Administração, ou a"
+                    " conta do agente não tem o papel necessário.")
             try:
                 erro = r.json()["error"]
                 raise McpRecusado(f"{erro['code']}: {erro['message']}")
@@ -365,15 +401,55 @@ def build_server(cli: ArbitesClient) -> MCPServer:
     return server
 
 
+FALTA_TOKEN = (
+    "ARBITES_TOKEN não está definido no ambiente deste servidor MCP. Gere a"
+    " credencial do agente no Arbites, em IA → MCP, e ponha em `env` do"
+    " cliente — no mesmo bloco onde está `command` e `args`."
+)
+
+
 def client_from_env() -> ArbitesClient:
+    """Sempre devolve um cliente. NUNCA derruba o processo.
+
+    Derrubar era o comportamento antigo, e ele produzia o pior desfecho
+    possível: o cliente MCP mostra "Connection closed" e nada mais, porque a
+    mensagem sai em stderr e a maioria dos clientes não o exibe. A pessoa
+    fica com um erro genérico e nenhuma pista (change 0200).
+    """
     base = os.environ.get("ARBITES_URL", "http://127.0.0.1:8347")
     token = os.environ.get("ARBITES_TOKEN", "")
+    return ArbitesClient(base, token, None if token else FALTA_TOKEN)
+
+
+async def diagnostico() -> list[str]:
+    """Por que o servidor MCP não está servindo — dito em texto, não em
+    protocolo. Existe porque "Connection closed" não é um diagnóstico."""
+    base = os.environ.get("ARBITES_URL", "http://127.0.0.1:8347")
+    token = os.environ.get("ARBITES_TOKEN", "")
+    linhas = [
+        "arbites.mcp — diagnóstico",
+        f"  ARBITES_URL   = {base}",
+        # O token NUNCA é impresso: comprimento basta para reconhecer "colei
+        # errado", e este texto vai ser colado num chat.
+        "  ARBITES_TOKEN = " + (f"definido, {len(token)} caracteres"
+                                if token else "NAO DEFINIDO"),
+    ]
+    if token != token.strip():
+        linhas.append("  ATENCAO: o token tem espaço ou quebra de linha nas"
+                      " pontas.")
     if not token:
-        raise SystemExit(
-            "ARBITES_TOKEN não definido — gere a credencial do agente no"
-            " Arbites, em IA → MCP, e ponha no env do cliente MCP."
-        )
-    return ArbitesClient(base, token)
+        linhas.append(f"  -> {FALTA_TOKEN}")
+        return linhas
+    cliente = ArbitesClient(base, token)
+    try:
+        await cliente.get("/testcases", limit=1)
+        linhas.append("  conexão e credencial: OK — o servidor consegue ler a"
+                      " instância.")
+    except McpRecusado as e:
+        linhas.append(f"  RECUSADO: {e}")
+    except Exception as e:  # noqa: BLE001
+        linhas.append(f"  FALHA INESPERADA: {type(e).__name__}: {e}")
+    return linhas
 
 
 async def main() -> None:

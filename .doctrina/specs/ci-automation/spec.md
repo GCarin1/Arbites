@@ -5,7 +5,7 @@
 **Implementation:** verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo
 **Realizes:** SC6
 **Last updated:** 2026-09-17
-**Version:** 0.17.0
+**Version:** 0.18.0
 
 ## Purpose
 
@@ -59,6 +59,8 @@ workflow/jobs/steps do workflow.
 - The system shall aceitar um bundle de CA declarado por variável de ambiente e usá-lo na verificação TLS de toda chamada externa, para funcionar em rede que re-assina o tráfego.
 - The system shall calcular taxa de sucesso e contagem de falhas apenas sobre execuções que deram veredito sobre o produto — concluída com sucesso, com falha, ou por estouro de tempo —, e apresentar junto do número o denominador e quantas ficaram de fora.
 - The system shall carregar a origem de cada sinal — declarado pelo produtor ou derivado pelo Arbites — em toda leitura da série, até a tela.
+- The system shall apresentar o estado do período antes das listas de exceção; o que mudou e os cenários instáveis vêm depois dos números que se consulta todo dia.
+- The system shall declarar, junto da lista de cenários instáveis, o período que a produziu, o critério que define instabilidade e o fato de ser recalculada a cada período.
 
 ### Event-driven
 
@@ -84,6 +86,8 @@ workflow/jobs/steps do workflow.
 - When a limpeza total da observabilidade é pedida, the system shall responder antes quantas execuções, quantos anexos, quanto espaço e que intervalo de datas seriam removidos, para que a confirmação seja informada.
 - When a limpeza total é confirmada, the system shall mover execuções e anexos para a lixeira, esquecer a cobertura de busca junto, e preservar as origens declaradas.
 - When uma execução é gravada, the system shall calcular as medidas que já apurou sobre ela — duração, veredito, jobs falhos, cenários e sua taxa, violações de acessibilidade por gravidade e critérios WCAG distintos —, emitindo-as como sinais marcados com a origem derivada.
+- When um relatório de cenários é lido, the system shall guardar a mensagem do passo que falhou, para que a pergunta "por que falhou" seja respondida sem abrir a execução.
+- When o diagnóstico do período é pedido, the system shall responder quais cenários mais falharam, quais nunca falharam, quais mensagens de erro mais se repetem agrupadas pelo molde, e quais etapas do pipeline mais quebram, com recorte por repositório.
 
 ### State-driven
 
@@ -120,6 +124,7 @@ workflow/jobs/steps do workflow.
 - The system shall not apagar a observabilidade fora da lixeira nem executar a limpeza total para quem não administra a instância.
 - The system shall not emitir medida derivada cujo nome já tenha sido declarado no manifesto, nem medida cuja fonte não exista na execução; um zero inventado é um ponto no gráfico afirmando o que não foi medido.
 - The system shall not derivar sinal de arquivo cuja forma não reconhece; reconhecer um formato documentado é leitura, adivinhar o significado de um número solto é invenção.
+- The system shall not agrupar mensagens de erro pelo texto cru nem listar como estável um cenário sem histórico; o primeiro devolve uma lista de linhas únicas e o segundo dá um atestado que ninguém provou.
 
 ### Optional
 
@@ -158,6 +163,8 @@ workflow/jobs/steps do workflow.
 21. [verified] A taxa é calculada sobre as conclusivas (25 de 32, não de 45), estouro de tempo conta como falha, cancelada e pulada ficam fora do denominador e aparecem nomeadas ao lado, um período só de canceladas responde ausência em vez de zero, e a contagem de falhas por repositório deixa de somar o que não falhou — verified by `backend/tests/test_execucao_conclusiva.py`.
 22. [verified] A prévia informa execuções, anexos, bytes e intervalo sem remover nada; a limpeza manda tudo para a lixeira e o índice esquece junto; a cobertura de busca é descartada com o dado; as origens declaradas permanecem; e quem não é admin recebe recusa — verified by `backend/tests/test_limpar_observabilidade.py`.
 23. [verified] Sem nenhum manifesto a série existe, com duração vinda dos horários do provedor, cenários do relatório e acessibilidade dos achados; cancelada não vira zero; nome declarado desliga o derivado homônimo; ausência de fonte não vira sinal; toda medida carrega a origem até o painel; e reprocessar do disco cria a série do que já estava ingerido — verified by `backend/tests/test_sinais_derivados.py`.
+24. [verified] O painel abre pelos indicadores e traz o que mudou e os instáveis no fim — verified by `frontend/scripts/audita-ordem.mjs`; e a lista de instáveis nomeia o período, o critério e a recalculação, verificado em navegador.
+25. [verified] A mensagem do passo que falhou é lida e guardada só na primeira linha; mensagens iguais com números, tempos ou endereços diferentes caem no mesmo molde; o diagnóstico responde o cenário que mais falhou, os que nunca falharam com pelo menos três execuções, o erro mais repetido e a etapa que mais quebra; e o filtro por repositório recorta de verdade — verified by `backend/tests/test_diagnostico_observabilidade.py`.
 
 ## Maturity
 

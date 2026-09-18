@@ -7,6 +7,7 @@ import { Esqueleto, Progresso } from "./Progresso";
 import { TabBar } from "./TabBar";
 import { DocBody } from "./ReadView";
 import type {
+  CiDiagnostico,
   CiFlaky,
   CiRetention,
   CiRun,
@@ -127,6 +128,59 @@ function Variacao({ sinal }: { sinal: CiSignalSeries }) {
  * e poder clicar num ponto. Cada ponto é um botão — é ele que começa a
  * descida.
  */
+/** Um número com a unidade, curto o bastante para caber num eixo. */
+function curto(valor: number, unidade: string | null | undefined): string {
+  const arredondado = Math.abs(valor) >= 100 ? Math.round(valor)
+    : Math.round(valor * 10) / 10;
+  return unidade === "%" ? `${arredondado}%` : String(arredondado);
+}
+
+/** A série em uma frase — para quem abre o painel e não desenha gráfico na
+ *  cabeça. "Entre 12 e 37" responde a escala, que era o que faltava: sem
+ *  eixo, o desenho dizia apenas "subiu e desceu", e subir de 12 para 13 tem
+ *  a mesma forma de subir de 12 para 1200. */
+function emPalavras(sinal: CiSignalSeries): string {
+  const valores = sinal.points.map((p) => p.value);
+  if (valores.length === 0) return "";
+  const min = Math.min(...valores);
+  const max = Math.max(...valores);
+  // `plural()` já traz o número junto; repeti-lo aqui produzia "45 45
+  // execuções". E `formatarData` já termina em ponto ("03 de set."), então a
+  // frase não põe outro.
+  const execucoes = plural(valores.length, "execução", "execuções");
+  if (min === max) return `Sempre ${curto(min, sinal.unit)}, nas ${execucoes}.`;
+  const extremo = sinal.points[valores.indexOf(max)];
+  return (
+    `Entre ${curto(min, sinal.unit)} e ${curto(max, sinal.unit)} em ${execucoes}`
+    + ` — o maior foi em ${formatarData(extremo.at)}`
+  );
+}
+
+/**
+ * A série no tempo (change 0195).
+ *
+ * ## O que estava errado
+ *
+ * Três coisas, e as três juntas faziam o gráfico não dizer nada:
+ *
+ * 1. **Sem escala.** Nenhum eixo. Subir de 12 para 13 tem exatamente o mesmo
+ *    desenho de subir de 12 para 1200 — a linha é normalizada entre o mínimo
+ *    e o máximo. Só o valor final aparecia, e ele sozinho não diz de onde
+ *    veio.
+ * 2. **Sem tempo.** Nenhuma data. "Como cada medida se moveu" sem dizer
+ *    entre quando e quando.
+ * 3. **Rolagem lateral dentro do cartão.** Ela existia para dar espaço aos
+ *    pontos clicáveis (change 0181), e o preço foi um gráfico que só se vê
+ *    por pedaços — quem olha nunca tem a série inteira na frente.
+ *
+ * ## O conserto
+ *
+ * O desenho cabe na largura, sempre. Os pontos deixam de ser botões de 16px
+ * lado a lado e viram uma faixa invisível por ponto, da altura inteira do
+ * gráfico: a área de acerto cresce em vez de encolher, e a rolagem some.
+ * Sobram círculos desenhados — marcas, não alvos —, com destaque só nos
+ * extremos e no último, que é o rótulo direto seletivo.
+ */
 function Serie({
   sinal,
   onPonto,
@@ -136,82 +190,344 @@ function Serie({
   onPonto: (runId: string) => void;
   selecionado: string | null;
 }) {
+  // A margem existe para o círculo da PONTA não ser cortado pela borda do
+  // viewBox: sem ela o primeiro e o último ponto viravam meias-luas, e são
+  // justamente os dois que mais se olha.
   const largura = 100;
+  const margem = 3;
+  const util = largura - margem * 2;
+  // Margem vertical pelo mesmo motivo: o ponto no topo e no fundo da escala
+  // é o extremo da série, e era exatamente ele que saía cortado ao meio.
   const altura = 32;
+  const margemY = 3;
+  const utilY = altura - margemY * 2;
   const pontos = sinal.points;
-  const geometria = useMemo(() => {
-    if (pontos.length === 0) return { caminho: "", coords: [] as { x: number; y: number }[] };
+  const g = useMemo(() => {
+    if (pontos.length === 0) {
+      return { caminho: "", coords: [] as { x: number; y: number }[],
+               min: 0, max: 0, constante: true, metaY: null as number | null,
+               iMax: -1, iMin: -1 };
+    }
     const valores = pontos.map((p) => p.value);
+    // A META entra na escala, senão uma linha de meta fora do intervalo
+    // seria desenhada fora do quadro.
     const min = Math.min(...valores, sinal.goal ?? Infinity);
     const max = Math.max(...valores, sinal.goal ?? -Infinity);
     const amplitude = max - min || 1;
+    const y = (v: number) =>
+      altura - margemY - ((v - min) / amplitude) * utilY;
     const coords = pontos.map((p, i) => ({
-      x: pontos.length === 1 ? largura / 2 : (i / (pontos.length - 1)) * largura,
-      y: altura - ((p.value - min) / amplitude) * altura,
+      x: pontos.length === 1
+        ? largura / 2
+        : margem + (i / (pontos.length - 1)) * util,
+      y: y(p.value),
     }));
     return {
       caminho: coords.map((c, i) => `${i ? "L" : "M"}${c.x},${c.y}`).join(" "),
       coords,
-      metaY:
-        sinal.goal === null
-          ? null
-          : altura - ((sinal.goal - min) / amplitude) * altura,
+      min,
+      max,
+      constante: min === max,
+      metaY: sinal.goal === null || sinal.goal === undefined ? null : y(sinal.goal),
+      iMax: valores.indexOf(Math.max(...valores)),
+      iMin: valores.indexOf(Math.min(...valores)),
     };
   }, [pontos, sinal.goal]);
 
   if (pontos.length === 0) {
     return <p className="obs-sem-ponto">sem medida neste período</p>;
   }
+  const ultimo = pontos.length - 1;
+  const destacado = (i: number) => i === g.iMax || i === g.iMin || i === ultimo;
+
   return (
-    // `--pontos` vai para o CSS porque ele nao sabe contar: e o que da a
-    // largura minima da serie e impede que dezenas de pontos virem um borrao
-    // de 3px em que nenhum toque acerta (change 0181).
-    <div className="obs-serie-rolagem">
-    <div
-      className="obs-serie"
-      style={{ "--pontos": pontos.length } as React.CSSProperties}
-    >
-      <svg viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" aria-hidden="true">
-        {geometria.metaY !== null && geometria.metaY !== undefined && (
-          <line
-            x1={0}
-            x2={largura}
-            y1={geometria.metaY}
-            y2={geometria.metaY}
-            className="obs-meta-linha"
-          />
-        )}
-        <path d={geometria.caminho} className="obs-linha" />
-      </svg>
-      <div className="obs-pontos">
-        {pontos.map((ponto, i) => (
-          <button
-            key={`${ponto.run_id}-${i}`}
-            type="button"
-            className={`obs-ponto ${
-              ponto.conclusion && ponto.conclusion !== "success" ? "obs-ponto-falha" : ""
-            } ${selecionado === ponto.run_id ? "obs-ponto-ativo" : ""}`.trim()}
-            /* WCAG 2.5.8 pede 24x24, e este circulo tem 16. Cresce-lo faria
-               os pontos da serie se sobreporem, e a excecao "Equivalente" do
-               proprio criterio se aplica: a tabela Execucoes recentes abre a
-               MESMA descida, com linha de altura cheia. A excecao fica
-               declarada aqui, e nao escondida no detector. */
-            data-alvo-pequeno="equivalente: tabela Execuções recentes"
-            style={{
-              left: `${pontos.length === 1 ? 50 : (i / (pontos.length - 1)) * 100}%`,
-              bottom: `${geometria.coords[i] ? 100 - (geometria.coords[i].y / altura) * 100 : 50}%`,
-            }}
-            onClick={() => onPonto(ponto.run_id)}
-            title={`${formatarValor(ponto.value, sinal.unit)} em ${formatarData(ponto.at)} — abrir a execução`}
+    <figure className="obs-serie-figura">
+      <div className="obs-serie-quadro">
+        {/* A ESCALA, que era o que faltava. Fora do SVG: texto dentro de um
+            viewBox esticado sairia deformado. */}
+        <div
+          className={"obs-serie-escala"
+            + (g.constante ? " obs-serie-escala-unica" : "")}
+          aria-hidden="true"
+        >
+          {/* Série sem variação mostra UM valor: repetir "9" em cima e
+              embaixo sugere um intervalo que não existe. */}
+          <span>{curto(g.max, sinal.unit)}</span>
+          {!g.constante && <span>{curto(g.min, sinal.unit)}</span>}
+        </div>
+        <div className="obs-serie">
+          <svg
+            viewBox={`0 0 ${largura} ${altura}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
           >
-            <span className="sr-only">
-              {formatarValor(ponto.value, sinal.unit)} em {formatarData(ponto.at)}
-            </span>
-          </button>
-        ))}
+            {g.metaY !== null && (
+              <line x1={0} x2={largura} y1={g.metaY} y2={g.metaY}
+                    className="obs-meta-linha" />
+            )}
+            <path d={g.caminho} className="obs-linha" />
+            {g.coords.map((c, i) => (
+              <circle
+                key={`m-${i}`}
+                cx={c.x}
+                cy={c.y}
+                r={destacado(i) ? 2.6 : 1.4}
+                className={
+                  "obs-marca"
+                  + (pontos[i].conclusion && pontos[i].conclusion !== "success"
+                    ? " obs-marca-falha" : "")
+                  + (selecionado === pontos[i].run_id ? " obs-marca-ativa" : "")
+                }
+                vectorEffect="non-scaling-size"
+              />
+            ))}
+          </svg>
+          {/* Uma FAIXA por ponto, da altura inteira: a área de acerto cresce
+              com a altura em vez de disputar largura com o vizinho, e por
+              isso a rolagem deixou de ser necessária. A exceção "Equivalente"
+              da WCAG 2.5.8 continua valendo e continua declarada: a tabela
+              Execuções recentes abre a MESMA descida em linha de altura
+              cheia. */}
+          <div className="obs-faixas">
+            {pontos.map((ponto, i) => (
+              <button
+                key={`${ponto.run_id}-${i}`}
+                type="button"
+                className={"obs-faixa"
+                  + (selecionado === ponto.run_id ? " obs-faixa-ativa" : "")}
+                data-alvo-pequeno="equivalente: tabela Execuções recentes"
+                onClick={() => onPonto(ponto.run_id)}
+                title={`${formatarValor(ponto.value, sinal.unit)} em `
+                  + `${formatarData(ponto.at)}`
+                  + (ponto.conclusion ? ` (${ponto.conclusion})` : "")
+                  + " — abrir a execução"}
+              >
+                <span className="sr-only">
+                  {formatarValor(ponto.value, sinal.unit)} em{" "}
+                  {formatarData(ponto.at)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
-    </div>
+      {/* O TEMPO. "Como cada medida se moveu" sem dizer entre quando e quando
+          não se lê. */}
+      <div className="obs-serie-tempo" aria-hidden="true">
+        <span>{formatarData(pontos[0].at)}</span>
+        <span>{formatarData(pontos[ultimo].at)}</span>
+      </div>
+      <figcaption className="obs-serie-frase">{emPalavras(sinal)}</figcaption>
+    </figure>
+  );
+}
+
+/**
+ * Onde doer — a área de consulta do fim da página (change 0197).
+ *
+ * O painel responde "como estamos". Estas são outras perguntas, e nenhuma
+ * delas se respondia sem abrir execução por execução: qual cenário falhou
+ * mais, qual nunca falhou, qual mensagem de erro se repete, qual etapa do
+ * pipeline quebra. Ficam no FIM de propósito — são para quando já se decidiu
+ * investigar, não para quem só quer saber como o dia está.
+ */
+function Diagnostico({ dias, onError, onAbrirRun }: {
+  dias: number;
+  onError: (m: string) => void;
+  onAbrirRun: (id: string) => void;
+}) {
+  const [dados, setDados] = useState<CiDiagnostico | null>(null);
+  const [repo, setRepo] = useState("");
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    api
+      .ciDiagnostico(dias, repo || undefined)
+      .then((r) => vivo && setDados(r))
+      .catch((e) => onError((e as Error).message))
+      .finally(() => vivo && setCarregando(false));
+    return () => {
+      vivo = false;
+    };
+  }, [dias, repo, onError]);
+
+  return (
+    <section className="card obs-diagnostico">
+      <div className="card-head">
+        <h3>Onde doer</h3>
+        <span className="spacer" />
+        <label className="caption muted" htmlFor="obs-diag-repo">
+          Repositório
+        </label>
+        <select
+          id="obs-diag-repo"
+          value={repo}
+          onChange={(e) => setRepo(e.target.value)}
+        >
+          <option value="">todos</option>
+          {(dados?.repos ?? []).map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+      <p className="obs-pergunta">
+        As perguntas que abrem um plano de correção — e que antes só se
+        respondia abrindo execução por execução.
+      </p>
+
+      {carregando && !dados ? (
+        <Esqueleto linhas={4} titulo="Carregando o diagnóstico" />
+      ) : !dados ? null : (
+        <>
+          <h4>Cenários que mais falharam</h4>
+          {dados.scenarios.mais_falharam.length === 0 ? (
+            <p className="caption muted">
+              Nenhum cenário falhou no período
+              {dados.scenarios.total_cenarios > 0
+                ? ` — ${dados.scenarios.total_cenarios} distintos executados.`
+                : "; também não houve cenário nenhum."}
+            </p>
+          ) : (
+            <div className="scroll-x">
+              <table className="table dense stack-narrow">
+                <thead>
+                  <tr>
+                    <th>Cenário</th>
+                    <th>Caso</th>
+                    <th>Falhou</th>
+                    <th>de</th>
+                    <th>Taxa</th>
+                    <th>Última falha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dados.scenarios.mais_falharam.map((c) => (
+                    <tr key={c.scenario}>
+                      <td data-label="Cenário">
+                        {c.run_id ? (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => onAbrirRun(c.run_id as string)}
+                          >
+                            {c.scenario}
+                          </button>
+                        ) : c.scenario}
+                      </td>
+                      <td data-label="Caso" className="mono">
+                        {c.testcase_id ?? "—"}
+                      </td>
+                      <td data-label="Falhou">{c.falhas}</td>
+                      <td data-label="de">{c.total}</td>
+                      <td data-label="Taxa">
+                        <span className={c.taxa_falha >= 50 ? "obs-ruim"
+                          : c.taxa_falha >= 20 ? "obs-atencao" : ""}>
+                          {c.taxa_falha}%
+                        </span>
+                      </td>
+                      <td data-label="Última falha" className="caption muted">
+                        {formatarData(c.ultima_falha)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <h4>Erros que mais se repetem</h4>
+          {dados.errors.length === 0 ? (
+            <p className="caption muted">
+              Nenhuma mensagem de erro chegou no período. Ela vem do relatório
+              Cucumber, no passo que falhou — se as suas execuções falham e
+              nada aparece aqui, o relatório não está trazendo{" "}
+              <code>error_message</code>.
+            </p>
+          ) : (
+            <div className="scroll-x">
+              <table className="table dense stack-narrow">
+                <thead>
+                  <tr>
+                    <th>Erro</th>
+                    <th>Vezes</th>
+                    <th>Cenários</th>
+                    <th>Última</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dados.errors.map((e) => (
+                    <tr key={e.pattern}>
+                      <td data-label="Erro">
+                        <span className="obs-erro-molde" title={e.exemplo}>
+                          {e.pattern}
+                        </span>
+                      </td>
+                      <td data-label="Vezes">{e.count}</td>
+                      <td data-label="Cenários">{e.cenarios}</td>
+                      <td data-label="Última">
+                        {e.run_id ? (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => onAbrirRun(e.run_id as string)}
+                          >
+                            {formatarData(e.ultima)}
+                          </button>
+                        ) : formatarData(e.ultima)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {dados.jobs.length > 0 && (
+            <>
+              <h4>Etapas do pipeline que mais quebram</h4>
+              <div className="scroll-x">
+                <table className="table dense stack-narrow">
+                  <thead>
+                    <tr><th>Job</th><th>Falhou</th><th>de</th></tr>
+                  </thead>
+                  <tbody>
+                    {dados.jobs.map((j) => (
+                      <tr key={j.name}>
+                        <td data-label="Job" className="mono">{j.name}</td>
+                        <td data-label="Falhou">{j.falhas}</td>
+                        <td data-label="de">{j.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {dados.scenarios.nunca_falharam.length > 0 && (
+            <>
+              <h4>Nunca falharam no período</h4>
+              <p className="caption muted">
+                Com pelo menos três execuções — um cenário que rodou uma vez e
+                passou não provou estabilidade nenhuma. São candidatos a rodar
+                com menos frequência, e ninguém olha para eles porque eles não
+                incomodam.
+              </p>
+              <ul className="obs-estaveis">
+                {dados.scenarios.nunca_falharam.map((c) => (
+                  <li key={c.scenario}>
+                    {c.scenario}{" "}
+                    <span className="caption muted">({c.total}×)</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -673,6 +989,25 @@ function Analise({ dias, onError }: {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [carregado, setCarregado] = useState(false);
+  const [tamanho, setTamanho] = useState<{
+    chars: number; tokens_aprox: number;
+    caps: { flaky: number; recorte: number; mudancas: number };
+  } | null>(null);
+
+  useEffect(() => {
+    // Quanto texto vai para o modelo, ANTES de clicar (change 0198). Quem
+    // clica em Analisar não fazia ideia se aquilo custa um décimo de centavo
+    // ou dez, e "se for muito vai ser chato de API" é uma preocupação que a
+    // tela tinha como responder e não respondia.
+    let vivo = true;
+    api
+      .ciTamanhoDaAnalise(dias)
+      .then((r) => vivo && setTamanho(r))
+      .catch(() => vivo && setTamanho(null));
+    return () => {
+      vivo = false;
+    };
+  }, [dias]);
 
   const carregarHistorico = useCallback(async () => {
     try {
@@ -746,6 +1081,20 @@ function Analise({ dias, onError }: {
           — e escreve o veredito. A análise fica guardada com os números que
           ela viu, para poder ser comparada depois.
         </p>
+        {tamanho && (
+          <p className="caption muted">
+            O agente vai ler{" "}
+            <strong>
+              {tamanho.chars.toLocaleString("pt-BR")} caracteres
+            </strong>{" "}
+            (≈ {tamanho.tokens_aprox.toLocaleString("pt-BR")} tokens de
+            entrada, estimativa grosseira). O texto é{" "}
+            <strong>agregado</strong>: dobrar as execuções não dobra o custo —
+            o que cresce é a variedade, e por isso a lista de instáveis para
+            em {tamanho.caps.flaky} e os recortes de repositório em{" "}
+            {tamanho.caps.recorte}.
+          </p>
+        )}
         {historico.length === 0 && (
           <p className="caption muted">
             Nenhuma análise ainda. Ela exige um provider de IA configurado em{" "}
@@ -1587,97 +1936,6 @@ export function Observability({ onError }: { onError: (message: string) => void 
         <Acessibilidade achados={painel.findings} dias={dias} />
       ) : (
         <>
-          {/* PERGUNTA: o que mudou sozinho desde o período anterior?
-              É o bloco que justifica a aba existir — a diferença calculada e
-              dita em uma frase, em vez de caçada a olho num mural. */}
-          <section className="card obs-mudancas">
-            <h3>O que mudou</h3>
-            <p className="obs-pergunta">
-              O que se moveu sozinho desde o período anterior.
-            </p>
-            {painel.changes.length === 0 ? (
-              <p className="muted">
-                Nada se moveu o bastante para merecer atenção neste período.
-              </p>
-            ) : (
-              <ul className="obs-lista-mudancas">
-                {painel.changes.map((mudanca, i) => (
-                  <li key={i} className={`obs-mudanca obs-mudanca-${mudanca.kind}`}>
-                    <span>{mudanca.text}</span>
-                    {mudanca.run_id && (
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => void abrirRun(mudanca.run_id as string)}
-                      >
-                        abrir a execução
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* PERGUNTA: em que teste eu não posso mais confiar?
-              Instabilidade não aparece em média nenhuma — um teste que passa,
-              falha e passa de novo some numa taxa de sucesso e continua
-              corroendo a confiança na suíte. */}
-          {painel.flaky.length > 0 && (
-            <section className="card obs-instaveis">
-              <h3>Testes instáveis</h3>
-              <p className="obs-pergunta">
-                Cenários que passaram <em>e</em> falharam neste período. Os
-                marcados como <strong>novos</strong> estavam estáveis antes.
-              </p>
-              <div className="scroll-x">
-                <table className="table stack-narrow">
-                  <thead>
-                    <tr>
-                      <th>Cenário</th>
-                      <th>Caso</th>
-                      <th>Execuções</th>
-                      <th>Falhas</th>
-                      <th>Viradas</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...painel.flaky]
-                      .sort((a, b) => Number(b.newly_flaky) - Number(a.newly_flaky))
-                      .map((f: CiFlaky) => (
-                        <tr key={f.scenario}>
-                          <td data-label="Cenário">
-                            {f.scenario}
-                            {f.newly_flaky && (
-                              <span className="badge obs-badge-novo">novo</span>
-                            )}
-                          </td>
-                          <td data-label="Caso" className="mono">
-                            {f.testcase_id ?? "—"}
-                          </td>
-                          <td data-label="Execuções">{f.runs}</td>
-                          <td data-label="Falhas">{f.failures}</td>
-                          <td data-label="Viradas">{f.flips}</td>
-                          <td data-label="">
-                            {f.last_run && (
-                              <button
-                                type="button"
-                                className="link-btn"
-                                onClick={() => void abrirRun(f.last_run as string)}
-                              >
-                                última execução
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
           {/* PERGUNTA: a automação está rodando, e está passando? */}
           <section className="obs-saude">
             <div className="card obs-cartao">
@@ -1924,6 +2182,116 @@ export function Observability({ onError }: { onError: (message: string) => void 
               </table>
             </div>
           </section>
+
+          <Diagnostico
+            dias={dias}
+            onError={onError}
+            onAbrirRun={(id) => void abrirRun(id)}
+          />
+
+          {/* Estas duas seções ficam no FIM de propósito (change 0196).
+              Elas abriam a aba e empurravam para baixo os números que se
+              consulta todo dia — e quem entra para ver "como estamos" não
+              entra para ler uma lista de exceções. Notícia vem depois do
+              estado, não antes. */}
+          {/* PERGUNTA: o que mudou sozinho desde o período anterior?
+              É o bloco que justifica a aba existir — a diferença calculada e
+              dita em uma frase, em vez de caçada a olho num mural. */}
+          <section className="card obs-mudancas">
+            <h3>O que mudou</h3>
+            <p className="obs-pergunta">
+              O que se moveu sozinho desde o período anterior.
+            </p>
+            {painel.changes.length === 0 ? (
+              <p className="muted">
+                Nada se moveu o bastante para merecer atenção neste período.
+              </p>
+            ) : (
+              <ul className="obs-lista-mudancas">
+                {painel.changes.map((mudanca, i) => (
+                  <li key={i} className={`obs-mudanca obs-mudanca-${mudanca.kind}`}>
+                    <span>{mudanca.text}</span>
+                    {mudanca.run_id && (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => void abrirRun(mudanca.run_id as string)}
+                      >
+                        abrir a execução
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* PERGUNTA: em que teste eu não posso mais confiar?
+              Instabilidade não aparece em média nenhuma — um teste que passa,
+              falha e passa de novo some numa taxa de sucesso e continua
+              corroendo a confiança na suíte. */}
+          {painel.flaky.length > 0 && (
+            <section className="card obs-instaveis">
+              <h3>Testes instáveis</h3>
+              <p className="obs-pergunta">
+                Cenário que <strong>passou e falhou dentro do mesmo período</strong>{" "}
+                — de {formatarData(painel.period.since)} a{" "}
+                {formatarData(painel.period.until)}. Não é um rótulo que gruda:
+                a lista é recalculada a cada período, então um cenário que
+                parar de balançar some daqui sozinho. "Viradas" é quantas
+                vezes ele mudou de resultado entre uma execução e a seguinte —
+                é esse número que mede o incômodo. Os marcados como{" "}
+                <strong>novos</strong> estavam estáveis no período anterior, e
+                são a notícia: quem já sabe que aquele teste balança não
+                precisa ser lembrado.
+              </p>
+              <div className="scroll-x">
+                <table className="table stack-narrow">
+                  <thead>
+                    <tr>
+                      <th>Cenário</th>
+                      <th>Caso</th>
+                      <th>Execuções</th>
+                      <th>Falhas</th>
+                      <th>Viradas</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...painel.flaky]
+                      .sort((a, b) => Number(b.newly_flaky) - Number(a.newly_flaky))
+                      .map((f: CiFlaky) => (
+                        <tr key={f.scenario}>
+                          <td data-label="Cenário">
+                            {f.scenario}
+                            {f.newly_flaky && (
+                              <span className="badge obs-badge-novo">novo</span>
+                            )}
+                          </td>
+                          <td data-label="Caso" className="mono">
+                            {f.testcase_id ?? "—"}
+                          </td>
+                          <td data-label="Execuções">{f.runs}</td>
+                          <td data-label="Falhas">{f.failures}</td>
+                          <td data-label="Viradas">{f.flips}</td>
+                          <td data-label="">
+                            {f.last_run && (
+                              <button
+                                type="button"
+                                className="link-btn"
+                                onClick={() => void abrirRun(f.last_run as string)}
+                              >
+                                última execução
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
         </>
       )}

@@ -2,7 +2,7 @@
   "$schema_version": "0.1.0",
   "project": "Arbites",
   "framework_version": "0.16.0",
-  "last_updated": "2026-09-17",
+  "last_updated": "2026-09-18",
   "artifacts": {
     "product": {
       "path": ".doctrina/product.md",
@@ -26,7 +26,7 @@
         "id": "ai-assist",
         "path": ".doctrina/specs/ai-assist/spec.md",
         "status": "active",
-        "version": "0.15.0",
+        "version": "0.16.0",
         "last_updated": "2026-07-20",
         "implementation": "verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport",
         "realizes": [
@@ -56,7 +56,7 @@
         "id": "ci-automation",
         "path": ".doctrina/specs/ci-automation/spec.md",
         "status": "deprecated",
-        "version": "0.17.0",
+        "version": "0.18.0",
         "last_updated": "2026-09-17",
         "implementation": "verified — congelada pela ADR 0012: continua funcionando e no gate, fora do escopo ativo",
         "realizes": [
@@ -105,7 +105,7 @@
         "id": "design-system",
         "path": ".doctrina/specs/design-system/spec.md",
         "status": "active",
-        "version": "0.20.0",
+        "version": "0.21.0",
         "last_updated": "2026-09-16",
         "implementation": "verified — as 3 slices landaram: fundação (0060), estados & feedback (0061) e orientação & navegação (0062)."
       },
@@ -166,7 +166,7 @@
         "id": "mcp-server",
         "path": ".doctrina/specs/mcp-server/spec.md",
         "status": "active",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "last_updated": "2026-09-13",
         "implementation": "planned — leituras na change 0146, escritas na 0147, tela na 0149"
       },
@@ -455,11 +455,20 @@
         "title": "medida derivada do run é sinal de primeira classe, marcada como derivada",
         "status": "accepted",
         "date": "2026-09-17",
-        "summary": "Existem duas origens de sinal, e ambas produzem série:",
-        "landed": "2026-09-17 — `backend/arbites/ci_derivados.py`, `backend/tests/test_sinais_derivados.py`"
+        "landed": "2026-09-17 — `backend/arbites/ci_derivados.py`, `backend/tests/test_sinais_derivados.py`",
+        "summary": "Existem duas origens de sinal, e ambas produzem série:"
       }
     ],
-    "changes": [],
+    "changes": [
+      {
+        "id": "0199-relatorio-evolucao-contra-marco",
+        "title": "relatorio de evolucao contra um marco nomeado, exportavel",
+        "path": ".doctrina/changes/0199-relatorio-evolucao-contra-marco",
+        "status": "proposed",
+        "opened": "2026-09-18",
+        "lane": "product (uncertain)"
+      }
+    ],
     "changes_archive": [
       {
         "id": "0001-m0-fundacao-workspace-parsers-reindex-api-de-req",
@@ -2989,6 +2998,71 @@
         "specs_affected": [
           {
             "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0195-graficos-serie-eixo-rolagem",
+        "title": "o gráfico que não dizia nada",
+        "path": ".doctrina/changes/archive/2026-09-17-0195-graficos-serie-eixo-rolagem",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "design-system",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0196-mudou-testes-instaveis-topo",
+        "title": "notícia depois do estado",
+        "path": ".doctrina/changes/archive/2026-09-17-0196-mudou-testes-instaveis-topo",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0197-area-diagnostico-fim-cenario",
+        "title": "onde doer",
+        "path": ".doctrina/changes/archive/2026-09-17-0197-area-diagnostico-fim-cenario",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ci-automation",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0198-quanto-contexto-vai-ia",
+        "title": "quanto isso custa, antes de custar",
+        "path": ".doctrina/changes/archive/2026-09-17-0198-quanto-contexto-vai-ia",
+        "status": "applied",
+        "applied": "2026-09-17",
+        "specs_affected": [
+          {
+            "capability": "ai-assist",
+            "operation": "MODIFIED"
+          }
+        ]
+      },
+      {
+        "id": "0200-servidor-mcp-morre-calado",
+        "title": "\"Connection closed\" não é um diagnóstico",
+        "path": ".doctrina/changes/archive/2026-09-18-0200-servidor-mcp-morre-calado",
+        "status": "applied",
+        "applied": "2026-09-18",
+        "specs_affected": [
+          {
+            "capability": "mcp-server",
             "operation": "MODIFIED"
           }
         ]

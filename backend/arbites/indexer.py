@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS ci_jobs(
   finished_at TEXT, url TEXT, ord INTEGER);
 CREATE TABLE IF NOT EXISTS ci_scenarios(
   run_id TEXT, scenario TEXT, feature TEXT, testcase_id TEXT,
-  status TEXT, at TEXT);
+  status TEXT, at TEXT, error TEXT);
 CREATE TABLE IF NOT EXISTS ci_attachments(
   run_id TEXT, kind TEXT, path TEXT, title TEXT, sha256 TEXT, bytes INTEGER);
 CREATE TABLE IF NOT EXISTS ci_findings(
@@ -145,6 +145,9 @@ def connect(ws: Workspace) -> sqlite3.Connection:
         # pelo Arbites apresentado como se o pipeline o tivesse medido seria
         # uma mentira de procedência.
         "ALTER TABLE ci_signals ADD COLUMN source TEXT",
+        # A mensagem do passo que quebrou (change 0197): é ela que responde
+        # "por que falhou?" sem abrir execução nenhuma.
+        "ALTER TABLE ci_scenarios ADD COLUMN error TEXT",
         "ALTER TABLE results ADD COLUMN assignee TEXT",
         "ALTER TABLE defects ADD COLUMN opened_at TEXT",
         "ALTER TABLE testcases ADD COLUMN created TEXT",
@@ -831,10 +834,11 @@ def _insert_ci_run(conn: sqlite3.Connection, doc: ParsedDoc, rel: str) -> None:
             continue
         conn.execute(
             "INSERT INTO ci_scenarios(run_id, scenario, feature, testcase_id,"
-            " status, at) VALUES (?,?,?,?,?,?)",
+            " status, at, error) VALUES (?,?,?,?,?,?,?)",
             (run_id, cenario["scenario"], cenario.get("feature"),
              cenario.get("testcase_id"), cenario.get("status"),
-             meta.get("started_at") or meta.get("ingested_at")),
+             meta.get("started_at") or meta.get("ingested_at"),
+             cenario.get("error")),
         )
     conn.execute("DELETE FROM ci_attachments WHERE run_id = ?", (run_id,))
     for anexo in meta.get("attachments") or []:

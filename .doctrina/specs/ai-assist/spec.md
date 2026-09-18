@@ -5,7 +5,7 @@
 **Implementation:** verified — M5 (backend/arbites/ai.py, backend/arbites/api.py, frontend/src/components/AiAssist.tsx); providers OpenAI-compatível/Anthropic/Gemini exercitados via httpx MockTransport
 **Realizes:** SC7
 **Last updated:** 2026-07-20
-**Version:** 0.15.0
+**Version:** 0.16.0
 
 ## Purpose
 
@@ -128,6 +128,7 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   `onChange` de seleção de arquivo, e sinalizar que modelos locais de
   raciocínio podem levar minutos (timeout do cliente HTTP ≥ 300 s).
 - While a conta nao e administradora, the system shall exibir o estado e as ferramentas do MCP em modo de leitura, sem permitir mudar o interruptor nem gerar credencial, explicando o motivo.
+- While a análise de observabilidade não foi disparada, the system shall informar quanto texto ela mandará ao modelo, em caracteres e em estimativa de tokens declarada como aproximada.
 
 ### Unwanted-behavior (must-not)
 
@@ -142,6 +143,7 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
   último passo de um cenário Gherkin durante o parse verbatim; apenas passos
   Given/When/Then/And/But e linhas de tabela de dados (`| a | b |`) são
   anexados.
+- The system shall not deixar o contexto da análise crescer sem teto com a variedade de cenários instáveis e de repositórios; o dossiê é agregado e permanece previsível.
 
 ### Optional
 
@@ -226,6 +228,7 @@ Toda saída é preview: nada é gravado sem confirmação explícita.
     → 422; execution inexistente → 404; o aceite do draft cria o defeito
     vinculado — verified by `backend/tests/test_ai_analyze_run.py`.
 16. [unverified] O bloco de configuracao traz o endereco real e e copiavel, a credencial aparece uma vez e revoga sem derrubar a sessao do navegador, escrita desligada recusa ferramenta de escrita, e conta nao-admin ve sem poder mudar — verified by `frontend/src/components/AiAssist.tsx` + `backend/tests/test_mcp_server.py`.
+17. [verified] O tamanho é respondido antes da análise; dobrar as execuções não dobra o texto; a lista de instáveis e os recortes de repositório param nos tetos, guardando os novos e os de mais viradas primeiro, e o total real continua declarado — verified by `backend/tests/test_contexto_da_analise.py`.
 
 ## Maturity
 

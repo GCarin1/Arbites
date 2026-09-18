@@ -1,5 +1,6 @@
 import type {
   ActivityEntry,
+  CiDiagnostico,
   AdminOverview,
   AgentToken,
   ExternalLink,
@@ -254,6 +255,16 @@ export const api = {
   ciPurge: () =>
     request<{ removed: { runs: number; attachments: number; bytes: number } }>(
       "/ci/purge", { method: "POST" }),
+  /** Onde doer: cenário que mais falha, erro que mais se repete, job que
+   *  mais quebra — por período e por repositório. */
+  ciDiagnostico: (days: number, repo?: string) =>
+    request<CiDiagnostico>(
+      `/ci/diagnostic?days=${days}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`),
+  /** Quanto texto a análise vai mandar ao modelo — antes de mandar. */
+  ciTamanhoDaAnalise: (days: number) =>
+    request<{ chars: number; tokens_aprox: number;
+              caps: { flaky: number; recorte: number; mudancas: number } }>(
+      `/ci/analysis/size?days=${days}`),
   ciSources: () =>
     request<{ sources: CiSource[]; max_runs_per_poll: number }>("/ci/sources"),
   ciSourcesSave: (sources: CiSource[]) =>
