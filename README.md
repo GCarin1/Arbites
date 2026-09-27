@@ -312,6 +312,7 @@ O token em claro aparece **uma vez**. Guarde-o.
     "arbites": {
       "command": "python",
       "args": ["-m", "arbites.mcp"],
+      "cwd": "C:/caminho/para/Arbites/backend",
       "env": {
         "ARBITES_URL": "http://192.168.0.17:8347",
         "ARBITES_TOKEN": "arb_..."
@@ -320,6 +321,22 @@ O token em claro aparece **uma vez**. Guarde-o.
   }
 }
 ```
+
+> **O `cwd` não é opcional, e a falta dele é a causa nº 1 de
+> `Connection closed`.** O cliente MCP lança o comando a partir da pasta
+> **dele**, não da sua; sem `cwd`, o Python responde `No module named arbites`
+> em stderr — que a maioria dos clientes não exibe — e sobra um erro genérico.
+>
+> A alternativa, que dispensa o `cwd` e vale para sempre, é instalar o pacote
+> uma vez:
+>
+> ```
+> pip install -e backend
+> ```
+>
+> Feito isso, `python -m arbites.mcp` funciona de qualquer diretório. Para
+> saber em qual dos dois casos você está: `python -m arbites diagnostico`, que
+> tem uma seção **[servidor MCP]** dizendo exatamente o comando a rodar.
 
 **Não conectou? `Connection closed` não é um diagnóstico.** Esse erro é o
 cliente MCP dizendo que não sabe — ele aparece para qualquer falha no

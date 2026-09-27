@@ -312,6 +312,58 @@ def secao_credencial() -> tuple[list[str], str | None]:
 # ---------------------------------------------------------------------------
 
 
+def secao_mcp() -> list[str]:
+    """O servidor MCP arranca de onde o CLIENTE vai lançá-lo? (change 0201)
+
+    `python -m arbites.mcp` só encontra o pacote quando o processo nasce
+    dentro de `backend/` — e o cliente MCP não nasce ali. O Python responde
+    `No module named arbites` em stderr, que a maioria dos clientes não
+    exibe, e sobra "Connection closed": um erro que não diz nada.
+
+    Este comando roda de dentro do projeto, onde sempre funciona. Então ele
+    não testa daqui: testa a partir de OUTRO diretório, que é a condição
+    real do cliente.
+    """
+    import subprocess
+    import sys
+    import tempfile
+
+    linhas = ["", "[servidor MCP]"]
+    try:
+        import arbites  # noqa: F401
+        raiz = str(Path(sys.modules["arbites"].__file__).parent.parent)
+    except Exception:  # noqa: BLE001 - sem o pacote não há o que aferir
+        linhas.append("  o pacote `arbites` não está importável aqui.")
+        return linhas
+
+    with tempfile.TemporaryDirectory() as fora:
+        ambiente = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        try:
+            saida = subprocess.run(
+                [sys.executable, "-c", "import arbites.mcp"],
+                cwd=fora, env=ambiente, capture_output=True, text=True,
+                timeout=60,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            linhas.append(f"  não deu para aferir: {exc}")
+            return linhas
+
+    if saida.returncode == 0:
+        linhas.append("  `python -m arbites.mcp` funciona de qualquer pasta"
+                      " — o pacote está instalado.")
+        return linhas
+    linhas.append(
+        "  `python -m arbites.mcp` NAO funciona fora desta pasta — e o seu"
+        " cliente MCP lanca o comando da pasta dele.")
+    linhas.append("  E ISTO que vira `Connection closed` no cliente: o Python"
+                  " nao acha o pacote e morre antes de falar o protocolo.")
+    linhas.append("  Resolva de um dos dois jeitos:")
+    linhas.append(f"    pip install -e {raiz}")
+    linhas.append(f'    ou ponha  "cwd": "{raiz}"  no bloco do servidor em'
+                  " mcp.json")
+    return linhas
+
+
 def relatorio(workspace: str, diretorio: str | os.PathLike[str] | None = None,
               destino: str = DESTINO, rede: bool = True) -> list[str]:
     from . import versao as versao_ops
@@ -325,6 +377,7 @@ def relatorio(workspace: str, diretorio: str | os.PathLike[str] | None = None,
         linhas += secao_rede(destino, token)
     else:
         linhas += ["", "[rede] pulado (--sem-rede)"]
+    linhas += secao_mcp()
     linhas += secao_workspace(workspace)
     return linhas
 

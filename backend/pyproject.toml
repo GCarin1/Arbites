@@ -1,0 +1,36 @@
+# O projeto passa a ser INSTALÁVEL (change 0201).
+#
+# `python -m arbites.mcp` só encontrava o pacote quando o processo nascia
+# dentro de `backend/`. O cliente MCP não nasce ali: ele lança o comando a
+# partir do diretório dele, o Python responde `No module named arbites` em
+# stderr — que a maioria dos clientes não exibe — e a pessoa vê apenas
+# "Connection closed". Reproduzido exatamente, e a documentação do `mcp.json`
+# era a causa direta: mostrava o comando sem `cwd` nenhum.
+#
+# Com `pip install -e backend`, o comando funciona de qualquer diretório e a
+# armadilha deixa de existir. O `cwd` continua valendo para quem não quer
+# instalar nada, e está documentado no README.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arbites"
+version = "0.1.0"
+description = "Plataforma local de gestão e rastreabilidade de testes"
+# 3.11 e nao 3.12: o `AGENTS.md` declara 3.12+ como alvo, mas a suite inteira
+# passa em 3.11 e restringir aqui RECUSA a instalacao numa maquina que roda o
+# produto sem problema — trocando um erro de "nao acha o pacote" por um erro
+# de "versao errada", que nao e progresso nenhum.
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+# O atalho para quem instalou: `arbites serve`, `arbites diagnostico`.
+arbites = "arbites.__main__:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["arbites*"]
